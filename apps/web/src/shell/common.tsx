@@ -1,0 +1,294 @@
+/**
+ * Small shared shell components: toasts, profile editor, chat, results actions,
+ * game stage wrapper, connection indicator, pending view.
+ */
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import { AVATARS, GAME_CATALOG, LIMITS, isGameId, type Avatar, type ChatMessage, type GameId } from '@dascade/shared';
+import { Avatar as AvatarBadge, Button, EmptyState, GameTheme, IconButton, Spinner, TextInput, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
+import { useApp } from '../app/store.ts';
+import { getStateSnapshot, session, useSessionStore } from '../net/session.ts';
+import { useGame, useRoomSelector } from '../net/hooks.ts';
+import { sfx } from '../audio/audio.ts';
+
+export { Toasts } from './Toasts.tsx';
+
+/** Profile changes propagate to the current room only where the server allows them. */
+function canEditRoomProfile(): boolean {
+  const phase = getStateSnapshot()?.phase;
+  return phase === 'LOBBY' || phase === 'RESULTS';
+}
+
+// ---------------------------------------------------------------------------
+export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean; onSubmit?: () => void }) {
+  const profile = useApp((s) => s.profile);
+  const updateProfile = useApp((s) => s.updateProfile);
+  const [name, setName] = useState(profile.name);
+  // Unique ids: the editor can be on screen twice (entry card + settings modal).
+  const hintId = useId();
+  const avatarLabelId = useId();
+  useEffect(() => setName(profile.name), [profile.name]);
+  const commit = () => {
+    if (name.trim() && name.trim() !== profile.name) {
+      updateProfile({ name });
+      if (canEditRoomProfile()) session.lobby.profile({ name });
+    }
+  };
+  return (
+    <div className="profile-editor">
+      <label className="dc-field">
+        <span className="dc-field__label">Your name</span>
+        <TextInput
+          value={name}
+          maxLength={LIMITS.nickname}
+          placeholder="Pick a nickname"
+          autoComplete="nickname"
+          onChange={(e) => setName(e.currentTarget.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commit();
+              onSubmit?.();
+            }
+          }}
+          aria-describedby={hintId}
+        />
+        <span id={hintId} className="dc-field__hint">
+          Shown to other players. {LIMITS.nickname} characters max.
+        </span>
+      </label>
+      <div className="dc-field">
+        <span className="dc-field__label" id={avatarLabelId}>
+          Avatar
+        </span>
+        <div
+          className={cx('avatar-grid', compact && 'avatar-grid--compact')}
+          role="radiogroup"
+          aria-labelledby={avatarLabelId}
+          onKeyDown={(e) => handleRovingKeys(e, 'radio')}
+        >
+          {AVATARS.map((a, i) => (
+            <button
+              key={a}
+              type="button"
+              role="radio"
+              aria-checked={profile.avatar === a}
+              tabIndex={rovingTabIndex(profile.avatar === a, i, AVATARS.includes(profile.avatar))}
+              aria-label={a}
+              className="avatar-grid__item"
+              onClick={() => {
+                sfx('click');
+                updateProfile({ avatar: a as Avatar });
+                if (canEditRoomProfile()) session.lobby.profile({ avatar: a });
+              }}
+            >
+              <AvatarBadge avatar={a} color={profile.avatar === a ? 'var(--accent)' : 'var(--text-2)'} size={compact ? 30 : 38} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+export function ChatPanel({
+  placeholder = 'Say something…',
+  className,
+  disabled,
+  renderMessage,
+  onSend,
+  emptyText = 'No messages yet. Say hi!',
+}: {
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  renderMessage?: (m: ChatMessage) => ReactNode;
+  onSend?: (text: string) => void;
+  emptyText?: string;
+}) {
+  const chat = useSessionStore((s) => s.chat);
+  const [text, setText] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  useEffect(() => {
+    const el = listRef.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [chat.length]);
+  const send = () => {
+    const t = text.trim();
+    if (!t) return;
+    if (onSend) onSend(t);
+    else session.lobby.chat(t);
+    setText('');
+  };
+  return (
+    <div className={cx('chat', className)}>
+      <div
+        className="chat__list"
+        ref={listRef}
+        role="log"
+        aria-live="polite"
+        aria-label="Room chat"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+        }}
+      >
+        {chat.length === 0 ? <div className="chat__empty">{emptyText}</div> : null}
+        {chat.map((m) =>
+          renderMessage ? (
+            <div key={m.id}>{renderMessage(m)}</div>
+          ) : (
+            <div key={m.id} className="chat__msg" data-kind={m.kind}>
+              {m.playerId && m.kind !== 'system' && m.kind !== 'correct' ? (
+                <span className="chat__name" style={{ color: m.color }}>
+                  {m.name}
+                </span>
+              ) : null}
+              <span className="chat__text">{m.text}</span>
+            </div>
+          ),
+        )}
+      </div>
+      <form
+        className="chat__form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <TextInput
+          value={text}
+          maxLength={LIMITS.chat}
+          disabled={disabled}
+          placeholder={placeholder}
+          aria-label="Chat message"
+          enterKeyHint="send"
+          onChange={(e) => setText(e.currentTarget.value)}
+        />
+        <IconButton icon="arrow-right" label="Send message" type="submit" variant="primary" disabled={disabled || !text.trim()} />
+      </form>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** Host: "Play again" (back to lobby) · Everyone: "Leave". Use on results screens. */
+export function ResultsActions({ extra }: { extra?: ReactNode }) {
+  // Selectors, not useGame(): results screens can keep receiving game patches.
+  const hostId = useRoomSelector((s) => s.hostId);
+  const playerId = useSessionStore((s) => s.playerId);
+  if (hostId === null) return null;
+  const isHost = Boolean(playerId && hostId === playerId);
+  return (
+    <div className="results-actions">
+      {isHost ? (
+        <Button variant="primary" size="lg" icon="refresh" onClick={() => session.lobby.toLobby()}>
+          Play again
+        </Button>
+      ) : (
+        <span className="dc-muted results-actions__wait">
+          <Spinner label="Waiting for host" /> Waiting for the host to start another round…
+        </span>
+      )}
+      {extra}
+      <LeaveButton />
+    </div>
+  );
+}
+
+export function LeaveButton({ size = 'lg', compact }: { size?: 'sm' | 'md' | 'lg'; compact?: boolean }) {
+  const [confirming, setConfirming] = useState(false);
+  const navigate = useNavigate();
+  const leave = async () => {
+    await session.leaveRoom();
+    navigate('/');
+  };
+  if (confirming) {
+    return (
+      <span className="dc-row" role="group" aria-label="Confirm leave">
+        <Button size={size === 'lg' ? 'md' : 'sm'} variant="danger" onClick={leave}>
+          Leave room
+        </Button>
+        <Button size={size === 'lg' ? 'md' : 'sm'} variant="ghost" onClick={() => setConfirming(false)}>
+          Stay
+        </Button>
+      </span>
+    );
+  }
+  return compact ? (
+    <IconButton icon="leave" label="Leave room" onClick={() => setConfirming(true)} />
+  ) : (
+    <Button size={size} variant="ghost" icon="leave" onClick={() => setConfirming(true)}>
+      Leave
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** Full-bleed themed container for a game view (below the top bar). */
+export function GameStage({ gameId, className, children, style }: { gameId: GameId; className?: string; children: ReactNode; style?: CSSProperties }) {
+  const accent = GAME_CATALOG[gameId].accent;
+  // While auto-reconnecting every action would be dropped: make the stage inert (no clicks/focus)
+  // and dim it, so players aren't pressing buttons that silently do nothing. The top bar / shell
+  // menu (outside the stage) keeps Leave reachable.
+  const reconnecting = useSessionStore((s) => s.status === 'reconnecting');
+  return (
+    <GameTheme
+      accent={accent}
+      as="main"
+      className={cx('game-stage dc-game-backdrop', className)}
+      style={style}
+      id="main"
+      inert={reconnecting || undefined}
+      aria-busy={reconnecting || undefined}
+      data-reconnecting={reconnecting ? 'true' : undefined}
+    >
+      {children}
+    </GameTheme>
+  );
+}
+
+// ---------------------------------------------------------------------------
+export function ConnectionDot() {
+  const status = useSessionStore((s) => s.status);
+  const ping = useSessionStore((s) => s.pingMs);
+  const label =
+    status === 'connected'
+      ? `Connected${ping !== null ? ` · ${ping}ms` : ''}`
+      : status === 'reconnecting'
+        ? 'Reconnecting…'
+        : status === 'connecting'
+          ? 'Connecting…'
+          : 'Offline';
+  const tone = status === 'connected' ? (ping !== null && ping > 250 ? 'var(--yellow)' : 'var(--green)') : status === 'reconnecting' || status === 'connecting' ? 'var(--yellow)' : 'var(--red)';
+  // Not a live region: the ping changes every few seconds and would be re-announced each time.
+  // Connection changes are announced by the reconnect banner (role=alert) and toasts instead.
+  return (
+    <span className="conn-dot" title={label} style={{ '--tone': tone } as CSSProperties}>
+      <i data-pulse={status !== 'connected' ? 'true' : undefined} aria-hidden />
+      <span className="conn-dot__text" aria-hidden>
+        {status === 'connected' && ping !== null ? `${ping}ms` : status === 'connected' ? 'Online' : label}
+      </span>
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+export function PendingGameView() {
+  const game = useGame();
+  const gameId = useSessionStore((s) => s.gameId);
+  const title = useMemo(() => (gameId && isGameId(gameId) ? GAME_CATALOG[gameId].title : 'Game'), [gameId]);
+  return (
+    <GameStage gameId={gameId ?? 'wheel'}>
+      <div className="center-screen">
+        <EmptyState icon="sparkle" title={`${title} is loading its cartridge…`}>
+          This cabinet is being wired up. Phase: {game?.phase ?? '—'}
+        </EmptyState>
+        <ResultsActions />
+      </div>
+    </GameStage>
+  );
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@dascade/game-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@dascade/shared": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}
