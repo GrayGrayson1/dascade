@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { Avatar, PixelIcon, cx } from '@dascade/ui';
 import type { DasinoPublicState } from '@dascade/shared/games/dasino';
 import { ResultsActions } from '../../shell/common.tsx';
@@ -10,6 +10,10 @@ export function Results({ state, playerId }: { state: DasinoPublicState; playerI
   const rows = state.results;
   const podium = PODIUM_ORDER.map((i) => rows[i]).filter(Boolean);
   const mine = rows.find((r) => r.playerId === playerId);
+  // Start the leaderboard at the top (the table views may have been scrolled).
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, []);
   return (
     <div className="dn-results">
       <header className="dn-floor__sign">

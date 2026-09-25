@@ -87,6 +87,32 @@ const CLOCK_WINDOW = 90;
 const RESYNC_GAP = 360;
 /** No snapshot for this long → treat the connection as stalled. */
 const STALL_MS = 500;
+/** Far beyond any track (tracks are a few thousand px across); anything larger is a corrupt snapshot. */
+const MAX_COORD = 1e6;
+const MAX_SPEED = 1e5;
+const MAX_PENDING_IMPACTS = 24;
+
+/**
+ * A snapshot's float32 fields can carry NaN/Infinity (a corrupted packet or a server-side
+ * physics blow-up). One such value would poison prediction, the correction offset and the
+ * camera forever, so cars with non-finite or absurd state are ignored.
+ */
+export function saneCarState(s: CarState): boolean {
+  return (
+    Number.isFinite(s.x) &&
+    Number.isFinite(s.y) &&
+    Number.isFinite(s.heading) &&
+    Number.isFinite(s.vx) &&
+    Number.isFinite(s.vy) &&
+    Number.isFinite(s.angVel) &&
+    Number.isFinite(s.boost) &&
+    Math.abs(s.x) < MAX_COORD &&
+    Math.abs(s.y) < MAX_COORD &&
+    Math.abs(s.vx) < MAX_SPEED &&
+    Math.abs(s.vy) < MAX_SPEED &&
+    Math.abs(s.angVel) < 1000
+  );
+}
 
 export class CircuitNet {
   readonly tickMs = 1000 / CIRCUIT_SIM.tickRate;
@@ -234,11 +260,17 @@ export class CircuitNet {
     const seen = new Set<number>();
     for (const car of snap.cars) {
       seen.add(car.slot);
+      if (!saneCarState(car.state)) continue;
       let buf = this.buffers.get(car.slot);
       if (!buf) this.buffers.set(car.slot, (buf = []));
       buf.push({ tick: snap.tick, state: car.state, flags: car.flags, flags2: car.flags2 });
       if (buf.length > 48) buf.splice(0, buf.length - 48);
-      if (car.impact > 60) this.impacts.push({ slot: car.slot, impact: car.impact });
+      if (car.impact > 60) {
+        this.impacts.push({ slot: car.slot, impact: car.impact });
+        // Nobody drains impacts while the tab is hidden (no rAF): keep only the latest few so
+        // coming back doesn't replay a burst of stale crashes (sparks + sounds).
+        if (this.impacts.length > MAX_PENDING_IMPACTS) this.impacts.splice(0, this.impacts.length - MAX_PENDING_IMPACTS);
+      }
       if (car.slot === this.localSlot) this.reconcile(car.state, car.ack, arrivalMs);
     }
     for (const slot of [...this.buffers.keys()]) if (!seen.has(slot)) this.buffers.delete(slot);
@@ -280,7 +312,7 @@ export class CircuitNet {
       this.corrections++;
       this.lastCorrection = dist;
     }
-    if (dist > SNAP_DISTANCE || Math.abs(dh) > 1.4) {
+    if (!Number.isFinite(dist) || !Number.isFinite(dh) || dist > SNAP_DISTANCE || Math.abs(dh) > 1.4) {
       this.errX = this.errY = this.errH = 0;
     } else {
       this.errX += dx;

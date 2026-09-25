@@ -91,7 +91,7 @@ export function encodeSnapshot(snap: Snapshot): Uint8Array {
   return new Uint8Array(buf);
 }
 
-/** Decode a snapshot; returns null for anything malformed. */
+/** Decode a snapshot; returns null for anything malformed (short, wrong version, non-finite car state). */
 export function decodeSnapshot(bytes: Uint8Array): Snapshot | null {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength < SNAPSHOT_HEADER) return null;
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -102,6 +102,9 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot | null {
   const cars: SnapshotCar[] = [];
   for (let i = 0; i < count; i++) {
     const o = SNAPSHOT_HEADER + i * SNAPSHOT_CAR;
+    // The server only ever encodes finite floats: NaN/Infinity means a corrupt frame, which
+    // must not poison prediction or rendering.
+    for (let f = o + 8; f < o + 32; f += 4) if (!Number.isFinite(v.getFloat32(f, true))) return null;
     const flags2Raw = v.getUint8(o + 2);
     cars.push({
       slot: v.getUint8(o),

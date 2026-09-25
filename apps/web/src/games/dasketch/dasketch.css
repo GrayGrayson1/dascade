@@ -610,9 +610,7 @@
   line-height: 1.2;
 }
 .sk-row__name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1549,8 +1547,9 @@
 /* =====================================================================
  * Results
  * ===================================================================== */
-.sk-results {
-  overflow-y: auto;
+/* clip (not hidden/auto) so the page scrolls and the sticky action row works. */
+.sk-stage.sk-results {
+  overflow: clip;
 }
 .sk-results__inner {
   width: min(1180px, 100%);
@@ -2047,4 +2046,41 @@
 }
 .sk-pool.is-empty strong {
   color: var(--red);
+}
+
+/* ---------- Numerals: the pixel display face renders 8 like "$" at small sizes,
+ * so every timer, score and rank uses Space Grotesk with tabular figures. ---------- */
+.sk-timer .dc-timer span,
+.sk-hud__round-num,
+.sk-row__rank,
+.sk-banner__num,
+.sk-burst__pts,
+.sk-podium__place,
+.sk-standing__place {
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.sk-timer .dc-timer span {
+  font-size: var(--fs-md);
+}
+
+/* ---------- Results: actions stay reachable while the gallery scrolls ---------- */
+.sk-results__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin: 0 calc(-16px - var(--safe-right)) calc(-40px - var(--safe-bottom)) calc(-16px - var(--safe-left));
+  padding: 18px calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: linear-gradient(180deg, transparent, rgba(12, 5, 18, 0.9) 34%, rgba(12, 5, 18, 0.97));
+}
+.sk-results__actions .sk-results__more {
+  display: block;
+  margin-bottom: 8px;
+  text-align: center;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
 }

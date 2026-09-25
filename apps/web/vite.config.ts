@@ -19,7 +19,8 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // Maps are generated for error reporting but not referenced from the published bundles.
+    sourcemap: 'hidden',
     chunkSizeWarningLimit: 1800,
   },
 });

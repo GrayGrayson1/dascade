@@ -20,6 +20,8 @@ export interface DockProps {
   canSit: boolean;
   /** Dock lives in a side column (landscape phones): smaller hero cards. */
   side?: boolean;
+  /** Short screens: the raise sizing panel opens only when Raise is pressed. */
+  collapseRaise?: boolean;
 }
 
 function send(type: string, payload?: unknown) {
@@ -39,7 +41,7 @@ function Key({ k }: { k: string }) {
   );
 }
 
-export function ActionDock({ state, settings, mySeat, heroCards, myTurn, compact, isSpectator, canSit, side = false }: DockProps) {
+export function ActionDock({ state, settings, mySeat, heroCards, myTurn, compact, isSpectator, canSit, side = false, collapseRaise = false }: DockProps) {
   const seat = mySeat >= 0 ? state.seats[mySeat] : undefined;
   const inHand = Boolean(seat?.inHand && !seat.folded && heroCards.length === 2);
   const live = handLive(state);
@@ -74,13 +76,31 @@ export function ActionDock({ state, settings, mySeat, heroCards, myTurn, compact
 
         <div className="hd-dock__actions">
           {myTurn && seat && state.legal.seat === mySeat ? (
-            <BetControls key={state.actionSeq} state={state} legal={state.legal} compact={compact} />
+            <BetControls key={state.actionSeq} state={state} legal={state.legal} compact={compact} collapsible={collapseRaise} />
           ) : (
-            <SeatControls state={state} settings={settings} seatIndex={mySeat} heroCards={heroCards} handOver={handOver} />
+            <>
+              {!compact || side ? <RecentLog state={state} /> : null}
+              <SeatControls state={state} settings={settings} seatIndex={mySeat} heroCards={heroCards} handOver={handOver} />
+            </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The last few lines of this hand's history, filling the dock while you wait. */
+function RecentLog({ state }: { state: HoldemPublicState }) {
+  const lines = state.log.filter((l) => l.hand === state.handNumber && l.kind !== 'hand').slice(-3);
+  if (lines.length === 0) return <div className="hd-feed" aria-hidden />;
+  return (
+    <ul className="hd-feed" aria-label="Latest actions">
+      {lines.map((l, i) => (
+        <li key={`${state.handNumber}-${state.log.length}-${i}`} className="hd-feed__line" data-kind={l.kind}>
+          {l.text}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -181,7 +201,8 @@ function isTyping(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
-function BetControls({ state, legal, compact }: { state: HoldemPublicState; legal: HoldemLegalView; compact: boolean }) {
+function BetControls({ state, legal, compact, collapsible }: { state: HoldemPublicState; legal: HoldemLegalView; compact: boolean; collapsible: boolean }) {
+  const [open, setOpen] = useState(!collapsible);
   const [raiseTo, setRaiseTo] = useState(legal.minRaiseTo);
   const [draft, setDraft] = useState(String(legal.minRaiseTo));
   const [sent, setSent] = useState(false);
@@ -228,6 +249,10 @@ function BetControls({ state, legal, compact }: { state: HoldemPublicState; lega
   const raiseIsAllIn = raiseTo >= max;
   const raise = () => {
     if (!legal.canRaise) return;
+    if (!open) {
+      setOpen(true);
+      return;
+    }
     if (raiseIsAllIn) act('allin');
     else act(legal.isBet ? 'bet' : 'raise', raiseTo);
   };
@@ -246,7 +271,10 @@ function BetControls({ state, legal, compact }: { state: HoldemPublicState; lega
       else if (k === 'r' || k === 'b') {
         if (legal.canRaise) h.raise();
       } else if (k === 'a') {
-        if (legal.canRaise) h.choose(max);
+        if (legal.canRaise) {
+          setOpen(true);
+          h.choose(max);
+        }
       } else return;
       e.preventDefault();
     };
@@ -258,7 +286,7 @@ function BetControls({ state, legal, compact }: { state: HoldemPublicState; lega
 
   return (
     <div className={cx('hd-bet-controls', compact && 'hd-bet-controls--compact')} role="group" aria-label="Your action">
-      {legal.canRaise ? (
+      {legal.canRaise && open ? (
         <div className="hd-raise">
           <div className="hd-raise__presets" role="group" aria-label="Bet size presets">
             {presets.map((p) => (
@@ -282,6 +310,11 @@ function BetControls({ state, legal, compact }: { state: HoldemPublicState; lega
             >
               All-in
             </button>
+            {collapsible ? (
+              <button type="button" className="hd-preset hd-preset--close" aria-label="Hide bet sizing" onClick={() => setOpen(false)}>
+                ✕
+              </button>
+            ) : null}
           </div>
           <div className="hd-raise__row">
             <Slider
@@ -337,7 +370,16 @@ function BetControls({ state, legal, compact }: { state: HoldemPublicState; lega
         )}
         {legal.canRaise ? (
           <Button variant="gold" className="hd-action hd-action--raise" onClick={raise} disabled={sent}>
-            <span className="hd-action__verb">{raiseIsAllIn ? 'All-in' : legal.isBet ? 'Bet' : 'Raise to'}</span> <Amt n={raiseIsAllIn ? max : raiseTo} />
+            {open ? (
+              <>
+                <span className="hd-action__verb">{raiseIsAllIn ? 'All-in' : legal.isBet ? 'Bet' : 'Raise to'}</span> <Amt n={raiseIsAllIn ? max : raiseTo} />
+              </>
+            ) : (
+              <>
+                <span className="hd-action__verb">{legal.isBet ? 'Bet' : 'Raise'}</span> <Amt n={min} />
+                <span className="hd-action__more">+</span>
+              </>
+            )}
             {!compact ? <Key k="R" /> : null}
           </Button>
         ) : null}

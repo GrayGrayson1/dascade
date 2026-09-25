@@ -615,6 +615,54 @@
     display: inline;
   }
 }
+.wh-digits {
+  font-family: var(--font-pixel);
+  font-variant-numeric: tabular-nums;
+}
+.wh-count {
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.wh-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(460px, 100%);
+  min-height: 48px;
+  padding: 8px 18px 8px 12px;
+  background: rgba(12, 5, 14, 0.82);
+  border: 1px solid rgba(255, 176, 32, 0.45);
+  box-shadow:
+    inset 3px 0 0 var(--wh-amber),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: var(--fs-md);
+  color: #fff1d6;
+}
+.wh-waiting__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--wh-amber);
+}
+.wh-waiting[data-live='true'] {
+  border-color: rgba(255, 79, 129, 0.6);
+  box-shadow:
+    inset 3px 0 0 var(--wh-pink),
+    0 0 22px rgba(255, 79, 129, 0.25);
+}
+.wh-waiting[data-live='true'] .wh-waiting__icon {
+  color: var(--wh-pink);
+}
+.wh-waiting__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wh-controls__hint {
   margin: 0;
   min-height: 1.5em;
@@ -857,7 +905,8 @@
 }
 .wh-editor__question {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-weight: 600;
   font-size: var(--fs-lg);
   color: #fff1d0;
 }
@@ -1332,7 +1381,8 @@
 }
 .wh-results__question {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-weight: 600;
   font-size: var(--fs-lg);
   color: #ffe7b8;
 }
@@ -1354,7 +1404,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
   gap: var(--sp-4);
-  align-items: start;
+  align-items: stretch;
 }
 .wh-results__log .dc-panel__body,
 .wh-results__people .dc-panel__body {
@@ -1491,6 +1541,102 @@
     font-size: 1.5rem;
   }
   .wh-readout {
+    display: none;
+  }
+}
+
+/* Landscape phones: wheel on the left at full height; title, SPIN and the rail on the right. */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+  .wh-play__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 32vw);
+    height: calc(100dvh - var(--topbar-h) - var(--safe-top));
+    min-height: 0;
+  }
+  .wh-stage {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'wheel head'
+      'wheel .'
+      'wheel controls';
+    column-gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + var(--safe-bottom)) calc(var(--sp-2) + var(--safe-left));
+  }
+  .wh-stage__wheel {
+    grid-area: wheel;
+    height: 100%;
+    width: calc(100dvh - var(--topbar-h) - var(--safe-top) - var(--sp-4));
+    padding: 0;
+  }
+  .wh-head {
+    grid-area: head;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .wh-head__title {
+    flex: none;
+  }
+  .wh-head__kicker {
+    display: none;
+  }
+  .wh-title {
+    font-size: clamp(1.05rem, 2.6vw, 1.4rem);
+  }
+  .wh-head__side {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .wh-head .wh-badges {
+    justify-content: flex-start;
+  }
+  .wh-head__actions {
+    justify-content: flex-start;
+  }
+  .wh-controls {
+    grid-area: controls;
+    align-items: stretch;
+  }
+  .wh-readout {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+  .wh-spin.dc-btn {
+    min-width: 0;
+    width: calc(100% - 2 * var(--px));
+    min-height: 54px;
+    font-size: 1.4rem;
+  }
+  .wh-waiting {
+    font-size: var(--fs-sm);
+  }
+  .wh-controls__hint {
+    text-align: left;
+    font-size: var(--fs-xs);
+  }
+  .wh-rail {
+    border-top: 0;
+    border-left: 1px solid rgba(255, 176, 32, 0.22);
+    min-height: 0;
+  }
+  .wh-rail__tabs {
+    position: static;
+  }
+  .wh-rail__tabs .dc-tab {
+    padding: 0 6px;
+    font-size: var(--fs-xs);
+  }
+  .wh-rail__body {
+    overflow-y: auto;
+    min-height: 0;
+    padding: var(--sp-3);
+  }
+  .wh-rail__body--chat {
+    height: auto;
+  }
+  .wh-history__item .dc-badge {
     display: none;
   }
 }

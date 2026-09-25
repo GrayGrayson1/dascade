@@ -3,7 +3,7 @@
  * Lobby or the game's GameView based on phase. Handles every connection /
  * error / removal state with a friendly screen.
  */
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GAME_CATALOG, isGameId, isValidRoomCode, normalizeRoomCode, type GameId } from '@dascade/shared';
 import { Button, EmptyState, GameTheme, Panel, Spinner } from '@dascade/ui';
@@ -128,6 +128,18 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
 
   useEffect(() => {
     if (phase === 'PLAYING') sfx('go');
+  }, [phase]);
+
+  // A new screen (lobby → countdown → game → results → lobby) starts at the top instead of
+  // inheriting the previous screen's scroll position (e.g. results opening mid-page on phones).
+  // Round loops (PLAYING ↔ INTERMISSION) keep the player's position.
+  const prevPhase = useRef(phase);
+  useEffect(() => {
+    const prev = prevPhase.current;
+    prevPhase.current = phase;
+    if (!phase || prev === phase || !prev) return;
+    const roundLoop = (prev === 'PLAYING' && phase === 'INTERMISSION') || (prev === 'INTERMISSION' && phase === 'PLAYING');
+    if (!roundLoop) window.scrollTo(0, 0);
   }, [phase]);
 
   const lobbyPhases = module?.lobbyPhases ?? ['LOBBY'];

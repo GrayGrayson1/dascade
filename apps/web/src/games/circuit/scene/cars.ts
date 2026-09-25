@@ -14,6 +14,36 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
+/**
+ * Car + nameplate textures are generated per look. Looks can change while the scene is alive
+ * (the customizer is open on the results screen, ~3 changes/s per player), so textures are
+ * reference-counted per scene and released when no car uses them any more.
+ */
+const textureRefs = new WeakMap<Phaser.Scene, Map<string, number>>();
+
+function retainTexture(scene: Phaser.Scene, key: string, make: () => HTMLCanvasElement): void {
+  let refs = textureRefs.get(scene);
+  if (!refs) textureRefs.set(scene, (refs = new Map()));
+  if (!scene.textures.exists(key)) scene.textures.addCanvas(key, make());
+  refs.set(key, (refs.get(key) ?? 0) + 1);
+}
+
+function releaseTexture(scene: Phaser.Scene, key: string): void {
+  const refs = textureRefs.get(scene);
+  const n = refs?.get(key) ?? 0;
+  if (n > 1) {
+    refs!.set(key, n - 1);
+    return;
+  }
+  refs?.delete(key);
+  if (scene.sys?.textures && scene.textures.exists(key)) scene.textures.remove(key);
+}
+
+/** Live texture count per scene (diagnostics / tests). */
+export function carTextureCount(scene: Phaser.Scene): number {
+  return textureRefs.get(scene)?.size ?? 0;
+}
+
 export class CarView {
   readonly slot: number;
   private lookKey = '';
@@ -32,6 +62,8 @@ export class CarView {
   private label: Phaser.GameObjects.Image;
   private arrow: Phaser.GameObjects.Image | null = null;
   private readonly glowAlpha: number;
+  /** Textures this car currently holds a reference to. */
+  private texKeys: string[] = [];
   seen = 0;
 
   constructor(scene: Phaser.Scene, car: RaceCar, local: boolean, glowAlpha: number) {
@@ -59,11 +91,14 @@ export class CarView {
     this.primary = hexToInt(car.look.primary);
     const h = hash(car.lookKey);
     const carKey = `ci-car-${h}`;
-    if (!this.scene.textures.exists(carKey)) this.scene.textures.addCanvas(carKey, renderCarCanvas(car.look, TEX_SCALE));
-    this.body.setTexture(carKey).setScale(1 / TEX_SCALE);
     const npKey = `ci-np-${h}-${local ? 1 : 0}`;
-    if (!this.scene.textures.exists(npKey)) this.scene.textures.addCanvas(npKey, renderNameplate(car.look, 3, local));
+    const look = car.look;
+    retainTexture(this.scene, carKey, () => renderCarCanvas(look, TEX_SCALE));
+    retainTexture(this.scene, npKey, () => renderNameplate(look, 3, local));
+    this.body.setTexture(carKey).setScale(1 / TEX_SCALE);
     this.label.setTexture(npKey).setScale(1 / 3);
+    this.releaseKeys();
+    this.texKeys = [carKey, npKey];
     this.shadow.setTexture(`ci-shadow-${this.chassis}`);
     this.glow.setTint(this.primary);
     if (local && !this.arrow) this.arrow = this.scene.add.image(car.x, car.y, 'ci-arrow').setDepth(DEPTH.label).setScale(0.8);
@@ -144,7 +179,13 @@ export class CarView {
     return [car.x - Math.cos(car.heading) * (this.L / 2 + 2), car.y - Math.sin(car.heading) * (this.L / 2 + 2)];
   }
 
+  private releaseKeys(): void {
+    for (const key of this.texKeys) releaseTexture(this.scene, key);
+    this.texKeys = [];
+  }
+
   destroy(): void {
     for (const o of [this.body, this.shadow, this.glow, this.head, this.tailL, this.tailR, this.label, this.arrow]) o?.destroy();
+    this.releaseKeys();
   }
 }

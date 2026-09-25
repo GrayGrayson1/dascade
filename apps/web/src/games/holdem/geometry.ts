@@ -45,11 +45,14 @@ export interface TableGeometry {
 export function computeGeometry(width: number, height: number): TableGeometry {
   const w = Math.max(280, width);
   const h = Math.max(260, height);
-  const compact = w < 720 || h < 470;
+  // Compact pods only for narrow arenas (phones) or genuinely short ones that are also not wide.
+  const compact = w < 720 || (h < 400 && w < 1000);
   const portrait = w < h * 0.92;
-  const podW = compact ? 78 : 150;
-  const podH = compact ? 46 : 60;
-  const seatCardW = compact ? 22 : 34;
+  // Medium pods for wide-but-short arenas (e.g. 1280×720 while the dock is open).
+  const medium = !compact && h < 520;
+  const podW = compact ? 86 : medium ? 136 : 150;
+  const podH = compact ? 48 : medium ? 52 : 60;
+  const seatCardW = compact ? 22 : medium ? 28 : 34;
   // Room for (tabled, slightly larger) cards above the top pods and the status badge under the bottom pods.
   const padTop = podH / 2 + seatCardW * 1.3 * 1.4 - 8;
   const padBottom = podH / 2 + (compact ? 20 : 26);
@@ -99,7 +102,7 @@ export function computeGeometry(width: number, height: number): TableGeometry {
     podW,
     podH,
     seatCardW,
-    heroCardW: compact ? 46 : 60,
+    heroCardW: compact ? 46 : medium ? 50 : 60,
     boardCardW,
     boardHalfW: (boardCardW * 5 + gap * 4) / 2,
     boardHalfH: boardH / 2,
@@ -148,7 +151,7 @@ function seatExtents(geo: TableGeometry, heroCards: boolean) {
   return {
     half: geo.podW / 2 + 4,
     up: geo.podH / 2 + cardH,
-    down: geo.podH / 2 + (geo.compact ? 18 : 24),
+    down: geo.podH / 2 + (geo.compact ? 22 : 30),
   };
 }
 

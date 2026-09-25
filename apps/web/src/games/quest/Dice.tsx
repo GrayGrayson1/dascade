@@ -71,17 +71,20 @@ function RollMath({ d, dc, stat }: { d: QuestDieView; dc: number; stat: string }
   );
 }
 
-export function DiceOverlay({ roll, onClose }: { roll: QuestRollView; onClose: () => void }) {
+export function DiceOverlay({ roll, onClose, instant = false }: { roll: QuestRollView; onClose: () => void; instant?: boolean }) {
   const reduced = useApp((s) => s.settings.reducedMotion);
-  const [phase, setPhase] = useState<Phase>(reduced ? 'verdict' : 'tumble');
+  // `instant`: a reconnect mid-roll shows the verdict straight away instead of re-tumbling.
+  const skip = reduced || instant;
+  const [phase, setPhase] = useState<Phase>(skip ? 'verdict' : 'tumble');
   const cycling = useCycling(phase === 'tumble');
   const closeRef = useRef<HTMLButtonElement>(null);
   const stat = QUEST_STAT_INFO[roll.stat].short;
   const single = roll.dice.length === 1 ? roll.dice[0]! : null;
 
   useEffect(() => {
-    if (reduced) {
-      (roll.success ? questSound.success : questSound.failure)(roll.crit !== null);
+    if (skip) {
+      setPhase('verdict');
+      if (!instant) (roll.success ? questSound.success : questSound.failure)(roll.crit !== null);
       return;
     }
     questSound.diceStart();
@@ -97,7 +100,7 @@ export function DiceOverlay({ roll, onClose }: { roll: QuestRollView; onClose: (
       }, 2150),
     ];
     return () => timers.forEach(clearTimeout);
-  }, [roll.id, reduced, roll.success, roll.crit]);
+  }, [roll.id, skip, instant, roll.success, roll.crit]);
 
   useEffect(() => {
     if (phase === 'verdict') closeRef.current?.focus({ preventScroll: true });

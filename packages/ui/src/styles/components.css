@@ -30,7 +30,7 @@
 }
 .dc-title {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(var(--fs-2xl), 4vw, var(--fs-4xl));
   line-height: 1;
   letter-spacing: 0.02em;
@@ -40,7 +40,7 @@
     var(--text-glow);
 }
 .dc-num {
-  font-family: var(--font-tech);
+  font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -64,7 +64,7 @@
   background: linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
   color: var(--btn-fg);
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 400;
   font-size: var(--fs-md);
   letter-spacing: 0.03em;
   line-height: 1;
@@ -109,7 +109,6 @@
   --btn-fg: var(--accent-ink);
   --btn-edge: color-mix(in srgb, var(--accent) 60%, black);
   --btn-glow: color-mix(in srgb, var(--accent) 35%, transparent);
-  font-weight: 700;
 }
 .dc-btn--primary:hover:not(:disabled) {
   --btn-glow: color-mix(in srgb, var(--accent) 70%, transparent);
@@ -172,6 +171,15 @@
 }
 .dc-btn--icon.dc-btn--sm {
   width: 34px;
+}
+/* Touch screens: every button, including small and icon ones, is at least a 44px target. */
+@media (pointer: coarse) {
+  .dc-btn--sm {
+    min-height: 44px;
+  }
+  .dc-btn--icon.dc-btn--sm {
+    width: 44px;
+  }
 }
 .dc-btn__spinner {
   width: 14px;
@@ -346,7 +354,9 @@
   background: var(--bg-2);
 }
 .dc-input--code {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-2xl);
   letter-spacing: 0.35em;
   text-transform: uppercase;
@@ -563,7 +573,7 @@
   border: 1px solid color-mix(in srgb, var(--badge, var(--accent)) 50%, transparent);
   color: color-mix(in srgb, var(--badge, var(--accent)) 80%, white);
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -586,7 +596,7 @@
   border: 1px solid var(--line-bright);
   border-bottom-width: 3px;
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-1);
   border-radius: 3px;
 }
@@ -757,7 +767,7 @@
 }
 .dc-timer span {
   position: relative;
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 700;
   font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;

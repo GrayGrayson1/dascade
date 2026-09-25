@@ -186,17 +186,31 @@ export function Customizer() {
     };
   }, [me, serverLook]);
 
+  const pending = useRef<CarConfig | null>(null);
+
+  // Leaving the customizer (race starting, panel closed) flushes a debounced edit instead of
+  // dropping it: always keep it locally; only send it while the server still accepts car setups.
   useEffect(
     () => () => {
       if (sendTimer.current) clearTimeout(sendTimer.current);
+      const last = pending.current;
+      pending.current = null;
+      if (!last) return;
+      const phase = (session.room?.state as { phase?: string } | undefined)?.phase;
+      if (phase === 'LOBBY' || phase === 'RESULTS') session.send(CIRCUIT_MSG.car, last);
+      void persistence()
+        .saveDoc(CIRCUIT_CAR_DOC, last)
+        .catch(() => undefined);
     },
     [],
   );
 
   const commit = (next: CarConfig) => {
     setConfig(next);
+    pending.current = next;
     if (sendTimer.current) clearTimeout(sendTimer.current);
     sendTimer.current = setTimeout(() => {
+      pending.current = null;
       session.send(CIRCUIT_MSG.car, next);
       void persistence()
         .saveDoc(CIRCUIT_CAR_DOC, next)

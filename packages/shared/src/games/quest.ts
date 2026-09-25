@@ -162,6 +162,9 @@ export type QuestThemeId = (typeof QUEST_THEMES)[number];
 
 export const QUEST_DIFFICULTY_DC: Record<'story' | 'normal' | 'hard', number> = { story: -2, normal: 0, hard: 2 };
 
+/** How long the host has to settle a 'host' mode tie before the auto rule decides (ms). */
+export const QUEST_TIEBREAK_MS = 15_000;
+
 export const QuestSettingsSchema = z.object({
   /** Adventure pack id (see the pack registry in @dascade/game-core/quest). */
   pack: z

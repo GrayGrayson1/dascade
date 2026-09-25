@@ -14,6 +14,7 @@
  *     --join CODE        join an existing room instead of creating one (the room's host starts it)
  *     --no-start         create the room but let a human host start it
  *     --drift 0.35       share of bots that drift through tight corners
+ *     --spectators 10    extra passive spectator clients (snapshot delivery only)
  */
 import { Client, type Room } from '@colyseus/sdk';
 import { CIRCUIT_MSG, CIRCUIT_SIM, CAR_PAINTS, CHASSIS_IDS, DECAL_IDS, WHEEL_IDS, type CircuitTrackId } from '../packages/shared/src/games/circuit.ts';
@@ -36,6 +37,7 @@ const TRACK = arg('track', 'neon-loop') as CircuitTrackId;
 const JOIN = arg('join', '');
 const NO_START = flag('no-start');
 const DRIFT_SHARE = Number(arg('drift', '0.35'));
+const SPECTATORS = Math.max(0, Math.min(30, Number(arg('spectators', '0'))));
 
 interface Bot {
   idx: number;
@@ -66,14 +68,26 @@ function stateOf(room: Room): any {
   return room.state as any;
 }
 
+/** Resolves on the first full state (a plain SDK Room has no waitForInitialState). */
+function initialState(room: Room, timeoutMs = 5000): Promise<void> {
+  if (stateOf(room)?.phase) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    room.onStateChange.once(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
 function racerOf(bot: Bot): any {
   return stateOf(bot.room)?.racers?.get?.(bot.playerId);
 }
 
-async function connect(client: Client, idx: number, code: string | null): Promise<Bot> {
-  const name = `Bot ${String(idx + 1).padStart(2, '0')}`;
+async function connect(client: Client, idx: number, code: string | null, spectator = false): Promise<Bot> {
+  const name = spectator ? `Watch ${String(idx + 1).padStart(2, '0')}` : `Bot ${String(idx + 1).padStart(2, '0')}`;
   const room = code
-    ? await client.joinById(code, { name })
+    ? await client.joinById(code, spectator ? { name, spectator: true } : { name })
     : await client.create('circuit', { name, maxPlayers: 20, settings: { laps: LAPS, track: TRACK, finishWindowSec: 45 } });
   const bot: Bot = {
     idx,
@@ -128,9 +142,10 @@ async function connect(client: Client, idx: number, code: string | null): Promis
     bot.net.ingest(bytes, now);
   });
   for (const t of ['sys:toast', 'sys:time', 'sys:removed', 'chat:msg', 'chat:history', CIRCUIT_MSG.event]) room.onMessage(t, () => undefined);
-  await room.waitForInitialState?.();
+  await initialState(room);
   const until = Date.now() + 5000;
   while (!bot.playerId && Date.now() < until) await sleep(20);
+  if (spectator) return bot;
   room.send(CIRCUIT_MSG.car, {
     chassis: pick(CHASSIS_IDS, idx),
     primary: pick(CAR_PAINTS, idx * 3),
@@ -173,7 +188,12 @@ async function main(): Promise<void> {
     bots.push(await connect(client, i, code));
     await sleep(25);
   }
-  console.log(`${bots.length} bots connected in ${Math.round(performance.now() - t0)} ms`);
+  const watchers: Bot[] = [];
+  for (let i = 0; i < SPECTATORS; i++) {
+    watchers.push(await connect(client, i, code, true));
+    await sleep(25);
+  }
+  console.log(`${bots.length} bots + ${watchers.length} spectators connected in ${Math.round(performance.now() - t0)} ms`);
   await sleep(800);
 
   if (!JOIN && !NO_START) {
@@ -238,6 +258,15 @@ async function main(): Promise<void> {
   console.log(`server errors received   ${bots.reduce((a, b) => a + b.errors, 0)}`);
   const stats = bots.map((b) => b.net.stats());
   console.log(`client corrections       mean ${(stats.reduce((a, s) => a + s.corrections, 0) / bots.length).toFixed(1)} per bot · mean input RTT ${(stats.reduce((a, s) => a + s.rttMs, 0) / bots.length).toFixed(0)} ms`);
+  if (watchers.length) {
+    const wRates = watchers.map((w) => w.snaps / Math.max(1, (w.lastTickAt - w.firstTickAt) / 1000));
+    const wGaps: number[] = [];
+    for (const w of watchers) for (let i = 1; i < w.arrivals.length; i++) wGaps.push(w.arrivals[i]! - w.arrivals[i - 1]!);
+    const seated = watchers.filter((w) => !stateOf(w.room)?.players?.get?.(w.playerId)?.spectator).length;
+    console.log(
+      `spectators               ${watchers.length} (${seated} wrongly seated) · snapshots/s mean ${(wRates.reduce((a, b) => a + b, 0) / watchers.length).toFixed(1)} · interval p95 ${pct(wGaps, 0.95).toFixed(1)} ms · errors ${watchers.reduce((a, w) => a + w.errors, 0)}`,
+    );
+  }
   console.log(`bots that made progress  ${progressed}/${bots.length}`);
   console.log(`bots that completed ≥1 lap ${lapped}/${bots.length} · finished ${finished}/${bots.length}`);
   for (const b of bots) {
@@ -251,7 +280,7 @@ async function main(): Promise<void> {
   }
   const ok = progressed === bots.length && (phase === 'RESULTS' || lapped === bots.length || elapsed < SECONDS);
   console.log(ok ? 'RESULT: healthy' : 'RESULT: check the numbers above');
-  for (const b of bots) await b.room.leave(true).catch(() => undefined);
+  for (const b of [...bots, ...watchers]) await b.room.leave(true).catch(() => undefined);
   process.exit(0);
 }
 

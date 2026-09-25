@@ -32,7 +32,7 @@ export const SIM_LIMITS = {
   ghostAfterTicks: 120,
   /** Ticks a disconnected racer may be gone before the race stops waiting for them. */
   absentAfterTicks: 300,
-  /** Reject a packet whose seq is further than this ahead of the last seen. */
+  /** A packet whose seq is further than this ahead of the last seen re-anchors the sequence. */
   maxSeqJump: 600,
   /** Only cars this close along the track (and on the same level) can collide. */
   collisionWindow: 160,
@@ -168,14 +168,21 @@ export class RaceSim {
 
   /**
    * Queue input frames for a car. `seq` numbers frame 0; the rest follow consecutively.
-   * Old/duplicate frames are ignored; absurd sequence jumps reject the packet.
+   * Old/duplicate frames are ignored. A jump further than `maxSeqJump` re-anchors the
+   * sequence: the client kept numbering frames while its packets were held back (a long
+   * stall, or a reconnect inside the grace period). Rejecting it would ignore the car for
+   * the rest of the race, since the client never goes back. It can't buy speed, because
+   * every frame is still paid for from the per-tick credit bank.
    * Returns how many frames were accepted.
    */
   pushInputs(slot: number, seq: number, packed: readonly number[]): number {
     const car = this.bySlot.get(slot);
     if (!car || car.retired) return 0;
     if (car.lastSeq === 0) car.lastSeq = seq - 1;
-    if (seq > car.lastSeq + SIM_LIMITS.maxSeqJump) return 0;
+    if (seq > car.lastSeq + SIM_LIMITS.maxSeqJump) {
+      car.queue.length = 0;
+      car.lastSeq = seq - 1;
+    }
     let accepted = 0;
     for (let k = 0; k < packed.length; k++) {
       const s = seq + k;

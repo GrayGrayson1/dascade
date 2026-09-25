@@ -27,6 +27,38 @@ export function createRaceGame(parent: HTMLElement, opts: SceneOptions): RaceGam
       host.resize(parent.clientWidth, parent.clientHeight);
     },
   };
+  // Phaser's VisibilityHandler (run from Game#start, right after the postBoot callback) adds a
+  // document 'visibilitychange' listener and sets window.onblur/onfocus, and never removes them:
+  // every destroyed race would leave a dead listener behind. Capture them so destroy() can.
+  const leftovers: { visibility: EventListenerOrEventListenerObject | null; onblur: Window['onblur']; onfocus: Window['onfocus'] } = {
+    visibility: null,
+    onblur: null,
+    onfocus: null,
+  };
+  const captureVisibility = () => {
+    const hadOwn = Object.prototype.hasOwnProperty.call(document, 'addEventListener');
+    const original = document.addEventListener;
+    const restore = () => {
+      if (hadOwn) document.addEventListener = original;
+      else delete (document as { addEventListener?: unknown }).addEventListener;
+    };
+    document.addEventListener = function (this: Document, type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
+      if (type === 'visibilitychange' && listener && !leftovers.visibility) leftovers.visibility = listener;
+      return listener ? original.call(this, type, listener, options) : undefined;
+    } as Document['addEventListener'];
+    // VisibilityHandler runs synchronously after postBoot; restore right after it.
+    queueMicrotask(() => {
+      restore();
+      leftovers.onblur = window.onblur;
+      leftovers.onfocus = window.onfocus;
+    });
+  };
+  const releaseLeftovers = () => {
+    if (leftovers.visibility) document.removeEventListener('visibilitychange', leftovers.visibility);
+    leftovers.visibility = null;
+    if (leftovers.onblur && window.onblur === leftovers.onblur) window.onblur = null;
+    if (leftovers.onfocus && window.onfocus === leftovers.onfocus) window.onfocus = null;
+  };
   const cssW = Math.max(1, parent.clientWidth);
   const cssH = Math.max(1, parent.clientHeight);
   const scene = new RaceScene(opts);
@@ -43,7 +75,22 @@ export function createRaceGame(parent: HTMLElement, opts: SceneOptions): RaceGam
     audio: { noAudio: true },
     input: { keyboard: false, mouse: false, touch: false, gamepad: false },
     disableContextMenu: true,
+    callbacks: { postBoot: captureVisibility },
     scene,
+  });
+  // Grab the GL context now: after destroy() Phaser drops its references.
+  let gl: WebGLRenderingContext | null = null;
+  game.events.once(Phaser.Core.Events.READY, () => {
+    const r = game.renderer as unknown as { gl?: WebGLRenderingContext } | null;
+    gl = r?.gl ?? null;
+  });
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    releaseLeftovers();
+    // Phaser never loses its context: release the GPU memory now instead of whenever GC runs
+    // (browsers cap live WebGL contexts, and racers cycle lobby ⇄ race many times per session).
+    const ctx = gl;
+    gl = null;
+    if (ctx) setTimeout(() => ctx.getExtension('WEBGL_lose_context')?.loseContext(), 0);
   });
   const styleCanvas = () => {
     const canvas = game.canvas;

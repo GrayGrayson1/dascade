@@ -131,7 +131,12 @@ export class RaceController {
     );
     const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.sampler.touch.autoGas = touch;
-    if (touch) this.sampler.lastDevice = 'touch';
+    if (touch) {
+      // Touch-first device: honour "Auto-gas on" from the green light, before the first tap
+      // (a key press or gamepad still takes over, see InputSampler).
+      this.sampler.lastDevice = 'touch';
+      this.sampler.touch.active = true;
+    }
     this.uiState = { trackId: this.trackId, spectating: false, followName: '', netDebug: debug.show, touch, finished: false };
   }
 
@@ -283,6 +288,9 @@ export class RaceController {
   }
 
   private onEvent(ev: CircuitEvent): void {
+    if (this.disposed) return;
+    // Scene events are drained once per rendered frame; with the tab hidden (no rAF) keep the backlog small.
+    if (this.events.length > 32) this.events.splice(0, this.events.length - 32);
     const me = this.meta.me;
     const now = performance.now();
     const solo = Boolean(this.meta.race?.solo);

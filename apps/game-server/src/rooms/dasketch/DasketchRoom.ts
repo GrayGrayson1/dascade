@@ -151,12 +151,11 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
   /**
    * Sends the custom list to the host. Only while it can be edited (LOBBY/RESULTS): mid-match
    * the host may have changed (migration, transfer) to someone who is guessing, and the list
-   * would reveal the candidate words. `force` is for the lobby hand-off in onReturnToLobby,
-   * which runs just before the phase flips to LOBBY.
+   * would reveal the candidate words.
    */
-  private sendWords(player: PlayerRecord, force = false): void {
+  private sendWords(player: PlayerRecord): void {
     if (player.id !== this.state.hostId) return;
-    if (!force && this.phase !== 'LOBBY' && this.phase !== 'RESULTS') return;
+    if (this.phase !== 'LOBBY' && this.phase !== 'RESULTS') return;
     const payload: SketchWordsPrivate = { words: [...this.customWords], report: { ...this.customReport } };
     this.sendTo(player, DASKETCH_MSG.words, payload);
   }
@@ -634,10 +633,8 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     this.order.remove(player.id);
     this.guessBuckets.delete(player.id);
     this.state.sketch.delete(player.id);
+    // returnToLobby() switches to LOBBY before dropping away players, so this skips that sweep too.
     if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return;
-    // returnToLobby() clears every timer and then drops away players while the phase is still
-    // PLAYING: a live turn always has one of these pending, so don't replay game flow then.
-    if (!this.isScheduled('choose') && !this.isScheduled('turn-end') && !this.isScheduled('next')) return;
     if (player.id === this.state.artistId) {
       this.artistGone(player, 'left');
       return;
@@ -694,7 +691,7 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     s.historyJson = '[]';
     s.awardsJson = '[]';
     const host = this.hostRecord;
-    if (host) this.sendWords(host, true);
+    if (host) this.sendWords(host);
   }
 
   // ===========================================================================

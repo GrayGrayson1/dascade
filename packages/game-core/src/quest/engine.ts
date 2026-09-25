@@ -565,10 +565,14 @@ export function restoreRun(adv: Adventure, raw: unknown): RestoreResult {
   if (run.packVersion !== adv.version) return { ok: false, error: `That save was made with version ${run.packVersion} of this adventure (now ${adv.version}).` };
   const node = adv.nodeMap.get(run.nodeId);
   if (!node || node.ending) return { ok: false, error: 'That save points at a scene that no longer exists.' };
+  // Checkpoints are only ever taken mid-adventure: a finished run can't be resumed.
+  if (run.endingId !== null) return { ok: false, error: 'That adventure is already over.' };
+  if (run.chapter !== node.chapter) return { ok: false, error: 'The save file is damaged.' };
   for (const id of Object.keys(run.inventory)) if (!adv.items[id]) return { ok: false, error: 'The save contains unknown items.' };
   for (const h of run.heroes) {
     for (const s of h.statuses) if (!adv.statuses[s.id]) return { ok: false, error: 'The save contains unknown statuses.' };
     if (!adv.archetypes.includes(h.archetype)) return { ok: false, error: 'The save contains a hero this adventure does not allow.' };
+    if (h.hp > h.maxHp || (h.ko && h.hp > 0)) return { ok: false, error: 'The save file is damaged.' };
   }
   const slots = new Set(run.heroes.map((h) => h.slot));
   if (slots.size !== run.heroes.length) return { ok: false, error: 'The save file is damaged.' };

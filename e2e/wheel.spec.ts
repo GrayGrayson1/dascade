@@ -37,7 +37,8 @@ test('wheel smoke: bulk paste, join, spin together, same winner, leave', async (
   await waitForPhase(guest, 'PLAYING');
 
   // Only the host may spin by default.
-  await expect(guest.getByRole('button', { name: 'Spin the wheel' })).toBeDisabled();
+  await expect(guest.getByTestId('wheel-waiting')).toHaveText(/Waiting for Host to spin/);
+  await expect(guest.getByRole('button', { name: 'Spin the wheel' })).toHaveCount(0);
   const spin = page.getByRole('button', { name: 'Spin the wheel' });
   await expect(spin).toBeEnabled();
   await spin.click();

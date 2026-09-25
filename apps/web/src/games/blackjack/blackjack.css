@@ -278,7 +278,8 @@
   align-items: center;
   gap: 5px;
   padding: 3px 9px 2px;
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: clamp(11px, calc(var(--bj-card-base) * 0.22), 17px);
   line-height: 1.1;
@@ -443,7 +444,7 @@
   animation: bj-banner-in 420ms var(--ease-spring) both;
 }
 .bj-banner__title {
-  font-family: var(--font-display);
+  font-family: var(--font-pixel);
   font-weight: 700;
   font-size: clamp(18px, calc(var(--felt-w) * 0.026), 38px);
   letter-spacing: 0.06em;
@@ -604,7 +605,7 @@
   border-style: solid;
 }
 .bj-spot__num {
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
   font-size: calc(var(--spot) * 0.34);
   font-weight: 700;
   color: rgba(255, 210, 63, 0.26);
@@ -894,7 +895,7 @@
   top: 76%;
   transform: translate(-50%, -50%);
   padding: 4px 9px 3px;
-  font-family: var(--font-display);
+  font-family: var(--font-pixel);
   font-weight: 700;
   font-size: clamp(10px, calc(var(--bj-card-w) * 0.21), 16px);
   letter-spacing: 0.06em;
@@ -1068,7 +1069,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 22px;
   letter-spacing: 0.02em;
@@ -1978,4 +1980,182 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* Numbers stay unambiguous: Tiny5 draws small 8s like $, so totals, balances and timers use
+ * Space Grotesk tabular figures (badges and banners use Silkscreen). */
+.bj-stage .dc-timer span,
+.bj-board__rank {
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------
+ * Phones on their side: dealer on the left, seat strip + your hand on the right,
+ * avatar-and-chips plates only, one shared decision clock in the bar.
+ * ------------------------------------------------------------------- */
+.bj-room--short .bj-compact {
+  padding: 4px 8px 0;
+}
+.bj-room--short .bj-felt--compact {
+  --bj-card-base: clamp(30px, 9.5vh, 46px);
+  --spot: 38px;
+  --chip-size: 20px;
+  display: grid;
+  grid-template-columns: minmax(170px, 27%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'dealer others'
+    'dealer mine';
+  gap: 4px 10px;
+  padding: 6px 10px;
+  border-radius: 6px 6px 36px 36px / 6px 6px 24px 24px;
+}
+.bj-room--short .bj-felt--compact .bj-dealer-zone {
+  grid-area: dealer;
+  align-self: center;
+  gap: 4px;
+}
+.bj-room--short .bj-compact-print,
+.bj-room--short .bj-shoe__label,
+.bj-room--short .bj-discard__label,
+.bj-room--short .bj-dealer__peeked,
+.bj-room--short .bj-mini .bj-plate__timer,
+.bj-room--short .bj-mini .bj-plate__status {
+  display: none;
+}
+.bj-room--short .bj-felt--compact .bj-banner__title {
+  font-size: 13px;
+}
+.bj-room--short .bj-banner__sub {
+  font-size: 8px;
+  padding: 2px 6px;
+}
+.bj-room--short .bj-others {
+  grid-area: others;
+  padding: 0;
+  gap: 6px;
+}
+.bj-room--short .bj-mini {
+  --bj-card-w: 24px;
+  --bj-card-base: 24px;
+  --chip-size: 16px;
+  --spot: 28px;
+  min-width: 0;
+  gap: 3px;
+  padding: 4px;
+}
+.bj-room--short .bj-mini__hands {
+  min-height: 40px;
+}
+.bj-room--short .bj-plate--compact {
+  max-width: 84px;
+  gap: 3px;
+  padding: 2px 4px 2px 2px;
+}
+.bj-room--short .bj-plate--compact .dc-avatar {
+  --size: 18px !important;
+}
+.bj-room--short .bj-plate--compact .bj-plate__name {
+  font-size: 10px;
+}
+.bj-room--short .bj-mine {
+  grid-area: mine;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.bj-room--short .bj-mine__hands {
+  --bj-card-w: var(--bj-card-base);
+  min-height: 0;
+}
+.bj-room--short .bj-bar__inner {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'wallet main menu';
+}
+.bj-room--short .bj-ctl--bet {
+  grid-template-columns: auto auto;
+  grid-template-areas: 'rail actions';
+}
+.bj-room--short .bj-ctl--bet .bj-ctl__actions {
+  flex-wrap: nowrap;
+}
+.bj-room--short .bj-ctl__clock {
+  height: 3px;
+}
+
+/* ---------------------------------------------------------------------
+ * Big screens: the bar scales with the table so chips and actions keep their weight.
+ * ------------------------------------------------------------------- */
+@media (min-width: 1600px) and (min-height: 900px) {
+  .bj-bar {
+    padding-top: 14px;
+    padding-bottom: calc(14px + var(--safe-bottom));
+  }
+  .bj-bar__inner {
+    max-width: 1760px;
+    min-height: 112px;
+    gap: 28px;
+  }
+  .bj-bar__balance {
+    font-size: 34px;
+  }
+  .bj-bar__session {
+    font-size: 14px;
+  }
+  .bj-rail {
+    gap: 10px;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(70, 30, 42, 0.7));
+    border-color: rgba(255, 210, 63, 0.45);
+  }
+  .bj-rail__chip {
+    width: 68px;
+    height: 68px;
+  }
+  .bj-rail__chip .dc-chip {
+    width: 64px;
+    height: 64px;
+  }
+  .bj-rail__key {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+  }
+  .bj-bar .dc-btn--sm {
+    min-height: 48px;
+    padding: 0 18px;
+    font-size: var(--fs-lg);
+  }
+  .bj-bar .dc-btn:not(.dc-btn--sm):not(.dc-btn--icon) {
+    min-height: 64px;
+    padding: 0 30px;
+    font-size: var(--fs-xl);
+  }
+  .bj-act {
+    min-width: 170px;
+  }
+  .bj-ctl__title {
+    font-size: 28px;
+  }
+  .bj-ctl__hint {
+    font-size: 15px;
+  }
+  .bj-ctl__fine {
+    font-size: 11px;
+  }
+  .bj-bar .dc-timer {
+    width: 60px !important;
+    height: 60px !important;
+  }
+  .bj-bar .dc-timer span {
+    font-size: 22px;
+  }
+}
+/* Disabled betting buttons stay legible against the dark bar. */
+.bj-ctl--bet .dc-btn:disabled {
+  opacity: 0.62;
 }

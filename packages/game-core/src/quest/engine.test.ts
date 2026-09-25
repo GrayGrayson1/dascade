@@ -568,6 +568,26 @@ describe('snapshots', () => {
     extra.injected = '<script>';
     expect(restoreRun(adv, extra)).toMatchObject({ ok: false });
   });
+
+  it('rejects schema-valid but inconsistent snapshots (defense in depth if a save key ever leaks)', () => {
+    const { adv, run } = labRun('scout', 'tinker');
+    const snap = () => JSON.parse(JSON.stringify(snapshotRun(run)));
+    // A finished run would jump straight to its ending (and its score) on start.
+    const over = snap();
+    over.endingId = Object.keys(adv.endings)[0];
+    expect(restoreRun(adv, over)).toMatchObject({ ok: false });
+    const overheal = snap();
+    overheal.heroes[0].maxHp = 10;
+    overheal.heroes[0].hp = 60;
+    expect(restoreRun(adv, overheal)).toMatchObject({ ok: false });
+    const zombie = snap();
+    zombie.heroes[0].ko = true;
+    expect(restoreRun(adv, zombie)).toMatchObject({ ok: false });
+    const warped = snap();
+    warped.chapter = warped.chapter === 1 ? 2 : 1;
+    expect(restoreRun(adv, warped)).toMatchObject({ ok: false });
+    expect(restoreRun(adv, snap())).toMatchObject({ ok: true });
+  });
 });
 
 describe('determinism', () => {

@@ -277,9 +277,13 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
     if (next) this.sendSeed(next);
   }
 
-  /** Tell the host about the fixed seed: its value only if they typed it, otherwise just that one is set. */
+  /**
+   * Tell the host about the fixed seed. Its value only goes to the host who typed it, and only in
+   * LOBBY/RESULTS: mid-match a host (even one who inherits or regains the role) just learns one is set,
+   * because the seed reveals every card in play.
+   */
   private sendSeed(player: PlayerRecord): void {
-    const mine = player.id === this.customSeedBy;
+    const mine = player.id === this.customSeedBy && (this.phase === 'LOBBY' || this.phase === 'RESULTS');
     const payload: BingoSeedPayload = { seed: mine ? this.customSeed : '', hidden: !mine && this.customSeed !== '' };
     this.sendTo(player, BINGO_MSG.seed, payload);
   }

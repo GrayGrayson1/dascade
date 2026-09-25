@@ -165,7 +165,7 @@ function BettingControls({ seat, rules, state, send }: { seat: BlackjackSeatView
           </Button>
         ) : (
           <Button variant="primary" icon="play" disabled={!canDeal} onClick={lock} aria-keyshortcuts="Enter">
-            {shown > 0 ? `Deal · ${formatChips(shown)}` : 'Deal'}
+            {shown > 0 && shown < rules.minBet ? `Min ${formatChips(rules.minBet)}` : shown > 0 ? `Deal · ${formatChips(shown)}` : 'Deal'}
           </Button>
         )}
         {shown === 0 ? (

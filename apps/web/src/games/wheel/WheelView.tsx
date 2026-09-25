@@ -6,7 +6,7 @@
  * screen (including late joiners who pick the spin up mid-flight) celebrates
  * the same winner at the same moment.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { computeArcs, initialRotation, normalizeSegments } from '@dascade/game-core/wheel';
 import { WHEEL_MSG, type WheelPublicState, type WheelSettings, type WheelSnapshotSegment } from '@dascade/shared/games/wheel';
 import { Button, IconButton, Kbd, Modal, PixelIcon, Tabs, cx } from '@dascade/ui';
@@ -232,12 +232,27 @@ function PlayView() {
     layout.segments.length ? `: ${layout.segments.slice(0, 12).map((s) => s.label || s.emoji).join(', ')}${layout.segments.length > 12 ? '…' : ''}` : ''
   }`;
   const title = settings.title || 'Spin the wheel';
+  const hostName = game.players.find((p) => p.isHost)?.name ?? 'the host';
   const editorLocked = inFlight ? 'Editing pauses while the wheel spins.' : null;
 
-  const tabs: Array<{ value: RailTab; label: string }> = [
-    { value: 'history', label: `Results${state.history.length ? ` ${state.history.length}` : ''}` },
+  const tabs: Array<{ value: RailTab; label: ReactNode }> = [
+    {
+      value: 'history',
+      label: (
+        <>
+          Results{state.history.length ? ' ' : null}{state.history.length ? <span className="wh-count">{state.history.length}</span> : null}
+        </>
+      ),
+    },
     { value: 'wheel', label: isHost ? 'Edit wheel' : 'Options' },
-    { value: 'players', label: `People ${game.players.length}` },
+    {
+      value: 'players',
+      label: (
+        <>
+          People{' '}<span className="wh-count">{game.players.length}</span>
+        </>
+      ),
+    },
     { value: 'chat', label: 'Chat' },
   ];
 
@@ -296,10 +311,23 @@ function PlayView() {
                 —
               </span>
             </div>
-            <Button variant="primary" size="xl" className="wh-spin" aria-label="Spin the wheel" disabled={!!reason} onClick={doSpin}>
-              <span className="wh-spin__text">{inFlight ? 'Spinning' : 'SPIN'}</span>
-            </Button>
-            <p className="wh-controls__hint" aria-live="polite">
+            {canRole ? (
+              <Button variant="primary" size="xl" className="wh-spin" aria-label="Spin the wheel" disabled={!!reason} onClick={doSpin}>
+                <span className="wh-spin__text">{inFlight ? 'Spinning' : 'SPIN'}</span>
+              </Button>
+            ) : (
+              <div className="wh-waiting" role="status" data-testid="wheel-waiting" data-live={inFlight ? 'true' : undefined}>
+                <PixelIcon name={inFlight ? 'sparkle' : isSpectator ? 'eye' : 'crown'} className="wh-waiting__icon" />
+                <span className="wh-waiting__text">
+                  {inFlight
+                    ? `${spunByName || hostName} is spinning…`
+                    : isSpectator && settings.spinPermission === 'anyone'
+                      ? 'Spectating · players spin this wheel'
+                      : `${isSpectator ? 'Spectating · ' : ''}Waiting for ${hostName} to spin`}
+                </span>
+              </div>
+            )}
+            <p className="wh-controls__hint" aria-live="polite" hidden={!canRole}>
               {reason ? (
                 reason
               ) : (

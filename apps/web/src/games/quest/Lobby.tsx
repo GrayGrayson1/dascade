@@ -292,6 +292,31 @@ function ago(ms: number): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+/** The server accepts save blobs of 16…120 000 characters (QuestLoadSchema). */
+const SAVE_BLOB_MIN = 16;
+const SAVE_BLOB_MAX = 120_000;
+
+/**
+ * Stored saves come from this device's storage (or a synced profile), so they are untrusted:
+ * only list ones whose display info has the expected shape, so a damaged entry can't crash
+ * the settings panel. The server re-verifies the signed blob itself.
+ */
+function isUsableSave(p: Preset<QuestCheckpointPayload>): boolean {
+  const d = p.data as Partial<QuestCheckpointPayload> | null | undefined;
+  const info = d?.info as Partial<QuestSaveInfo> | undefined;
+  return (
+    typeof d?.blob === 'string' &&
+    d.blob.length >= SAVE_BLOB_MIN &&
+    d.blob.length <= SAVE_BLOB_MAX &&
+    !!info &&
+    typeof info.packTitle === 'string' &&
+    typeof info.chapterTitle === 'string' &&
+    Number.isFinite(info.chapter) &&
+    Array.isArray(info.heroes) &&
+    info.heroes.every((h) => !!h && typeof h === 'object' && (QUEST_ARCHETYPE_IDS as readonly string[]).includes(h.archetype) && Number.isFinite(h.slot))
+  );
+}
+
 function SavedAdventures({ canEdit }: { canEdit: boolean }) {
   const saveJson = useRoomSelector<QuestPublicState, string>((s) => s.saveJson);
   const loaded = useJson<QuestSaveInfo>(saveJson);
@@ -302,7 +327,7 @@ function SavedAdventures({ canEdit }: { canEdit: boolean }) {
     let alive = true;
     persistence()
       .listPresets<QuestCheckpointPayload>('quest-save')
-      .then((list) => alive && setSaves(list.filter((p) => p.data && typeof p.data.blob === 'string')))
+      .then((list) => alive && setSaves(list.filter(isUsableSave)))
       .catch(() => alive && setSaves([]));
     return () => {
       alive = false;
@@ -349,6 +374,10 @@ function SavedAdventures({ canEdit }: { canEdit: boolean }) {
                 size="sm"
                 variant="primary"
                 onClick={() => {
+                  if (s.data.blob.length < SAVE_BLOB_MIN || s.data.blob.length > SAVE_BLOB_MAX) {
+                    toast('error', 'That save is damaged and can’t be loaded.');
+                    return;
+                  }
                   sfx('coin');
                   session.send(QUEST_MSG.load, { blob: s.data.blob });
                 }}
@@ -360,8 +389,12 @@ function SavedAdventures({ canEdit }: { canEdit: boolean }) {
                 size="sm"
                 label={`Delete save: ${s.name}`}
                 onClick={async () => {
-                  await persistence().deletePreset('quest-save', s.id);
-                  toast('info', 'Save deleted.');
+                  try {
+                    await persistence().deletePreset('quest-save', s.id);
+                    toast('info', 'Save deleted.');
+                  } catch {
+                    toast('error', 'That save could not be deleted.');
+                  }
                   setRev((r) => r + 1);
                 }}
               />

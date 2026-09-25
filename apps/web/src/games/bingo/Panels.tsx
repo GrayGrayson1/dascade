@@ -7,7 +7,7 @@ import { Avatar, Badge, Button, IconButton, PixelIcon, Segmented, Slider, cx } f
 import { useCountdown } from '../../net/hooks.ts';
 import { Ball, CallTimer } from './Caller.tsx';
 import { BingoCardView, PatternCycler } from './Card.tsx';
-import { maskOf, tokenLabel, tokenText, useDebouncedCommit, type Standing } from './util.ts';
+import { maskOf, tokenColor, tokenLabel, tokenLetter, tokenText, useDebouncedCommit, type Standing } from './util.ts';
 
 // ---------------------------------------------------------------------------
 // Caller
@@ -58,7 +58,18 @@ export function CallerPanel({
       <div className="bg-caller__plaque" aria-live="polite">
         <span className="dc-label">{calls.length ? `Call ${calls.length} of ${state.poolSize}` : 'Caller'}</span>
         <strong className={cx('bg-caller__label', state.mode === 'text' && 'bg-caller__label--text')}>
-          {latest === null ? 'Get ready…' : state.mode === 'numbers' ? tokenLabel('numbers', latest, items).replace(' ', '-') : tokenText('text', latest, items)}
+          {latest === null ? (
+            'Get ready…'
+          ) : state.mode === 'numbers' ? (
+            <span className="bg-caller__call" aria-label={tokenLabel('numbers', latest, items)}>
+              <span className="bg-caller__letter" style={{ '--tone': tokenColor('numbers', latest) } as CSSProperties} aria-hidden>
+                {tokenLetter('numbers', latest)}
+              </span>
+              <span aria-hidden>{latest}</span>
+            </span>
+          ) : (
+            tokenText('text', latest, items)
+          )}
         </strong>
         {onFirstCall ? (
           <Button className="bg-caller__first" variant="primary" icon="bolt" onClick={onFirstCall}>

@@ -115,5 +115,10 @@ export function useMediaQuery(query: string): boolean {
 
 /** Stacked layout for phones and portrait tablets; the half-moon needs a wide screen. */
 export function useCompactLayout(): boolean {
-  return useMediaQuery('(max-width: 760px), (orientation: portrait) and (max-width: 1100px)');
+  return useMediaQuery('(max-width: 760px), (orientation: portrait) and (max-width: 1100px), (orientation: landscape) and (max-height: 560px)');
+}
+
+/** Phones on their side: the seat strip goes beside the dealer instead of below. */
+export function useShortLandscape(): boolean {
+  return useMediaQuery('(orientation: landscape) and (max-height: 560px)');
 }

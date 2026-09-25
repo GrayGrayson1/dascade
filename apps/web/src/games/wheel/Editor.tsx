@@ -963,7 +963,7 @@ function BulkPanel({
           Cancel
         </Button>
         <Button size="sm" disabled={appendCount === 0} onClick={() => onApply(parsed.slice(0, room), 'append')}>
-          Append {appendCount || ''}
+          Append{appendCount ? ' ' : null}{appendCount ? <span className="wh-count">{appendCount}</span> : null}
         </Button>
         <Button size="sm" variant="primary" disabled={parsed.length === 0} onClick={() => onApply(parsed, 'replace')}>
           Replace all

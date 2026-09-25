@@ -26,6 +26,7 @@ export interface CabinetProps {
 }
 
 const SPARKS = Array.from({ length: 8 }, (_, i) => i);
+const TOUCH = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches;
 
 function isKeyboardFocus(el: Element): boolean {
   try {
@@ -117,7 +118,7 @@ export const Cabinet = memo(function Cabinet({ game, index, count, selected, tab
         <span className="af-cab__reflect" aria-hidden />
         <span className="af-cab__plate">
           <span className="af-cab__name">{game.title}</span>
-          <span className="af-cab__tag">{selected ? 'Selected · press again to play' : game.tagline}</span>
+          <span className="af-cab__tag">{selected ? TOUCH ? 'Selected · tap again to play' : 'Selected · press again to play' : game.tagline}</span>
         </span>
       </button>
     </li>

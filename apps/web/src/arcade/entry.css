@@ -255,6 +255,15 @@
   font-size: 16px;
 }
 
+/* Room codes contain 8/9: use the tech face, whose digits never blur together. */
+.af-entry .dc-input--code {
+  font-family: var(--font-tech);
+  font-weight: 600;
+}
+.af-entry {
+  overflow-x: clip;
+}
+
 /* ---------- Insert coin card ---------- */
 .af-entry__card {
   position: relative;
@@ -448,13 +457,13 @@
 }
 
 @media (max-width: 560px) {
-  .af-entry__help {
+  .af-entry .dc-btn.af-entry__help {
     font-size: 0;
     gap: 0;
     width: 44px;
     padding: 0;
   }
-  .af-entry__help .dc-icon {
+  .af-entry .dc-btn.af-entry__help .dc-icon {
     width: 20px;
     height: 20px;
   }
@@ -498,5 +507,45 @@
   .af-entry__desc,
   .af-entry__controls {
     display: none;
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .af-entry__marquee,
+  .af-entry__tagline {
+    display: none;
+  }
+  .af-entry__top {
+    grid-template-columns: 1fr auto;
+  }
+  .af-entry__grid {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    grid-template-areas:
+      'card head'
+      'card details';
+    padding-top: 4px;
+  }
+  .af-entry__card {
+    align-self: start;
+  }
+  .af-entry__card-head {
+    padding-block: 8px;
+  }
+  /* Name, then Create / Solo / Join, then the avatar picker. */
+  .af-entry__card .profile-editor {
+    display: contents;
+  }
+  .af-entry__card .profile-editor > .dc-field:nth-child(2) {
+    order: 10;
+  }
+  .af-entry__card #profile-name-hint {
+    display: none;
+  }
+  .af-entry__card-body {
+    gap: 10px;
+    padding: 12px;
+  }
+  .af-entry__card .dc-btn--xl,
+  .af-entry__card .dc-btn--lg {
+    min-height: 48px;
   }
 }

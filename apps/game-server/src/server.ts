@@ -130,6 +130,10 @@ function serveWebClient(app: express.Application): void {
     return;
   }
   const csp = contentSecurityPolicy();
+  // Source maps are built ('hidden') for error tooling but not published (set SERVE_SOURCEMAPS=1 to allow).
+  if (process.env.SERVE_SOURCEMAPS !== '1') {
+    app.use((req, res, next) => (req.path.endsWith('.map') ? void res.status(404).end() : next()));
+  }
   app.use(
     '/assets',
     express.static(path.join(dist, 'assets'), { immutable: true, maxAge: '1y', index: false, fallthrough: true }),

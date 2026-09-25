@@ -5,6 +5,9 @@
 import type { CSSProperties } from 'react';
 import { cx } from './core.tsx';
 
+/** Pixel face for ranks and chip values: Silkscreen's digits are unambiguous (Tiny5 draws 8 like "$" and 9 like "3"). */
+const NUM_PIXEL_FONT = "'Silkscreen', 'Space Grotesk Variable', monospace";
+
 // ---------------------------------------------------------------------------
 // Pixel suits (9×9)
 // ---------------------------------------------------------------------------
@@ -98,7 +101,7 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
                 x="10"
                 y="30"
                 fill={ink}
-                fontFamily="'Tiny5', 'Silkscreen', monospace"
+                fontFamily={NUM_PIXEL_FONT}
                 fontWeight="700"
                 fontSize={label.length > 1 ? 24 : 28}
               >
@@ -110,7 +113,7 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
                   x="10"
                   y="30"
                   fill={ink}
-                  fontFamily="'Tiny5', 'Silkscreen', monospace"
+                  fontFamily={NUM_PIXEL_FONT}
                   fontWeight="700"
                   fontSize={label.length > 1 ? 24 : 28}
                 >
@@ -126,7 +129,7 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
                     y="80"
                     textAnchor="middle"
                     fill={ink}
-                    fontFamily="'Tiny5', 'Silkscreen', monospace"
+                    fontFamily={NUM_PIXEL_FONT}
                     fontWeight="700"
                     fontSize="34"
                   >
@@ -238,7 +241,7 @@ export function CasinoChip({
           y="59"
           textAnchor="middle"
           fill={tier.text}
-          fontFamily="'Tiny5', 'Silkscreen', monospace"
+          fontFamily={NUM_PIXEL_FONT}
           fontWeight="700"
           fontSize={shortValue(value).length > 3 ? 20 : 26}
         >

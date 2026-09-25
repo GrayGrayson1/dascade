@@ -808,8 +808,8 @@
 .af-floor__dot {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   background: none;
@@ -995,9 +995,9 @@
   gap: 5px;
 }
 .af-foot__keys .dc-kbd {
-  height: 20px;
-  min-width: 20px;
-  font-size: 9px;
+  height: 22px;
+  min-width: 22px;
+  font-size: 11px;
 }
 .af-foot__status {
   display: none;
@@ -1124,13 +1124,16 @@
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: calc(var(--row-pad) + 44px);
-  padding-inline: calc(var(--row-pad) + 44px);
+  scroll-padding-inline: 8px;
+  padding-inline: 8px;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 .af-floor[data-mode='scroll'] .af-floor__row::-webkit-scrollbar {
   display: none;
+}
+.af-floor[data-mode='scroll'] .af-floor__stage {
+  padding-inline: calc(52px + var(--safe-left)) calc(52px + var(--safe-right));
 }
 .af-floor[data-mode='scroll'] .af-cab-slot {
   scroll-snap-align: start;
@@ -1180,7 +1183,11 @@
 }
 @media (max-width: 899px) and (min-width: 700px) and (orientation: portrait) {
   .af-plaque {
-    --plaque-min: 192px;
+    --plaque-min: 212px;
+  }
+  .af-plaque__desc {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
   }
 }
 
@@ -1197,7 +1204,7 @@
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   padding-inline: calc(50% - var(--cab-w) / 2);
-  padding-bottom: 42px;
+  padding-bottom: 46px;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
@@ -1226,7 +1233,7 @@
   /* Container-query units need a definite stage height on a scrolling page. */
   .af-floor[data-mode='carousel'] .af-floor__stage {
     flex: none;
-    height: max(380px, calc(100dvh - 330px));
+    height: max(360px, calc(100dvh - 422px - var(--safe-bottom)));
   }
 }
 @media (max-width: 699px) {
@@ -1353,7 +1360,6 @@
   .af-floor[data-mode='scroll'] .af-floor__row {
     --reserve-top: 10px;
     --cab-w: min(calc((100cqh - 22px) * 0.4314), 200px);
-    padding-inline: calc(var(--row-pad) + 40px);
   }
   .af-cab__plate {
     display: none;

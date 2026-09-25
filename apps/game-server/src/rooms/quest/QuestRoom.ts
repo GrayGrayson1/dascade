@@ -24,6 +24,7 @@ import {
   QuestUseSchema,
   QuestVoteSchema,
   QUEST_DIFFICULTY_DC,
+  QUEST_TIEBREAK_MS,
   type QuestArchetypeId,
   type QuestCatalogView,
   type QuestChangeView,
@@ -69,8 +70,8 @@ import {
 } from '@dascade/game-core/quest';
 import { BaseRoomState } from '../../schema/base.ts';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
-import { config } from '../../config.ts';
 import { log } from '../../lib/log.ts';
+import { questDebugEnabled } from './debug.ts';
 import { signSave, verifySave } from './saves.ts';
 
 // ---------------------------------------------------------------------------
@@ -163,7 +164,7 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     lockInMs: 1500,
     soloLockInMs: 600,
     rollRevealMs: 4200,
-    tiebreakMs: 15_000,
+    tiebreakMs: QUEST_TIEBREAK_MS,
     pauseRecheckMs: 5000,
   };
 
@@ -338,7 +339,8 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     }
     const saved = this.pendingSave.info.heroes.find((h) => h.slot === slot);
     if (!saved) return this.reject(player, QUEST_MSG.claim, 'invalid_payload', 'That hero is not in the saved party.');
-    const owner = [...this.state.heroes.values()].find((h) => h.slot === slot && h.playerId !== player.id);
+    // Only seated players hold claims (a claimer who switched to spectating can't block the hero).
+    const owner = [...this.state.heroes.values()].find((h) => h.slot === slot && h.playerId !== player.id && this.isSeated(h.playerId));
     if (owner) return this.reject(player, QUEST_MSG.claim, 'not_allowed', `${owner.name} already claimed that hero.`);
     hero.slot = slot;
     hero.archetype = saved.archetype;
@@ -380,6 +382,7 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
   protected onGameStart(): void {
     const adv = getPack(this.settings.pack);
     this.adv = adv;
+    this.lastCheckpoint = null;
     this.logSeq = 0;
     this.state.log.clear();
     this.state.resultJson = '';
@@ -482,6 +485,8 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
   protected override onReturnToLobby(): void {
     this.adv = null;
     this.run = null;
+    // A replay starts a new run: never hand the previous run's save to a new/reconnecting host.
+    this.lastCheckpoint = null;
     this.paused = false;
     this.omens = { rev: 0, omens: [] };
     this.state.stage = 'lobby';
@@ -637,6 +642,21 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     this.resolveWinner(tally.winner, votes, eligible.length, tieText);
   }
 
+  /** Re-open voting on the current scene (keeps votes that are still valid) with a fresh timer. */
+  private reopenVote(reason: string): void {
+    this.clearStageTimers();
+    this.state.tieJson = '';
+    this.state.stage = 'voting';
+    this.paused = false;
+    this.state.statusText = '';
+    this.pushLog('system', reason, 'neutral');
+    this.rerenderScene();
+    const ms = this.settings.voteSeconds * this.timing.voteMsPerSecond;
+    this.setTimer(ms);
+    this.schedule('vote', ms, () => this.finalizeVote('timer'));
+    this.checkAllVoted();
+  }
+
   private resumeIfPaused(): void {
     if (!this.paused || this.state.stage !== 'voting') return;
     if (this.eligibleVoters().length === 0) {
@@ -667,7 +687,11 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     this.clearStageTimers();
     this.state.tieJson = '';
     const choice = availableChoices(adv, run).find((c) => c.id === choiceId);
-    if (!choice) return;
+    if (!choice) {
+      // Never leave the party stuck with no timer: circumstances changed, so vote again.
+      this.reopenVote('That option is no longer available — vote again.');
+      return;
+    }
     const label = interpolate(adv, run, choice.label, this.leaderSlot());
     const count = Object.values(votes).filter((c) => c === choiceId).length;
     const slotVotes = new Map<number, string>();
@@ -789,6 +813,14 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     this.event({ kind: 'item', text: `${player.state.name} used ${res.itemName}${on}` });
     this.syncRun();
     this.rerenderScene();
+    if (this.state.stage === 'tiebreak') {
+      // The item may have made a tied choice unavailable (e.g. eating the Energy Bar the
+      // "feed it" option needs): the tie no longer reflects what the party can do.
+      const tie = JSON.parse(this.state.tieJson || '{"choiceIds":[]}') as QuestTieView;
+      const available = new Set(availableChoices(this.adv, this.run).map((c) => c.id));
+      if (!tie.choiceIds.every((id) => available.has(id))) this.reopenVote('The situation changed during the tie-break — vote again.');
+      return;
+    }
     this.checkAllVoted();
   }
 
@@ -813,6 +845,12 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
       heroes: run.heroes.map((h) => ({ slot: h.slot, name: h.name, archetype: h.archetype, hp: h.hp, maxHp: h.maxHp, ko: h.ko })),
     };
     const blob = signSave({ info, run: snapshotRun(run) });
+    if (!blob) {
+      // Saves are disabled on this server (production without DASCADE_SAVE_SECRET).
+      this.pushLog('system', `Checkpoint reached: ${info.chapterTitle}. (Saving is turned off on this server.)`, 'neutral');
+      this.event({ kind: 'checkpoint', text: info.chapterTitle });
+      return;
+    }
     this.lastCheckpoint = { id: run.runId, name: `${adv.title} · Ch. ${run.chapter}: ${info.chapterTitle}`, blob, info };
     const host = this.hostRecord;
     if (host) this.sendTo(host, QUEST_MSG.checkpoint, this.lastCheckpoint);
@@ -920,11 +958,11 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
   }
 
   // =========================================================================
-  // Debug (development only: DASCADE_QUEST_DEBUG=1 and not production)
+  // Debug (NODE_ENV development/test AND DASCADE_QUEST_DEBUG=1; see debug.ts)
   // =========================================================================
 
   private debug(player: PlayerRecord, payload: { nodeId?: string; endingId?: string }): void {
-    if (config.isProduction || process.env.DASCADE_QUEST_DEBUG !== '1') {
+    if (!questDebugEnabled()) {
       return this.reject(player, QUEST_MSG.debug, 'not_allowed', 'Debug tools are disabled on this server.');
     }
     if (!this.adv || !this.run || this.state.stage === 'ended') return;

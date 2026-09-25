@@ -176,7 +176,10 @@ export function SketchResults() {
           </section>
         ) : null}
 
-        <ResultsActions />
+        <div className="sk-results__actions">
+          {history.length > 0 ? <span className="sk-results__more">Scroll for awards &amp; tonight’s gallery</span> : null}
+          <ResultsActions />
+        </div>
       </div>
     </GameStage>
   );

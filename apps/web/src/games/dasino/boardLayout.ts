@@ -43,10 +43,21 @@ export function numberCell(n: number): Rect {
   return { x: 1 + s, y: 2 - c, w: 1, h: 1 };
 }
 
+/**
+ * Chips on numbers and outside boxes sit toward a corner/end so the printed
+ * number or label stays readable; line/corner bets sit exactly on their line.
+ */
+function defaultAnchor(kind: SpotKind, r: Rect): { x: number; y: number } {
+  if (kind === 'number' || kind === 'column') return { x: r.x + r.w - 0.27, y: r.y + r.h - 0.22 };
+  if (kind === 'zero') return { x: r.x + r.w / 2, y: r.y + r.h - 0.3 };
+  if (kind === 'dozen' || kind === 'even') return { x: r.x + r.w - 0.3, y: r.y + r.h / 2 + 0.12 };
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+
 function spot(kind: SpotKind, key: string, rect: Rect, anchor?: { x: number; y: number }, text?: string): BoardSpot {
   const def = getRouletteBet(key);
   if (!def) throw new Error(`Board references unknown bet ${key}`);
-  return { key, kind, rect, def, anchor: anchor ?? { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, text };
+  return { key, kind, rect, def, anchor: anchor ?? defaultAnchor(kind, rect), text };
 }
 
 function vEdge(key: string, cx: number, cy: number): BoardSpot {

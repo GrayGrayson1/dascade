@@ -40,6 +40,7 @@ export function HoldemView() {
   const compactDock = useMedia('(max-width: 719px), (max-height: 560px)');
   // Short landscape screens (phones on their side): the dock moves into a side column.
   const sideDock = useMedia('(orientation: landscape) and (max-height: 520px)');
+  const shortScreen = useMedia('(max-height: 800px)');
   const arenaRef = useRef<HTMLDivElement>(null);
   const [arena, setArena] = useState({ w: 0, h: 0 });
   const [drawer, setDrawer] = useState(false);
@@ -153,6 +154,7 @@ export function HoldemView() {
         isSpectator={isSpectator}
         canSit={canSit}
         side={sideDock}
+        collapseRaise={shortScreen}
       />
 
       <HistoryDrawer open={drawer} onClose={closeDrawer} log={state.log} currentHand={state.handNumber} />

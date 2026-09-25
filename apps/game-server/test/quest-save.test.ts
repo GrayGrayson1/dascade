@@ -98,7 +98,7 @@ describe('save signing', () => {
   };
 
   it('verifies what it signed and rejects any modification', () => {
-    const blob = signSave({ info, run: { hello: 'world' } as never });
+    const blob = signSave({ info, run: { hello: 'world' } as never })!;
     const ok = verifySave(blob);
     expect(ok.ok).toBe(true);
     const [prefix, body, sig] = blob.split('.') as [string, string, string];
@@ -112,7 +112,7 @@ describe('save signing', () => {
   });
 
   it('a different server secret cannot verify the save', () => {
-    const blob = signSave({ info, run: {} as never });
+    const blob = signSave({ info, run: {} as never })!;
     const prev = process.env.DASCADE_SAVE_SECRET;
     process.env.DASCADE_SAVE_SECRET = 'another-secret';
     try {
@@ -178,19 +178,19 @@ describe('checkpoints & resume', () => {
     // 2. Validly signed but structurally impossible (e.g. forged by someone who knows the dev secret).
     const impossible = structuredClone(payload);
     impossible.run.heroes[0].hp = 999;
-    host2.room.send('quest:load', { blob: signSave(impossible) });
+    host2.room.send('quest:load', { blob: signSave(impossible)! });
     await waitFor(() => host2.errors.some((e) => e.type === 'quest:load' && /damaged/.test(e.message)), 3000, 'invalid run rejected');
 
     // 3. Made with an older version of the adventure.
     const old = structuredClone(payload);
     old.run.packVersion = '0.9.0';
-    host2.room.send('quest:load', { blob: signSave(old) });
+    host2.room.send('quest:load', { blob: signSave(old)! });
     await waitFor(() => host2.errors.some((e) => e.type === 'quest:load' && /version 0\.9\.0/.test(e.message)), 3000, 'outdated rejected');
 
     // 4. An adventure this server doesn't have.
     const foreign = structuredClone(payload);
     foreign.info.packId = 'not-installed';
-    host2.room.send('quest:load', { blob: signSave(foreign) });
+    host2.room.send('quest:load', { blob: signSave(foreign)! });
     await waitFor(() => host2.errors.some((e) => e.type === 'quest:load' && /not installed/.test(e.message)), 3000, 'foreign rejected');
 
     // 5. Oversized / malformed payloads never reach the handler.

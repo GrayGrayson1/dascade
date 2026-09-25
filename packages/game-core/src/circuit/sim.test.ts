@@ -289,6 +289,40 @@ describe('RaceSim', () => {
   });
 });
 
+describe('snapshot decoding bounds', () => {
+  it('rejects truncated, wrong-version and non-finite snapshots without throwing', () => {
+    const sim = new RaceSim(getTrack('neon-loop'), OPTS);
+    sim.addCar(0, 'a', 'volt');
+    sim.addCar(1, 'b', 'comet');
+    const good = sim.encodeSnapshot();
+    expect(decodeSnapshot(good)?.cars).toHaveLength(2);
+    expect(decodeSnapshot(good.slice(0, good.byteLength - 1))).toBeNull();
+    expect(decodeSnapshot(new Uint8Array(3))).toBeNull();
+    const version = good.slice();
+    version[0] = 99;
+    expect(decodeSnapshot(version)).toBeNull();
+    const count = good.slice();
+    count[12] = 200;
+    expect(decodeSnapshot(count)).toBeNull();
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      for (const field of [8, 12, 16, 20, 24, 28]) {
+        const bytes = good.slice();
+        new DataView(bytes.buffer).setFloat32(16 + 40 + field, bad, true);
+        expect(decodeSnapshot(bytes), `field ${field} = ${bad}`).toBeNull();
+      }
+    }
+    // Random garbage never throws.
+    let seed = 7;
+    for (let k = 0; k < 500; k++) {
+      const junk = new Uint8Array(16 + (k % 5) * 40);
+      for (let b = 0; b < junk.length; b++) junk[b] = (seed = (seed * 1103515245 + 12345) >>> 0) & 0xff;
+      junk[0] = 3;
+      const snap = decodeSnapshot(junk);
+      if (snap) for (const c of snap.cars) expect(Number.isFinite(c.state.x) && Number.isFinite(c.state.heading)).toBe(true);
+    }
+  });
+});
+
 describe('input helpers', () => {
   it('neutral input packs to zero throttle/brake and centred steering', () => {
     const u: CarInput = unpackInput(packInput(NEUTRAL_INPUT));

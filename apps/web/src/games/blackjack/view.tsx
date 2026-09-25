@@ -20,7 +20,7 @@ import { ControlBar } from './controls.tsx';
 import { TableMenu } from './menu.tsx';
 import { BetSpot, ChipRack, DealerHand, DiscardTray, FeltLogo, FeltPrint, HandView, SeatPlate, Shoe } from './parts.tsx';
 import { ResultsView } from './results.tsx';
-import { SEAT_COUNT, parseRules, seatGeometry, useCompactLayout } from './util.ts';
+import { SEAT_COUNT, parseRules, seatGeometry, useCompactLayout, useShortLandscape } from './util.ts';
 
 type Send = (type: string, payload?: unknown) => void;
 
@@ -56,6 +56,7 @@ interface TableProps {
 function TableView({ state, settings, playerId, me, isHost, send }: TableProps) {
   const rules = useMemo(() => parseRules(state.rulesJson), [state.rulesJson]);
   const compact = useCompactLayout();
+  const short = useShortLandscape();
   const mySeat = playerId ? state.seats[playerId] : undefined;
   const stage = (state.stage ?? 'IDLE') as BlackjackStage;
   useTableSounds(state, mySeat);
@@ -90,7 +91,7 @@ function TableView({ state, settings, playerId, me, isHost, send }: TableProps) 
   );
 
   return (
-    <div className={cx('bj-room', compact && 'bj-room--compact')} data-stage={stage}>
+    <div className={cx('bj-room', compact && 'bj-room--compact', compact && short && 'bj-room--short')} data-stage={stage}>
       {compact ? (
         <CompactTable state={state} rules={rules} playerId={playerId} bySeat={bySeat} furniture={furniture} />
       ) : (

@@ -13,8 +13,8 @@
   --hd-felt-3: #094a30;
   --hd-felt-4: #06311f;
   --hd-pod: rgba(14, 12, 28, 0.94);
-  /* Pixel numerals (the platform display face: distinct 5/S, compact widths). */
-  --hd-num: var(--font-display);
+  /* Numerals: crisp tabular sans (pixel faces blur 8/9 at small sizes). */
+  --hd-num: var(--font-tech);
   position: relative;
   height: calc(100dvh - var(--topbar-h) - var(--safe-top));
   min-height: 0;
@@ -499,7 +499,7 @@
   margin: 0 1px;
 }
 .hd-seat[data-hero-cards='true'] .hd-seat__cards {
-  bottom: calc(100% - 6px);
+  bottom: calc(100% + 4px);
 }
 .hd-seat[data-hero-cards='true'] .hd-seat__card {
   margin: 0 calc(var(--card-w) * -0.06);
@@ -592,9 +592,11 @@
   color: var(--yellow);
 }
 .hd-pod__stack {
-  margin-top: 3px;
+  margin-top: 2px;
   font-family: var(--hd-num);
-  font-size: 17px;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
   color: var(--hd-gold-soft);
   white-space: nowrap;
@@ -609,16 +611,26 @@
   color: var(--cyan);
 }
 .hd-seat[data-compact='true'] .hd-pod {
-  gap: 5px;
-  padding: 0 6px 0 5px;
+  gap: 4px;
+  padding: 0 4px 0 4px;
   border-radius: 9px;
 }
 .hd-seat[data-compact='true'] .hd-pod__name {
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.05;
+}
+/* Phones: names may take two short lines instead of three letters and an ellipsis. */
+.hd-seat[data-compact='true'] .hd-pod__name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .hd-seat[data-compact='true'] .hd-pod__stack {
-  margin-top: 2px;
-  font-size: 13px;
+  margin-top: 1px;
+  font-size: 12px;
 }
 .hd-seat[data-compact='true'] .hd-pod__you {
   display: none;
@@ -717,7 +729,6 @@
   display: grid;
   place-items: center;
 }
-.hd-seat__open,
 .hd-seat__sit {
   display: grid;
   place-items: center;
@@ -726,11 +737,6 @@
   border-radius: 50%;
   font-family: var(--font-pixel);
   font-size: 10px;
-}
-.hd-seat__open {
-  color: rgba(255, 255, 255, 0.25);
-  border: 1.5px dashed rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.2);
 }
 .hd-seat__sit {
   width: auto;
@@ -1462,4 +1468,76 @@
   .hd-hud__virtual {
     display: none;
   }
+}
+
+/* Tabular numerals everywhere amounts appear. */
+.hd-pot__amount,
+.hd-bet__amount,
+.hd-hud__stat b,
+.hd-hero__stack,
+.hd-raise__input,
+.hd-amt,
+.hd-winner__amount,
+.hd-standing__stack,
+.hd-standing__net,
+.hd-pot__side b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Waiting feed in the dock: the last few actions of this hand. */
+.hd-feed {
+  flex: 1;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.hd-feed__line {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hd-feed__line:last-child {
+  color: var(--text-0);
+}
+.hd-feed__line[data-kind='street'] {
+  color: var(--hd-emerald);
+}
+.hd-feed__line[data-kind='win'] {
+  color: var(--hd-gold);
+}
+.hd-action__more {
+  margin-left: -2px;
+  opacity: 0.8;
+}
+.hd-preset--close {
+  flex: 0 0 auto;
+  min-width: 34px;
+}
+.hd--side .hd-dock__inner {
+  gap: 10px;
+}
+.hd--side .hd-dock__actions {
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 10px;
+}
+.hd--side .hd-feed {
+  flex: 1;
+  margin: 0;
+  align-content: start;
+}
+.hd--side .hd-feed__line {
+  white-space: normal;
+}
+.hd--side .hd-seat-controls {
+  justify-content: flex-start;
 }

@@ -5,7 +5,20 @@
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { AVATARS, GAME_CATALOG, LIMITS, isGameId, type Avatar, type ChatMessage, type GameId } from '@dascade/shared';
-import { Avatar as AvatarBadge, Button, EmptyState, GameTheme, IconButton, Spinner, TextInput, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
+import {
+  Avatar as AvatarBadge,
+  Button,
+  EmptyState,
+  GameTheme,
+  IconButton,
+  PixelIcon,
+  Spinner,
+  TextInput,
+  cx,
+  handleRovingKeys,
+  rovingTabIndex,
+  type IconName,
+} from '@dascade/ui';
 import { useApp } from '../app/store.ts';
 import { getStateSnapshot, session, useSessionStore } from '../net/session.ts';
 import { useGame, useRoomSelector } from '../net/hooks.ts';
@@ -198,7 +211,57 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
   );
 }
 
-export function LeaveButton({ size = 'lg', compact }: { size?: 'sm' | 'md' | 'lg'; compact?: boolean }) {
+/**
+ * Standard results layout games can adopt: a centered header (title, optional icon and subtitle),
+ * the game's own results content, and a sticky action row — "Play again" for the host, "Leave" for
+ * everyone, plus optional extra `actions`. Render it inside your <GameStage>.
+ */
+export function ResultsShell({
+  title,
+  subtitle,
+  icon,
+  actions,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  icon?: IconName;
+  /** Extra buttons for the action row (e.g. "Share results"). */
+  actions?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const headingId = useId();
+  return (
+    <section className={cx('results-shell', className)} aria-labelledby={headingId}>
+      <header className="results-shell__header">
+        {icon ? <PixelIcon name={icon} className="results-shell__icon" /> : null}
+        <h1 id={headingId} className="dc-title results-shell__title">
+          {title}
+        </h1>
+        {subtitle ? <p className="results-shell__subtitle">{subtitle}</p> : null}
+      </header>
+      <div className="results-shell__body">{children}</div>
+      <footer className="results-shell__actions">
+        <ResultsActions extra={actions} />
+      </footer>
+    </section>
+  );
+}
+
+export function LeaveButton({
+  size = 'lg',
+  compact,
+  className,
+  collapseLabel,
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  compact?: boolean;
+  className?: string;
+  /** Wrap the label so a layout can hide it visually (it stays the accessible name). */
+  collapseLabel?: boolean;
+}) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
   const leave = async () => {
@@ -207,7 +270,7 @@ export function LeaveButton({ size = 'lg', compact }: { size?: 'sm' | 'md' | 'lg
   };
   if (confirming) {
     return (
-      <span className="dc-row" role="group" aria-label="Confirm leave">
+      <span className={cx('dc-row', className)} role="group" aria-label="Confirm leave">
         <Button size={size === 'lg' ? 'md' : 'sm'} variant="danger" onClick={leave}>
           Leave room
         </Button>
@@ -218,10 +281,10 @@ export function LeaveButton({ size = 'lg', compact }: { size?: 'sm' | 'md' | 'lg
     );
   }
   return compact ? (
-    <IconButton icon="leave" label="Leave room" onClick={() => setConfirming(true)} />
+    <IconButton icon="leave" label="Leave room" className={className} onClick={() => setConfirming(true)} />
   ) : (
-    <Button size={size} variant="ghost" icon="leave" onClick={() => setConfirming(true)}>
-      Leave
+    <Button size={size} variant="ghost" icon="leave" className={className} onClick={() => setConfirming(true)}>
+      {collapseLabel ? <span className="dc-collapse-label">Leave</span> : 'Leave'}
     </Button>
   );
 }

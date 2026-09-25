@@ -712,8 +712,10 @@
   min-width: 0;
 }
 .dn-status__text strong {
-  font-family: var(--font-display);
-  font-size: var(--fs-lg);
+  font-family: var(--font-pixel);
+  letter-spacing: 0.04em;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
   color: var(--text-0);
 }
 .dn-status__text span {
@@ -917,7 +919,8 @@
   border-color: var(--dn-violet);
 }
 .dn-wheel-result__n {
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: clamp(1.8rem, 4.2vw, 3rem);
   line-height: 1;
@@ -1038,7 +1041,7 @@
   transition: background var(--dur-1);
 }
 .dn-cell {
-  font-family: var(--font-display);
+  font-family: var(--font-pixel);
   font-weight: 700;
   font-size: clamp(12px, calc(var(--unit, 48px) * 0.34), 22px);
 }
@@ -1164,6 +1167,11 @@
   width: 60%;
 }
 .dn-board[data-open='true'] .dn-hit:hover i,
+.dn-hit:focus-visible {
+  outline: 2px solid var(--dn-gold);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
 .dn-hit:focus-visible i {
   opacity: 1;
   transform: none;
@@ -1814,7 +1822,8 @@
   gap: 14px;
 }
 .dn-point__num {
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 3.8rem;
   line-height: 1;
@@ -2259,7 +2268,8 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 40%, #1a0d33), #0d0619);
   border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
   box-shadow: 0 0 24px color-mix(in srgb, var(--c) 30%, transparent);
-  font-family: var(--font-display);
+  font-family: var(--font-tech);
+  font-variant-numeric: tabular-nums;
   font-size: 2rem;
   color: var(--text-0);
 }

@@ -104,16 +104,22 @@
 }
 .code-chip__label {
   font-family: var(--font-pixel);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--text-2);
   text-transform: uppercase;
 }
 .code-chip__code {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   color: var(--accent);
+}
+@media (pointer: coarse) {
+  .code-chip {
+    height: 44px;
+  }
 }
 
 .conn-dot {
@@ -219,7 +225,7 @@
 }
 .countdown-overlay__num {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 400;
   font-size: clamp(120px, 26vw, 260px);
   line-height: 1;
   color: var(--accent);
@@ -247,10 +253,15 @@
 }
 
 /* ---------- Lobby ---------- */
+.lobby {
+  /* Height of the sticky action bar (used to size the sticky chat so the bar never hides it). */
+  --lobby-bar-h: 72px;
+}
 .lobby__inner {
+  flex: 1 0 auto;
   width: min(var(--content-max), 100%);
   margin: 0 auto;
-  padding: var(--sp-6) calc(16px + var(--safe-right)) calc(120px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  padding: var(--sp-6) calc(16px + var(--safe-right)) var(--sp-6) calc(16px + var(--safe-left));
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
@@ -300,7 +311,8 @@
   box-shadow:
     inset 0 -4px 0 rgba(0, 0, 0, 0.35),
     var(--glow-sm);
-  font-family: var(--font-display);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: clamp(var(--fs-2xl), 4.5vw, var(--fs-3xl));
   color: var(--accent);
@@ -340,20 +352,24 @@
   top: calc(var(--topbar-h) + 16px);
 }
 .lobby__chat .chat {
-  height: min(520px, 60dvh);
+  /* Fits between the top bar and the action bar even before the panel becomes sticky. */
+  height: clamp(260px, calc(100dvh - var(--topbar-h) - var(--lobby-bar-h) - 290px), 520px);
 }
 .lobby__grid:not(:has(.lobby__setup)) {
   grid-template-areas: 'players settings chat';
 }
 
 .lobby__actions {
-  position: fixed;
+  /* Sticky *in the flow*: it takes up its own height, so the end of the lobby is never covered. */
+  position: sticky;
   z-index: var(--z-hud);
-  left: 0;
-  right: 0;
   bottom: 0;
-  padding: 12px calc(16px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(16px + var(--safe-left));
-  background: linear-gradient(180deg, transparent, rgba(5, 4, 11, 0.92) 30%);
+  padding: 10px calc(16px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: color-mix(in srgb, var(--bg-1) 94%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
 }
 .lobby__actions-inner {
   width: min(var(--content-max), 100%);
@@ -369,6 +385,20 @@
   gap: 8px;
   font-family: var(--font-display);
   color: var(--text-1);
+}
+/* Short landscape phones: a slimmer bar. */
+@media (max-height: 480px) {
+  .lobby {
+    --lobby-bar-h: 58px;
+  }
+  .lobby__actions {
+    padding-top: 6px;
+    padding-bottom: calc(6px + var(--safe-bottom));
+  }
+  .lobby__actions .dc-btn--lg {
+    min-height: 44px;
+    font-size: var(--fs-md);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -462,7 +492,7 @@
 }
 .ready-pill {
   font-family: var(--font-pixel);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -597,6 +627,57 @@
   gap: 10px;
 }
 
+/* Shared results layout (ResultsShell): header, game content, sticky action row. */
+.results-shell {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.results-shell__header {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  width: min(var(--content-max), 100%);
+  margin: 0 auto;
+  padding: var(--sp-8) calc(16px + var(--safe-right)) var(--sp-5) calc(16px + var(--safe-left));
+  text-align: center;
+}
+.results-shell__icon {
+  width: 40px;
+  height: 40px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+.results-shell__title {
+  font-size: clamp(var(--fs-2xl), 5vw, var(--fs-4xl));
+  overflow-wrap: anywhere;
+}
+.results-shell__subtitle {
+  max-width: 60ch;
+  color: var(--text-2);
+}
+.results-shell__body {
+  flex: 1 0 auto;
+  width: min(var(--content-max), 100%);
+  margin: 0 auto;
+  padding: 0 calc(16px + var(--safe-right)) var(--sp-6) calc(16px + var(--safe-left));
+}
+.results-shell__actions {
+  position: sticky;
+  z-index: var(--z-hud);
+  bottom: 0;
+  padding: 10px calc(16px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: color-mix(in srgb, var(--bg-1) 94%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line-strong);
+}
+.results-shell__actions .results-actions {
+  width: min(var(--content-max), 100%);
+  margin: 0 auto;
+}
+
 /* ---------- Cabinet entry ---------- */
 .entry {
   position: relative;
@@ -705,26 +786,71 @@
   width: min(480px, 100%);
 }
 
-/* Compact lobby action bar on phones */
+/* Phones: ONE row — Leave (icon) · Spectate (icon) · Ready/Start (fills the rest) — with the
+   "waiting for host" note as a small caption above it. Labels stay as accessible names. */
 @media (max-width: 560px) {
-  .lobby__inner {
-    padding-bottom: calc(190px + var(--safe-bottom));
+  .lobby {
+    --lobby-bar-h: 64px;
+  }
+  .lobby__actions {
+    padding-top: 8px;
+    padding-bottom: calc(8px + var(--safe-bottom));
   }
   .lobby__actions-inner {
-    gap: 6px;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas: 'leave spec main';
+    align-items: center;
+    gap: 4px 6px;
   }
-  .lobby__waiting {
-    order: -1;
-    width: 100%;
-    justify-content: center;
-    font-size: var(--fs-sm);
-    color: var(--text-2);
+  .lobby__actions-inner:has(.lobby__waiting) {
+    grid-template-areas:
+      'cap cap cap'
+      'leave spec main';
   }
   .lobby__actions-inner .dc-spacer {
     display: none;
   }
-  .lobby__actions-inner > .dc-btn:last-child {
-    flex: 1;
+  .lobby__leave {
+    grid-area: leave;
+  }
+  .lobby__spectate {
+    grid-area: spec;
+  }
+  .lobby__ready,
+  .lobby__start {
+    grid-area: main;
+    min-width: 0;
+    width: auto;
+  }
+  .lobby__start.dc-btn--lg {
+    min-height: 48px;
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-md);
+  }
+  .lobby__actions .dc-collapse-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .lobby__leave.dc-btn,
+  .lobby__spectate.dc-btn {
+    width: 44px;
+    padding: 0;
+  }
+  .lobby__waiting {
+    grid-area: cap;
+    justify-self: center;
+    gap: 6px;
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+  }
+  .lobby__waiting .dc-icon {
+    width: 12px;
+    height: 12px;
   }
 }
 

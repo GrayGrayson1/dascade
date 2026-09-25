@@ -2,7 +2,7 @@
  * The shared lobby used by every cabinet. Games plug in their own SettingsPanel
  * and PlayerSetup via their GameClientModule.
  */
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { GAME_CATALOG, LIMITS, type GameId, type PlayerView } from '@dascade/shared';
 import {
   Badge,
@@ -74,8 +74,15 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   const canStart = activeConnected.length >= minPlayers;
   const SettingsPanel = module?.SettingsPanel as ComponentType<SettingsPanelProps<Record<string, unknown>>> | undefined;
   const PlayerSetup = module?.PlayerSetup;
-  const tabs: Array<{ value: LobbyTab; label: string }> = [
-    { value: 'players', label: `Players ${seated.length}/${state.maxPlayers}` },
+  const tabs: Array<{ value: LobbyTab; label: ReactNode }> = [
+    {
+      value: 'players',
+      label: (
+        <>
+          Players <span className="dc-num">{`${seated.length}/${state.maxPlayers}`}</span>
+        </>
+      ),
+    },
     { value: 'settings', label: 'Settings' },
     ...(PlayerSetup ? [{ value: 'setup' as const, label: 'Your setup' }] : []),
     { value: 'chat', label: 'Chat' },
@@ -139,12 +146,16 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
         </div>
       </div>
 
+      {/* In-flow sticky bar: it reserves its own height (never covers the end of the lobby). On
+          phones it is one row — Leave and Spectate collapse to icons, Ready/Start fills the rest
+          and the waiting note becomes a caption (see app.css). */}
       <footer className="lobby__actions">
         <div className="lobby__actions-inner">
-          <LeaveButton size="md" />
+          <LeaveButton size="md" className="lobby__leave" collapseLabel />
           <span className="dc-spacer" />
           {me && !me.spectator && !isHost ? (
             <Button
+              className="lobby__ready"
               variant={me.ready ? 'success' : 'secondary'}
               icon={me.ready ? 'check' : undefined}
               onClick={() => {
@@ -158,16 +169,25 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           ) : null}
           {state.allowSpectators && me ? (
             <Button
+              className="lobby__spectate"
               variant="ghost"
               icon="eye"
               onClick={() => session.lobby.spectate(!me.spectator)}
               disabled={me.spectator && seated.length >= state.maxPlayers}
             >
-              {me.spectator ? 'Take a seat' : 'Spectate'}
+              <span className="dc-collapse-label">{me.spectator ? 'Take a seat' : 'Spectate'}</span>
             </Button>
           ) : null}
           {isHost ? (
-            <Button variant="primary" size="lg" icon="play" disabled={!canStart} onClick={start} title={canStart ? undefined : `Need ${minPlayers} players`}>
+            <Button
+              className="lobby__start"
+              variant="primary"
+              size="lg"
+              icon="play"
+              disabled={!canStart}
+              onClick={start}
+              title={canStart ? undefined : `Need ${minPlayers} players`}
+            >
               {canStart ? 'Start game' : `Need ${minPlayers - activeConnected.length} more`}
             </Button>
           ) : (

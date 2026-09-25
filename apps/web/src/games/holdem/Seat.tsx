@@ -54,18 +54,14 @@ export const Seat = memo(function Seat(props: SeatProps) {
   const style = { left: pos.x, top: pos.y, '--pod-w': `${geo.podW}px`, '--pod-h': `${geo.podH}px` } as CSSProperties;
 
   if (!seat.playerId) {
+    // Open seats only appear when the viewer can take one; otherwise the rail stays clean.
+    if (!props.canSit) return null;
     return (
       <div className="hd-seat hd-seat--empty" style={style} data-compact={geo.compact ? 'true' : undefined}>
-        {props.canSit ? (
-          <button type="button" className="hd-seat__sit" onClick={() => props.onSit(seat.index)} aria-label={`Sit in seat ${seat.index + 1}`}>
-            <PixelIcon name="plus" />
-            <span>Sit</span>
-          </button>
-        ) : (
-          <span className="hd-seat__open" aria-label={`Seat ${seat.index + 1} is open`}>
-            {seat.index + 1}
-          </span>
-        )}
+        <button type="button" className="hd-seat__sit" onClick={() => props.onSit(seat.index)} aria-label={`Sit in seat ${seat.index + 1}`}>
+          <PixelIcon name="plus" />
+          <span>Sit</span>
+        </button>
       </div>
     );
   }
@@ -136,7 +132,7 @@ export const Seat = memo(function Seat(props: SeatProps) {
 
       <div className="hd-pod">
         <span className="hd-pod__avatar">
-          <Avatar avatar={player?.avatar ?? 'ghost'} color={player?.color ?? '#8f88b3'} size={geo.compact ? 24 : 34} offline={!connected} />
+          <Avatar avatar={player?.avatar ?? 'ghost'} color={player?.color ?? '#8f88b3'} size={geo.compact ? 18 : geo.podH < 60 ? 28 : 34} offline={!connected} />
           {!connected && !seat.left ? <PixelIcon name="wifi-off" className="hd-pod__offline" title="Disconnected" /> : null}
         </span>
         <span className="hd-pod__info">

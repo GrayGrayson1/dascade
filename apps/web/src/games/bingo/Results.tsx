@@ -36,7 +36,7 @@ export function Results({ game }: { game: GameContext<BingoPublicState, BingoSet
 
   return (
     <div className="bg-results">
-      <Confetti burst={burst} />
+      <Confetti burst={burst} behind />
       <header className="bg-results__hero">
         <div className="bg-results__balls" aria-hidden>
           {BINGO_LETTERS.map((l, i) => (

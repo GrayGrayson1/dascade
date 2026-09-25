@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CIRCUIT_SIM, packInput, type CarInput, type CircuitInputPacket } from '@dascade/shared/games/circuit';
-import { CHASSIS, RaceSim, autopilot, createBotMemory, getTrack, type SimOptions } from '@dascade/game-core/circuit';
+import { CHASSIS, RaceSim, autopilot, createBotMemory, encodeSnapshot, getTrack, type SimOptions } from '@dascade/game-core/circuit';
 import { CircuitNet } from './netClient.ts';
 
 const OPTS: SimOptions = { laps: 3, collisions: false, boost: true, tickRate: CIRCUIT_SIM.tickRate, finishWindowMs: 30_000, maxRaceMs: 600_000 };
@@ -202,5 +202,62 @@ describe('CircuitNet interpolation', () => {
     expect(sent.length).toBeGreaterThan(0);
     expect(sent[0]!.seq).toBeGreaterThan(5002);
     expect(sim.pushInputs(0, sent[0]!.seq, sent[0]!.inputs)).toBe(sent[0]!.inputs.length);
+  });
+});
+
+describe('CircuitNet robustness against malformed snapshots', () => {
+  const finite = (c: { x: number; y: number; heading: number; vx: number; vy: number } | null) =>
+    c !== null && [c.x, c.y, c.heading, c.vx, c.vy].every(Number.isFinite);
+
+  /** A snapshot one tick ahead of the server whose cars carry non-finite state. */
+  function poisoned(h: ReturnType<typeof harness>, value: number): Uint8Array {
+    const snap = h.sim.snapshot();
+    snap.tick += 1;
+    snap.cars = snap.cars.map((c) => ({ ...c, state: { ...c.state, x: value, vx: value, heading: value } }));
+    return encodeSnapshot(snap);
+  }
+
+  it('ignores cars with NaN/Infinity state instead of poisoning prediction, correction offsets or interpolation', () => {
+    const h = harness(3);
+    h.sim.go();
+    for (let k = 0; k < 120; k++) h.step();
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      expect(() => h.me.ingest(poisoned(h, bad), h.now)).not.toThrow();
+      expect(() => h.observer.ingest(poisoned(h, bad), h.now)).not.toThrow();
+      h.step();
+      expect(finite(h.me.localRender())).toBe(true);
+      expect(finite(h.me.predicted)).toBe(true);
+      expect(finite(h.observer.remoteRender(1, h.now))).toBe(true);
+    }
+    // Normal snapshots keep flowing and everything stays finite afterwards.
+    for (let k = 0; k < 60; k++) h.step();
+    expect(finite(h.me.localRender())).toBe(true);
+    expect(finite(h.observer.remoteRender(0, h.now + 50))).toBe(true);
+  });
+
+  it('survives truncated, oversized-count and random garbage packets', () => {
+    const h = harness(2);
+    h.sim.go();
+    for (let k = 0; k < 60; k++) h.step();
+    const good = h.sim.encodeSnapshot();
+    const garbage: Uint8Array[] = [new Uint8Array(0), good.slice(0, 15), good.slice(0, good.length - 1)];
+    const bigCount = good.slice();
+    bigCount[12] = 255;
+    garbage.push(bigCount);
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+    for (let n = 0; n < 200; n++) {
+      const b = good.slice();
+      for (let j = 0; j < 12; j++) b[Math.floor(rnd() * b.length)] = Math.floor(rnd() * 256);
+      b[0] = good[0]!; // keep the version byte so the body is actually parsed
+      garbage.push(b);
+    }
+    for (const bytes of garbage) {
+      expect(() => h.me.ingest(bytes, h.now)).not.toThrow();
+      expect(() => h.observer.ingest(bytes, h.now)).not.toThrow();
+    }
+    for (let k = 0; k < 30; k++) h.step();
+    expect(finite(h.me.localRender())).toBe(true);
+    for (const slot of h.observer.slots()) expect(finite(h.observer.remoteRender(slot, h.now))).toBe(true);
   });
 });

@@ -22,7 +22,10 @@ export function Narrative({ paragraphs, onDone }: { paragraphs: string[]; onDone
   const tokens = useMemo<Token[]>(() => paragraphs.flatMap((p, para) => emphasis(p).map((seg) => ({ ...seg, para }))), [paragraphs]);
   const text = useMemo(() => tokens.map((t) => t.text).join(''), [tokens]);
   const total = text.length;
-  const [shown, setShown] = useState(reduced ? total : 0);
+  const [typed, setShown] = useState(reduced ? total : 0);
+  // Turning reduced motion on mid-reveal shows everything at once (and `typed` may exceed a
+  // shorter re-rendered text, e.g. after an item changes an interpolated count).
+  const shown = reduced ? total : Math.min(typed, total);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 

@@ -19,7 +19,7 @@ interface Particle {
 }
 
 /** Full-screen pixel confetti. Re-fires whenever `burst` changes. */
-export function Confetti({ burst }: { burst: number }) {
+export function Confetti({ burst, behind = false }: { burst: number; behind?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const fx = useFx();
   const reduced = useReducedMotion();
@@ -75,11 +75,11 @@ export function Confetti({ burst }: { burst: number }) {
         if (p.y > H() + 20) continue;
         alive++;
         const w = Math.max(1, Math.abs(Math.cos(p.phase)) * p.size);
-        ctx.globalAlpha = Math.max(0, Math.min(1, 1.4 - (now - started) / 3200));
+        ctx.globalAlpha = Math.max(0, Math.min(1, 1.3 - (now - started) / 2400));
         ctx.fillStyle = p.color;
         ctx.fillRect(Math.round(p.x - w / 2), Math.round(p.y - p.size / 2), Math.round(w), p.size);
       }
-      if (alive > 0 && now - started < 4200) raf = requestAnimationFrame(tick);
+      if (alive > 0 && now - started < 3000) raf = requestAnimationFrame(tick);
       else ctx.clearRect(0, 0, W(), H());
     };
     raf = requestAnimationFrame(tick);
@@ -91,7 +91,7 @@ export function Confetti({ burst }: { burst: number }) {
   }, [burst, amount]);
 
   if (amount === 0) return null;
-  return <canvas ref={ref} className="bg-confetti" aria-hidden />;
+  return <canvas ref={ref} className={behind ? 'bg-confetti bg-confetti--behind' : 'bg-confetti'} aria-hidden />;
 }
 
 export interface BurstInfo {

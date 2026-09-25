@@ -70,7 +70,13 @@ export function ResultsView() {
         <header className="wh-results__hero">
           <span className="dc-label">Session complete</span>
           <h1 className="dc-title wh-results__title">
-            {total === 0 ? 'No spins this time' : `The wheel spoke ${total} time${total === 1 ? '' : 's'}`}
+            {total === 0 ? (
+              'No spins this time'
+            ) : (
+              <>
+                The wheel spoke <span className="wh-digits">{total}</span> time{total === 1 ? '' : 's'}
+              </>
+            )}
           </h1>
           {settings.title ? <p className="wh-results__question">“{settings.title}”</p> : null}
           {top ? <TopLine tallies={tallies} /> : null}

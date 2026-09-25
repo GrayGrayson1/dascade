@@ -394,6 +394,32 @@ describe('DAS Bingo room', () => {
     expect(seeds).toHaveLength(0);
   });
 
+  it('mid-match host changes never send the seed value, even back to the host who typed it', async () => {
+    const host = await create({ ...MANUAL });
+    const heir = await join(host.room.roomId, 'Heir');
+    const hostSeeds = collect<{ seed: string; hidden: boolean }>(host.room, BINGO_MSG.seed);
+    const heirSeeds = collect<{ seed: string; hidden: boolean }>(heir.room, BINGO_MSG.seed);
+    host.room.send(BINGO_MSG.setSeed, { seed: 'SECRET-SEED' });
+    await waitFor(() => hostSeeds.some((s) => s.seed === 'SECRET-SEED'), 3000, 'host sees its seed in the lobby');
+    await start(host, [heir]);
+    const before = hostSeeds.length;
+    host.room.send('lobby:transferHost', { playerId: heir.me().playerId });
+    await waitFor(() => heirSeeds.length > 0, 3000, 'heir told about the seed');
+    heir.room.send('lobby:transferHost', { playerId: host.me().playerId });
+    await waitFor(() => hostSeeds.length > before, 3000, 'host told again');
+    expect(heirSeeds.every((s) => s.seed === '' && s.hidden)).toBe(true);
+    expect(hostSeeds.slice(before).every((s) => s.seed === '' && s.hidden)).toBe(true);
+    // Once the match is over the original host may see it again.
+    host.room.send(BINGO_MSG.endGame, {});
+    await waitFor(() => st(host.room).phase === 'RESULTS', 3000, 'RESULTS');
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'LOBBY');
+    host.room.send('lobby:transferHost', { playerId: heir.me().playerId });
+    await waitFor(() => st(host.room).hostId === heir.me().playerId, 3000, 'heir host');
+    heir.room.send('lobby:transferHost', { playerId: host.me().playerId });
+    await waitFor(() => hostSeeds.at(-1)?.seed === 'SECRET-SEED', 3000, 'seed back in the lobby');
+  });
+
   it('a new host is told a fixed seed is set but never sees its value', async () => {
     const host = await create({ ...MANUAL });
     const heir = await join(host.room.roomId, 'Heir');
