@@ -165,7 +165,9 @@ function drive(bot: Bot, now: number): void {
   if (!net.predicting) return;
   const spec = CHASSIS[(stateOf(bot.room)?.cars?.get?.(bot.playerId)?.chassis as keyof typeof CHASSIS) ?? 'volt'] ?? CHASSIS.volt;
   const track = getTrack(TRACK);
-  const locked = net.status !== RaceStatusCode.racing;
+  // Locked only on the grid: after the race is decided the server keeps simulating the
+  // cool-down lap, so predicting "locked" there would fight every snapshot.
+  const locked = net.status === RaceStatusCode.grid;
   net.update(now, () => autopilot(net.predicted!, spec, track, bot.memory, { skill: bot.skill, lane: bot.lane, drift: bot.drift }), locked);
 }
 

@@ -184,6 +184,27 @@ describe('CircuitRoom under adversarial conditions', () => {
     expect(st(host.room).race.status).toBe('racing');
   });
 
+  it('a racer whose connection blips as the countdown starts still gets their grid slot', async () => {
+    const host = await createHost();
+    const guest = await join(host.room.roomId, 'Blip');
+    const guestId = guest.me().playerId;
+    guest.room.reconnection.minUptime = 0;
+    const reconnected = new Promise<void>((r) => guest.room.onReconnect(() => r()));
+    (guest.room as any).connection.transport.ws.close(4010);
+    await waitFor(() => st(host.room).players.get(guestId)?.connected === false, 3000, 'drop');
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host.room).racers.size > 0, 3000, 'grid');
+    await reconnected;
+    await waitFor(() => st(host.room).players.get(guestId)?.connected === true, 3000, 'back');
+    expect(st(host.room).racers.has(guestId)).toBe(true);
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'green light');
+    const slot = racer(guest).slot;
+    const car = sim(host.server).car(slot)!;
+    expect(car.connected).toBe(true);
+    await drive(guest, 600);
+    await waitFor(() => car.applied > 10, 2000, 'guest drives');
+  });
+
   it('a racer leaving on the grid is retired; the last racer leaving ends the match cleanly', async () => {
     const host = await createHost();
     (host.server as any).countdownMs = 1500;

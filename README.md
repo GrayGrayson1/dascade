@@ -72,7 +72,7 @@ Everything is optional. Copy `.env.example` to `.env` at the repo root (both app
 |---|---|---|
 | `PORT`, `HOST` | server | Listen address (default `0.0.0.0:2567`) |
 | `NODE_ENV=production` | server | Serve the built client from the game server |
-| `DASCADE_SAVE_SECRET` | server | HMAC key for DASQuest save files (**set this in production**) |
+| `DASCADE_SAVE_SECRET` | server | HMAC key (32+ chars) for DASQuest save files. Production disables saves when it is unset. |
 | `DASCADE_LATENCY_MS` | server | Simulated round-trip latency for netcode testing |
 | `DASCADE_ONLY_GAMES` | server | Comma-separated game ids to load (focused development) |
 | `DASCADE_RELAXED_LIMITS=1` | server | Relax per-IP matchmaking throttles (tests / load simulation) |

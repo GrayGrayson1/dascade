@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false --env-file-if-exists=../../.env src/index.ts",
+    "dev": "NODE_ENV=development tsx watch --clear-screen=false --env-file-if-exists=../../.env src/index.ts",
     "build": "node build.mjs",
     "start": "NODE_ENV=production node --env-file-if-exists=../../.env dist/index.js",
     "typecheck": "tsc --noEmit -p ."

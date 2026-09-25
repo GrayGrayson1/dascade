@@ -148,7 +148,7 @@ export class CircuitRoom extends BaseGameRoom<CircuitState, CircuitSettings> {
   // ---------------------------------------------------------------------------
 
   protected override validateStart(): string | null {
-    if (this.activePlayers().length > GRID_SLOTS) return `The grid holds ${GRID_SLOTS} cars.`;
+    if (this.seatedPlayers().filter((p) => !p.away).length > GRID_SLOTS) return `The grid holds ${GRID_SLOTS} cars.`;
     return null;
   }
 
@@ -182,10 +182,16 @@ export class CircuitRoom extends BaseGameRoom<CircuitState, CircuitSettings> {
     this.slotOf.clear();
     this.playerAt.clear();
     this.state.racers.clear();
-    const entrants = shuffleInPlace([...this.activePlayers()], this.rng).slice(0, GRID_SLOTS);
+    // Seated players who are connected or inside their reconnect grace (a blip as the countdown
+    // starts must not cost a grid slot). Absent cars coast, turn into ghosts and never stall the race.
+    const entrants = shuffleInPlace(
+      this.seatedPlayers().filter((p) => !p.away),
+      this.rng,
+    ).slice(0, GRID_SLOTS);
     entrants.forEach((p, slot) => {
       const look = this.state.cars.get(p.id);
       sim.addCar(slot, p.id, (look?.chassis as CarConfig['chassis']) ?? 'volt');
+      if (!p.client) sim.setConnected(slot, false);
       this.slotOf.set(p.id, slot);
       this.playerAt.set(slot, p.id);
       const racer = new Racer();

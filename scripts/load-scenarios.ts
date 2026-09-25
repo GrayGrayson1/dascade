@@ -124,7 +124,7 @@ export function register(add: (name: string, fn: () => Promise<void>) => void, c
     const claimed = new Set<number>();
     let calls = 0;
     const t0 = performance.now();
-    let winners = 0;
+    let winners: number;
     while (calls < 75 && performance.now() - t0 < 45_000) {
       host.room.send(BINGO_MSG.call, {});
       calls++;

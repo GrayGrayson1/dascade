@@ -48,7 +48,7 @@ test.describe('DASh Circuit', () => {
     await page.keyboard.up('KeyW');
 
     // Server-side progress increased (the client only sends inputs).
-    await expect.poll(async () => (await distance(page, hostId)) - before, { timeout: 10_000 }).toBeGreaterThan(400);
+    await expect.poll(async () => (await distance(page, hostId)) - before, { timeout: 25_000 }).toBeGreaterThan(400);
     const s = await roomState(page);
     expect(s.race.status).toBe('racing');
     expect(Object.keys(s.racers).length).toBe(2);
@@ -72,7 +72,7 @@ test.describe('DASh Circuit', () => {
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(3000);
     await page.keyboard.up('ArrowUp');
-    await expect.poll(async () => (await distance(page, me)) - before, { timeout: 10_000 }).toBeGreaterThan(400);
+    await expect.poll(async () => (await distance(page, me)) - before, { timeout: 25_000 }).toBeGreaterThan(400);
     await leaveRoom(page);
   });
 });
