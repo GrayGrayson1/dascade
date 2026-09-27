@@ -14,7 +14,7 @@ services:
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: 22.12.0
+        value: 22.22.3
       # Enables DASQuest checkpoint saves. Render generates a random 32+ char value.
       - key: DASCADE_SAVE_SECRET
         generateValue: true
