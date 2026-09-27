@@ -14,6 +14,23 @@ export const ROOM_LOADERS: Record<GameId, () => Promise<AnyGameRoom>> = {
   dasino: async () => (await import('./dasino/DasinoRoom.ts')).DasinoRoom,
   circuit: async () => (await import('./circuit/CircuitRoom.ts')).CircuitRoom,
   quest: async () => (await import('./quest/QuestRoom.ts')).QuestRoom,
+  chess: async () => (await import('./chess/ChessRoom.ts')).ChessRoom,
+  checkers: async () => (await import('./checkers/CheckersRoom.ts')).CheckersRoom,
+  ships: async () => (await import('./ships/ShipsRoom.ts')).ShipsRoom,
+  trivia: async () => (await import('./trivia/TriviaRoom.ts')).TriviaRoom,
+  deception: async () => (await import('./deception/DeceptionRoom.ts')).DeceptionRoom,
+  masterpiece: async () => (await import('./masterpiece/MasterpieceRoom.ts')).MasterpieceRoom,
+  words: async () => (await import('./words/WordsRoom.ts')).WordsRoom,
+  survey: async () => (await import('./survey/SurveyRoom.ts')).SurveyRoom,
+  putt: async () => (await import('./putt/PuttRoom.ts')).PuttRoom,
+  tanks: async () => (await import('./tanks/TanksRoom.ts')).TanksRoom,
+  paddle: async () => (await import('./paddle/PaddleRoom.ts')).PaddleRoom,
+  snake: async () => (await import('./snake/SnakeRoom.ts')).SnakeRoom,
+  bricks: async () => (await import('./bricks/BricksRoom.ts')).BricksRoom,
+  asteroids: async () => (await import('./asteroids/AsteroidsRoom.ts')).AsteroidsRoom,
+  memory: async () => (await import('./memory/MemoryRoom.ts')).MemoryRoom,
+  blocks: async () => (await import('./blocks/BlocksRoom.ts')).BlocksRoom,
+  tournament: async () => (await import('./tournament/TournamentRoom.ts')).TournamentRoom,
 };
 
 /**

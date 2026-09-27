@@ -23,11 +23,19 @@ test.describe('shared room lifecycle', () => {
     const code = await createRoom(page, GAME, 'Hosty');
     const guest = await joinRoom(browser, code, 'Refresher');
     const before = await guest.evaluate(() => (window as any).__DASCADE__.store.getState().playerId);
+    // The one-time reconnection token is spent exactly once, even when the room screen mounts twice
+    // (React StrictMode in dev): a second attempt would be refused and log a warning.
+    const resumeSockets: string[] = [];
+    const warnings: string[] = [];
+    guest.on('websocket', (ws) => ws.url().includes('reconnectionToken=') && resumeSockets.push(ws.url()));
+    guest.on('console', (m) => (m.type() === 'warning' || m.type() === 'error') && warnings.push(m.text()));
     await guest.reload();
     await expect(guest.locator('.lobby')).toBeVisible();
     await expect.poll(() => guest.evaluate(() => (window as any).__DASCADE__.store.getState().playerId)).toBe(before);
     const state = await roomState(page);
     expect(Object.keys(state.players)).toHaveLength(2);
+    expect(resumeSockets).toHaveLength(1);
+    expect(warnings.filter((w) => /closed unexpectedly|reconnect/i.test(w))).toEqual([]);
     await guest.context().close();
   });
 
@@ -97,20 +105,20 @@ test.describe('connection loss and error states', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'reconnecting you to your seat' })).toBeVisible();
     await expect(page.locator('main.game-stage')).toHaveAttribute('inert', '');
     await expect(guest.locator('.player-list')).toContainText('Reconnecting');
-    await expect(page.getByText('Reconnected!')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Reconnected!' })).toBeVisible();
     await expect(page.locator('main.game-stage')).not.toHaveAttribute('inert', '');
     expect(await myPlayerId(page)).toBe(before);
     expect(Object.keys((await roomState(guest)).players)).toHaveLength(2);
     await guest.context().close();
   });
 
-  test('when auto-reconnect gives up, "Try again" reclaims the same seat without a reload', async ({ page, browser }) => {
+  test('when auto-reconnect gives up, "Rejoin my seat" reclaims the same seat without a reload', async ({ page, browser }) => {
     const code = await createRoom(page, GAME, 'Host');
     const guest = await joinRoom(browser, code, 'Flaky');
     const before = await myPlayerId(guest);
     await dropConnection(guest, { maxRetries: 0 });
-    await expect(guest.getByText('Connection lost')).toBeVisible();
-    await guest.getByRole('button', { name: 'Try again' }).click();
+    await expect(guest.getByRole('heading', { name: 'Connection lost' })).toBeVisible();
+    await guest.getByRole('button', { name: 'Rejoin my seat' }).click();
     await expect(guest.locator('.lobby')).toBeVisible();
     expect(await myPlayerId(guest)).toBe(before);
     await expect.poll(async () => Object.keys((await roomState(page)).players).length).toBe(2);

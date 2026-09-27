@@ -55,6 +55,7 @@ import {
   type CreateOptions,
   type GameCatalogEntry,
   type GameId,
+  type GameOutcome,
   type JoinOptions,
   type Phase,
   type RateSpec,
@@ -62,14 +63,28 @@ import {
   type Rng,
   type RoomMetadata,
   type ToastKind,
+  type TournamentMatchInfo,
   type WelcomePayload,
 } from '@dascade/shared';
+import { isProvisional, type Rating } from '@dascade/game-core/rating';
 import { PlayerState, type BaseRoomState } from '../schema/base.ts';
+import { primeRoomStateContext } from '../schema/typeContext.ts';
 import { allocateRoomCode, releaseRoomCode } from '../lib/roomCodes.ts';
 import { clientIpFromAuth, ipRateKey } from '../lib/clientIp.ts';
 import { log } from '../lib/log.ts';
 import { config } from '../config.ts';
 import { matchSink, type MatchSummary } from '../persistence/index.ts';
+import { emitOutcome, type OutcomePlayer } from '../platform/hub.ts';
+import { getRating, ratingIdentity } from '../platform/ratings.ts';
+import {
+  MATCH_BINDING_OPTION,
+  consumeMatchBinding,
+  getTournament,
+  registerBoundRoom,
+  unregisterBoundRoom,
+  type BoundMatchRoom,
+  type SeriesUpdate,
+} from '../platform/tournaments.ts';
 
 export interface PlayerRecord {
   /** Stable logical id for the lifetime of the room. Use this for all game state. */
@@ -116,6 +131,11 @@ export interface MessageOptions {
 }
 
 type Handler<T> = (player: PlayerRecord, payload: T, client: Client) => void;
+
+/** A player's DASCADE rating for this room's game (see @dascade/game-core/rating). */
+export interface PlayerRating extends Rating {
+  provisional: boolean;
+}
 
 // Per-IP matchmaking throttles. Generous on purpose: whole offices often share one public IP.
 let ipLimiter = new KeyedRateLimiter(config.relaxedLimits ? { burst: 5000, perSecond: 500 } : { burst: 300, perSecond: 5 });
@@ -166,6 +186,19 @@ export abstract class BaseGameRoom<
   protected catalog!: GameCatalogEntry;
   protected isSolo = false;
   protected matchStartedAt = 0;
+  /** Set when the Tournament Center created this room for one of its matches (see tournamentMatch). */
+  protected tournamentInfo: TournamentMatchInfo | null = null;
+  /** Increments every time a match starts; reportOutcome() accepts one outcome per match. */
+  private matchSerial = 0;
+  private outcomeReportedFor = -1;
+  /** Seated players of the current match (kept even if they leave, for outcomes/forfeits). */
+  private matchRoster = new Map<string, OutcomePlayer>();
+  /** Server-only Tournament Center binding (see "Tournament Center binding" below). */
+  private tournamentBinding: TournamentBindingState | null = null;
+  /** Platform timers (tournament series) — kept out of `timers` so games' clearAllTimers() can't cancel them. */
+  private readonly platformTimers = new Map<string, Delayed>();
+  /** Whether `lobby:ready` means anything in this room (the Tournament Center kiosk turns it off). */
+  protected lobbyReadyEnabled = true;
 
   /** All player records keyed by logical player id (includes spectators and away players). */
   protected readonly players = new Map<string, PlayerRecord>();
@@ -212,6 +245,14 @@ export abstract class BaseGameRoom<
   protected validateStart(): string | null {
     return null;
   }
+  /**
+   * Return a human-readable reason to refuse a host settings change right now (checked after
+   * `settingsEditablePhases`), or null to allow — e.g. a solo run in progress whose board or
+   * scoring depends on the settings it started with.
+   */
+  protected settingsLockReason(): string | null {
+    return null;
+  }
   protected onSettingsChanged(_prev: Settings, _next: Settings): void {}
   /** Host returned the room to the lobby (reset game state here). */
   protected onReturnToLobby(): void {}
@@ -229,6 +270,28 @@ export abstract class BaseGameRoom<
    */
   protected canBecomeHost(player: PlayerRecord): boolean {
     return !player.state.spectator || !IN_MATCH_PHASES.has(this.phase);
+  }
+  /**
+   * Return a reason to refuse a host kick, or null to allow it. Hidden-team games override this so a
+   * host can't remove opponents mid-match to swing the result (moderation still works in the lobby).
+   */
+  protected kickBlocker(_target: PlayerRecord): string | null {
+    return null;
+  }
+  /**
+   * The host is ending a match in progress ("Back to lobby" or closing the room mid-game). Games whose
+   * result matters settle it here before the match is torn down (e.g. a playing host concedes, so a
+   * losing host can't erase a rated game), or return a reason to refuse. Default: allowed, no result.
+   */
+  protected hostEndsMatch(_host: PlayerRecord): string | null {
+    return null;
+  }
+  /**
+   * Casual rooms of a rated game may opt in to rating changes (e.g. a "Rated" lobby toggle).
+   * Tournament matches of rated games are always rated.
+   */
+  protected ratedOptIn(): boolean {
+    return false;
   }
 
   // ===========================================================================
@@ -260,6 +323,9 @@ export abstract class BaseGameRoom<
     this.roomId = code;
 
     this.isSolo = Boolean(options.solo && this.catalog.capacity.supportsSolo);
+    if (this.reconnectGraceSeconds === RECONNECT_GRACE_SECONDS && this.catalog.reconnectGraceSeconds) {
+      this.reconnectGraceSeconds = this.catalog.reconnectGraceSeconds;
+    }
     const cap = this.catalog.capacity;
     this.maxClients = cap.maxRoomSize;
     // Hard per-connection ceiling; Colyseus disconnects (it can't drop) above it. Fairness comes from
@@ -281,6 +347,8 @@ export abstract class BaseGameRoom<
     const fallbackName = `${cleanNickname(options.name, LIMITS.nickname)}'s ${this.catalog.title}`;
     // Same profanity masking as a lobby rename (the name is public, e.g. via /api/rooms/:code).
     state.roomName = maskProfanity(cleanText(options.roomName ?? '', LIMITS.roomName) || (this.isSolo ? `Solo ${this.catalog.title}` : fallbackName));
+    // Describe only this room's schema types to joining clients (not every cabinet's; see typeContext.ts).
+    primeRoomStateContext(state);
     this.state = state;
 
     this.settings = this.defaultSettings();
@@ -290,6 +358,7 @@ export abstract class BaseGameRoom<
       if (merged.success) this.settings = merged.data;
     }
     this.publishSettings();
+    this.bindTournament(rawOptions);
     this.registerBaseMessages();
     // Unknown message types: Colyseus would drop the client in production. A stale or buggy client
     // shouldn't lose its seat over it, so ignore them (logged once per type).
@@ -323,6 +392,12 @@ export abstract class BaseGameRoom<
         this.rebind(existing, client);
         return;
       }
+    }
+
+    // Tournament match rooms: a valid ticket seats its participant; everyone else spectates.
+    if (this.tournamentBinding) {
+      this.joinTournamentMatch(client, options);
+      return;
     }
 
     if (options.seatToken && this.banned.has(options.seatToken)) this.rejectKicked();
@@ -372,6 +447,7 @@ export abstract class BaseGameRoom<
     if (record.id === this.state.hostId) this.scheduleHostMigration();
     this.safeHook(() => this.onPlayerDisconnected(record), 'onPlayerDisconnected');
     this.markMetadataDirty();
+    this.tournamentPresenceChanged();
 
     const deferred = this.allowReconnection(client, this.reconnectGraceSeconds);
     this.pendingReconnects.set(client.sessionId, deferred);
@@ -405,6 +481,7 @@ export abstract class BaseGameRoom<
     this.sendChatHistory(record);
     this.safeHook(() => this.onPlayerReconnected(record), 'onPlayerReconnected');
     this.safeHook(() => this.syncPrivate(record), 'syncPrivate');
+    this.tournamentPresenceChanged();
   }
 
   override onLeave(client: Client, code?: number): void {
@@ -430,10 +507,12 @@ export abstract class BaseGameRoom<
     this.systemChat(`${record.state.name} lost connection.`);
     this.safeHook(() => this.onPlayerAway(record), 'onPlayerAway');
     this.markMetadataDirty();
+    this.tournamentPresenceChanged();
   }
 
   override async onDispose(): Promise<void> {
     this.clearAllTimers();
+    this.disposeTournamentBinding();
     this.cancelHostMigration();
     this.emptyMatchCheck?.clear();
     this.emptyMatchCheck = null;
@@ -442,6 +521,13 @@ export abstract class BaseGameRoom<
   }
 
   override onUncaughtException(error: unknown, methodName: string): void {
+    // Colyseus also reports deliberate join refusals (room locked or full, kicked, match over, rate
+    // limited) here, wrapped around our ServerError: those are answers to the player, not faults.
+    const cause = error instanceof Error ? error.cause : undefined;
+    if ((methodName === 'onJoin' || methodName === 'onAuth') && cause instanceof ServerError) {
+      log.debug('join refused', { room: this.roomId, game: this.gameId, code: cause.code, reason: cause.message });
+      return;
+    }
     log.error('room exception', { room: this.roomId, game: this.gameId, methodName, error: error as Error });
   }
 
@@ -587,6 +673,67 @@ export abstract class BaseGameRoom<
   }
 
   /**
+   * Report the structured result of ONE finished game (call it when the game ends, alongside
+   * endMatch()). The platform uses it for DASCADE ratings, stats and Tournament Center series and
+   * bracket advancement. Accepted once per match — later calls for the same match are ignored, so
+   * a duplicate timer or message can never advance a tournament twice.
+   */
+  protected reportOutcome(outcome: GameOutcome): void {
+    if (this.outcomeReportedFor === this.matchSerial) {
+      log.warn('duplicate outcome ignored', { room: this.roomId, game: this.gameId });
+      return;
+    }
+    // Everyone who was seated at the start plus anyone seated mid-match (late joiners, promoted queue).
+    const roster = new Map(this.matchRoster);
+    for (const p of this.seatedPlayers()) {
+      if (!roster.has(p.id)) roster.set(p.id, { playerId: p.id, name: p.state.name, guestId: p.guestId, userId: p.userId, spectator: false });
+    }
+    const seen = new Set<string>();
+    const placements = outcome.placements
+      .map((group) => group.filter((id) => roster.has(id) && !seen.has(id) && (seen.add(id), true)))
+      .filter((group) => group.length > 0);
+    if (placements.length === 0) return;
+    this.outcomeReportedFor = this.matchSerial;
+    emitOutcome(
+      { ...outcome, placements },
+      {
+        gameId: this.gameId,
+        roomCode: this.roomId,
+        rated: this.isRatedMatch(),
+        players: roster,
+        tournament: this.tournamentInfo ? structuredClone(this.tournamentInfo) : null,
+        startedAt: this.matchStartedAt,
+        endedAt: Date.now(),
+      },
+    );
+    this.afterTournamentOutcome();
+  }
+
+  /**
+   * Room player ids of players seated when the current match started who have since left the room,
+   * so a game can still list them in its outcome (usually as the last group).
+   */
+  protected matchLeaverIds(): string[] {
+    return [...this.matchRoster.keys()].filter((id) => !this.players.has(id));
+  }
+
+  /** The Tournament Center match this room is playing, or null for ordinary rooms. */
+  protected get tournamentMatch(): TournamentMatchInfo | null {
+    return this.tournamentInfo;
+  }
+
+  /** Whether the current match changes DASCADE ratings. */
+  protected isRatedMatch(): boolean {
+    return Boolean(this.catalog.rated) && !this.isSolo && (this.tournamentInfo !== null || this.ratedOptIn());
+  }
+
+  /** A player's current DASCADE rating for this game (default rating for anonymous players). */
+  protected ratingOf(player: PlayerRecord): PlayerRating {
+    const rating = getRating(ratingIdentity(player), this.gameId);
+    return { ...rating, provisional: isProvisional(rating) };
+  }
+
+  /**
    * Reset to LOBBY: clears timers, drops away players, resets readies, promotes queued spectators,
    * then calls onReturnToLobby(). The phase is LOBBY *before* away players are removed, so games'
    * onPlayerRemoved takes its lobby path instead of replaying mid-match logic (e.g. ending a turn);
@@ -609,6 +756,7 @@ export abstract class BaseGameRoom<
     }
     this.safeHook(() => this.onReturnToLobby(), 'onReturnToLobby');
     this.repairHost();
+    this.tournamentReturnedToLobby();
   }
 
   /** Seat queued spectators now (e.g. between poker hands). Returns promoted players. */
@@ -720,6 +868,9 @@ export abstract class BaseGameRoom<
       LOBBY.ready,
       ReadySchema,
       (p, { ready }) => {
+        if (!this.lobbyReadyEnabled || this.tournamentBinding) {
+          return this.reject(p, LOBBY.ready, 'not_allowed', this.tournamentBinding ? 'Tournament games start automatically.' : 'There is nothing to get ready for here.');
+        }
         p.state.ready = ready && !p.state.spectator;
       },
       { phases: ['LOBBY'] },
@@ -729,6 +880,7 @@ export abstract class BaseGameRoom<
       LOBBY.spectate,
       SpectateSchema,
       (p, { spectator }) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.spectate, 'not_allowed', 'Seats in a tournament match are fixed.');
         if (spectator) {
           if (!this.state.allowSpectators) return this.reject(p, LOBBY.spectate, 'not_allowed', 'Spectating is disabled in this room.');
           p.state.spectator = true;
@@ -748,6 +900,7 @@ export abstract class BaseGameRoom<
       LOBBY.profile,
       ProfileSchema,
       (p, { name, avatar }) => {
+        if (name !== undefined && this.tournamentBinding) return this.reject(p, LOBBY.profile, 'not_allowed', 'Tournament players keep their registered names.');
         if (name !== undefined) {
           const clean = this.uniqueName(maskProfanity(cleanNickname(name, LIMITS.nickname)), p.id);
           if (clean !== p.state.name) {
@@ -764,9 +917,12 @@ export abstract class BaseGameRoom<
       LOBBY.settings,
       SettingsUpdateSchema,
       (p, { settings }) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.settings, 'not_allowed', 'Tournament match settings are set by the organizer.');
         if (!this.settingsEditablePhases.includes(this.phase)) {
           return this.reject(p, LOBBY.settings, 'wrong_phase', 'Settings are locked right now.');
         }
+        const lockReason = this.settingsLockReason();
+        if (lockReason) return this.reject(p, LOBBY.settings, 'wrong_phase', lockReason);
         if (JSON.stringify(settings).length > this.maxSettingsBytes) {
           return this.reject(p, LOBBY.settings, 'invalid_payload', 'Those settings are too large.');
         }
@@ -795,6 +951,7 @@ export abstract class BaseGameRoom<
       LOBBY.room,
       RoomUpdateSchema,
       (p, update) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.room, 'not_allowed', 'Tournament match rooms are managed by the Tournament Center.');
         // Mid-match renames are refused: the name is visible to everyone and could leak hidden
         // information (e.g. a host broadcasting the DASketch word).
         if (update.roomName !== undefined && IN_MATCH_PHASES.has(this.phase)) {
@@ -823,8 +980,11 @@ export abstract class BaseGameRoom<
       LOBBY.kick,
       TargetPlayerSchema,
       (p, { playerId }) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.kick, 'not_allowed', 'Nobody can be removed from a tournament match.');
         const target = this.players.get(playerId);
         if (!target || target.id === p.id) return;
+        const blocked = this.kickBlocker(target);
+        if (blocked) return this.reject(p, LOBBY.kick, 'not_allowed', blocked);
         this.banned.add(target.seatToken);
         if (target.guestId) this.banned.add(`guest:${target.guestId}`);
         const payload: RemovedPayload = { reason: 'kicked', message: 'The host removed you from the room.' };
@@ -844,7 +1004,7 @@ export abstract class BaseGameRoom<
       (p, { playerId }) => {
         const target = this.players.get(playerId);
         if (!target || !target.client) return;
-        if (!this.canBecomeHost(target)) {
+        if (!this.hostEligible(target)) {
           return this.reject(p, LOBBY.transferHost, 'not_allowed', 'Spectators can take over as host after this match.');
         }
         this.setHost(target);
@@ -856,6 +1016,7 @@ export abstract class BaseGameRoom<
       LOBBY.start,
       StartSchema,
       (p) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.start, 'not_allowed', 'Tournament games start automatically when both players are here.');
         const reason = this.startBlocker();
         if (reason) return this.reject(p, LOBBY.start, 'not_allowed', reason);
         this.beginCountdown();
@@ -866,8 +1027,13 @@ export abstract class BaseGameRoom<
     this.handle(
       LOBBY.toLobby,
       EmptySchema,
-      () => {
+      (p) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.toLobby, 'not_allowed', 'The tournament runs this match — the next game starts automatically.');
         if (this.phase === 'LOBBY' || this.phase === 'ENDED') return;
+        if (IN_MATCH_PHASES.has(this.phase)) {
+          const blocked = this.hostEndsMatch(p);
+          if (blocked) return this.reject(p, LOBBY.toLobby, 'not_allowed', blocked);
+        }
         this.returnToLobby();
       },
       { hostOnly: true },
@@ -876,7 +1042,14 @@ export abstract class BaseGameRoom<
     this.handle(
       LOBBY.close,
       EmptySchema,
-      () => this.closeRoom(),
+      (p) => {
+        if (this.tournamentBinding) return this.reject(p, LOBBY.close, 'not_allowed', 'Tournament match rooms close by themselves when the match is over.');
+        if (IN_MATCH_PHASES.has(this.phase)) {
+          const blocked = this.hostEndsMatch(p);
+          if (blocked) return this.reject(p, LOBBY.close, 'not_allowed', blocked);
+        }
+        this.closeRoom();
+      },
       { hostOnly: true },
     );
 
@@ -910,6 +1083,8 @@ export abstract class BaseGameRoom<
   }
 
   private startBlocker(): string | null {
+    const tournament = this.tournamentStartBlocker();
+    if (tournament) return tournament;
     const active = this.activePlayers().length;
     const min = this.catalog.capacity.minPlayers;
     if (active < min) return `Need at least ${min} player${min === 1 ? '' : 's'} to start.`;
@@ -921,7 +1096,15 @@ export abstract class BaseGameRoom<
     for (const p of this.players.values()) p.state.score = 0;
     const start = () => {
       this.matchStartedAt = Date.now();
+      this.matchSerial++;
+      this.matchRoster = new Map(
+        this.seatedPlayers().map((p) => [
+          p.id,
+          { playerId: p.id, name: p.state.name, guestId: p.guestId, userId: p.userId, spectator: false },
+        ]),
+      );
       this.setPhase('PLAYING');
+      this.tournamentGameStarted();
       this.safeHook(() => this.onGameStart(), 'onGameStart');
     };
     if (this.countdownMs > 0) {
@@ -989,6 +1172,7 @@ export abstract class BaseGameRoom<
     this.sendChatHistory(record);
     this.safeHook(() => this.onPlayerReconnected(record), 'onPlayerReconnected');
     this.safeHook(() => this.syncPrivate(record), 'syncPrivate');
+    this.tournamentPresenceChanged();
   }
 
   /** Permanently remove a player record. */
@@ -1007,6 +1191,7 @@ export abstract class BaseGameRoom<
     this.safeHook(() => this.onPlayerRemoved(record, reason), 'onPlayerRemoved');
     if (wasHost) this.migrateHost();
     this.markMetadataDirty();
+    this.forgetTournamentSeat(record);
     if (!record.state.spectator) this.checkEmptyMatch();
   }
 
@@ -1027,12 +1212,14 @@ export abstract class BaseGameRoom<
   private setHost(next: PlayerRecord | null): void {
     const prev = this.hostRecord ?? null;
     if (prev === next) return;
+    const prevHostId = this.state.hostId;
     if (prev) prev.state.isHost = false;
     this.state.hostId = next?.id ?? '';
     if (next) {
       next.state.isHost = true;
       if (prev) this.systemChat(`${next.state.name} is now the host.`);
-      this.toast(next, 'info', 'You are now the host.');
+      // A hand-over is news; the player who creates the room doesn't need a toast saying they host it.
+      if (prevHostId && prevHostId !== next.id) this.toast(next, 'info', 'You are now the host.');
     }
     this.cancelHostMigration();
     this.safeHook(() => this.onHostChanged(next, prev), 'onHostChanged');
@@ -1047,7 +1234,7 @@ export abstract class BaseGameRoom<
     const current = this.hostRecord;
     if (current?.client) return;
     const candidates = [...this.players.values()]
-      .filter((p) => p.client && !p.away && this.canBecomeHost(p))
+      .filter((p) => p.client && !p.away && this.hostEligible(p))
       .sort((a, b) => Number(a.state.spectator) - Number(b.state.spectator) || a.state.joinOrder - b.state.joinOrder);
     const next = candidates[0];
     if (next) this.setHost(next);
@@ -1062,7 +1249,7 @@ export abstract class BaseGameRoom<
   private claimHostIfOrphaned(record: PlayerRecord): void {
     const host = this.hostRecord;
     if (!host) {
-      if (this.canBecomeHost(record)) this.setHost(record);
+      if (this.hostEligible(record)) this.setHost(record);
       return;
     }
     if (host === record) {
@@ -1125,6 +1312,7 @@ export abstract class BaseGameRoom<
       gameId: this.gameId,
       serverNow: Date.now(),
       rejoined,
+      reconnectGraceSeconds: this.reconnectGraceSeconds,
     };
     record.client?.send(SYS.welcome, payload);
   }
@@ -1160,6 +1348,267 @@ export abstract class BaseGameRoom<
     if (userId && this.players.get(record.id) === record) record.userId = userId;
   }
 
+  // ===========================================================================
+  // Tournament Center binding — rooms the kiosk creates for one match
+  // (isolated here; ordinary rooms never have a binding and skip all of this)
+  // ===========================================================================
+
+  /** Consume a server-created binding. The key must exist in this process — client create options can't forge one. */
+  private bindTournament(rawOptions: unknown): void {
+    const key = (rawOptions as Record<string, unknown> | null | undefined)?.[MATCH_BINDING_OPTION];
+    if (key === undefined) return;
+    const binding = consumeMatchBinding(key);
+    if (!binding || binding.gameId !== this.gameId) {
+      log.warn('invalid tournament binding ignored', { room: this.roomId, game: this.gameId });
+      return;
+    }
+    const handle: BoundMatchRoom = {
+      roomCode: this.roomId,
+      attempt: binding.attempt,
+      applySeries: (update) => this.applyTournamentSeries(update),
+    };
+    this.tournamentBinding = {
+      code: binding.tournamentCode,
+      matchId: binding.matchId,
+      tickets: new Map(Object.entries(binding.tickets)),
+      playerOf: new Map(),
+      status: 'waiting',
+      handle,
+    };
+    this.isSolo = false;
+    this.tournamentInfo = { ...structuredClone(binding.info), seriesStatus: 'waiting', nextGameAt: 0, result: null };
+    for (const p of this.tournamentInfo.participants) p.playerId = null;
+    this.state.locked = true;
+    this.state.maxPlayers = 2;
+    this.state.allowSpectators = this.catalog.capacity.supportsSpectators;
+    this.reconnectGraceSeconds = Math.max(this.reconnectGraceSeconds, binding.reconnectGraceSeconds);
+    this.autoDispose = false;
+    this.publishTournamentInfo();
+    registerBoundRoom(binding.tournamentCode, binding.matchId, handle);
+  }
+
+  /** Join a bound room: a valid ticket seats (or re-seats) its participant; anyone else spectates. */
+  private joinTournamentMatch(client: Client, options: JoinOptions): void {
+    const binding = this.tournamentBinding!;
+    const info = this.tournamentInfo!;
+    const participantId = options.ticket && binding.status !== 'closed' ? binding.tickets.get(options.ticket) : undefined;
+    let record: PlayerRecord;
+    let notice: string | null = null;
+    if (participantId) {
+      const existing = this.players.get(binding.playerOf.get(participantId) ?? '');
+      if (existing) {
+        this.rebind(existing, client);
+        return;
+      }
+      const entry = info.participants.find((p) => p.participantId === participantId);
+      record = this.createRecord(client, { ...options, name: entry?.name ?? options.name }, false, false);
+      record.data.tournamentParticipantId = participantId;
+      binding.playerOf.set(participantId, record.id);
+      if (entry) entry.playerId = record.id;
+      this.publishTournamentInfo();
+    } else {
+      if (!this.state.allowSpectators) throw new ServerError(JoinErrorCode.ROOM_LOCKED, 'Only the two tournament players can join this match.');
+      record = this.createRecord(client, options, true, false);
+      if (options.ticket) notice = 'That match ticket is not valid here — you joined as a spectator.';
+    }
+    const spectator = record.state.spectator;
+    this.claimHostIfOrphaned(record);
+    this.sendWelcome(record, false);
+    this.sendChatHistory(record);
+    this.systemChat(`${record.state.name} joined${spectator ? ' as a spectator' : ''}.`);
+    if (notice) this.toast(record, 'warning', notice);
+    this.markMetadataDirty();
+    this.safeHook(() => this.onPlayerJoined(record, { lateJoin: this.phase !== 'LOBBY' }), 'onPlayerJoined');
+    this.safeHook(() => this.syncPrivate(record), 'syncPrivate');
+    if (options.accessToken) void this.verifyAccount(record, options.accessToken);
+    this.tournamentPresenceChanged();
+  }
+
+  /** Hand the host role to a specific player (rooms with their own host rules, e.g. the tournament organizer). */
+  protected assignHost(player: PlayerRecord | null): void {
+    this.setHost(player);
+  }
+
+  /** Host powers in a bound room only ever go to one of the two participants. */
+  private hostEligible(player: PlayerRecord): boolean {
+    if (this.tournamentBinding && !player.data.tournamentParticipantId) return false;
+    return this.canBecomeHost(player);
+  }
+
+  private publishTournamentInfo(): void {
+    this.state.tournamentJson = this.tournamentInfo ? JSON.stringify(this.tournamentInfo) : '';
+  }
+
+  /** Participants connected right now. */
+  private presentParticipants(): string[] {
+    const binding = this.tournamentBinding;
+    if (!binding) return [];
+    return [...binding.playerOf].filter(([, playerId]) => this.players.get(playerId)?.client).map(([pid]) => pid);
+  }
+
+  private tournamentPresenceChanged(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || binding.status === 'closed') return;
+    const waiting = this.phase === 'LOBBY' && (binding.status === 'waiting' || binding.status === 'intermission');
+    getTournament(binding.code)?.matchRoomStatus(binding.matchId, this.roomId, { present: this.presentParticipants(), waiting });
+    this.maybeAutoStartTournamentGame();
+  }
+
+  private tournamentStartBlocker(): string | null {
+    const binding = this.tournamentBinding;
+    if (!binding) return null;
+    if (binding.status === 'decided' || binding.status === 'closed') return 'This tournament match is over.';
+    if (binding.status !== 'waiting') return 'The next game starts automatically.';
+    const missing = this.tournamentInfo!.participants.filter((p) => {
+      const record = p.playerId ? this.players.get(p.playerId) : undefined;
+      return !record?.client || record.state.spectator;
+    });
+    if (missing.length) return `Waiting for ${missing.map((p) => p.name).join(' and ')}.`;
+    return null;
+  }
+
+  /** Both participants are here: start the game shortly (the series runs itself). */
+  private maybeAutoStartTournamentGame(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || this.phase !== 'LOBBY' || binding.status !== 'waiting') return;
+    if (this.tournamentStartBlocker()) {
+      this.cancelPlatformTimer('tournament:start');
+      return;
+    }
+    if (this.platformTimers.has('tournament:start')) return;
+    this.platformSchedule('tournament:start', tournamentTiming('START_DELAY', 2_500), () => {
+      if (this.phase === 'LOBBY' && !this.startBlocker()) this.beginCountdown();
+    });
+  }
+
+  private tournamentGameStarted(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || !this.tournamentInfo) return;
+    binding.status = 'playing';
+    this.tournamentInfo.seriesStatus = 'playing';
+    this.tournamentInfo.nextGameAt = 0;
+    this.publishTournamentInfo();
+    getTournament(binding.code)?.matchGameStarted(binding.matchId, this.roomId, this.tournamentInfo.gameNumber);
+  }
+
+  /** After reportOutcome(): the kiosk normally answered synchronously via applySeries(). */
+  private afterTournamentOutcome(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || binding.status !== 'playing') return;
+    if (!getTournament(binding.code)) {
+      // The tournament is gone: nothing more to play for here.
+      this.applyTournamentSeries({ status: 'closed', info: this.tournamentInfo!, message: 'The tournament is no longer running.' });
+    }
+  }
+
+  /** A game was abandoned without a result (e.g. everyone left): it will be replayed. */
+  private tournamentReturnedToLobby(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || binding.status !== 'playing') return;
+    binding.status = 'waiting';
+    this.tournamentInfo!.seriesStatus = 'waiting';
+    this.publishTournamentInfo();
+    this.tournamentPresenceChanged();
+  }
+
+  /** Kiosk → room: next game, series decided, or the match was resolved elsewhere. */
+  private applyTournamentSeries(update: SeriesUpdate): void {
+    const binding = this.tournamentBinding;
+    if (!binding || binding.status === 'closed' || this.phase === 'ENDED') return;
+    // Keep this room's player ids; everything else comes from the kiosk.
+    const playerIds = new Map(binding.playerOf);
+    const info: TournamentMatchInfo = structuredClone(update.info);
+    for (const p of info.participants) p.playerId = playerIds.get(p.participantId) ?? null;
+    this.tournamentInfo = info;
+    this.cancelPlatformTimer('tournament:start');
+    if (update.status === 'next') {
+      binding.status = 'intermission';
+      info.seriesStatus = 'intermission';
+      const intermission = tournamentTiming('INTERMISSION', 8_000);
+      info.nextGameAt = Date.now() + intermission;
+      this.publishTournamentInfo();
+      this.platformSchedule('tournament:next', intermission, () => this.nextTournamentGame());
+      return;
+    }
+    if (update.status === 'decided') {
+      binding.status = 'decided';
+      info.seriesStatus = 'decided';
+      info.nextGameAt = 0;
+      this.publishTournamentInfo();
+      this.autoDispose = true;
+      this.platformSchedule('tournament:dispose', TOURNAMENT_DECIDED_TTL_MS, () => void this.disconnect());
+      return;
+    }
+    binding.status = 'closed';
+    info.seriesStatus = 'void';
+    info.nextGameAt = 0;
+    this.publishTournamentInfo();
+    this.autoDispose = true;
+    const message = update.message ?? 'The organizer resolved this match.';
+    this.systemChat(message);
+    this.toast('all', 'info', message);
+    this.platformSchedule('tournament:close', tournamentTiming('CLOSE_DELAY', 4_000), () => {
+      this.setPhase('ENDED');
+      const payload: RemovedPayload = { reason: 'room_closed', message };
+      this.broadcast(SYS.removed, payload);
+      this.clock.setTimeout(() => void this.disconnect(RoomCloseCode.ROOM_CLOSED), 150);
+    });
+  }
+
+  private nextTournamentGame(): void {
+    const binding = this.tournamentBinding;
+    if (!binding || binding.status !== 'intermission') return;
+    if (this.phase !== 'LOBBY') this.returnToLobby();
+    binding.status = 'waiting';
+    this.tournamentInfo!.seriesStatus = 'waiting';
+    this.tournamentInfo!.nextGameAt = 0;
+    // Records re-created after a removal get their new player id.
+    for (const p of this.tournamentInfo!.participants) p.playerId = binding.playerOf.get(p.participantId) ?? null;
+    this.publishTournamentInfo();
+    if (!this.startBlocker()) this.beginCountdown();
+    else this.tournamentPresenceChanged();
+  }
+
+  /** A participant's record is gone for good (they can come back with their ticket). */
+  private forgetTournamentSeat(record: PlayerRecord): void {
+    const binding = this.tournamentBinding;
+    const participantId = record.data.tournamentParticipantId;
+    if (!binding || typeof participantId !== 'string') return;
+    if (binding.playerOf.get(participantId) === record.id) binding.playerOf.delete(participantId);
+    const entry = this.tournamentInfo?.participants.find((p) => p.participantId === participantId);
+    if (entry && entry.playerId === record.id) entry.playerId = null;
+    this.publishTournamentInfo();
+    this.tournamentPresenceChanged();
+  }
+
+  private disposeTournamentBinding(): void {
+    for (const timer of this.platformTimers.values()) timer.clear();
+    this.platformTimers.clear();
+    const binding = this.tournamentBinding;
+    if (!binding) return;
+    unregisterBoundRoom(binding.code, binding.matchId, binding.handle);
+    // Died before the series was decided: the kiosk re-launches the match (the series score is kept).
+    if (binding.status !== 'decided' && binding.status !== 'closed') getTournament(binding.code)?.matchRoomClosed(binding.matchId, this.roomId);
+  }
+
+  private platformSchedule(key: string, ms: number, fn: () => void): void {
+    this.cancelPlatformTimer(key);
+    const delayed = this.clock.setTimeout(() => {
+      this.platformTimers.delete(key);
+      try {
+        fn();
+      } catch (err) {
+        log.error('platform timer failed', { room: this.roomId, key, err: err as Error });
+      }
+    }, Math.max(0, ms));
+    this.platformTimers.set(key, delayed);
+  }
+
+  private cancelPlatformTimer(key: string): void {
+    this.platformTimers.get(key)?.clear();
+    this.platformTimers.delete(key);
+  }
+
   protected markMetadataDirty(): void {
     this.metadataDirty = true;
   }
@@ -1182,6 +1631,26 @@ export abstract class BaseGameRoom<
 }
 
 const IN_MATCH_PHASES: ReadonlySet<Phase> = new Set<Phase>(['COUNTDOWN', 'PLAYING', 'INTERMISSION']);
+
+/** Tournament match rooms: delay before an automatic game start, the pause between series games, cleanup. */
+const TOURNAMENT_DECIDED_TTL_MS = 30 * 60_000;
+/** Timing knobs; non-production environments may shorten them (tests) via DASCADE_TOURNAMENT_*_MS. */
+function tournamentTiming(name: 'START_DELAY' | 'INTERMISSION' | 'CLOSE_DELAY', fallback: number): number {
+  if (process.env.NODE_ENV === 'production') return fallback;
+  const raw = Number(process.env[`DASCADE_TOURNAMENT_${name}_MS`]);
+  return Number.isFinite(raw) && raw >= 0 && process.env[`DASCADE_TOURNAMENT_${name}_MS`] !== undefined ? raw : fallback;
+}
+
+interface TournamentBindingState {
+  code: string;
+  matchId: string;
+  /** ticket → participantId. */
+  tickets: Map<string, string>;
+  /** participantId → room player id. */
+  playerOf: Map<string, string>;
+  status: 'waiting' | 'playing' | 'intermission' | 'decided' | 'closed';
+  handle: BoundMatchRoom;
+}
 /** ~64 KB/s of settings JSON per room (typical settings are < 2 KB; a 200-segment wheel ≈ 50 KB). */
 const SETTINGS_BYTE_BUDGET: RateSpec = { burst: 256 * 1024, perSecond: 64 * 1024 };
 

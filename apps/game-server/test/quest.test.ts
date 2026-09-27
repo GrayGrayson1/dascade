@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { Rng, WelcomePayload } from '@dascade/shared';
+import type { GameOutcome, Rng, WelcomePayload } from '@dascade/shared';
 import type {
   QuestCheckpointPayload,
   QuestOutcomeView,
@@ -13,6 +13,7 @@ import type {
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import { createDascadeServer } from '../src/server.ts';
 import type { QuestRoom, QuestTiming } from '../src/rooms/quest/QuestRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 process.env.DASCADE_QUEST_DEBUG = '1';
 
@@ -371,5 +372,72 @@ describe('DASQuest solo & endings', () => {
     await waitFor(() => st(solo.room).phase === 'RESULTS', 4000, 'defeat');
     expect(JSON.parse(st(solo.room).resultJson)).toMatchObject({ endingId: 'all-hands', title: 'The 9 AM All-Hands' });
     expect(st(solo.room).heroes.get(solo.me().playerId)).toMatchObject({ ko: true, hp: 0 });
+  });
+});
+
+describe('DASQuest DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Details = { ending: string; success: boolean; playerStats: Record<string, Record<string, number>> };
+
+  it('a successful ending puts the whole party (including a hero whose player left) in one place', async () => {
+    const host = await createQuest();
+    const guest = await join(host.room.roomId, 'Bea');
+    const leaver = await join(host.room.roomId, 'Lee');
+    const leaverId = leaver.me().playerId;
+    await start(host);
+    await leaver.room.leave(true);
+    await waitFor(() => st(host.room).heroes.get(leaverId)?.present === false, 3000, 'leaver gone');
+    host.room.send('quest:debug', { endingId: 'player-two' });
+    await waitFor(() => st(host.room).phase === 'RESULTS', 4000, 'results');
+
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    const party = [host.me().playerId, guest.me().playerId, leaverId];
+    expect(outcome.placements).toHaveLength(1);
+    expect(outcome.placements[0]!.slice().sort()).toEqual(party.slice().sort());
+    const score = (JSON.parse(st(host.room).resultJson) as QuestResultView).score;
+    expect(outcome.scores).toEqual(Object.fromEntries(party.map((id) => [id, score])));
+    expect(outcome.reason).toBe('quest_complete');
+    const details = outcome.details as Details;
+    expect(details).toMatchObject({ ending: 'player-two', success: true });
+    for (const id of party) expect(details.playerStats[id]!.questsCompleted).toBe(1);
+  });
+
+  it('a failed ending still counts the game but no completed quest', async () => {
+    const solo = await createQuest('Solo', { solo: true });
+    await pick(solo, 'analyst');
+    await start(solo);
+    vote(solo, 'printer');
+    await nextScene(solo, 'c1_printer');
+    (solo.server as any).run.heroes[0].hp = 2;
+    (solo.server as any).rng = scriptedRng([2]);
+    vote(solo, 'fix');
+    await waitFor(() => st(solo.room).phase === 'RESULTS', 4000, 'defeat');
+    const mine = forRoom(solo.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    expect(outcome.placements).toEqual([[solo.me().playerId]]);
+    expect(outcome.reason).toBe('quest_failed');
+    const details = outcome.details as Details;
+    expect(details).toMatchObject({ ending: 'all-hands', success: false });
+    expect(details.playerStats[solo.me().playerId]).toMatchObject({ questsCompleted: 0, checksPassed: 0 });
+  });
+
+  it('reports nothing for an adventure sent back to the lobby', async () => {
+    const host = await createQuest();
+    await join(host.room.roomId, 'Bea');
+    await start(host);
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(host.room.roomId)).toHaveLength(0);
   });
 });

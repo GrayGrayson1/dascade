@@ -1,13 +1,15 @@
 /** Global modals: Settings, Help / How to play, Profile, Join-by-code. */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { GAME_CATALOG, GAME_LIST, ROOM_CODE_LENGTH, isGameId, normalizeRoomCode } from '@dascade/shared';
-import { Badge, Button, Field, Modal, PixelIcon, Segmented, Slider, Tabs, TextInput, Toggle } from '@dascade/ui';
+import { CABINET_LIST, GAME_CATALOG, GAME_LIST, ROOM_CODE_LENGTH, cabinetForGame, isGameId, normalizeRoomCode, type GameId } from '@dascade/shared';
+import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Slider, Tabs, TextInput, Toggle, getTheme, useThemeId } from '@dascade/ui';
 import { useApp, type FxLevel } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { session } from '../net/session.ts';
 import { sfx } from '../audio/audio.ts';
 import { ProfileEditor } from './common.tsx';
+import { crumbCabinet } from './crumbs.ts';
+import { ProfileTabs } from './profile/ProfileTabs.tsx';
 
 export function GlobalModals() {
   const modal = useApp((s) => s.modal);
@@ -17,7 +19,7 @@ export function GlobalModals() {
       <SettingsModal open={modal === 'settings'} onClose={close} />
       <HelpModal open={modal === 'help'} onClose={close} />
       <Modal open={modal === 'profile'} onClose={close} title="Your profile" footer={<Button variant="primary" onClick={close}>Done</Button>}>
-        <ProfileEditor onSubmit={close} />
+        <ProfileTabs onSubmit={close} />
       </Modal>
       <JoinModal open={modal === 'join'} onClose={close} />
     </>
@@ -110,6 +112,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
               />
               <span className="dc-field__hint">Lower this on older laptops or if the neon is too much.</span>
             </div>
+            <ThemeLine />
             {fullscreenSupported ? (
               <Toggle
                 label="Fullscreen"
@@ -128,6 +131,27 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
         {tab === 'account' ? <AccountPanel /> : null}
       </div>
     </Modal>
+  );
+}
+
+/** Read-only for now: DASCADE ships one theme. The line becomes a picker when more themes ship. */
+function ThemeLine() {
+  const theme = getTheme(useThemeId());
+  return (
+    <div className="dc-field">
+      <span className="dc-field__label">Theme</span>
+      <div className="theme-line">
+        <span className="theme-line__swatch" aria-hidden>
+          <i style={{ background: theme.renderer.accent }} />
+          <i style={{ background: theme.renderer.accent2 }} />
+          <i style={{ background: theme.renderer.surface }} />
+        </span>
+        <span className="theme-line__text">
+          <strong className="theme-line__name">Theme: {theme.name}</strong>
+          <span className="dc-field__hint">{theme.description}</span>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -176,6 +200,13 @@ function AccountPanel() {
 }
 
 // ---------------------------------------------------------------------------
+/** Unique games per cabinet (DASino lists its tables separately; help is per game). */
+const HELP_GROUPS = CABINET_LIST.map((cabinet) => ({
+  cabinet,
+  games: [...new Set(cabinet.games.map((g) => g.gameId))].map((id) => GAME_CATALOG[id]),
+}));
+const PLATFORM_GAMES = GAME_LIST.filter((g) => g.cabinet === null);
+
 function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const helpGameId = useApp((s) => s.helpGameId);
   const [tab, setTab] = useState<string>(helpGameId && isGameId(helpGameId) ? helpGameId : 'dascade');
@@ -183,37 +214,66 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     if (open) setTab(helpGameId && isGameId(helpGameId) ? helpGameId : 'dascade');
   }, [open, helpGameId]);
   const game = isGameId(tab) ? GAME_CATALOG[tab] : null;
+  const cabinet = game ? cabinetForGame(game.id) : undefined;
+  const siblings = cabinet ? [...new Set(cabinet.games.map((g) => g.gameId))] : [];
   return (
     <Modal open={open} onClose={onClose} wide title="How to play" footer={<Button variant="primary" onClick={onClose}>Got it</Button>}>
-      <Tabs
-        label="Help topics"
-        value={tab}
-        onChange={setTab}
-        tabs={[{ value: 'dascade', label: 'DASCADE' }, ...GAME_LIST.map((g) => ({ value: g.id, label: g.title }))]}
-      />
+      <div className="help-nav">
+        <Field label="Help topic" className="help-nav__topic">
+          {({ id }) => (
+            <Select id={id} value={tab} onChange={(e) => setTab(e.currentTarget.value)}>
+              <option value="dascade">DASCADE basics</option>
+              {HELP_GROUPS.map(({ cabinet: c, games }) => (
+                <optgroup key={c.id} label={c.title}>
+                  {games.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {PLATFORM_GAMES.length ? (
+                <optgroup label="Platform">
+                  {PLATFORM_GAMES.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </Select>
+          )}
+        </Field>
+        {siblings.length > 1 && cabinet ? (
+          <Tabs
+            className="help-nav__siblings"
+            label={`${cabinet.title} games`}
+            value={tab as GameId}
+            onChange={setTab}
+            tabs={siblings.map((id) => ({ value: id, label: GAME_CATALOG[id].title }))}
+          />
+        ) : null}
+      </div>
       <div className="help-body">
         {game ? (
           <>
-            <h3 className="dc-display" style={{ color: game.accent.primary, fontSize: 'var(--fs-2xl)' }}>
+            {crumbCabinet(game.id) ? <p className="help-body__crumb">{cabinet?.title}</p> : null}
+            <h3 className="dc-display help-body__title" style={{ color: game.accent.primary }}>
               {game.title}
             </h3>
-            <p className="dc-muted" style={{ margin: '6px 0 16px' }}>
-              {game.description}
-            </p>
+            <p className="dc-muted help-body__desc">{game.description}</p>
             <ol className="help-steps">
               {game.howToPlay.map((step) => (
                 <li key={step}>{step}</li>
               ))}
             </ol>
-            <h4 className="dc-label" style={{ marginTop: 20 }}>
-              Controls
-            </h4>
+            <h4 className="dc-label help-body__label">Controls</h4>
             <ul className="help-controls">
               {game.controls.map((c) => (
                 <li key={c}>{c}</li>
               ))}
             </ul>
-            <p className="dc-field__hint" style={{ marginTop: 12 }}>
+            <p className="dc-field__hint help-body__meta">
               {game.capacity.minPlayers === 1 ? 'Playable solo' : `${game.capacity.minPlayers}+ players`} · up to {game.capacity.maxPlayersLimit} players
               {game.capacity.supportsSpectators ? ' · spectators welcome' : ''}
               {game.virtualChips ? ' · virtual chips only, no real money' : ''}
@@ -221,12 +281,15 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </>
         ) : (
           <div className="dc-stack">
-            <h3 className="dc-display dc-neon" style={{ fontSize: 'var(--fs-2xl)' }}>
-              Welcome to DASCADE
-            </h3>
-            <p>The Delta Alpha Sierra Arcade: eight multiplayer cabinets you can play right in your browser — no account needed.</p>
+            <h3 className="dc-display dc-neon help-body__title">Welcome to DASCADE</h3>
+            <p>
+              The Delta Alpha Sierra Arcade: {CABINET_LIST.length} cabinets and {GAME_LIST.filter((g) => g.cabinet !== null).length} multiplayer
+              games you can play right in your browser — no account needed.
+            </p>
             <ol className="help-steps">
-              <li>Walk up to a cabinet and pick <strong>Create game</strong>.</li>
+              <li>
+                Walk up to a cabinet (some hold several games — pick one), then choose <strong>Create game</strong>.
+              </li>
               <li>Share the 5-letter room code (or the link) with your team.</li>
               <li>Everyone joins the lobby, the host tweaks settings, then hits <strong>Start</strong>.</li>
               <li>
@@ -235,7 +298,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             </ol>
             <p className="dc-muted">
               Lost connection? DASCADE reconnects you automatically and keeps your seat. Refreshing the page puts you right back in your
-              room.
+              room — and if the network stays down, <strong>Rejoin my seat</strong> takes it back.
             </p>
             <p className="dc-field__hint">
               All casino-style games use meaningless virtual chips. There is no real-money wagering, purchasing or cash-out of any kind.

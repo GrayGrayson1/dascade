@@ -1,0 +1,138 @@
+/* In-game Tournament Center strip (shown in match rooms only). */
+.tb {
+  --tb-gold: var(--yellow);
+  position: relative;
+  z-index: calc(var(--z-shell) - 1);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-height: 44px;
+  padding: 6px calc(14px + var(--safe-right)) 6px calc(14px + var(--safe-left));
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tb-gold) 16%, transparent), transparent 45%), var(--glass-strong);
+  border-bottom: 1px solid color-mix(in srgb, var(--tb-gold) 40%, var(--line));
+}
+.tb[data-over] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tb-gold) 26%, transparent), transparent 70%), var(--glass-strong);
+}
+.tb__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tb-gold);
+}
+.tb__what {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.tb__name {
+  color: var(--text-0);
+}
+.tb__sep {
+  color: var(--text-3);
+}
+.tb__score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  background: color-mix(in srgb, var(--shade) 40%, var(--bg-1));
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+.tb__score b {
+  font-size: var(--fs-md);
+  color: var(--tb-gold);
+}
+.tb__player {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+}
+.tb__player[data-side='first']::before,
+.tb__player[data-side='second']::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border: 1px solid var(--text-1);
+  border-radius: 1px;
+  vertical-align: 0;
+}
+.tb__player[data-side='first']::before {
+  background: var(--text-0);
+}
+.tb__status {
+  color: var(--text-2);
+}
+.tb[data-over] .tb__status {
+  color: var(--text-0);
+  font-weight: 600;
+}
+.tb__back {
+  margin-left: auto;
+}
+
+/* Immersive games: a compact floating chip. TournamentBanner extends the room's --safe-top by the
+   chip's height so the game's header/HUD sit below it — the chip itself uses the real inset. */
+.tb--compact {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: calc(10px + var(--safe-left));
+  max-width: min(560px, calc(100vw - 80px));
+  min-height: 40px;
+  padding: 4px 6px 4px 12px;
+  gap: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--tb-gold) 40%, var(--line));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  z-index: var(--z-shell);
+}
+.tb--compact .tb__what > :not(.tb__name):not(:nth-child(5)),
+.tb--compact .tb__tag-text {
+  display: none;
+}
+/* Phones: one line (game n of N + series score) so the game keeps its height; the kiosk has the name. */
+@media (max-width: 480px) {
+  .tb--compact .tb__name {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .tb {
+    gap: 4px 10px;
+    font-size: var(--fs-xs);
+  }
+  .tb__tag-text {
+    display: none;
+  }
+  .tb__what {
+    flex-basis: calc(100% - 30px);
+  }
+  .tb__score {
+    order: 2;
+  }
+  .tb__back {
+    order: 3;
+  }
+  .tb__status {
+    order: 4;
+    flex-basis: 100%;
+  }
+  .tb--compact .tb__what {
+    flex-basis: auto;
+  }
+}

@@ -1,0 +1,182 @@
+/* Brick Blitz (.bb-) — on top of the Classics kit (.cl-). */
+
+.bb-sector__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text-0);
+}
+.bb-sector__meta {
+  margin: 4px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.bb-sector__meta span {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.bb-pill {
+  --pill: var(--accent);
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  line-height: 1;
+  color: #0b0914;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pill) 70%, white), color-mix(in srgb, var(--pill) 80%, black));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pill) 55%, transparent), inset 0 0 0 1px color-mix(in srgb, white 45%, transparent);
+}
+
+.bb-legend__list,
+.bb-active__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.bb-legend__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.bb-legend__text {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.bb-legend__text strong {
+  display: block;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.bb-active__none {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.bb-active__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+.bb-active__name {
+  color: var(--text-0);
+}
+.bb-active__time {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.bb-active__bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) calc(var(--k) * 100%), color-mix(in srgb, var(--line) 60%, transparent) 0);
+}
+
+.bb-rivals__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bb-field {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.bb-field__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pc, var(--accent)) 50%, transparent);
+}
+.bb-field.is-out .bb-field__canvas {
+  filter: grayscale(0.9) brightness(0.7);
+}
+.bb-field__cap {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-2);
+  min-width: 0;
+}
+.bb-field__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bb-field__score {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-0);
+  white-space: nowrap;
+}
+.bb-field--large {
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.bb-field--large .bb-field__canvas {
+  height: 100%;
+  width: auto;
+  justify-self: center;
+}
+.bb-field--large .bb-field__cap {
+  font-size: 13px;
+  padding: 0 10px 8px;
+}
+.bb-watch {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 10px;
+}
+
+.bb-move {
+  display: flex;
+  gap: 10px;
+}
+.bb-picker {
+  display: grid;
+  gap: 8px;
+}
+.bb-picker__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.bb-settings {
+  display: grid;
+  gap: 16px;
+}
+.bb-rules summary {
+  cursor: pointer;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  padding: 4px 0;
+}
+.bb-rules[open] summary {
+  margin-bottom: 10px;
+}
+.bb-stage .cl-screen {
+  cursor: none;
+}
+.bb-stage.is-paused .cl-screen,
+.bb-stage .cl-shell[data-overlay='true'] .cl-screen {
+  cursor: default;
+}

@@ -3,10 +3,10 @@
  * Animation pacing is compressed with DASCADE_BJ_PACE (honoured only outside production)
  * and rounds are made deterministic by stacking the shoe through the room's test hook.
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { WelcomePayload } from '@dascade/shared';
+import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import {
   BLACKJACK_MSG,
   type BlackjackHandView,
@@ -15,6 +15,7 @@ import {
   type BlackjackStage,
 } from '@dascade/shared/games/blackjack';
 import { readTestHooks } from '../src/rooms/blackjack/testHooks.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 import { bootTestServer, collect, quiet, sleep, waitFor } from './helpers.ts';
 
 // Compress animation pacing (read by the room at creation; ignored in production).
@@ -602,5 +603,107 @@ describe('DASjack 21 room', () => {
     expect(bob.state().seats[aliceId]).toBeUndefined();
     expect(seatOf(bob)).toMatchObject({ balance: 990, bought: 1000, handsPlayed: 1 });
     expect(bob.state().players[bob.id()]!.score).toBe(-10);
+  });
+});
+
+describe('DASjack 21 room: DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Extras = { playerStats: Record<string, Record<string, number>> };
+
+  it('reports the closed table by balance with blackjack stats, and lists a player who left last', async () => {
+    const host = await createTable();
+    const bob = await joinTable(host.room.roomId, 'Bob');
+    const cy = await joinTable(host.room.roomId, 'Cy');
+    const cyId = cy.id();
+    await start(host);
+    await cy.room.leave(true);
+    await waitFor(() => host.state().seats[cyId] === undefined, 3000, 'cy gone');
+    // Bob A♠ K♦ (blackjack), Alice T♠ 9♦ (19), dealer 7♥ / T♣ (17).
+    host.server.testStacks = [['As', 'Ts', '7h', 'Kd', '9d', 'Tc']];
+    await bet(host, 100);
+    await bet(bob, 100);
+    await waitStage(host, 'PLAYING');
+    await act(host, 'stand');
+    await nextRound(host, 1);
+    expect(seatOf(bob)).toMatchObject({ balance: 1150, blackjacks: 1 });
+    expect(seatOf(host)).toMatchObject({ balance: 1100 });
+    host.room.send(BLACKJACK_MSG.end, {});
+    await waitFor(() => host.state().phase === 'RESULTS', 3000, 'results');
+    await sleep(30);
+
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    expect(outcome.placements).toEqual([[bob.id()], [host.id()], [cyId]]);
+    expect(outcome.scores).toEqual({ [bob.id()]: 1150, [host.id()]: 1100 });
+    expect(outcome.reason).toBe('table_closed');
+    const stats = (outcome.details as Extras).playerStats;
+    expect(stats[bob.id()]).toMatchObject({ handsPlayed: 1, handsWon: 1, blackjacks: 1, bestWin: 150 });
+    expect(stats[host.id()]).toMatchObject({ handsPlayed: 1, handsWon: 1, blackjacks: 0, bestWin: 100 });
+  });
+
+  it('ranks by the leaderboard (net of refills) and shares a place only on identical rows', async () => {
+    const host = await createTable({ settings: { startingBalance: 100, minBet: 100, maxBet: 100 } });
+    const bob = await joinTable(host.room.roomId, 'Bob');
+    await start(host);
+    host.server.testStacks = [['9s', 'Ts', 'Th', '9c', '6d', '8h']];
+    await bet(host, 100);
+    await bet(bob, 100);
+    await waitStage(host, 'PLAYING');
+    await act(host, 'stand'); // 16 v 18 → lose
+    await act(bob, 'stand'); // 18 v 18 → push
+    await nextRound(host, 1);
+    host.room.send(BLACKJACK_MSG.refill, {});
+    await waitFor(() => seatOf(host)!.refills === 1);
+    host.room.send(BLACKJACK_MSG.end, {});
+    await waitFor(() => host.state().phase === 'RESULTS', 3000, 'results');
+    const [only] = forRoom(host.room.roomId);
+    // Both hold 100 chips, but Alice needed a refill to get there.
+    expect(only!.outcome.placements).toEqual([[bob.id()], [host.id()]]);
+    expect(only!.outcome.scores).toEqual({ [bob.id()]: 100, [host.id()]: 100 });
+  });
+
+  it('records a solo session (the house is the opponent)', async () => {
+    const solo = await createTable({ solo: true });
+    await waitStage(solo, 'BETTING');
+    solo.server.testStacks = [['Ts', '9h', '7d', '8c']];
+    await bet(solo, 100);
+    await waitStage(solo, 'PLAYING');
+    await act(solo, 'stand');
+    await nextRound(solo, 1);
+    solo.room.send(BLACKJACK_MSG.end, {});
+    await waitFor(() => solo.state().phase === 'RESULTS', 3000, 'results');
+    const mine = forRoom(solo.room.roomId);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.outcome.placements).toEqual([[solo.id()]]);
+    expect(mine[0]!.outcome.scores).toEqual({ [solo.id()]: seatOf(solo)!.balance });
+  });
+
+  it('reports nothing for a table closed before the first deal or sent back to the lobby', async () => {
+    const early = await createTable();
+    await joinTable(early.room.roomId, 'Bob');
+    await start(early);
+    early.room.send(BLACKJACK_MSG.end, {});
+    await waitFor(() => early.state().phase === 'RESULTS', 3000, 'results');
+
+    const lobby = await createTable();
+    const bob = await joinTable(lobby.room.roomId, 'Bob');
+    await start(lobby);
+    lobby.server.testStacks = [['9s', 'Ts', '7h', '9c', '6d', 'Th']];
+    await bet(lobby, 10);
+    await bet(bob, 10);
+    await waitStage(lobby, 'PLAYING');
+    lobby.room.send('lobby:toLobby', {});
+    await waitFor(() => lobby.state().phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(early.room.roomId)).toHaveLength(0);
+    expect(forRoom(lobby.room.roomId)).toHaveLength(0);
   });
 });

@@ -45,6 +45,7 @@ import {
 } from '@dascade/game-core/blackjack';
 import { cardToCode, type Card } from '@dascade/game-core/cards';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { groupSorted, withLeaversLast } from '../outcomePlacements.ts';
 import { log } from '../../lib/log.ts';
 import { BjHand, BjSeat, BlackjackState } from './schema.ts';
 import { readTestHooks, type BlackjackTestHooks } from './testHooks.ts';
@@ -972,6 +973,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     this.state.stage = 'IDLE';
     this.state.endRequested = false;
     this.state.statusText = 'Table closed';
+    this.reportBlackjackOutcome(standings);
     this.endMatch({
       players: standings.map((x, i) => ({
         playerId: x.player!.id,
@@ -983,6 +985,31 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
       })),
       details: { rounds: this.state.round },
     });
+  }
+
+  /**
+   * DASCADE stats: places follow the closing leaderboard (chip balance, net of refills; equal rows
+   * share a place), players who left mid-session last; `scores` are final balances. Solo sessions
+   * count too (the house is the opponent). A session closed before any round was dealt is no contest.
+   */
+  private reportBlackjackOutcome(standings: ReadonlyArray<{ seat: BjSeat; net: number }>): void {
+    if (this.state.round === 0) return;
+    const placements = withLeaversLast(
+      groupSorted(standings, (x) => x.seat.playerId, (a, b) => a.net === b.net && a.seat.balance === b.seat.balance),
+      this.matchLeaverIds(),
+    );
+    const scores: Record<string, number> = {};
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const { seat } of standings) {
+      scores[seat.playerId] = seat.balance;
+      playerStats[seat.playerId] = {
+        handsPlayed: seat.handsPlayed,
+        handsWon: seat.handsWon,
+        blackjacks: seat.blackjacks,
+        bestWin: seat.biggestWin,
+      };
+    }
+    this.reportOutcome({ placements, scores, reason: 'table_closed', details: { rounds: this.state.round, playerStats } });
   }
 
   // ===========================================================================

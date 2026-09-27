@@ -3,6 +3,9 @@ import { matchMaker } from '@colyseus/core';
 import { KeyedRateLimiter, isValidRoomCode, normalizeRoomCode, type RoomLookup, type RoomMetadata } from '@dascade/shared';
 import { config } from '../config.ts';
 import { CLIENT_IP_HEADER, ipRateKey } from '../lib/clientIp.ts';
+import { registerStatsRoutes } from '../platform/statsRoutes.ts';
+import { registerClassicsRoutes } from '../rooms/classics/scoresRoute.ts';
+import { registerTournamentRoutes } from './tournamentRoutes.ts';
 
 const startedAt = Date.now();
 
@@ -11,6 +14,9 @@ const startedAt = Date.now();
 const lookupLimiter = new KeyedRateLimiter(config.relaxedLimits ? { burst: 5000, perSecond: 500 } : { burst: 300, perSecond: 10 });
 
 export function registerApiRoutes(app: express.Application): void {
+  registerStatsRoutes(app);
+  registerClassicsRoutes(app);
+  registerTournamentRoutes(app);
   app.get('/api/health', async (_req, res) => {
     const rooms = await matchMaker.query({});
     res.json({ ok: true, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000), rooms: rooms.length });

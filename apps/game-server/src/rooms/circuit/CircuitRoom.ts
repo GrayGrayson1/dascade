@@ -28,6 +28,7 @@ import {
 import { EmptySchema, cleanText, maskProfanity, shuffleInPlace } from '@dascade/shared';
 import { GRID_SLOTS, RaceSim, getTrack, type SimEvent } from '@dascade/game-core/circuit';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { groupSorted } from '../outcomePlacements.ts';
 import { CarLook, CircuitState, Racer } from './CircuitState.ts';
 
 /** How often (ticks) race meta (distance/positions) is copied into the schema. */
@@ -396,6 +397,7 @@ export class CircuitRoom extends BaseGameRoom<CircuitState, CircuitSettings> {
       };
     });
     const winner = standings.find((c) => c.progress.finished);
+    this.reportRaceOutcome(standings);
     this.endMatch({
       players,
       details: {
@@ -405,6 +407,37 @@ export class CircuitRoom extends BaseGameRoom<CircuitState, CircuitSettings> {
         winnerMs: winner?.progress.finishMs ?? null,
         fastestLapMs: this.state.race.fastestLapMs || null,
       },
+    });
+  }
+
+  /**
+   * DASCADE stats: finishing order (identical race times share a place), then every car that did
+   * not finish (retired, left, timed out) as one last group. `scores` are race times in ms for
+   * finishers only (lower is better). A race nobody finished is no contest.
+   */
+  private reportRaceOutcome(standings: ReturnType<RaceSim['standings']>): void {
+    const sim = this.sim!;
+    const finishers = standings.filter((c) => c.progress.finished);
+    if (finishers.length === 0) return;
+    const dnf = standings.filter((c) => !c.progress.finished).map((c) => c.id);
+    const placements = groupSorted(finishers, (c) => c.id, (a, b) => a.progress.finishMs === b.progress.finishMs);
+    if (dnf.length > 0) placements.push(dnf);
+    const scores: Record<string, number> = {};
+    for (const c of finishers) scores[c.id] = c.progress.finishMs;
+    const multi = standings.length >= 2;
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const c of standings) {
+      playerStats[c.id] = {
+        ...(c.progress.bestLapMs > 0 ? { minLapMs: c.progress.bestLapMs } : {}),
+        ...(multi ? { fastestLaps: this.state.race.fastestLapBy === c.id ? 1 : 0 } : {}),
+      };
+    }
+    this.reportOutcome({
+      placements,
+      scores,
+      lowerIsBetter: true,
+      reason: 'finished',
+      details: { track: sim.track.def.id, laps: sim.opts.laps, playerStats },
     });
   }
 

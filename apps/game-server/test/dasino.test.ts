@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import { createSeededRng, type Rng, type WelcomePayload } from '@dascade/shared';
+import { createSeededRng, type GameOutcome, type Rng, type WelcomePayload } from '@dascade/shared';
 import { DASINO_MSG, type DasinoPrivatePayload, type DasinoPublicState, type SlotResultPayload } from '@dascade/shared/games/dasino';
 import { SLOT_REELS, settleRouletteBets } from '@dascade/game-core/dasino';
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import { createDascadeServer } from '../src/server.ts';
 import type { DasinoRoom } from '../src/rooms/dasino/DasinoRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -446,5 +447,80 @@ describe('DASino room', () => {
     await waitFor(() => view(solo).phase === 'PLAYING', 3000, 'solo start');
     expect(seatOf(solo).balance).toBe(10_000);
     expect(view(solo).roulette.phase).toBe('BETTING');
+  });
+});
+
+describe('DASino room: DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Extras = { playerStats: Record<string, Record<string, number>> };
+
+  it('reports the closed floor by the leaderboard with balances and wager stats; a leaver is last', async () => {
+    const { host, server } = await createRoom();
+    const guest = await join(host.room.roomId, 'Guest');
+    const leaver = await join(host.room.roomId, 'Leaver');
+    const leaverId = leaver.me().playerId;
+    host.room.send('lobby:start', {});
+    await waitFor(() => view(host).phase === 'PLAYING' && view(host).roulette.phase === 'BETTING', 3000, 'playing');
+    await leaver.room.leave(true);
+    await waitFor(() => !view(host).seats[leaverId], 3000, 'leaver gone');
+    host.room.send(DASINO_MSG.rouletteBet, { spot: 'red', amount: 500 });
+    guest.room.send(DASINO_MSG.rouletteBet, { spot: 'black', amount: 300 });
+    await waitFor(() => seatOf(host).inPlay === 500 && seatOf(guest).inPlay === 300);
+    (server as any).rng = scripted([1]);
+    closeRouletteNow(server);
+    await waitFor(() => view(host).roulette.phase === 'RESULT');
+    host.room.send(DASINO_MSG.endSession, {});
+    await waitFor(() => view(host).phase === 'RESULTS', 3000, 'results');
+
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    const h = host.me().playerId;
+    const g = guest.me().playerId;
+    expect(outcome.placements).toEqual([[h], [g], [leaverId]]);
+    expect(outcome.scores).toEqual({ [h]: 10_500, [g]: 9_700 });
+    expect(outcome.reason).toBe('session_closed');
+    expect((outcome.details as Extras).playerStats).toEqual({
+      [h]: { chipsWagered: 500, bestWin: 500 },
+      [g]: { chipsWagered: 300, bestWin: 0 },
+    });
+  });
+
+  it('records a solo session', async () => {
+    const room = await colyseus.sdk.create('dasino', { name: 'Solo', solo: true });
+    const solo = await ready(wire(room));
+    const server = colyseus.getRoomById(room.roomId) as unknown as DasinoRoom;
+    server.timing = { ...FAST };
+    await waitFor(() => view(solo).phase === 'PLAYING', 3000, 'solo start');
+    solo.room.send(DASINO_MSG.spin, { lineBet: 10, lines: 1 });
+    await waitFor(() => seatOf(solo).spins === 1, 3000, 'spin');
+    solo.room.send(DASINO_MSG.endSession, {});
+    await waitFor(() => view(solo).phase === 'RESULTS', 3000, 'results');
+    const mine = forRoom(room.roomId);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.outcome.placements).toEqual([[solo.me().playerId]]);
+    expect(mine[0]!.outcome.scores).toEqual({ [solo.me().playerId]: seatOf(solo).balance });
+  });
+
+  it('reports nothing for a floor closed before anyone bet, or sent back to the lobby', async () => {
+    const idle = await startSession();
+    idle.host.room.send(DASINO_MSG.endSession, {});
+    await waitFor(() => view(idle.host).phase === 'RESULTS', 3000, 'results');
+
+    const lobby = await startSession();
+    lobby.host.room.send(DASINO_MSG.rouletteBet, { spot: 'red', amount: 500 });
+    await waitFor(() => seatOf(lobby.host).inPlay === 500);
+    lobby.host.room.send('lobby:toLobby', {});
+    await waitFor(() => view(lobby.host).phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(idle.host.room.roomId)).toHaveLength(0);
+    expect(forRoom(lobby.host.room.roomId)).toHaveLength(0);
   });
 });

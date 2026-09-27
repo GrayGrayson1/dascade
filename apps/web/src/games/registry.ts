@@ -11,6 +11,23 @@ export const GAME_MODULES: Record<GameId, () => Promise<{ default: GameClientMod
   dasino: () => import('./dasino/index.tsx'),
   circuit: () => import('./circuit/index.tsx'),
   quest: () => import('./quest/index.tsx'),
+  chess: () => import('./chess/index.tsx'),
+  checkers: () => import('./checkers/index.tsx'),
+  ships: () => import('./ships/index.tsx'),
+  trivia: () => import('./trivia/index.tsx'),
+  deception: () => import('./deception/index.tsx'),
+  masterpiece: () => import('./masterpiece/index.tsx'),
+  words: () => import('./words/index.tsx'),
+  survey: () => import('./survey/index.tsx'),
+  putt: () => import('./putt/index.tsx'),
+  tanks: () => import('./tanks/index.tsx'),
+  paddle: () => import('./paddle/index.tsx'),
+  snake: () => import('./snake/index.tsx'),
+  bricks: () => import('./bricks/index.tsx'),
+  asteroids: () => import('./asteroids/index.tsx'),
+  memory: () => import('./memory/index.tsx'),
+  blocks: () => import('./blocks/index.tsx'),
+  tournament: () => import('./tournament/index.tsx'),
 };
 
 const cache = new Map<GameId, Promise<GameClientModule>>();

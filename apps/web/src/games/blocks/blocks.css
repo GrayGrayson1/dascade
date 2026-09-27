@@ -1,0 +1,163 @@
+/* Block Drop (.bd-) — on top of the Classics kit (.cl-). */
+
+.bd-piece {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1.1;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--shade) 35%, transparent);
+}
+.bd-piece--small {
+  aspect-ratio: 2 / 0.9;
+  opacity: 0.85;
+}
+.bd-next .cl-panel__body {
+  gap: 6px;
+}
+.bd-mode__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--text-0);
+}
+.bd-mode__hint {
+  margin: 4px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+.bd-rivals__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bd-mini {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.bd-mini__board {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 2;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pc, var(--accent)) 50%, transparent);
+}
+.bd-mini.is-out .bd-mini__board {
+  filter: grayscale(0.9) brightness(0.7);
+}
+.bd-mini__cap {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-2);
+  min-width: 0;
+}
+.bd-mini__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bd-mini__score {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-0);
+  font-weight: 700;
+}
+.bd-mini--large {
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.bd-mini--large .bd-mini__board {
+  height: 100%;
+  width: auto;
+  justify-self: center;
+}
+.bd-mini--large .bd-mini__cap {
+  font-size: 13px;
+  padding: 0 10px 8px;
+}
+.bd-watch {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 10px;
+}
+
+.bd-actions {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  align-items: end;
+}
+.bd-actions > :nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+.bd-actions > :nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.bd-actions > :nth-child(3) {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.bd-ccw svg {
+  transform: scaleX(-1);
+}
+
+.bd-picker {
+  display: grid;
+  gap: 8px;
+}
+.bd-picker .dc-segmented {
+  flex-wrap: wrap;
+}
+.bd-picker__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.bd-settings {
+  display: grid;
+  gap: 16px;
+}
+.bd-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.bd-stepper output {
+  min-width: 2ch;
+  text-align: center;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.bd-rules summary {
+  cursor: pointer;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  padding: 4px 0;
+}
+.bd-rules[open] summary {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 720px) {
+  .bd-stage .cl-rail {
+    gap: 6px;
+  }
+  .bd-piece {
+    aspect-ratio: 1.4 / 1;
+  }
+  .bd-piece--small {
+    aspect-ratio: 1.6 / 1;
+  }
+}

@@ -73,6 +73,7 @@ const BASE_KEYS = [
   'settingsRev',
   'round',
   'statusText',
+  'tournamentJson',
 ] as const satisfies ReadonlyArray<keyof BaseRoomView>;
 
 function pickBase(s: BaseRoomView): BaseRoomView {

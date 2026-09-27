@@ -25,13 +25,29 @@ function newId(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Guest ids are sent with every join (the server accepts ≤ 64 chars); anything else is regenerated. */
+const GUEST_ID_RE = /^[\w-]{1,64}$/;
+
 export function getOrCreateGuestId(): string {
-  let id = read<string>('guestId');
-  if (!id) {
-    id = `g_${newId()}`;
-    write('guestId', id);
-  }
+  const stored = read<unknown>('guestId');
+  if (typeof stored === 'string' && GUEST_ID_RE.test(stored)) return stored;
+  // Missing or corrupted (a number, an object, an over-long string…): a fresh identity beats a
+  // browser that can never join a room again.
+  const id = `g_${newId()}`;
+  write('guestId', id);
   return id;
+}
+
+function isPreset(value: unknown): value is Preset {
+  if (!value || typeof value !== 'object') return false;
+  const p = value as Partial<Preset>;
+  return typeof p.id === 'string' && typeof p.name === 'string' && typeof p.updatedAt === 'number' && Number.isFinite(p.updatedAt);
+}
+
+/** A kind's saved presets; a corrupted list (not an array, junk entries) degrades to its valid entries. */
+function readPresets<T>(kind: PresetKind): Array<Preset<T>> {
+  const all = read<unknown>(`presets:${kind}`);
+  return Array.isArray(all) ? (all.filter(isPreset) as Array<Preset<T>>) : [];
 }
 
 export class LocalPersistence implements PersistenceAdapter {
@@ -61,11 +77,10 @@ export class LocalPersistence implements PersistenceAdapter {
     write('settings', settings);
   }
   async listPresets<T>(kind: PresetKind): Promise<Array<Preset<T>>> {
-    const all = read<Array<Preset<T>>>(`presets:${kind}`) ?? [];
-    return all.sort((a, b) => b.updatedAt - a.updatedAt);
+    return readPresets<T>(kind).sort((a, b) => b.updatedAt - a.updatedAt);
   }
   async savePreset<T>(kind: PresetKind, name: string, data: T, id?: string): Promise<Preset<T>> {
-    const all = read<Array<Preset<T>>>(`presets:${kind}`) ?? [];
+    const all = readPresets<T>(kind);
     const preset: Preset<T> = { id: id ?? newId(), kind, name: name.slice(0, 60), data, updatedAt: Date.now() };
     const idx = all.findIndex((p) => p.id === preset.id);
     if (idx >= 0) all[idx] = preset;
@@ -74,7 +89,7 @@ export class LocalPersistence implements PersistenceAdapter {
     return preset;
   }
   async deletePreset(kind: PresetKind, id: string): Promise<void> {
-    const all = read<Array<Preset>>(`presets:${kind}`) ?? [];
+    const all = readPresets(kind);
     write(
       `presets:${kind}`,
       all.filter((p) => p.id !== id),

@@ -14,7 +14,9 @@ import { Client, type Room } from '@colyseus/sdk';
 import { create } from 'zustand';
 import {
   CHAT,
+  GAME_CATALOG,
   JoinErrorCode,
+  RECONNECT_GRACE_SECONDS,
   LOBBY,
   RoomCloseCode,
   SYS,
@@ -52,6 +54,8 @@ export interface SessionState {
   removed: RemovedPayload | null;
   /** Round-trip latency estimate (ms). */
   pingMs: number | null;
+  /** Seconds the server holds our seat after a drop (from the welcome; null until it arrives). */
+  graceSeconds: number | null;
   chat: ChatMessage[];
 }
 
@@ -64,6 +68,7 @@ const initial: SessionState = {
   error: null,
   removed: null,
   pingMs: null,
+  graceSeconds: null,
   chat: [],
 };
 
@@ -77,6 +82,8 @@ interface StoredSeat {
   gameId: string;
   seatToken: string;
   reconnectionToken?: string;
+  /** Tournament match ticket this seat was taken with: a rejoin after the seat expired re-seats the participant. */
+  ticket?: string;
   savedAt: number;
 }
 
@@ -277,13 +284,22 @@ function resetBus(): void {
   hasState = false;
 }
 
-function attach(room: Room, gameId: GameId): void {
+const RECONNECT_MAX_DELAY_MS = 4000;
+
+/** Auto-reconnect attempts that cover a seat held for `graceSeconds` (retries back off to 4 s apart). */
+function retriesFor(graceSeconds: number): number {
+  return Math.max(12, Math.ceil((graceSeconds * 1000) / RECONNECT_MAX_DELAY_MS) + 1);
+}
+
+function attach(room: Room, gameId: GameId, ticket?: string): void {
   const generation = ++attachGeneration;
   resetBus();
   leavingIntentionally = false;
   room.reconnection.minUptime = 1500;
-  room.reconnection.maxRetries = 12;
-  room.reconnection.maxDelay = 4000;
+  // Keep retrying for as long as the server holds the seat (longer for chess, tournaments…). The
+  // catalog default is refined by the welcome, which carries the room's actual window.
+  room.reconnection.maxRetries = retriesFor(GAME_CATALOG[gameId]?.reconnectGraceSeconds ?? RECONNECT_GRACE_SECONDS);
+  room.reconnection.maxDelay = RECONNECT_MAX_DELAY_MS;
 
   useSessionStore.setState({
     ...initial,
@@ -303,9 +319,19 @@ function attach(room: Room, gameId: GameId): void {
     switch (t) {
       case SYS.welcome: {
         const w = payload as WelcomePayload;
-        useSessionStore.setState({ playerId: w.playerId });
+        const grace = typeof w.reconnectGraceSeconds === 'number' && w.reconnectGraceSeconds > 0 ? w.reconnectGraceSeconds : null;
+        if (grace) room.reconnection.maxRetries = retriesFor(grace);
+        useSessionStore.setState({ playerId: w.playerId, graceSeconds: grace });
         seedClock(w.serverNow);
-        saveSeat({ code: w.code, gameId: w.gameId, seatToken: w.seatToken, reconnectionToken: room.reconnectionToken, savedAt: Date.now() });
+        const seatTicket = ticket ?? loadSeat(w.code)?.ticket;
+        saveSeat({
+          code: w.code,
+          gameId: w.gameId,
+          seatToken: w.seatToken,
+          reconnectionToken: room.reconnectionToken,
+          ...(seatTicket ? { ticket: seatTicket } : {}),
+          savedAt: Date.now(),
+        });
         break;
       }
       case SYS.time:
@@ -364,7 +390,7 @@ function attach(room: Room, gameId: GameId): void {
     useSessionStore.setState({ status: 'connected' });
     const seat = loadSeat(room.roomId);
     if (seat) saveSeat({ ...seat, reconnectionToken: room.reconnectionToken, savedAt: Date.now() });
-    useApp.getState().toast('success', 'Reconnected!');
+    // The shell shows the RECONNECTED confirmation (shell/Reconnect.tsx) — no toast on top of it.
     startClockSync(room);
   });
 
@@ -409,6 +435,27 @@ function attach(room: Room, gameId: GameId): void {
 
   startClockSync(room);
   bumpState();
+}
+
+let resumeInFlight: { code: string; promise: Promise<boolean> } | null = null;
+
+async function resumeOnce(code: string): Promise<boolean> {
+  const seat = loadSeat(code);
+  if (!seat) return false;
+  const current = useSessionStore.getState();
+  if (current.room && current.code === code) return true;
+  useSessionStore.setState({ ...initial, status: 'connecting', code });
+  if (seat.reconnectionToken) {
+    try {
+      const room = await getClient().reconnect(seat.reconnectionToken);
+      attach(room, seat.gameId as GameId);
+      return true;
+    } catch {
+      /* fall through to seat-token rejoin */
+    }
+  }
+  const result = await session.joinRoom(code);
+  return result.ok;
 }
 
 async function lookup(code: string): Promise<RoomLookup> {
@@ -461,7 +508,7 @@ export const session = {
   },
 
   /** Join by code. Reuses a stored seat token for this code when present (rejoin). */
-  async joinRoom(rawCode: string, extra: { spectator?: boolean } = {}): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
+  async joinRoom(rawCode: string, extra: { spectator?: boolean; ticket?: string } = {}): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
     const code = normalizeRoomCode(rawCode);
     if (!isValidRoomCode(code)) {
       const error = friendly('invalid_code');
@@ -478,8 +525,14 @@ export const session = {
       const info = await lookup(code);
       if (!info.exists || !info.gameId) throw { code: JoinErrorCode.NOT_FOUND };
       const seat = loadSeat(code);
-      const room = await getClient().joinById(code, await joinOptions({ ...extra, ...(seat ? { seatToken: seat.seatToken } : {}) }));
-      attach(room, info.gameId as GameId);
+      // A tournament participant whose seat expired (e.g. a long outage before the game started) comes
+      // back with the ticket they first joined with, instead of as a spectator of their own match.
+      const ticket = extra.ticket ?? (extra.spectator ? undefined : seat?.ticket);
+      const room = await getClient().joinById(
+        code,
+        await joinOptions({ ...extra, ...(ticket ? { ticket } : {}), ...(seat ? { seatToken: seat.seatToken } : {}) }),
+      );
+      attach(room, info.gameId as GameId, ticket);
       sfx('join');
       return { ok: true, gameId: info.gameId as GameId };
     } catch (err) {
@@ -489,25 +542,19 @@ export const session = {
     }
   },
 
-  /** After a page refresh: resume the Colyseus session, else reclaim the seat by token. */
-  async resumeRoom(rawCode: string): Promise<boolean> {
+  /**
+   * After a page refresh: resume the Colyseus session, else reclaim the seat by token. Concurrent
+   * calls for the same code share one attempt (a remounting screen must not spend the one-time
+   * reconnection token twice — the loser would be refused and the SDK logs a warning).
+   */
+  resumeRoom(rawCode: string): Promise<boolean> {
     const code = normalizeRoomCode(rawCode);
-    const seat = loadSeat(code);
-    if (!seat) return false;
-    const current = useSessionStore.getState();
-    if (current.room && current.code === code) return true;
-    useSessionStore.setState({ ...initial, status: 'connecting', code });
-    if (seat.reconnectionToken) {
-      try {
-        const room = await getClient().reconnect(seat.reconnectionToken);
-        attach(room, seat.gameId as GameId);
-        return true;
-      } catch {
-        /* fall through to seat-token rejoin */
-      }
-    }
-    const result = await session.joinRoom(code);
-    return result.ok;
+    if (resumeInFlight?.code === code) return resumeInFlight.promise;
+    const promise = resumeOnce(code).finally(() => {
+      if (resumeInFlight?.promise === promise) resumeInFlight = null;
+    });
+    resumeInFlight = { code, promise };
+    return promise;
   },
 
   async leaveRoom(): Promise<void> {

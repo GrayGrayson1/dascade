@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { ChatMessage, WelcomePayload } from '@dascade/shared';
+import type { ChatMessage, GameOutcome, WelcomePayload } from '@dascade/shared';
 import {
   DASKETCH_MSG,
   SKETCH_CANVAS,
@@ -15,6 +15,7 @@ import {
 import { collect, freePort, sleep, waitFor, quiet } from './helpers.ts';
 import { createDascadeServer } from '../src/server.ts';
 import type { DasketchRoom } from '../src/rooms/dasketch/DasketchRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -581,5 +582,83 @@ describe('DASketch room: returning to the lobby', () => {
     expect(ended).toBe(0);
     expect(t.host.chat.some((m) => /not enough players/i.test(m.text))).toBe(false);
     expect(t.server.state.stage).toBe('idle');
+  });
+});
+
+describe('DASketch room: DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (t: Table) => outcomes.filter((o) => o.ctx.roomCode === t.server.roomId);
+
+  it('reports one outcome for a finished match: places by score, points as scores, sketch extras', async () => {
+    const t = await setup(['Ada', 'Bo']);
+    t.server.drawMsFor = () => 900;
+    await start(t);
+    const first = t.artist();
+    const word = await chooseFirst(t);
+    const guesser = t.guessers()[0]!;
+    say(guesser, word);
+    await waitFor(() => t.server.state.stage === 'reveal', 3000, 'all guessed');
+    await waitFor(() => t.server.state.stage === 'choosing' && t.server.state.turn === 2, 3000, 'second turn');
+    await waitFor(() => t.artist().lastPrivate()?.turn === 2 && t.artist().lastPrivate()?.choices !== null);
+    await chooseFirst(t); // nobody guesses: the turn times out and the match ends
+    await waitFor(() => t.server.state.phase === 'RESULTS', 4000, 'results');
+    await sleep(50);
+
+    const mine = forRoom(t);
+    expect(mine).toHaveLength(1);
+    const { outcome, ctx } = mine[0]!;
+    expect(ctx.gameId).toBe('dasketch');
+    const a = first.me().playerId;
+    const b = guesser.me().playerId;
+    const sa = score(t, first);
+    const sb = score(t, guesser);
+    expect(outcome.scores).toEqual({ [a]: sa, [b]: sb });
+    expect(outcome.placements).toEqual(sa === sb ? [[a, b]] : sa > sb ? [[a], [b]] : [[b], [a]]);
+    expect(outcome.reason).toBe('completed');
+    const stats = (outcome.details as { playerStats: Record<string, Record<string, number>> }).playerStats;
+    expect(stats[b]).toMatchObject({ correctGuesses: 1, drawingsGuessed: 0 });
+    expect(stats[b]!.minGuessMs).toBeGreaterThan(0);
+    expect(stats[a]).toEqual({ correctGuesses: 0, drawingsGuessed: 1 });
+  });
+
+  it('lists a player who left mid-match last and reports the early finish', async () => {
+    const t = await setup(['Ada', 'Bo'], { settings: { rounds: 3 } });
+    await start(t);
+    const word = await chooseFirst(t);
+    const artist = t.artist();
+    const guesser = t.guessers()[0]!;
+    const leaverId = guesser.me().playerId;
+    say(guesser, word);
+    await waitFor(() => t.server.state.stage === 'reveal', 3000, 'reveal');
+    await guesser.room.leave(true);
+    await waitFor(() => t.server.state.phase === 'RESULTS', 3000, 'results');
+    await sleep(50);
+    const mine = forRoom(t);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.outcome.placements).toEqual([[artist.me().playerId], [leaverId]]);
+    expect(mine[0]!.outcome.reason).toBe('not_enough_players');
+    expect(mine[0]!.ctx.players.has(leaverId)).toBe(true);
+  });
+
+  it('reports nothing for a match abandoned before any drawing or sent back to the lobby', async () => {
+    const early = await setup(['Ada', 'Bo'], { settings: { rounds: 3 } });
+    await start(early);
+    await early.guessers()[0]!.room.leave(true);
+    await waitFor(() => early.server.state.phase === 'RESULTS', 3000, 'results');
+
+    const lobby = await setup(['Cy', 'Di']);
+    await start(lobby);
+    await chooseFirst(lobby);
+    lobby.host.room.send('lobby:toLobby', {});
+    await waitFor(() => lobby.server.state.phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(early)).toHaveLength(0);
+    expect(forRoom(lobby)).toHaveLength(0);
   });
 });

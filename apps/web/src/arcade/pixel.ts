@@ -170,7 +170,15 @@ export function ring(ctx: Ctx, cx: number, cy: number, r: number, color: string)
 }
 
 /** Draws a sprite authored as character rows; '.' is transparent. */
-export function sprite(ctx: Ctx, rows: readonly string[], x: number, y: number, pal: Record<string, string>, scale = 1, flipX = false): void {
+export function sprite(
+  ctx: Ctx,
+  rows: readonly string[],
+  x: number,
+  y: number,
+  pal: Record<string, string>,
+  scale = 1,
+  flipX = false,
+): void {
   x = Math.round(x);
   y = Math.round(y);
   for (let r = 0; r < rows.length; r++) {

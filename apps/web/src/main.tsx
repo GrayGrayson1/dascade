@@ -7,13 +7,37 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/space-grotesk';
 import '@dascade/ui/styles.css';
 import './styles/app.css';
+import { activeThemeId, listThemes, readThemeTokens, registerTheme, type ThemeDefinition, type ThemeTokens } from '@dascade/ui';
 import { App } from './app/App.tsx';
 import { applyDocumentSettings, useApp } from './app/store.ts';
 import { initPersistence } from './persistence/index.ts';
 import { installAudio } from './audio/audio.ts';
 
+// Theme + fx + reduced motion on <html> before the first render (the stored theme id is read
+// synchronously, so a non-default theme never flashes Delta Neon first).
 applyDocumentSettings(useApp.getState().settings);
 installAudio();
+
+// Theme hook for QA / E2E (e2e/theme.spec.ts): register a throwaway theme and switch to it.
+// Themes are purely cosmetic and local to this browser.
+declare global {
+  interface Window {
+    __DASCADE_THEME__?: {
+      registerTheme: (theme: ThemeDefinition) => ThemeDefinition;
+      listThemes: () => ThemeDefinition[];
+      activeThemeId: () => string;
+      setTheme: (id: string) => void;
+      readThemeTokens: (el?: Element | null) => ThemeTokens;
+    };
+  }
+}
+window.__DASCADE_THEME__ = {
+  registerTheme,
+  listThemes,
+  activeThemeId,
+  setTheme: (id) => useApp.getState().updateSettings({ theme: id }),
+  readThemeTokens,
+};
 
 void initPersistence()
   .then(() => useApp.getState().hydrate())

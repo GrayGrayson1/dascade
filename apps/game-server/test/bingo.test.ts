@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { WelcomePayload } from '@dascade/shared';
+import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import {
   BINGO_FREE,
   BINGO_MSG,
@@ -14,6 +14,7 @@ import {
 import { boardSpec, cardKey, dealCards, isValidCard, verifyCard } from '@dascade/game-core/bingo';
 import { bootTestServer, collect, sleep, waitFor, quiet } from './helpers.ts';
 import type { BingoRoom } from '../src/rooms/bingo/BingoRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -617,5 +618,93 @@ describe('DAS Bingo room', () => {
     await waitFor(() => st(host.room).phase === 'RESULTS', 5000, 'RESULTS');
     expect(st(host.room).toJSON().winners.some((w: { name: string }) => w.name === 'Bot 18')).toBe(true);
     await Promise.all(everyone.map((c) => c.room.leave(true)));
+  });
+});
+
+describe('DAS Bingo room: DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Extras = { playerStats: Record<string, Record<string, number>> };
+
+  it('puts the bingo winner first and everyone else (a leaver included) second, with bingo counts', async () => {
+    const host = await create({ ...MANUAL, rounds: fourCorners });
+    const guest = await join(host.room.roomId, 'Winner');
+    const leaver = await join(host.room.roomId, 'Leaver');
+    const leaverId = leaver.me().playerId;
+    await start(host, [guest, leaver]);
+    await leaver.room.leave(true);
+    await waitFor(() => !st(host.room).players.has(leaverId), 3000, 'leaver gone');
+    for (const n of corners(guest.card().cells, 5)) await hostCall(host, n);
+    guest.room.send(BINGO_MSG.claim, {});
+    await waitFor(() => st(host.room).phase === 'RESULTS', 3000, 'RESULTS');
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    expect(outcome.placements).toEqual([[guest.me().playerId], [host.me().playerId, leaverId]]);
+    expect(outcome.reason).toBe('bingo');
+    expect(outcome.scores).toBeUndefined();
+    expect((outcome.details as Extras).playerStats).toEqual({
+      [guest.me().playerId]: { bingos: 1 },
+      [host.me().playerId]: { bingos: 0 },
+      [leaverId]: { bingos: 0 },
+    });
+  });
+
+  it('players sharing a round share first place', async () => {
+    const items = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
+    const host = await create({
+      ...MANUAL,
+      tieWindowMs: 600,
+      mode: 'text',
+      size: 3,
+      items,
+      rounds: [{ prize: '', patterns: [{ type: 'preset', id: 'blackout', rotate: false, mirror: false }] }],
+    });
+    const a = await join(host.room.roomId, 'Ann');
+    const b = await join(host.room.roomId, 'Ben');
+    await start(host, [a, b]);
+    for (let i = 0; i < 8; i++) await hostCall(host);
+    a.room.send(BINGO_MSG.claim, {});
+    b.room.send(BINGO_MSG.claim, {});
+    await waitFor(() => st(host.room).phase === 'RESULTS', 3000, 'RESULTS');
+    const [only] = forRoom(host.room.roomId);
+    expect(only!.outcome.placements[0]!.slice().sort()).toEqual([a.me().playerId, b.me().playerId].sort());
+    // The host never claimed, so they are the only one in second place.
+    expect(only!.outcome.placements[1]).toEqual([host.me().playerId]);
+  });
+
+  it('a game nobody won is a draw; ending before any ball or going back to the lobby reports nothing', async () => {
+    const played = await create({ ...MANUAL });
+    const guest = await join(played.room.roomId, 'Guest');
+    await start(played, [guest]);
+    await hostCall(played);
+    played.room.send(BINGO_MSG.endGame, {});
+    await waitFor(() => st(played.room).phase === 'RESULTS', 3000, 'RESULTS');
+    const [draw] = forRoom(played.room.roomId);
+    expect(draw!.outcome.placements).toEqual([[played.me().playerId, guest.me().playerId]]);
+    expect(draw!.outcome.reason).toBe('no_winner');
+
+    const early = await create({ ...MANUAL });
+    await join(early.room.roomId, 'Guest');
+    await start(early);
+    early.room.send(BINGO_MSG.endGame, {});
+    await waitFor(() => st(early.room).phase === 'RESULTS', 3000, 'RESULTS');
+
+    const lobby = await create({ ...MANUAL });
+    await join(lobby.room.roomId, 'Guest');
+    await start(lobby);
+    await hostCall(lobby);
+    lobby.room.send('lobby:toLobby', {});
+    await waitFor(() => st(lobby.room).phase === 'LOBBY', 3000, 'LOBBY');
+    await sleep(80);
+    expect(forRoom(early.room.roomId)).toHaveLength(0);
+    expect(forRoom(lobby.room.roomId)).toHaveLength(0);
+    expect(forRoom(played.room.roomId)).toHaveLength(1);
   });
 });

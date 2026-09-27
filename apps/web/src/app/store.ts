@@ -3,20 +3,12 @@
  * High-frequency game data never lives here.
  */
 import { create } from 'zustand';
-import { AVATARS, cleanNickname, type Avatar, type ToastKind } from '@dascade/shared';
+import { AVATARS, cleanNickname, cleanText, type Avatar, type ToastKind } from '@dascade/shared';
+import { applyTheme } from '@dascade/ui';
 import { getOrCreateGuestId, persistence } from '../persistence/index.ts';
+import { DEFAULT_THEME_PREF, SETTINGS_VERSION, migrateSettings, peekStoredTheme, type AppSettings } from './settings.ts';
 
-export type FxLevel = 'high' | 'low' | 'off';
-
-export interface AppSettings {
-  masterVolume: number;
-  sfxVolume: number;
-  musicVolume: number;
-  muted: boolean;
-  musicEnabled: boolean;
-  reducedMotion: boolean;
-  fx: FxLevel;
-}
+export type { AppSettings, FxLevel } from './settings.ts';
 
 export interface Profile {
   name: string;
@@ -44,7 +36,42 @@ export const DEFAULT_SETTINGS: AppSettings = {
   musicEnabled: false,
   reducedMotion: prefersReducedMotion(),
   fx: 'high',
+  theme: DEFAULT_THEME_PREF,
 };
+
+const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;
+
+/** Stored keys this build doesn't know (kept and written back untouched), known after hydrate(). */
+let storedExtras: Record<string, unknown> | null = null;
+
+function extrasOf(stored: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(stored).filter(([key]) => !(SETTINGS_KEYS as string[]).includes(key)));
+}
+
+/** Saves settings without ever dropping stored keys this build doesn't know about. */
+async function saveSettings(settings: AppSettings): Promise<void> {
+  const p = persistence();
+  if (!storedExtras) storedExtras = extrasOf(migrateSettings(await p.loadSettings<unknown>().catch(() => null), DEFAULT_SETTINGS));
+  await p.saveSettings({
+    ...storedExtras,
+    ...settings,
+    settingsVersion: Math.max(SETTINGS_VERSION, Number(storedExtras.settingsVersion) || 0),
+  });
+}
+
+function pickSettings(source: AppSettings): AppSettings {
+  const out = { ...DEFAULT_SETTINGS };
+  for (const key of SETTINGS_KEYS) (out as Record<string, unknown>)[key] = source[key];
+  return out;
+}
+
+function localStorageOrNull(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null; // storage disabled (privacy mode, sandboxed frame)
+  }
+}
 
 interface AppState {
   settings: AppSettings;
@@ -70,7 +97,8 @@ function randomAvatar(): Avatar {
 }
 
 export const useApp = create<AppState>((set, get) => ({
-  settings: DEFAULT_SETTINGS,
+  // The theme is read synchronously so a non-default theme is applied before the first paint.
+  settings: { ...DEFAULT_SETTINGS, theme: peekStoredTheme(localStorageOrNull()) ?? DEFAULT_THEME_PREF },
   profile: { name: '', avatar: randomAvatar(), guestId: getOrCreateGuestId() },
   profileConfirmed: false,
   toasts: [],
@@ -81,7 +109,7 @@ export const useApp = create<AppState>((set, get) => ({
     const settings = { ...get().settings, ...patch };
     set({ settings });
     applyDocumentSettings(settings);
-    void persistence().saveSettings(settings);
+    void saveSettings(settings).catch(() => undefined);
   },
 
   updateProfile(patch) {
@@ -114,13 +142,20 @@ export const useApp = create<AppState>((set, get) => ({
 
   async hydrate() {
     const p = persistence();
-    const [storedSettings, storedProfile] = await Promise.all([p.loadSettings<Partial<AppSettings>>(), p.loadProfile()]);
-    const settings = { ...DEFAULT_SETTINGS, ...(storedSettings ?? {}) };
+    const [storedSettings, storedProfile] = await Promise.all([p.loadSettings<unknown>(), p.loadProfile()]);
+    const migrated = migrateSettings(storedSettings, DEFAULT_SETTINGS);
+    const storedVersion = (storedSettings as { settingsVersion?: unknown } | null)?.settingsVersion;
+    storedExtras = extrasOf(migrated);
+    // Stamp the upgraded shape once (unknown keys are carried along untouched).
+    if (storedSettings && storedVersion !== migrated.settingsVersion) void p.saveSettings(migrated).catch(() => undefined);
+    const settings = pickSettings(migrated);
     // The OS-level "reduce motion" preference always wins over a stale stored default.
     if (prefersReducedMotion()) settings.reducedMotion = true;
     const profile: Profile = {
       guestId: getOrCreateGuestId(),
-      name: storedProfile?.name ?? '',
+      // Stored values are untrusted (edited, or written by an older build): a corrupted name
+      // must not reach join options (the server refuses non-strings / > 64 chars).
+      name: cleanText(storedProfile?.name, 20),
       avatar: (AVATARS as readonly string[]).includes(storedProfile?.avatar ?? '') ? (storedProfile!.avatar as Avatar) : randomAvatar(),
     };
     set({ settings, profile, profileConfirmed: profile.name.length > 0 });
@@ -130,8 +165,11 @@ export const useApp = create<AppState>((set, get) => ({
 
 export function applyDocumentSettings(settings: AppSettings): void {
   const root = document.documentElement;
-  root.dataset.reducedMotion = String(settings.reducedMotion);
-  root.dataset.fx = settings.fx;
+  // Only write changes: renderers observe these attributes (subscribeThemeTokens).
+  if (root.dataset.reducedMotion !== String(settings.reducedMotion)) root.dataset.reducedMotion = String(settings.reducedMotion);
+  if (root.dataset.fx !== settings.fx) root.dataset.fx = settings.fx;
+  // Unknown / removed theme ids fall back to Delta Neon (the preference itself is kept).
+  applyTheme(settings.theme);
 }
 
 /** Imperative toast helper usable outside React. */

@@ -6,7 +6,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GAME_CATALOG, isGameId, isValidRoomCode, normalizeRoomCode, type GameId } from '@dascade/shared';
-import { Button, EmptyState, GameTheme, Panel, Spinner } from '@dascade/ui';
+import { Button, GameTheme, Panel, Spinner, type IconName } from '@dascade/ui';
 import { session, useSessionStore } from '../net/session.ts';
 import { useCountdown, useRoomSelector } from '../net/hooks.ts';
 import { useApp } from '../app/store.ts';
@@ -16,7 +16,10 @@ import type { GameClientModule } from '../games/types.ts';
 import { music, sfx } from '../audio/audio.ts';
 import { Lobby } from './Lobby.tsx';
 import { ShellMenu, TopBar } from './TopBar.tsx';
-import { ProfileEditor } from './common.tsx';
+import { NoticeCard, ProfileEditor } from './common.tsx';
+import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './Reconnect.tsx';
+import { crumbCabinet } from './crumbs.ts';
+import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
 
 export function RoomScreen() {
   const params = useParams();
@@ -79,6 +82,18 @@ export function RoomScreen() {
   }
   if ((status === 'lost' || error) && noticeHere) {
     const err: FriendlyError = error ?? friendly('reconnect_failed');
+    if (err.kind === 'reconnect_failed') {
+      return (
+        <ConnectionLostScreen
+          code={code}
+          error={err}
+          onBack={() => {
+            session.clearNotices();
+            navigate('/');
+          }}
+        />
+      );
+    }
     return (
       <ErrorScreen
         error={err}
@@ -108,7 +123,6 @@ export function RoomScreen() {
 
 function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
   const phase = useRoomSelector((s) => s.phase);
-  const status = useSessionStore((s) => s.status);
   const [module, setModule] = useState<GameClientModule | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -150,11 +164,9 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
   return (
     <GameTheme accent={GAME_CATALOG[gameId].accent} className="room" data-immersive={immersive ? 'true' : undefined}>
       {immersive ? <ShellMenu gameId={gameId} code={code} /> : <TopBar gameId={gameId} code={code} />}
-      {status === 'reconnecting' ? (
-        <div className="conn-banner" role="alert">
-          <Spinner label="Reconnecting" /> Connection lost — reconnecting you to your seat…
-        </div>
-      ) : null}
+      <TournamentBanner compact={immersive} />
+      <ReconnectingOverlay gameId={gameId} immersive={immersive} />
+      <ReconnectedFlash />
       {loadError ? (
         <ErrorScreen error={friendly('unknown', 'This cabinet failed to load. Check your connection and try again.')} onRetry={() => location.reload()} />
       ) : inLobby ? (
@@ -181,7 +193,9 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
       .then(setLookup)
       .catch(() => setLookup(null));
   }, [code]);
-  const game = lookup?.gameId && isGameId(lookup.gameId) ? GAME_CATALOG[lookup.gameId] : null;
+  const gameId = lookup?.gameId && isGameId(lookup.gameId) ? lookup.gameId : null;
+  const game = gameId ? GAME_CATALOG[gameId] : null;
+  const cabinet = gameId ? crumbCabinet(gameId) : null;
   const join = async () => {
     setBusy(true);
     await session.joinRoom(code);
@@ -190,15 +204,28 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
   return (
     <GameTheme accent={game?.accent ?? GAME_CATALOG.wheel.accent} as="main" className="center-screen dc-game-backdrop" id="main">
       <Panel brackets glow className="join-prompt" title={game ? `Join ${game.title}` : 'Join room'}>
-        <div className="dc-col" style={{ gap: 18 }}>
-          <div>
+        <div className="dc-col join-prompt__body">
+          <div className="join-prompt__head">
+            {game ? (
+              <p className="shell-crumb" aria-label="Cabinet">
+                {cabinet ? (
+                  <>
+                    <span className="shell-crumb__cabinet">{cabinet.title}</span>
+                    <span className="shell-crumb__sep" aria-hidden>
+                      ›
+                    </span>
+                  </>
+                ) : null}
+                <span className="shell-crumb__game">{game.title}</span>
+              </p>
+            ) : null}
             <span className="dc-label">Room code</span>
             <div className="lobby-code__value lobby-code__value--static">
               {code.split('').map((c, i) => (
                 <span key={i}>{c}</span>
               ))}
             </div>
-            {lookup?.roomName ? <p className="dc-muted">{lookup.roomName}</p> : null}
+            {lookup?.roomName ? <p className="join-prompt__room">{lookup.roomName}</p> : null}
             {lookup && !lookup.exists ? <p className="dc-field__error">No room is using this code right now.</p> : null}
           </div>
           <ProfileEditor compact onSubmit={() => profileConfirmed && void join()} />
@@ -228,51 +255,78 @@ export function LoadingScreen({ label }: { label: string }) {
   );
 }
 
+const ERROR_ICON: Partial<Record<FriendlyError['kind'], IconName>> = {
+  server_unavailable: 'wifi-off',
+  server_restarted: 'refresh',
+  reconnect_failed: 'wifi-off',
+  kicked: 'leave',
+  room_locked: 'lock',
+  room_full: 'users',
+  not_found: 'help',
+  invalid_code: 'help',
+  match_ended: 'flag',
+  rate_limited: 'clock',
+};
+
 export function ErrorScreen({ error, onBack, onRetry }: { error: FriendlyError; onBack?: () => void; onRetry?: () => void | Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  const gameId = useSessionStore((s) => s.gameId);
+  const game = gameId && isGameId(gameId) ? GAME_CATALOG[gameId] : null;
+  const tone = error.kind === 'kicked' || error.kind === 'unknown' ? 'danger' : error.kind === 'not_found' || error.kind === 'invalid_code' ? 'info' : 'warning';
   return (
-    <main className="center-screen" id="main">
-      <Panel brackets className="error-card" role="alert">
-        <EmptyState icon={error.kind === 'server_unavailable' ? 'wifi-off' : error.kind === 'kicked' ? 'leave' : 'warning'} title={error.title}>
-          {error.message}
-        </EmptyState>
-        <div className="dc-row dc-row--wrap" style={{ justifyContent: 'center' }}>
-          <Button variant="ghost" icon="arrow-left" onClick={onBack ?? (() => navigate('/'))}>
-            Back to arcade
-          </Button>
-          {onRetry ? (
-            <Button
-              variant="primary"
-              icon="refresh"
-              loading={busy}
-              onClick={async () => {
-                setBusy(true);
-                await onRetry();
-                setBusy(false);
-              }}
-            >
-              Try again
+    <GameTheme accent={game?.accent ?? GAME_CATALOG.wheel.accent} as="main" className="center-screen dc-game-backdrop" id="main">
+      <NoticeCard
+        icon={ERROR_ICON[error.kind] ?? 'warning'}
+        tone={tone}
+        crumb={game?.title}
+        title={error.title}
+        role="alert"
+        actions={
+          <>
+            {onRetry ? (
+              <Button
+                variant="primary"
+                size="lg"
+                icon="refresh"
+                loading={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await onRetry();
+                  setBusy(false);
+                }}
+              >
+                Try again
+              </Button>
+            ) : null}
+            <Button variant={onRetry ? 'ghost' : 'primary'} icon="arrow-left" onClick={onBack ?? (() => navigate('/'))}>
+              Back to arcade
             </Button>
-          ) : null}
-        </div>
-      </Panel>
-    </main>
+          </>
+        }
+      >
+        <p className="notice-card__text">{error.message}</p>
+      </NoticeCard>
+    </GameTheme>
   );
 }
 
 export function NotFoundScreen() {
   const navigate = useNavigate();
   return (
-    <main className="center-screen" id="main">
-      <Panel brackets className="error-card">
-        <EmptyState icon="help" title="Nothing at this address">
-          That page wandered off the arcade floor.
-        </EmptyState>
-        <Button variant="primary" icon="arrow-left" onClick={() => navigate('/')}>
-          Back to arcade
-        </Button>
-      </Panel>
+    <main className="center-screen dc-game-backdrop" id="main">
+      <NoticeCard
+        icon="help"
+        tone="info"
+        title="Nothing at this address"
+        actions={
+          <Button variant="primary" icon="arrow-left" onClick={() => navigate('/')}>
+            Back to arcade
+          </Button>
+        }
+      >
+        <p className="notice-card__text">That page wandered off the arcade floor.</p>
+      </NoticeCard>
     </main>
   );
 }

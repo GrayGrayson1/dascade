@@ -206,13 +206,24 @@ export class RoomRenderer {
     return null;
   }
 
-  private layoutProps(W: number, H: number, sign: SignLayout | null, top: number, bottom: number, floorY: number, rowLeft: number, rowRight: number, rowTop: number): Prop[] {
+  private layoutProps(
+    W: number,
+    H: number,
+    sign: SignLayout | null,
+    top: number,
+    bottom: number,
+    floorY: number,
+    rowLeft: number,
+    rowRight: number,
+    rowTop: number,
+  ): Prop[] {
     const props: Prop[] = [];
     const zone = bottom - top;
     const leftLimit = sign ? sign.board.x - 6 : W * 0.35;
     const rightStart = sign ? sign.board.x + sign.board.w + 6 : W * 0.65;
     if (zone >= 12 && leftLimit >= 30) props.push({ kind: 'exit', x: 6, y: Math.round(top + 2), w: 25, h: 9 });
-    if (zone >= 24 && W - rightStart >= 34) props.push({ kind: 'prizes', x: W - 34, y: Math.round(top + 2), w: 29, h: Math.min(zone - 4, 30) });
+    if (zone >= 24 && W - rightStart >= 34)
+      props.push({ kind: 'prizes', x: W - 34, y: Math.round(top + 2), w: 29, h: Math.min(zone - 4, 30) });
     const sideL = rowLeft - 3;
     const sideR = W - rowRight - 3;
     const machineH = Math.round(clamp((floorY - rowTop) * 0.95, 24, 90));
@@ -477,7 +488,8 @@ export class RoomRenderer {
     let slot = 0;
     for (let x = b.x - 10 - pw; x >= leftEdge && slot < 2; x -= pw + 10) this.paintPoster(ctx, x, Math.max(zoneTop, py), pw, ph, slot++);
     slot = 2;
-    for (let x = b.x + b.w + 10; x + pw <= rightEdge && slot < 4; x += pw + 10) this.paintPoster(ctx, x, Math.max(zoneTop, py), pw, ph, slot++);
+    for (let x = b.x + b.w + 10; x + pw <= rightEdge && slot < 4; x += pw + 10)
+      this.paintPoster(ctx, x, Math.max(zoneTop, py), pw, ph, slot++);
   }
 
   private paintPoster(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, kind: number): void {
@@ -505,7 +517,11 @@ export class RoomRenderer {
       case 2: {
         rect(ctx, x, y, w, h, '#062a36');
         for (let yy = y + 2; yy < y + h; yy += 4) rect(ctx, x, yy, w, 1, '#0a3c4c');
-        sprite(ctx, ['...w...', '..www..', '..wcw..', '..www..', '.wwwww.', 'ww.w.ww', '...o...', '..ooo..'], cx - 3.5, y + h * 0.26, { w: '#e6fbff', c: '#22d3ee', o: '#ff8a3d' });
+        sprite(ctx, ['...w...', '..www..', '..wcw..', '..www..', '.wwwww.', 'ww.w.ww', '...o...', '..ooo..'], cx - 3.5, y + h * 0.26, {
+          w: '#e6fbff',
+          c: '#22d3ee',
+          o: '#ff8a3d',
+        });
         if (w >= 18) drawTextC(ctx, 'UP', cx, y + h - 7, '#22d3ee');
         break;
       }
@@ -556,7 +572,11 @@ export class RoomRenderer {
         rect(ctx, x, glassY, w, glassH, '#0b1030');
         outline(ctx, x, glassY, w, glassH, '#31407a');
         rect(ctx, x + 2, glassY + 1, 1, glassH - 2, '#1f2b5c');
-        for (let i = 0; i < Math.floor(w / 5); i++) sprite(ctx, PLUSH, x + 1 + i * 5 - (i % 2), glassY + glassH - 5 - (i % 2) * 2, { a: PLUSH_COLORS[(i + 2) % PLUSH_COLORS.length]!, w: '#ffffff' });
+        for (let i = 0; i < Math.floor(w / 5); i++)
+          sprite(ctx, PLUSH, x + 1 + i * 5 - (i % 2), glassY + glassH - 5 - (i % 2) * 2, {
+            a: PLUSH_COLORS[(i + 2) % PLUSH_COLORS.length]!,
+            w: '#ffffff',
+          });
         rect(ctx, x, glassY + glassH, w, cabH, '#1b1433');
         rect(ctx, x, glassY + glassH, w, 1, '#3a2f66');
         rect(ctx, x + w / 2 - 3, glassY + glassH + cabH * 0.3, 6, 3, '#07050d');

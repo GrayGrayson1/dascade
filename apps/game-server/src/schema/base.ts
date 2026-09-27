@@ -42,6 +42,8 @@ export const BaseRoomState = schema(
     players: t.map(PlayerState),
     round: t.uint16().default(0),
     statusText: t.string().default(''),
+    /** JSON TournamentMatchInfo when this room plays a Tournament Center match ('' otherwise). */
+    tournamentJson: t.string().default(''),
   },
   'BaseRoomState',
 );

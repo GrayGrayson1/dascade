@@ -10,6 +10,7 @@ import {
   type RacerView,
 } from '@dascade/shared/games/circuit';
 import { formatRaceTime, ordinal } from '@dascade/shared';
+import { parseBestDoc } from './bestDoc.ts';
 import { TRACK_DEFS } from '@dascade/game-core/circuit';
 import { Badge, Button, Panel, PixelIcon, cx } from '@dascade/ui';
 import { useGame } from '../../net/hooks.ts';
@@ -49,8 +50,8 @@ export function Results() {
   useEffect(() => {
     let alive = true;
     persistence()
-      .loadDoc<CircuitBestDoc>(circuitBestKey(trackId))
-      .then((doc) => alive && setPb(doc))
+      .loadDoc<unknown>(circuitBestKey(trackId))
+      .then((doc) => alive && setPb(parseBestDoc(doc, trackId)))
       .catch(() => undefined);
     return () => {
       alive = false;

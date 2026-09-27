@@ -780,6 +780,19 @@ export class QuestRoom extends BaseGameRoom<QuestState, QuestSettings> {
     this.pushLog('ending', `THE END — ${results.title}.`, results.tier === 'bad' ? 'bad' : 'good');
     this.event({ kind: 'ending', text: results.title, tone: results.tier === 'bad' ? 'bad' : 'good' });
     for (const p of this.players.values()) if (!p.state.spectator) p.state.score = results.score;
+    // DASCADE stats: co-op, so the whole party (including heroes whose players left) shares one place.
+    const success = results.tier === 'great' || results.tier === 'good' || results.tier === 'bittersweet';
+    const party = run.heroes.map((h) => h.playerId);
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const h of run.heroes) {
+      playerStats[h.playerId] = { questsCompleted: success ? 1 : 0, checksPassed: h.stats.successes, crits: h.stats.crits };
+    }
+    this.reportOutcome({
+      placements: [party],
+      scores: Object.fromEntries(party.map((id) => [id, results.score])),
+      reason: success ? 'quest_complete' : 'quest_failed',
+      details: { pack: adv.id, ending: endingId, tier: results.tier, success, turns: run.turn, playerStats },
+    });
     this.endMatch({
       players: run.heroes.map((h) => ({
         playerId: h.playerId,

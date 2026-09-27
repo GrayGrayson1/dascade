@@ -1,17 +1,24 @@
 /**
- * A cabinet screen: a tiny canvas running the game's attract loop on the
- * shared frame scheduler. Pauses off-screen / in hidden tabs, and renders a
- * single still frame with reduced motion or effects off.
+ * A cabinet screen: a tiny canvas running an attract playlist on the shared
+ * frame scheduler. Pauses off-screen / in hidden tabs, renders a single still
+ * frame with reduced motion or effects off, and only animates while `running`
+ * (the lineup runs just the centred cabinet and its neighbours).
  */
 import { useEffect, useRef } from 'react';
-import type { GameCatalogEntry } from '@dascade/shared';
+import type { GameAccent } from '@dascade/shared';
 import { useApp } from '../app/store.ts';
-import { drawAttract, stillTime } from './attract.ts';
+import { drawAttract, type SceneId } from './attract.ts';
 import { addFrameJob, clockNow } from './scheduler.ts';
 
 export interface AttractCanvasProps {
-  game: GameCatalogEntry;
+  /** Scene playlist (one scene loops; several cycle with channel changes). */
+  scenes: readonly SceneId[];
+  /** Marquee title for the HUD band. */
+  title: string;
+  accent: GameAccent;
   active?: boolean;
+  /** Animate (true) or hold a representative still (false). */
+  running?: boolean;
   /**
    * 'exact' sizes the canvas to its parent with whole device pixels per art
    * pixel (crisp cabinet screens); 'cover' renders a fixed 4:3 frame that CSS
@@ -27,14 +34,27 @@ export interface AttractCanvasProps {
   className?: string;
 }
 
-export function AttractCanvas({ game, active = false, fit = 'exact', resolution = 84, hud = true, fps = 24, offset = 0, className }: AttractCanvasProps) {
+export function AttractCanvas({
+  scenes,
+  title,
+  accent,
+  active = false,
+  running = true,
+  fit = 'exact',
+  resolution = 84,
+  hud = true,
+  fps = 24,
+  offset = 0,
+  className,
+}: AttractCanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const reduced = useApp((s) => s.settings.reducedMotion);
   const fx = useApp((s) => s.settings.fx);
-  const live = !reduced && fx !== 'off';
-  const state = useRef({ active, live, W: 0, H: 0 });
+  const live = !reduced && fx !== 'off' && running;
+  const state = useRef({ active, live, W: 0, H: 0, lastT: 0 });
   state.current.active = active;
   state.current.live = live;
+  const scenesKey = scenes.join(',');
 
   const paint = useRef<(t?: number) => void>(() => undefined);
   paint.current = (t?: number) => {
@@ -43,8 +63,11 @@ export function AttractCanvas({ game, active = false, fit = 'exact', resolution 
     if (!canvas || !s.W) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const still = !s.live;
-    drawAttract({ ctx, W: s.W, H: s.H, t: still ? stillTime(game.id) : (t ?? clockNow()) + offset, active: s.active, hud, still, game });
+    // A paused (not running) screen keeps its last live frame when it has one; motion-off shows the still.
+    const motionOff = reduced || fx === 'off';
+    const time = t ?? (s.lastT || clockNow() + offset);
+    if (t !== undefined) s.lastT = t;
+    drawAttract({ ctx, W: s.W, H: s.H, t: time, active: s.active, hud, still: motionOff || (!s.live && !s.lastT), scenes, title, accent });
   };
 
   // Size the backing store.
@@ -60,10 +83,13 @@ export function AttractCanvas({ game, active = false, fit = 'exact', resolution 
         H = Math.round(resolution * 0.75);
       } else {
         const r = host.getBoundingClientRect();
-        if (r.width < 4 || r.height < 4) return;
+        // Measure the untransformed box: the lineup scales cabinets with CSS transforms.
+        const w = host.clientWidth || r.width;
+        const h = host.clientHeight || r.height;
+        if (w < 4 || h < 4) return;
         const dpr = window.devicePixelRatio || 1;
-        const devW = r.width * dpr;
-        const devH = r.height * dpr;
+        const devW = w * dpr;
+        const devH = h * dpr;
         const k = Math.max(1, Math.round(devW / resolution));
         W = Math.max(40, Math.floor(devW / k));
         H = Math.max(30, Math.floor(devH / k));
@@ -90,10 +116,10 @@ export function AttractCanvas({ game, active = false, fit = 'exact', resolution 
     paint.current();
     if (!live) return;
     const canvas = ref.current;
-    return addFrameJob((t) => paint.current(t), { fps: fx === 'low' ? Math.min(fps, 15) : fps, el: canvas });
-  }, [live, fps, fx]);
+    return addFrameJob((t) => paint.current(t + offset), { fps: fx === 'low' ? Math.min(fps, 15) : fps, el: canvas });
+  }, [live, fps, fx, offset, scenesKey]);
 
-  // Repaint the still immediately when the active state flips.
+  // Repaint immediately when the active state flips (HUD text changes).
   useEffect(() => {
     if (!live) paint.current();
   }, [active, live]);

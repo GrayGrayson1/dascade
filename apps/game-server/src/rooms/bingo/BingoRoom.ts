@@ -389,6 +389,7 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
     const ranked = this.seatedPlayers()
       .map((p) => ({ p, wins: st.bingo.get(p.id)?.wins ?? 0 }))
       .sort((a, b) => b.wins - a.wins || a.p.state.joinOrder - b.p.state.joinOrder);
+    this.reportBingoOutcome();
     this.endMatch({
       players: ranked.map(({ p, wins }, i) => ({
         playerId: p.id,
@@ -405,6 +406,27 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
         calls: st.calls.length,
         winners: st.winners.map((w) => w.name),
       },
+    });
+  }
+
+  /**
+   * DASCADE stats: everyone who called a verified bingo shares first place, everyone else (leavers
+   * included) shares second; a game nobody won is a draw. Ended before a single ball was called = no contest.
+   */
+  private reportBingoOutcome(): void {
+    const st = this.state;
+    if (st.winners.length === 0 && st.calls.length === 0 && st.round <= 1) return;
+    const bingos = new Map<string, number>();
+    for (const w of st.winners) bingos.set(w.playerId, (bingos.get(w.playerId) ?? 0) + 1);
+    const winners = [...bingos.keys()];
+    const others = [...this.seatedPlayers().map((p) => p.id), ...this.matchLeaverIds()].filter((id) => !bingos.has(id));
+    const placements = [winners, others].filter((g) => g.length > 0);
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const id of placements.flat()) playerStats[id] = { bingos: bingos.get(id) ?? 0 };
+    this.reportOutcome({
+      placements,
+      reason: winners.length ? 'bingo' : 'no_winner',
+      details: { mode: this.spec.mode, rounds: this.plan.length, playerStats },
     });
   }
 

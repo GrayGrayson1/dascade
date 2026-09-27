@@ -1,0 +1,189 @@
+/* Asteroid Run — game-specific styles (prefix as-). Chrome comes from the Classics kit. */
+
+.as-canvas {
+  touch-action: none;
+}
+
+.as-final {
+  font-family: var(--font-ui);
+  color: var(--text-1);
+}
+.as-final strong {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+/* HUD shield meter */
+.as-shield__bar {
+  display: block;
+  width: clamp(64px, 9vw, 120px);
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg-0) 70%, var(--line));
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.as-shield__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #0e7490, #22d3ee);
+  box-shadow: 0 0 10px color-mix(in srgb, #22d3ee 60%, transparent);
+  transition: width 160ms linear;
+}
+.as-shield__fill.is-low {
+  background: linear-gradient(90deg, #9f1239, #fb7185);
+}
+@media (prefers-reduced-motion: reduce) {
+  .as-shield__fill {
+    transition: none;
+  }
+}
+
+.as-banner {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  z-index: 4;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--bg-0) 82%, transparent);
+  font-family: var(--font-pixel);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-1);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Crew rail */
+.as-crew {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.as-crew__row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-1);
+}
+.as-crew__row.is-me {
+  background: color-mix(in srgb, var(--pc) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent);
+}
+.as-crew__row.is-out {
+  color: var(--text-3);
+}
+.as-crew__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--pc);
+}
+.as-crew__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.as-crew__lives,
+.as-crew__score {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.as-crew__lives {
+  color: var(--text-2);
+}
+.as-crew__score {
+  color: var(--accent);
+  text-align: right;
+  min-width: 3ch;
+}
+
+/* Solo options */
+.as-options {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-1) 70%, transparent);
+}
+.as-options__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.as-options__row .dc-segmented {
+  flex: 1 1 auto;
+}
+.as-options__label {
+  min-width: 72px;
+  font-family: var(--font-pixel);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* Touch: analog flight stick + fire */
+.as-stick {
+  position: relative;
+  width: clamp(112px, 32vw, 150px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, var(--bg-1)) 0%, color-mix(in srgb, var(--bg-0) 80%, transparent) 70%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, var(--line)), 0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.as-stick__ring {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.as-stick__knob {
+  position: absolute;
+  left: calc(50% - 26px);
+  top: calc(50% - 26px);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 60%, white), var(--accent));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+  pointer-events: none;
+}
+.as-fire {
+  min-width: 92px;
+  min-height: 92px;
+  border-radius: 50%;
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .as-stick {
+    width: 118px;
+  }
+  .as-fire {
+    min-width: 78px;
+    min-height: 78px;
+  }
+}
+
+.as-settings {
+  display: grid;
+  gap: var(--sp-3);
+}

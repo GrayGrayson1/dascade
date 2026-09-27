@@ -6,6 +6,7 @@ import { DEFAULT_WHEEL_SETTINGS, WHEEL_MSG, type WheelSpinSnapshot } from '@dasc
 import { computeArcs, segmentAtPointer, pointerAngle } from '@dascade/game-core/wheel';
 import { bootTestServer, collect, quiet, sleep, waitFor } from './helpers.ts';
 import type { WheelRoom } from '../src/rooms/wheel/WheelRoom.ts';
+import { onOutcome } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -453,5 +454,26 @@ describe('WheelRoom session', () => {
     expect(st(guest.room).totalSpins).toBe(0);
     expect(st(guest.room).spin.spinId).toBe(0);
     expect(st(guest.room).spin.status).toBe('idle');
+  });
+});
+
+describe('WheelRoom outcomes', () => {
+  it('never reports a DASCADE outcome: the wheel is a decision tool, not a competition', async () => {
+    const reported: string[] = [];
+    const stop = onOutcome((_outcome, ctx) => reported.push(ctx.gameId));
+    try {
+      const host = await createWheel();
+      await join(host.room.roomId, 'Guest');
+      await setSettings(host, { spinDurationMs: 2000 });
+      await start(host);
+      host.room.send(WHEEL_MSG.spin, {});
+      await waitFor(landed(host.room, 1), 5000, 'landing');
+      host.room.send(WHEEL_MSG.end, {});
+      await waitFor(() => st(host.room).phase === 'RESULTS');
+      await sleep(50);
+      expect(reported).toEqual([]);
+    } finally {
+      stop();
+    }
   });
 });

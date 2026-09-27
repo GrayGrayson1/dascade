@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { WelcomePayload } from '@dascade/shared';
+import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import { CIRCUIT_MSG, packInput, type CircuitEvent } from '@dascade/shared/games/circuit';
 import { createCar, decodeSnapshot, pointAt, type RaceSim, type Snapshot } from '@dascade/game-core/circuit';
 import { bootTestServer, collect, sleep, waitFor, quiet } from './helpers.ts';
 import type { CircuitRoom } from '../src/rooms/circuit/CircuitRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
+import { getStatLine } from '../src/platform/stats.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -350,5 +352,83 @@ describe('CircuitRoom', () => {
     await waitFor(() => st(host.room).phase === 'COUNTDOWN' || st(host.room).phase === 'PLAYING', 3000, 'rematch');
     await waitFor(() => st(host.room).race.raceId !== firstRace, 2000, 'new race id');
     expect(st(host.room).racers.get(host.me().playerId).finished).toBe(false);
+  });
+});
+
+describe('CircuitRoom: DASCADE outcomes', () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Extras = { playerStats: Record<string, Record<string, number>> };
+
+  it('reports finishing order with race times (lower is better) and a racer who left as DNF last', async () => {
+    const host = await createHost('Ann');
+    const guest = await join(host.room.roomId, 'Ben');
+    const quitter = await join(host.room.roomId, 'Quit');
+    const quitId = quitter.me().playerId;
+    await startRace(host, { laps: 1, finishWindowSec: 10 });
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'playing');
+    await quitter.room.leave(true);
+    await waitFor(() => st(host.room).racers.get(quitId)?.dnf === true, 3000, 'dnf');
+    placeBeforeFinish(host.server, racer(guest).slot, 220, 40);
+    placeBeforeFinish(host.server, racer(host).slot, 420, -40);
+    await Promise.all([drive(host, GAS, 2500), drive(guest, GAS, 2500)]);
+    await waitFor(() => st(host.room).phase === 'RESULTS', 4000, 'results');
+
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    const a = host.me().playerId;
+    const b = guest.me().playerId;
+    expect(outcome.placements).toEqual([[b], [a], [quitId]]);
+    expect(outcome.lowerIsBetter).toBe(true);
+    expect(outcome.scores).toEqual({ [b]: racer(guest).finishMs, [a]: racer(host).finishMs });
+    expect(outcome.reason).toBe('finished');
+    const stats = (outcome.details as Extras).playerStats;
+    expect(stats[b]!.minLapMs).toBe(racer(guest).bestLapMs);
+    expect(stats[a]!.minLapMs).toBe(racer(host).bestLapMs);
+    const fastest = st(host.room).race.fastestLapBy;
+    expect(stats[fastest]!.fastestLaps).toBe(1);
+    expect(stats[quitId]).toEqual({ fastestLaps: 0 });
+  });
+
+  it('records a finished solo time trial, all the way into the player’s stats', async () => {
+    const guestId = 'g_circuit_outcome_solo_01';
+    const solo = await createHost('Solo', { solo: true, guestId, settings: { laps: 1 } });
+    await waitFor(() => st(solo.room).phase === 'PLAYING', 6000, 'playing');
+    placeBeforeFinish(solo.server, racer(solo).slot, 150);
+    await drive(solo, GAS, 1200);
+    await waitFor(() => st(solo.room).phase === 'RESULTS', 3000, 'results');
+    const mine = forRoom(solo.room.roomId);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.outcome.placements).toEqual([[solo.me().playerId]]);
+    expect(mine[0]!.outcome.scores).toEqual({ [solo.me().playerId]: racer(solo).finishMs });
+    const line = getStatLine(`g:${guestId}`, 'circuit');
+    expect(line).toMatchObject({ games: 1, wins: 0, losses: 0, bestScore: racer(solo).finishMs, lowerIsBetter: true });
+    expect(racer(solo).bestLapMs).toBeGreaterThan(0);
+    expect(line!.extras).toEqual({ minLapMs: racer(solo).bestLapMs });
+  });
+
+  it('reports nothing for a race nobody finished or one sent back to the lobby', async () => {
+    const timedOut = await createHost('Slow');
+    await join(timedOut.room.roomId, 'Slower');
+    await startRace(timedOut, { laps: 1 });
+    await waitFor(() => st(timedOut.room).phase === 'PLAYING', 3000, 'playing');
+    (sim(timedOut.server).opts as { maxRaceMs: number }).maxRaceMs = 0;
+    await waitFor(() => st(timedOut.room).phase === 'RESULTS', 3000, 'results');
+
+    const lobby = await createHost('Quitter');
+    await startRace(lobby, { laps: 1 });
+    await waitFor(() => st(lobby.room).phase === 'PLAYING', 3000, 'playing');
+    lobby.room.send('lobby:toLobby', {});
+    await waitFor(() => st(lobby.room).phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(timedOut.room.roomId)).toHaveLength(0);
+    expect(forRoom(lobby.room.roomId)).toHaveLength(0);
   });
 });

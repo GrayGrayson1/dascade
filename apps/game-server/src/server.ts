@@ -10,6 +10,7 @@ import { registerApiRoutes } from './http/routes.ts';
 import { config } from './config.ts';
 import { log } from './lib/log.ts';
 import { stampClientIp } from './lib/clientIp.ts';
+import { installPlatformServices } from './platform/index.ts';
 
 type RoomClass = new () => Room;
 
@@ -45,6 +46,7 @@ function securityHeaders(req: express.Request, res: express.Response, next: expr
 }
 
 export async function createDascadeServer(options: CreateServerOptions = {}) {
+  installPlatformServices();
   const rooms: Record<string, ReturnType<typeof defineRoom>> = {};
   const classes = await loadRoomClasses(options.games ?? envGames(), config.isProduction, (id, err) =>
     log.error(`Game room "${id}" failed to load — cabinet disabled`, { err: err as Error }),

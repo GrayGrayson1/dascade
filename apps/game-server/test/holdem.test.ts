@@ -1,12 +1,13 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import type { WelcomePayload } from '@dascade/shared';
+import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import type { HoldemPrivatePayload, HoldemPublicState, HoldemEvent } from '@dascade/shared/games/holdem';
 import type { HandState } from '@dascade/game-core/holdem';
 import { createDascadeServer } from '../src/server.ts';
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import type { HoldemRoom } from '../src/rooms/holdem/HoldemRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -482,5 +483,86 @@ describe("DAS Hold'em room", () => {
     for (const c of [host, ...others]) await waitFor(() => c.privates.some((p) => p.cards.length === 2), 3000, 'cards');
     const all = [host, ...others].flatMap((c) => c.privates.at(-1)!.cards);
     expect(new Set(all).size).toBe(20);
+  });
+});
+
+describe("DAS Hold'em room: DASCADE outcomes", () => {
+  let outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
+  let stop: () => void = () => undefined;
+  beforeEach(() => {
+    outcomes = [];
+    stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
+  });
+  afterEach(() => stop());
+  const forRoom = (code: string) => outcomes.filter((o) => o.ctx.roomCode === code);
+  type Extras = { playerStats: Record<string, Record<string, number>> };
+
+  it('reports the last player standing first, with final stacks and hand stats', async () => {
+    const { host } = await createTable({ startingStack: 1000, smallBlind: 5, bigBlind: 10, allowRebuys: false });
+    const guest = await join(host.room.roomId, 'Villain');
+    await start(host);
+    for (let attempt = 0; attempt < 12 && st(host).phase !== 'RESULTS'; attempt++) {
+      const hand = st(host).handNumber;
+      const first = await actor([host, guest]).catch(() => null);
+      if (!first) break;
+      await act(first, 'allin');
+      const second = await actor([host, guest]).catch(() => null);
+      if (!second) break;
+      await act(second, 'call');
+      await waitFor(() => st(host).handNumber > hand || st(host).phase === 'RESULTS', 5000, 'hand over');
+    }
+    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    const [top, bottom] = st(host).standings;
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    expect(outcome.placements).toEqual([[top!.playerId], [bottom!.playerId]]);
+    expect(outcome.scores).toEqual({ [top!.playerId]: 2000, [bottom!.playerId]: 0 });
+    expect(outcome.reason).toBe('last_standing');
+    const stats = (outcome.details as Extras).playerStats;
+    expect(stats[top!.playerId]!.handsWon).toBeGreaterThanOrEqual(1);
+    expect(stats[top!.playerId]!.bestPot).toBeGreaterThanOrEqual(2000);
+  });
+
+  it('a host-ended game with equal stacks is a shared place; a player who left is listed last', async () => {
+    const { host, server } = await createTable();
+    const guest = await join(host.room.roomId, 'Villain');
+    const leaver = await join(host.room.roomId, 'Leaver');
+    const leaverId = leaver.me().playerId;
+    await start(host);
+    await leaver.room.leave(true);
+    await waitFor(() => !(server as any).players.has(leaverId), 3000, 'leaver gone');
+    host.room.send('holdem:end', {});
+    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(1);
+    const { outcome } = mine[0]!;
+    const rows = st(host).standings;
+    // Places follow the closing leaderboard's ranks (equal rows share one).
+    const firstPlace = rows.filter((r) => r.rank === 1).map((r) => r.playerId);
+    expect(outcome.placements[0]!.sort()).toEqual(firstPlace.sort());
+    expect(outcome.placements.at(-1)).toEqual([leaverId]);
+    expect(outcome.placements.flat().sort()).toEqual([host.me().playerId, guest.me().playerId, leaverId].sort());
+    expect(outcome.reason).toBe('host_ended');
+    expect(Object.keys(outcome.scores ?? {}).sort()).toEqual([host.me().playerId, guest.me().playerId].sort());
+  });
+
+  it('reports nothing when the game ends before a hand is dealt or goes back to the lobby', async () => {
+    const early = await createTable();
+    early.server.timing = { ...FAST, firstHand: 5000 };
+    await join(early.host.room.roomId, 'Villain');
+    early.host.room.send('lobby:start', {});
+    await waitFor(() => st(early.host).phase === 'PLAYING', 3000, 'playing');
+    early.host.room.send('holdem:end', {});
+    await waitFor(() => st(early.host).phase === 'RESULTS', 3000, 'results');
+
+    const lobby = await createTable();
+    await join(lobby.host.room.roomId, 'Villain');
+    await start(lobby.host);
+    lobby.host.room.send('lobby:toLobby', {});
+    await waitFor(() => st(lobby.host).phase === 'LOBBY', 3000, 'lobby');
+    await sleep(80);
+    expect(forRoom(early.host.room.roomId)).toHaveLength(0);
+    expect(forRoom(lobby.host.room.roomId)).toHaveLength(0);
   });
 });

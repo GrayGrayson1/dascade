@@ -49,6 +49,7 @@ import {
   rankStandings,
 } from '@dascade/game-core/dasketch';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { groupSorted, withLeaversLast } from '../outcomePlacements.ts';
 import { DasketchState, SketchPlayerState } from './schema.ts';
 
 interface PlayerStats {
@@ -233,7 +234,7 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     const present = this.seatedPlayers().filter((p) => !p.away);
     if (present.length < 2) {
       this.systemChat('Not enough players to keep drawing — here are the final scores!');
-      this.finishMatch();
+      this.finishMatch('not_enough_players');
       return;
     }
     let artist = this.nextArtist();
@@ -386,7 +387,7 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     });
   }
 
-  private finishMatch(): void {
+  private finishMatch(reason: 'completed' | 'not_enough_players' = 'completed'): void {
     this.cancelTurnTimers();
     this.secret = null;
     this.choices = [];
@@ -397,6 +398,7 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     const standings = rankStandings(
       this.seatedPlayers().map((p) => ({ id: p.id, score: p.state.score, joinOrder: p.state.joinOrder, record: p })),
     );
+    this.reportSketchOutcome(standings, reason);
     this.endMatch({
       players: standings.map((s) => ({
         playerId: s.id,
@@ -410,6 +412,30 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
     });
     const host = this.hostRecord;
     if (host) this.sendWords(host);
+  }
+
+  /**
+   * DASCADE stats: places by final score (ties share a place), players who left mid-match last.
+   * A match that ends before any drawing was revealed (everyone else left at once) is no contest.
+   */
+  private reportSketchOutcome(standings: ReadonlyArray<{ id: string; score: number }>, reason: string): void {
+    if (this.history.length === 0) return;
+    const placements = withLeaversLast(
+      groupSorted(standings, (s) => s.id, (a, b) => a.score === b.score),
+      this.matchLeaverIds(),
+    );
+    const scores: Record<string, number> = {};
+    for (const s of standings) scores[s.id] = s.score;
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const id of placements.flat()) {
+      const st = this.stats.get(id);
+      playerStats[id] = {
+        correctGuesses: st?.correct ?? 0,
+        drawingsGuessed: this.history.filter((h) => h.artistId === id && h.guessers > 0).length,
+        ...(st && st.fastestMs > 0 ? { minGuessMs: st.fastestMs } : {}),
+      };
+    }
+    this.reportOutcome({ placements, scores, reason, details: { rounds: this.state.round, turns: this.history.length, playerStats } });
   }
 
   private computeAwards(): SketchAward[] {

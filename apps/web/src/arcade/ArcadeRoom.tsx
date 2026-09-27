@@ -2,7 +2,7 @@
  * The room backdrop: the pixel-art canvas plus a modern light layer on top
  * (sign bloom, ceiling light cones, neon pooling on the floor, vignette).
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useApp } from '../app/store.ts';
 import { RoomRenderer, type RoomGeometry, type RoomHints } from './room.ts';
 import { addFrameJob, clockNow } from './scheduler.ts';
@@ -13,7 +13,7 @@ export interface RoomSize {
   hints: RoomHints;
 }
 
-export function ArcadeRoom({ size }: { size: RoomSize | null }) {
+export const ArcadeRoom = memo(function ArcadeRoom({ size }: { size: RoomSize | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<RoomRenderer | null>(null);
   const [geo, setGeo] = useState<RoomGeometry | null>(null);
@@ -66,4 +66,4 @@ export function ArcadeRoom({ size }: { size: RoomSize | null }) {
       ) : null}
     </div>
   );
-}
+});

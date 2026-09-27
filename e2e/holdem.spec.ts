@@ -43,7 +43,8 @@ test("DAS Hold'em smoke: create, join, start, play a hand to the pot award, leav
   const bar = actor.locator('.hd-actions');
   await expect(bar.getByRole('button', { name: 'Fold' })).toBeVisible();
   await expect(bar.getByRole('button', { name: 'Call 50' })).toBeVisible();
-  await expect(bar.getByRole('button', { name: /^Raise to 200/ })).toBeVisible();
+  // Short screens (e.g. iPhone 14, ≤ 800px tall) collapse the sizing panel: "Raise 200 +" opens it.
+  await expect(bar.getByRole('button', { name: /^Raise (to )?200/ })).toBeVisible();
   await expect(bar.getByRole('button', { name: /^Check/ })).toHaveCount(0);
 
   // Call, then check it down to the showdown.

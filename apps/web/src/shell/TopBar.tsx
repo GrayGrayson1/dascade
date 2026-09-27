@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { GAME_CATALOG, type GameId } from '@dascade/shared';
-import { Badge, IconButton, PixelIcon } from '@dascade/ui';
+import { Badge, Button, IconButton, PixelIcon } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
 import { useRoomSelector } from '../net/hooks.ts';
 import { sfx } from '../audio/audio.ts';
 import { ConnectionDot, LeaveButton } from './common.tsx';
+import { crumbCabinet } from './crumbs.ts';
 
 const PHASE_LABEL: Record<string, string> = {
   LOBBY: 'Lobby',
@@ -48,13 +49,31 @@ export function TopBar({ gameId, code }: { gameId: GameId; code: string }) {
     const ps = Object.values(s.players ?? {});
     return { players: ps.filter((p) => !p.spectator).length, spectators: ps.filter((p) => p.spectator).length };
   });
+  const locked = useRoomSelector((s) => s.locked);
   const game = GAME_CATALOG[gameId];
+  const cabinet = crumbCabinet(gameId);
+  const multi = cabinet !== null;
   return (
     <header className="topbar" style={{ '--accent': game.accent.primary } as React.CSSProperties}>
       <div className="topbar__left">
         <LeaveButton size="sm" compact />
-        <span className="topbar__title dc-pixel">{game.marquee}</span>
+        <span className="topbar__title dc-pixel" title={multi && cabinet ? `${cabinet.title} › ${game.title}` : game.title}>
+          {multi && cabinet ? (
+            <>
+              <span className="topbar__cabinet">{cabinet.marquee}</span>
+              <span className="topbar__sep" aria-hidden>
+                ›
+              </span>
+            </>
+          ) : null}
+          <span>{game.marquee}</span>
+        </span>
         <RoomCodeChip code={code} />
+        {locked ? (
+          <span className="topbar__lock" title="Room locked — no new players">
+            <PixelIcon name="lock" title="Room locked" />
+          </span>
+        ) : null}
       </div>
       <div className="topbar__center">
         {phase ? (
@@ -86,17 +105,53 @@ export function TopBar({ gameId, code }: { gameId: GameId; code: string }) {
 /** Minimal floating menu for immersive games (top bar hidden). */
 export function ShellMenu({ gameId, code }: { gameId: GameId; code: string }) {
   const openModal = useApp((s) => s.openModal);
+  const muted = useApp((s) => s.settings.muted);
+  const updateSettings = useApp((s) => s.updateSettings);
   const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const game = GAME_CATALOG[gameId];
+  const cabinet = crumbCabinet(gameId);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
   return (
-    <div className="shell-menu" data-open={open ? 'true' : undefined}>
-      <IconButton icon={open ? 'close' : 'gear'} label={open ? 'Close menu' : 'Open menu'} variant="secondary" size="sm" onClick={() => setOpen(!open)} />
+    <div className="shell-menu" data-open={open ? 'true' : undefined} style={{ '--accent': game.accent.primary } as React.CSSProperties}>
+      <IconButton
+        icon={open ? 'close' : 'gear'}
+        label={open ? 'Close menu' : 'Open menu'}
+        variant="secondary"
+        size="sm"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        onClick={() => setOpen(!open)}
+      />
       {open ? (
-        <div className="shell-menu__panel dc-panel">
-          <RoomCodeChip code={code} />
-          <ConnectionDot />
-          <IconButton icon="help" label="How to play" size="sm" onClick={() => openModal('help', gameId)} />
-          <IconButton icon="gear" label="Settings" size="sm" onClick={() => openModal('settings')} />
-          <LeaveButton size="sm" />
+        <div className="shell-menu__panel dc-panel" id={panelId}>
+          <p className="shell-menu__title dc-pixel">
+            {cabinet ? <span className="topbar__cabinet">{cabinet.marquee} › </span> : null}
+            {game.marquee}
+          </p>
+          <div className="shell-menu__status">
+            <RoomCodeChip code={code} />
+            <ConnectionDot />
+          </div>
+          <div className="shell-menu__actions">
+            <Button size="sm" variant="ghost" icon="help" onClick={() => (setOpen(false), openModal('help', gameId))}>
+              How to play
+            </Button>
+            <Button size="sm" variant="ghost" icon="gear" onClick={() => (setOpen(false), openModal('settings'))}>
+              Settings
+            </Button>
+            <Button size="sm" variant="ghost" icon={muted ? 'sound-off' : 'sound-on'} aria-pressed={muted} onClick={() => updateSettings({ muted: !muted })}>
+              {muted ? 'Unmute' : 'Mute'}
+            </Button>
+            <LeaveButton size="sm" className="shell-menu__leave" />
+          </div>
         </div>
       ) : null}
     </div>

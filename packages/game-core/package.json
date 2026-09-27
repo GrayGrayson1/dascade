@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@dascade/shared": "workspace:*",
+    "chess.js": "1.4.0",
     "zod": "^4.6.5"
   }
 }

@@ -219,6 +219,7 @@ export class WheelRoom extends BaseGameRoom<WheelState, WheelSettings> {
     }
     const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
     const ranked = this.seatedPlayers().sort((a, b) => b.state.score - a.state.score);
+    // No reportOutcome(): the wheel is a shared decision tool, not a competition — nobody wins or loses.
     this.endMatch({
       players: ranked.map((p, i) => ({
         playerId: p.id,

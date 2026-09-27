@@ -2,7 +2,7 @@
  * Arcade floor HUD: the DASCADE neon lockup, server status, Join with code,
  * profile chip, sound / motion / settings / help controls, and the footer.
  */
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Avatar, Button, IconButton, Kbd } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
 import { serverUrl } from '../net/serverUrl.ts';
@@ -65,19 +65,24 @@ export function useServerStatus(intervalMs = 15_000): ServerStatus {
 export function ServerStatusPill({ status, className }: { status: ServerStatus; className?: string }) {
   const text =
     status.state === 'online'
-      ? `Online · ${status.rooms} ${status.rooms === 1 ? 'af-room' : 'rooms'} live`
+      ? `Online · ${status.rooms} ${status.rooms === 1 ? 'room' : 'rooms'} live`
       : status.state === 'offline'
         ? 'Arcade offline — retrying'
         : 'Connecting…';
   return (
-    <span className={`af-srv ${className ?? ''}`} data-state={status.state} role="status" title={status.state === 'offline' ? 'The game server isn’t reachable right now. We’ll keep trying.' : undefined}>
+    <span
+      className={`af-srv ${className ?? ''}`}
+      data-state={status.state}
+      role="status"
+      title={status.state === 'offline' ? 'The game server isn’t reachable right now. We’ll keep trying.' : undefined}
+    >
       <i aria-hidden />
       <span>{text}</span>
     </span>
   );
 }
 
-export function ArcadeHeader({ status }: { status: ServerStatus }) {
+export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { status: ServerStatus; kiosk?: ReactNode }) {
   const openModal = useApp((s) => s.openModal);
   const muted = useApp((s) => s.settings.muted);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
@@ -99,12 +104,18 @@ export function ArcadeHeader({ status }: { status: ServerStatus }) {
           </span>
         </h1>
       </div>
+      {kiosk ? <div className="af-hud__kiosk">{kiosk}</div> : null}
       <div className="af-hud__actions">
         <ServerStatusPill status={status} className="af-hud__status" />
         <Button variant="secondary" icon="users" className="af-hud__join" onClick={() => open('join')}>
           Join with code
         </Button>
-        <button type="button" className="af-hud__profile" onClick={() => open('profile')} aria-label={confirmed ? `Profile: ${profile.name}. Edit name and avatar` : 'Set your name and avatar'}>
+        <button
+          type="button"
+          className="af-hud__profile"
+          onClick={() => open('profile')}
+          aria-label={confirmed ? `Profile: ${profile.name}. Edit name and avatar` : 'Set your name and avatar'}
+        >
           <Avatar avatar={profile.avatar} color="var(--cyan)" size={28} />
           <span className="af-hud__profile-name" data-empty={confirmed ? undefined : 'true'}>
             {confirmed ? profile.name : 'Set your name'}
@@ -131,17 +142,17 @@ export function ArcadeHeader({ status }: { status: ServerStatus }) {
       </div>
     </header>
   );
-}
+});
 
-export function ArcadeFooter({ status }: { status: ServerStatus }) {
+export const ArcadeFooter = memo(function ArcadeFooter({ status }: { status: ServerStatus }) {
   return (
     <footer className="af-foot">
       <ServerStatusPill status={status} className="af-foot__status" />
       <span className="af-foot__legal">Virtual chips only — no real money, ever.</span>
       <span className="af-foot__keys" aria-hidden>
         <Kbd>←</Kbd>
-        <Kbd>→</Kbd> browse <Kbd>Enter</Kbd> play
+        <Kbd>→</Kbd> browse <Kbd>Enter</Kbd> open
       </span>
     </footer>
   );
-}
+});

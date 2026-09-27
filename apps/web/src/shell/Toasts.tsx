@@ -1,5 +1,9 @@
 import { PixelIcon } from '@dascade/ui';
+import type { ToastKind } from '@dascade/shared';
 import { useApp } from '../app/store.ts';
+
+const TOAST_ICON = { success: 'check', error: 'warning', warning: 'warning', info: 'info' } as const satisfies Record<ToastKind, string>;
+const TOAST_LABEL: Record<ToastKind, string> = { success: 'Done', error: 'Error', warning: 'Heads up', info: 'Info' };
 
 /** Global toast stack (kept dependency-light so the landing page doesn't pull in networking). */
 export function Toasts() {
@@ -8,12 +12,13 @@ export function Toasts() {
   return (
     <div className="dc-toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className="dc-toast" data-kind={t.kind} onClick={() => dismiss(t.id)}>
-          <PixelIcon
-            className="dc-toast__icon"
-            name={t.kind === 'success' ? 'check' : t.kind === 'error' ? 'warning' : t.kind === 'warning' ? 'warning' : 'info'}
-          />
-          <span>{t.text}</span>
+        <div key={t.id} className="dc-toast" data-kind={t.kind}>
+          <PixelIcon className="dc-toast__icon" name={TOAST_ICON[t.kind] ?? 'info'} />
+          <span className="visually-hidden">{TOAST_LABEL[t.kind] ?? 'Info'}: </span>
+          <span className="dc-toast__text">{t.text}</span>
+          <button type="button" className="dc-toast__close" aria-label="Dismiss notification" title="Dismiss" onClick={() => dismiss(t.id)}>
+            <PixelIcon name="close" />
+          </button>
         </div>
       ))}
     </div>

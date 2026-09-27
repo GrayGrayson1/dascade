@@ -2,8 +2,8 @@
  * The shared lobby used by every cabinet. Games plug in their own SettingsPanel
  * and PlayerSetup via their GameClientModule.
  */
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
-import { GAME_CATALOG, LIMITS, type GameId, type PlayerView } from '@dascade/shared';
+import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
+import { GAME_CATALOG, LIMITS, cabinetForGame, type GameId, type PlayerView } from '@dascade/shared';
 import {
   Badge,
   Button,
@@ -25,6 +25,8 @@ import { useApp } from '../app/store.ts';
 import { sfx } from '../audio/audio.ts';
 import type { GameClientModule, SettingsPanelProps } from '../games/types.ts';
 import { ChatPanel, GameStage, LeaveButton } from './common.tsx';
+import { crumbCabinet } from './crumbs.ts';
+import { TournamentButton } from '../tournament/TournamentButton.tsx';
 
 type LobbyTab = 'players' | 'settings' | 'setup' | 'chat';
 
@@ -101,13 +103,24 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   return (
     <GameStage gameId={gameId} className="lobby">
       <div className="lobby__inner">
-        <LobbyHero gameId={gameId} roomName={state.roomName} code={state.code} canEdit={isHost} />
+        <LobbyHero
+          gameId={gameId}
+          roomName={state.roomName}
+          code={state.code}
+          canEdit={isHost}
+          seated={seated.length}
+          maxPlayers={state.maxPlayers}
+          locked={state.locked}
+          allowSpectators={state.allowSpectators}
+          spectators={players.length - seated.length}
+        />
 
         <Tabs className="lobby__tabs" label="Lobby sections" value={tab} onChange={setTab} tabs={tabs} />
 
         <div className="lobby__grid" data-tab={tab}>
           <Panel className="lobby__players" data-section="players" title={`Players · ${seated.length}/${state.maxPlayers}`} brackets>
-            <PlayerList players={players} meId={game.playerId} hostView={isHost} />
+            <SeatMeter seated={seated.length} max={state.maxPlayers} min={minPlayers} />
+            <PlayerList players={players} meId={game.playerId} hostView={isHost} maxPlayers={state.maxPlayers} locked={state.locked} />
             {me?.spectator && !me.queued ? (
               <p className="dc-field__hint" style={{ marginTop: 12 }}>
                 You’re spectating. {seated.length < state.maxPlayers ? 'Grab a seat to play.' : 'All seats are taken.'}
@@ -131,6 +144,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
               <Button size="sm" variant="ghost" icon="help" onClick={() => openModal('help', gameId)}>
                 Full rules & controls
               </Button>
+              <TournamentButton gameId={gameId} label="Run a tournament" />
             </Panel>
           </div>
 
@@ -221,8 +235,30 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   );
 }
 
-function LobbyHero({ gameId, roomName, code, canEdit }: { gameId: GameId; roomName: string; code: string; canEdit: boolean }) {
+function LobbyHero({
+  gameId,
+  roomName,
+  code,
+  canEdit,
+  seated,
+  maxPlayers,
+  locked,
+  allowSpectators,
+  spectators,
+}: {
+  gameId: GameId;
+  roomName: string;
+  code: string;
+  canEdit: boolean;
+  seated: number;
+  maxPlayers: number;
+  locked: boolean;
+  allowSpectators: boolean;
+  spectators: number;
+}) {
   const catalog = GAME_CATALOG[gameId];
+  const cabinet = cabinetForGame(gameId);
+  const multi = crumbCabinet(gameId) !== null;
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(roomName);
   useEffect(() => setName(roomName), [roomName]);
@@ -248,7 +284,21 @@ function LobbyHero({ gameId, roomName, code, canEdit }: { gameId: GameId; roomNa
   return (
     <header className="lobby-hero">
       <div className="lobby-hero__title">
-        <span className="dc-label">{catalog.title} · Lobby</span>
+        <nav className="shell-crumb" aria-label="You are here" style={cabinet ? ({ '--crumb': cabinet.accent.primary } as CSSProperties) : undefined}>
+          {multi && cabinet ? (
+            <>
+              <span className="shell-crumb__cabinet">{cabinet.title}</span>
+              <span className="shell-crumb__sep" aria-hidden>
+                ›
+              </span>
+            </>
+          ) : null}
+          <span className="shell-crumb__game">{catalog.title}</span>
+          <span className="shell-crumb__sep" aria-hidden>
+            ·
+          </span>
+          <span className="shell-crumb__here">Lobby</span>
+        </nav>
         {editing ? (
           <form
             className="dc-row"
@@ -268,6 +318,24 @@ function LobbyHero({ gameId, roomName, code, canEdit }: { gameId: GameId; roomNa
           </h1>
         )}
         <p className="dc-muted">{catalog.tagline}</p>
+        <ul className="lobby-status" aria-label="Room status">
+          <li className="lobby-status__item">
+            <PixelIcon name="users" />
+            <span>
+              <span className="dc-num">{seated}</span>/<span className="dc-num">{maxPlayers}</span> seats
+            </span>
+          </li>
+          <li className="lobby-status__item" data-state={locked ? 'locked' : 'open'}>
+            <PixelIcon name={locked ? 'lock' : 'unlock'} />
+            <span>{locked ? 'Locked' : 'Open to join'}</span>
+          </li>
+          {allowSpectators ? (
+            <li className="lobby-status__item">
+              <PixelIcon name="eye" />
+              <span>{spectators > 0 ? `${spectators} watching` : 'Spectators welcome'}</span>
+            </li>
+          ) : null}
+        </ul>
       </div>
       <div className="lobby-code" aria-label={`Room code ${code}`}>
         <span className="dc-label">Room code</span>
@@ -289,47 +357,104 @@ function LobbyHero({ gameId, roomName, code, canEdit }: { gameId: GameId; roomNa
   );
 }
 
-function PlayerList({ players, meId, hostView }: { players: PlayerView[]; meId: string | null; hostView: boolean }) {
+/** Filled / empty seat pips (compact bar for big rooms). */
+function SeatMeter({ seated, max, min }: { seated: number; max: number; min: number }) {
+  const label = `${seated} of ${max} seats taken${seated < min ? ` · ${min - seated} more needed to start` : ''}`;
+  return (
+    <div className="seat-meter" role="img" aria-label={label} data-mode={max <= 12 ? 'pips' : 'bar'}>
+      {max <= 12 ? (
+        Array.from({ length: max }, (_, i) => <i key={i} data-filled={i < seated ? 'true' : undefined} data-needed={i >= seated && i < min ? 'true' : undefined} />)
+      ) : (
+        <i className="seat-meter__fill" style={{ '--fill': `${Math.min(100, (seated / Math.max(1, max)) * 100)}%` } as CSSProperties} />
+      )}
+    </div>
+  );
+}
+
+function PlayerList({
+  players,
+  meId,
+  hostView,
+  maxPlayers,
+  locked,
+}: {
+  players: PlayerView[];
+  meId: string | null;
+  hostView: boolean;
+  maxPlayers: number;
+  locked: boolean;
+}) {
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const sorted = useMemo(
-    () => [...players].sort((a, b) => Number(a.spectator) - Number(b.spectator) || a.joinOrder - b.joinOrder),
-    [players],
+  const seated = useMemo(() => players.filter((p) => !p.spectator).sort((a, b) => a.joinOrder - b.joinOrder), [players]);
+  const watching = useMemo(() => players.filter((p) => p.spectator).sort((a, b) => a.joinOrder - b.joinOrder), [players]);
+  const open = Math.max(0, maxPlayers - seated.length);
+  const row = (p: PlayerView) => (
+    <li key={p.id} className={cx('player-list__item', p.ready && 'is-ready', p.id === meId && 'is-me', !p.connected && 'is-away')}>
+      <PlayerChip
+        name={p.name}
+        avatar={p.avatar}
+        color={p.color}
+        isHost={p.isHost}
+        isYou={p.id === meId}
+        connected={p.connected}
+        spectator={p.spectator}
+        meta={p.queued ? <Badge color="var(--warning)">Next round</Badge> : null}
+      />
+      <span className="dc-spacer" />
+      {p.isHost && !p.spectator ? (
+        <span className="ready-pill ready-pill--host">Host</span>
+      ) : !p.spectator ? (
+        <span className={cx('ready-pill', p.ready && 'ready-pill--on')}>
+          <PixelIcon name={p.ready ? 'check' : 'clock'} /> {p.ready ? 'Ready' : 'Not ready'}
+        </span>
+      ) : null}
+      {hostView && p.id !== meId ? (
+        menuFor === p.id ? (
+          <span className="player-list__manage">
+            <Button size="sm" variant="ghost" icon="crown" onClick={() => (session.lobby.transferHost(p.id), setMenuFor(null))} disabled={!p.connected}>
+              Make host
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => (session.lobby.kick(p.id), setMenuFor(null))}>
+              Remove
+            </Button>
+            <IconButton icon="close" label="Close player actions" size="sm" onClick={() => setMenuFor(null)} />
+          </span>
+        ) : (
+          <IconButton icon="gear" label={`Manage ${p.name}`} size="sm" onClick={() => setMenuFor(p.id)} />
+        )
+      ) : null}
+    </li>
   );
   return (
     <ul className="player-list">
-      {sorted.map((p) => (
-        <li key={p.id} className={cx('player-list__item', p.ready && 'is-ready')}>
-          <PlayerChip
-            name={p.name}
-            avatar={p.avatar}
-            color={p.color}
-            isHost={p.isHost}
-            isYou={p.id === meId}
-            connected={p.connected}
-            spectator={p.spectator}
-            meta={p.queued ? <Badge color="var(--yellow)">Next round</Badge> : null}
-          />
-          <span className="dc-spacer" />
-          {!p.spectator && !p.isHost ? (
-            <span className={cx('ready-pill', p.ready && 'ready-pill--on')}>{p.ready ? 'Ready' : 'Not ready'}</span>
-          ) : null}
-          {hostView && p.id !== meId ? (
-            menuFor === p.id ? (
-              <span className="dc-row" style={{ gap: 4 }}>
-                <Button size="sm" variant="ghost" icon="crown" onClick={() => (session.lobby.transferHost(p.id), setMenuFor(null))} disabled={!p.connected}>
-                  Make host
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => (session.lobby.kick(p.id), setMenuFor(null))}>
-                  Remove
-                </Button>
-                <IconButton icon="close" label="Close player actions" size="sm" onClick={() => setMenuFor(null)} />
-              </span>
-            ) : (
-              <IconButton icon="gear" label={`Manage ${p.name}`} size="sm" onClick={() => setMenuFor(p.id)} />
-            )
-          ) : null}
+      {seated.map(row)}
+      {open > 0 ? (
+        locked ? (
+          <li className="player-list__open player-list__open--locked">
+            <PixelIcon name="lock" /> Room locked — no new players
+          </li>
+        ) : open <= 3 ? (
+          Array.from({ length: open }, (_, i) => (
+            <li key={`open-${i}`} className="player-list__open">
+              <span className="player-list__open-slot" aria-hidden />
+              Open seat
+            </li>
+          ))
+        ) : (
+          <li className="player-list__open">
+            <span className="player-list__open-slot" aria-hidden />
+            <span>
+              <span className="dc-num">{open}</span> open seats
+            </span>
+          </li>
+        )
+      ) : null}
+      {watching.length > 0 ? (
+        <li className="player-list__divider">
+          <PixelIcon name="eye" /> Spectators · <span className="dc-num">{watching.length}</span>
         </li>
-      ))}
+      ) : null}
+      {watching.map(row)}
     </ul>
   );
 }

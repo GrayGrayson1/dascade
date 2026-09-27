@@ -34,7 +34,25 @@ export async function joinRoom(browser: Browser, code: string, name: string, opt
 export async function startGame(host: Page): Promise<void> {
   await host.getByRole('button', { name: 'Start game' }).click();
   const confirm = host.getByRole('button', { name: 'Start now' });
-  if (await confirm.isVisible({ timeout: 800 }).catch(() => false)) await confirm.click();
+  // "Start anyway?" only appears when someone isn't ready. isVisible() never waits, so race the
+  // dialog against the match leaving the lobby instead of guessing a delay (slow machines lose).
+  const outcome = await Promise.race([
+    confirm.waitFor({ state: 'visible', timeout: 8_000 }).then(() => 'confirm' as const),
+    expect
+      .poll(async () => (await roomState(host))?.phase, { timeout: 8_000 })
+      .not.toBe('LOBBY')
+      .then(() => 'started' as const),
+  ]).catch(() => 'unknown' as const);
+  if (outcome !== 'confirm') return;
+  // Let the dialog's pop-in animation settle so the click isn't rejected as "not stable".
+  await confirm
+    .evaluate((el) => {
+      const root = el.closest('dialog') ?? el;
+      const finite = root.getAnimations({ subtree: true }).filter((a) => a.effect?.getComputedTiming().iterations !== Infinity);
+      return Promise.race([Promise.all(finite.map((a) => a.finished)), new Promise((resolve) => setTimeout(resolve, 2_000))]);
+    })
+    .catch(() => undefined);
+  await confirm.click();
 }
 
 /** Reads the synchronized room state snapshot exposed for tests. */

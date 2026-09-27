@@ -1,6 +1,11 @@
-/** The lit marquee logo shared by the floor cabinets and the cabinet title screen. */
-import type { GameCatalogEntry } from '@dascade/shared';
+/** The lit marquee logo shared by the lineup cabinets, the cabinet picker and the title screen. */
 import { PixelWord } from './PixelWord.tsx';
+
+/** Anything with a marquee: a cabinet (CabinetDef) or a game (GameCatalogEntry). */
+export interface MarqueeSubject {
+  id: string;
+  marquee: string;
+}
 
 export function marqueeParts(marquee: string): { top?: string; main: string; badge?: string } {
   const words = marquee.trim().split(/\s+/);
@@ -10,10 +15,10 @@ export function marqueeParts(marquee: string): { top?: string; main: string; bad
   return { main: marquee };
 }
 
-export function MarqueeLogo({ game, className }: { game: GameCatalogEntry; className?: string }) {
-  const { top, main, badge } = marqueeParts(game.marquee);
+export function MarqueeLogo({ subject, className }: { subject: MarqueeSubject; className?: string }) {
+  const { top, main, badge } = marqueeParts(subject.marquee);
   return (
-    <span className={className ? `af-mq ${className}` : 'af-mq'} data-game={game.id} aria-hidden>
+    <span className={className ? `af-mq ${className}` : 'af-mq'} data-mq={subject.id} aria-hidden>
       <span className="af-mq__art" />
       <span className="af-mq__text">
         {top ? <span className="af-mq__top">{top}</span> : null}

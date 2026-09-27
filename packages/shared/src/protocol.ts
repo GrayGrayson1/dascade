@@ -93,6 +93,8 @@ export const JoinOptionsSchema = /* @__PURE__ */ lazy(() =>
     spectator: z.boolean().optional(),
     /** Supabase access token when the user has a persistent account (optional). */
     accessToken: z.string().max(4096).optional(),
+    /** Tournament match ticket: seats a registered participant in a Tournament Center match room. */
+    ticket: z.string().max(128).optional(),
   }),
 );
 export type JoinOptions = z.infer<typeof JoinOptionsSchema>;
@@ -148,6 +150,8 @@ export interface WelcomePayload {
   serverNow: number;
   /** True when this join re-attached to an existing seat. */
   rejoined: boolean;
+  /** Seconds the server holds this seat after the connection drops (longer for chess, tournament matches…). */
+  reconnectGraceSeconds?: number;
 }
 
 export interface TimeSyncResponse {
@@ -257,6 +261,8 @@ export interface BaseRoomView {
   players: Record<string, PlayerView>;
   round: number;
   statusText: string;
+  /** JSON TournamentMatchInfo when this room plays a Tournament Center match ('' otherwise). */
+  tournamentJson: string;
 }
 
 /** Room info returned by GET /api/rooms/:code (used before joining). */

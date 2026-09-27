@@ -1,0 +1,134 @@
+/* Neon Snake — game-specific styles (prefix sn-). Chrome comes from the Classics kit. */
+
+.sn-canvas {
+  touch-action: none;
+}
+
+.sn-final {
+  font-family: var(--font-ui);
+  color: var(--text-1);
+}
+
+.sn-banner {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  z-index: 4;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--bg-0) 82%, transparent);
+  font-family: var(--font-pixel);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-1);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Arena roster (right rail) */
+.sn-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.sn-roster__row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-1);
+}
+.sn-roster__row.is-me {
+  background: color-mix(in srgb, var(--sc) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc) 45%, transparent);
+}
+.sn-roster__row.is-down {
+  color: var(--text-3);
+}
+.sn-roster__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--sc);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sc) 70%, transparent);
+}
+.sn-roster__row.is-down .sn-roster__swatch {
+  opacity: 0.35;
+  box-shadow: none;
+}
+.sn-roster__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sn-roster__len,
+.sn-roster__score {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.sn-roster__len {
+  color: var(--text-2);
+  display: inline-flex;
+}
+.sn-roster__score {
+  color: var(--accent);
+  min-width: 3ch;
+  text-align: right;
+}
+
+/* Solo options on the instructions card */
+.sn-options {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-1) 70%, transparent);
+}
+.sn-options__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.sn-options__row .dc-segmented {
+  flex: 1 1 auto;
+}
+.sn-options__label {
+  min-width: 56px;
+  font-family: var(--font-pixel);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.sn-options__toggles,
+.sn-settings__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.sn-swipe-hint {
+  max-width: 120px;
+  font-family: var(--font-pixel);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.sn-settings {
+  display: grid;
+  gap: var(--sp-3);
+}

@@ -2,11 +2,19 @@
  * DASino — the casino-floor cabinet (roulette, slots, dice). Virtual chips only.
  */
 import { useEffect, useRef } from 'react';
-import { DASINO_MSG, DEFAULT_DASINO_SETTINGS, type DasinoPublicState, type DasinoSettings, type SlotResultPayload } from '@dascade/shared/games/dasino';
+import {
+  DASINO_MSG,
+  DEFAULT_DASINO_SETTINGS,
+  type DasinoPublicState,
+  type DasinoSettings,
+  type SlotResultPayload,
+} from '@dascade/shared/games/dasino';
 import type { GameClientModule } from '../types.ts';
 import { GameStage } from '../../shell/common.tsx';
 import { useGame, useRoomMessage } from '../../net/hooks.ts';
-import { BalanceHud, TableNav, Ticker } from './parts.tsx';
+import { useSessionStore } from '../../net/session.ts';
+import { takeVariantRequest } from '../../arcade/variantRequest.ts';
+import { BalanceHud, TableNav, Ticker, goToTable } from './parts.tsx';
 import { Floor } from './Floor.tsx';
 import { RouletteTable } from './Roulette.tsx';
 import { SlotsTable } from './Slots.tsx';
@@ -26,13 +34,21 @@ function DasinoView() {
   useRoomMessage<SlotResultPayload>(DASINO_MSG.slotResult, logSlot);
   const playerId = game?.playerId ?? null;
   const seat = playerId ? game?.state.seats?.[playerId] : undefined;
+  const roomCode = useSessionStore((s) => s.code);
 
-  // After a refresh/reconnect, return to the table the server remembers.
+  // Entering from a table's title screen (/play/dasino?table=…) walks to that table once;
+  // after a refresh/reconnect, return to the table the server remembers.
   useEffect(() => {
     if (!seat || restored.current === seat.id) return;
     restored.current = seat.id;
+    const requested = takeVariantRequest(roomCode, 'dasino', ['roulette', 'slots', 'dice'] as const);
+    if (requested && seat.table === 'floor') {
+      if (useDasinoUi.getState().table === requested) setTable('floor'); // stale UI from an earlier visit
+      goToTable(requested, true);
+      return;
+    }
     if (seat.table !== useDasinoUi.getState().table) setTable(seat.table);
-  }, [seat, setTable]);
+  }, [seat, setTable, roomCode]);
 
   if (!game) return null;
   const { state, phase, isHost } = game;

@@ -4,7 +4,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { AVATARS, GAME_CATALOG, LIMITS, isGameId, type Avatar, type ChatMessage, type GameId } from '@dascade/shared';
+import { AVATARS, GAME_CATALOG, LIMITS, cabinetForGame, cabinetPath, isGameId, type Avatar, type ChatMessage, type GameId } from '@dascade/shared';
 import {
   Avatar as AvatarBadge,
   Button,
@@ -12,6 +12,7 @@ import {
   GameTheme,
   IconButton,
   PixelIcon,
+  PlayerChip,
   Spinner,
   TextInput,
   cx,
@@ -23,6 +24,7 @@ import { useApp } from '../app/store.ts';
 import { getStateSnapshot, session, useSessionStore } from '../net/session.ts';
 import { useGame, useRoomSelector } from '../net/hooks.ts';
 import { sfx } from '../audio/audio.ts';
+import { leaveRoomTo, useTournamentExit } from '../tournament/exit.ts';
 
 export { Toasts } from './Toasts.tsx';
 
@@ -49,6 +51,12 @@ export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean
   };
   return (
     <div className="profile-editor">
+      {!compact ? (
+        <div className="profile-preview">
+          <span className="dc-label">How others see you</span>
+          <PlayerChip name={name.trim() || 'Pick a nickname'} avatar={profile.avatar} color="var(--accent)" size={40} />
+        </div>
+      ) : null}
       <label className="dc-field">
         <span className="dc-field__label">Your name</span>
         <TextInput
@@ -187,12 +195,33 @@ export function ChatPanel({
 }
 
 // ---------------------------------------------------------------------------
-/** Host: "Play again" (back to lobby) · Everyone: "Leave". Use on results screens. */
+/**
+ * Host: "Play again" (back to lobby) · Everyone: "Back to cabinet" (leave → the cabinet's picker or
+ * title screen) and "Leave" (→ arcade floor). Use on results screens. In a Tournament Center match
+ * room: no "Play again" (the series runs itself) and the way out is "Back to tournament".
+ */
 export function ResultsActions({ extra }: { extra?: ReactNode }) {
   // Selectors, not useGame(): results screens can keep receiving game patches.
   const hostId = useRoomSelector((s) => s.hostId);
   const playerId = useSessionStore((s) => s.playerId);
+  const tournament = useTournamentExit();
   if (hostId === null) return null;
+  if (tournament) {
+    // Tournament Center match: the series runs itself — no "Play again". Participants stay for the
+    // next game; once the match is over (or for spectators) the way out leads back to the kiosk.
+    return (
+      <div className="results-actions">
+        {extra}
+        {tournament.over || !tournament.participant ? (
+          <BackToCabinetButton />
+        ) : (
+          <span className="dc-muted results-actions__wait">
+            <Spinner label="Next game" /> The next game of the series starts automatically…
+          </span>
+        )}
+      </div>
+    );
+  }
   const isHost = Boolean(playerId && hostId === playerId);
   return (
     <div className="results-actions">
@@ -206,8 +235,45 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
         </span>
       )}
       {extra}
+      <BackToCabinetButton />
       <LeaveButton />
     </div>
+  );
+}
+
+/**
+ * Leaves the room and returns to the game's cabinet (multi-game picker, or the title screen) — or,
+ * in a Tournament Center match room, to the tournament kiosk ("Back to tournament").
+ */
+export function BackToCabinetButton({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const navigate = useNavigate();
+  const gameId = useSessionStore((s) => s.gameId);
+  const tournament = useTournamentExit();
+  const [busy, setBusy] = useState(false);
+  if (tournament) {
+    const back = async () => {
+      setBusy(true);
+      await leaveRoomTo(navigate, tournament);
+      setBusy(false);
+    };
+    return (
+      <Button size={size} variant="secondary" icon="arrow-left" loading={busy} onClick={back} title={`Return to ${tournament.name}`}>
+        Back to tournament
+      </Button>
+    );
+  }
+  if (!gameId || !isGameId(gameId)) return null;
+  const cabinet = cabinetForGame(gameId);
+  if (!cabinet) return null;
+  const go = async () => {
+    setBusy(true);
+    await session.leaveRoom();
+    navigate(cabinetPath(cabinet));
+  };
+  return (
+    <Button size={size} variant="secondary" icon="arrow-left" loading={busy} onClick={go} title={`Leave the room and return to ${cabinet.title}`}>
+      Back to cabinet
+    </Button>
   );
 }
 
@@ -264,15 +330,15 @@ export function LeaveButton({
 }) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
-  const leave = async () => {
-    await session.leaveRoom();
-    navigate('/');
-  };
+  // Tournament match rooms lead back to the kiosk (the kiosk itself to the Tournament Center landing).
+  const tournament = useTournamentExit();
+  const label = tournament ? 'Leave match' : 'Leave room';
+  const leave = () => leaveRoomTo(navigate, tournament);
   if (confirming) {
     return (
       <span className={cx('dc-row', className)} role="group" aria-label="Confirm leave">
         <Button size={size === 'lg' ? 'md' : 'sm'} variant="danger" onClick={leave}>
-          Leave room
+          {label}
         </Button>
         <Button size={size === 'lg' ? 'md' : 'sm'} variant="ghost" onClick={() => setConfirming(false)}>
           Stay
@@ -281,7 +347,7 @@ export function LeaveButton({
     );
   }
   return compact ? (
-    <IconButton icon="leave" label="Leave room" className={className} onClick={() => setConfirming(true)} />
+    <IconButton icon="leave" label={label} className={className} onClick={() => setConfirming(true)} />
   ) : (
     <Button size={size} variant="ghost" icon="leave" className={className} onClick={() => setConfirming(true)}>
       {collapseLabel ? <span className="dc-collapse-label">Leave</span> : 'Leave'}
@@ -336,6 +402,41 @@ export function ConnectionDot() {
       </span>
       <span className="visually-hidden">{label}</span>
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** Centered notice card shared by the error, not-found and connection-lost screens. */
+export function NoticeCard({
+  icon,
+  tone = 'warning',
+  crumb,
+  title,
+  children,
+  actions,
+  role,
+}: {
+  icon: IconName;
+  tone?: 'warning' | 'danger' | 'info' | 'accent';
+  crumb?: ReactNode;
+  title: ReactNode;
+  children?: ReactNode;
+  actions?: ReactNode;
+  role?: 'alert' | 'status';
+}) {
+  const headingId = useId();
+  return (
+    <section className="notice-card dc-panel dc-panel--brackets" data-tone={tone} role={role} aria-labelledby={headingId}>
+      <div className="notice-card__icon" aria-hidden>
+        <PixelIcon name={icon} />
+      </div>
+      {crumb ? <p className="notice-card__crumb">{crumb}</p> : null}
+      <h1 id={headingId} className="notice-card__title">
+        {title}
+      </h1>
+      {children}
+      {actions ? <div className="notice-card__actions">{actions}</div> : null}
+    </section>
   );
 }
 

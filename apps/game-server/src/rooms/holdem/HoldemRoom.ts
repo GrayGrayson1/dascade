@@ -43,6 +43,7 @@ import {
   type LogLine,
 } from '@dascade/game-core/holdem';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { groupSorted, withLeaversLast } from '../outcomePlacements.ts';
 import { HoldemLogEntry, HoldemPot, HoldemSeat, HoldemStanding, HoldemState, HoldemWinner } from './HoldemState.ts';
 
 /** Pacing (ms). Instance-level so integration tests can speed the table up. */
@@ -140,7 +141,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     });
     this.handle(HOLDEM_MSG.rebuy, HoldemEmptySchema, (p) => this.onRebuy(p), { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true });
     this.handle(HOLDEM_MSG.show, HoldemEmptySchema, (p) => this.onShow(p), { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true });
-    this.handle(HOLDEM_MSG.end, HoldemEmptySchema, () => this.finishGame(), { phases: ['PLAYING', 'INTERMISSION'], hostOnly: true });
+    this.handle(HOLDEM_MSG.end, HoldemEmptySchema, () => this.finishGame('host_ended'), { phases: ['PLAYING', 'INTERMISSION'], hostOnly: true });
 
     // Housekeeping: keep lobby seats consistent with spectate toggles / table size,
     // and make sure the hand loop can never stall.
@@ -955,7 +956,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   // End of game
   // ===========================================================================
 
-  private finishGame(): void {
+  private finishGame(reason: 'last_standing' | 'host_ended' = 'last_standing'): void {
     if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return;
     const h = this.hand;
     if (h && h.stage !== 'complete') {
@@ -1003,6 +1004,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     this.state.tableMessage = '';
     this.pushLog({ kind: 'info', text: `Game over after ${this.state.handNumber} hand${this.state.handNumber === 1 ? '' : 's'}` });
     const standings = this.state.standings.map((s) => ({ ...s.toJSON() }));
+    this.reportHoldemOutcome(standings, reason);
     this.endMatch({
       players: standings.map((s) => {
         const record = this.getPlayer(s.playerId);
@@ -1011,5 +1013,26 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
       details: { hands: this.state.handNumber, leader: standings[0]?.name ?? null },
     });
     for (const p of this.players.values()) this.syncPrivate(p);
+  }
+
+  /**
+   * DASCADE stats: places follow the final leaderboard (chip stack, net of buy-ins when rebuys differ;
+   * equal rows share a place), players who left mid-game last; `scores` are final stacks.
+   * A game ended before any hand was dealt is no contest.
+   */
+  private reportHoldemOutcome(standings: ReadonlyArray<{ playerId: string; rank: number; stack: number }>, reason: string): void {
+    if (this.state.handNumber === 0) return;
+    const placements = withLeaversLast(
+      groupSorted(standings, (s) => s.playerId, (a, b) => a.rank === b.rank),
+      this.matchLeaverIds(),
+    );
+    const scores: Record<string, number> = {};
+    for (const s of standings) scores[s.playerId] = s.stack;
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const id of placements.flat()) {
+      const stat = this.stats.get(id);
+      playerStats[id] = { handsWon: stat?.handsWon ?? 0, bestPot: stat?.bestPot ?? 0 };
+    }
+    this.reportOutcome({ placements, scores, reason, details: { hands: this.state.handNumber, playerStats } });
   }
 }

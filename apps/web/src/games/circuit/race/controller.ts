@@ -16,6 +16,7 @@ import {
   type RacerView,
 } from '@dascade/shared/games/circuit';
 import { formatRaceTime } from '@dascade/shared';
+import { parseBestDoc } from '../bestDoc.ts';
 import { CHASSIS, CarFlag, RaceStatusCode, displaySpeed, generateDecor, getTrack, projectOnTrack, type Decor, type Track } from '@dascade/game-core/circuit';
 import { getLastMessage, getStateSnapshot, serverNow, session, subscribeMessage, subscribeState, useSessionStore } from '../../../net/session.ts';
 import { persistence } from '../../../persistence/index.ts';
@@ -271,7 +272,7 @@ export class RaceController {
   private async loadBest(): Promise<void> {
     const key = circuitBestKey(this.trackId);
     try {
-      this.best = await persistence().loadDoc<CircuitBestDoc>(key);
+      this.best = parseBestDoc(await persistence().loadDoc<unknown>(key), this.trackId);
     } catch {
       this.best = null;
     }

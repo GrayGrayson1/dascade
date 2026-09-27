@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
 import { isValidRoomCode, JoinErrorCode, type WelcomePayload } from '@dascade/shared';
@@ -68,6 +68,8 @@ describe('BaseGameRoom lifecycle', () => {
     expect(st(host.room).players.get(host.me().playerId).name).toBe('Alice');
     expect(host.me().seatToken.length).toBeGreaterThan(10);
     expect(JSON.parse(st(host.room).settingsJson)).toEqual({ target: 10, label: 'hello' });
+    // The client paces its auto-reconnect (and the "seat held" countdown) on the room's real window.
+    expect(host.me().reconnectGraceSeconds).toBe(host.server['reconnectGraceSeconds']);
   });
 
   it('joins by code, dedupes names, and exposes the lookup API', async () => {
@@ -225,6 +227,22 @@ describe('BaseGameRoom lifecycle', () => {
     host.room.send('lobby:room', { locked: true });
     await waitFor(() => st(host.room).locked === true);
     await expect(colyseus.sdk.joinById(host.room.roomId, { name: 'Nope' })).rejects.toMatchObject({ code: JoinErrorCode.ROOM_LOCKED });
+  });
+
+  it('deliberate join refusals are not logged as room exceptions; real faults still are', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const exceptionLines = () => errors.mock.calls.filter(([line]) => String(line).includes('room exception'));
+    try {
+      const host = await createRoom();
+      host.room.send('lobby:room', { locked: true });
+      await waitFor(() => st(host.room).locked === true);
+      await expect(colyseus.sdk.joinById(host.room.roomId, { name: 'Nope' })).rejects.toMatchObject({ code: JoinErrorCode.ROOM_LOCKED });
+      expect(exceptionLines()).toEqual([]);
+      host.server.onUncaughtException(new Error('join hook crashed', { cause: new TypeError('bug') }), 'onJoin');
+      expect(exceptionLines()).toHaveLength(1);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it('late joiners spectate a running match when the game disallows late join, and are promoted on return to lobby', async () => {

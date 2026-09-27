@@ -56,6 +56,7 @@ import {
   type DicePick,
 } from '@dascade/game-core/dasino';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { groupSorted, withLeaversLast } from '../outcomePlacements.ts';
 import {
   DasinoSeat,
   DasinoState,
@@ -936,6 +937,7 @@ export class DasinoRoom extends BaseGameRoom<DasinoState, DasinoSettings> {
       entry.refills = seat.refills;
       this.state.results.push(entry);
     });
+    this.reportDasinoOutcome();
     this.endMatch({
       players: this.state.results.map((e) => ({
         playerId: e.playerId,
@@ -946,6 +948,32 @@ export class DasinoRoom extends BaseGameRoom<DasinoState, DasinoSettings> {
         placement: e.placement,
       })),
       details: { spins: r.round, diceRounds: d.round },
+    });
+  }
+
+  /**
+   * DASCADE stats: places follow the closing leaderboard (chip balance, net of refills; equal nets
+   * share a place), players who left mid-session last; `scores` are final balances. Solo sessions
+   * count too (the house is the opponent). A session where nobody ever bet is no contest.
+   */
+  private reportDasinoOutcome(): void {
+    const results = [...this.state.results];
+    if (!results.some((e) => e.wagered > 0)) return;
+    const placements = withLeaversLast(
+      groupSorted(results, (e) => e.playerId, (a, b) => a.placement === b.placement),
+      this.matchLeaverIds(),
+    );
+    const scores: Record<string, number> = {};
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const e of results) {
+      scores[e.playerId] = e.balance;
+      playerStats[e.playerId] = { chipsWagered: e.wagered, bestWin: e.biggestWin };
+    }
+    this.reportOutcome({
+      placements,
+      scores,
+      reason: 'session_closed',
+      details: { spins: this.state.roulette.round, diceRounds: this.state.dice.round, playerStats },
     });
   }
 

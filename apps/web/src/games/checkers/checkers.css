@@ -1,0 +1,568 @@
+/*
+ * DAS Checkers — layout, board art and pieces. Classes are prefixed `ck-`; the board itself is the
+ * Boardroom kit's <SquareBoard> (`br-*`), re-skinned here through its CSS variables and data
+ * attributes. Board/piece ART colours are declared once as --ck-* custom properties so a theme can
+ * restyle the set; UI chrome uses the shared tokens (--bg-*, --text-*, --accent…).
+ */
+.ck {
+  /* Board art */
+  --ck-sq-light: #b39a88;
+  --ck-sq-dark: #3b1c2c;
+  --ck-sq-dark-2: #2b1220;
+  --ck-sq-num: rgba(255, 226, 214, 0.5);
+  --ck-hl-last: rgba(255, 210, 63, 0.18);
+  --ck-hl-last-edge: rgba(255, 210, 63, 0.55);
+  --ck-hl-select: rgba(255, 90, 95, 0.28);
+  --ck-hl-target: #ffd23f;
+  --ck-hl-must: #ff5a5f;
+  /* Dark pieces: obsidian with a crimson neon rim */
+  --ck-dark-top: #2b2438;
+  --ck-dark-shade: #221c2e;
+  --ck-dark-ring: #3f3553;
+  --ck-dark-shine: #75689a;
+  --ck-dark-side: #16111f;
+  --ck-dark-edge: #0a080e;
+  --ck-dark-rim: #ff5a5f;
+  --ck-dark-glow: rgba(255, 90, 95, 0.55);
+  /* Light pieces: ivory with a gold rim */
+  --ck-light-top: #f6ecd9;
+  --ck-light-shade: #e6d6b9;
+  --ck-light-ring: #d5bf98;
+  --ck-light-shine: #ffffff;
+  --ck-light-side: #c4a174;
+  --ck-light-edge: #8a6a45;
+  --ck-light-rim: #ffc93a;
+  --ck-light-glow: rgba(255, 201, 58, 0.5);
+  /* Crown */
+  --ck-crown: #ffd23f;
+  --ck-crown-deep: #d68a17;
+  --ck-crown-gem: #ff4f6d;
+  --ck-crown-shine: #fff6cc;
+  --ck-glow: 1;
+
+  /* Kit board palette */
+  --br-light: var(--ck-sq-light);
+  --br-dark: var(--ck-sq-dark);
+}
+
+/* ================================================================= layout */
+.ck-layout {
+  --ck-gutter: var(--sp-5);
+  --ck-side-w: clamp(280px, 25vw, 380px);
+  --ck-card-h: 70px;
+  --ck-board-size: min(
+    calc(100dvh - var(--topbar-h) - var(--safe-top) - var(--safe-bottom) - 2 * var(--ck-card-h) - 2 * var(--ck-gutter) - 16px),
+    calc(100vw - var(--ck-side-w) - 3 * var(--ck-gutter) - var(--safe-left) - var(--safe-right)),
+    880px
+  );
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--ck-board-size) var(--ck-side-w);
+  grid-template-rows: auto auto auto 1fr;
+  grid-template-areas:
+    'top side'
+    'board side'
+    'bottom side'
+    '. side';
+  column-gap: calc(var(--ck-gutter) + 4px);
+  row-gap: 8px;
+  justify-content: center;
+  align-content: center;
+  padding: var(--ck-gutter) calc(var(--ck-gutter) + var(--safe-right)) calc(var(--ck-gutter) + var(--safe-bottom)) calc(var(--ck-gutter) + var(--safe-left));
+  min-width: 0;
+}
+.ck-slot--top {
+  grid-area: top;
+}
+.ck-slot--bottom {
+  grid-area: bottom;
+}
+.ck-slot {
+  min-width: 0;
+}
+.ck-board-wrap {
+  grid-area: board;
+  position: relative;
+  width: var(--ck-board-size);
+  aspect-ratio: 1;
+  min-width: 0;
+}
+.ck-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  align-self: stretch;
+  max-height: calc(var(--ck-board-size) + 2 * var(--ck-card-h) + 16px);
+}
+
+/* Portrait phones & tablets: one column, actions right under the board. */
+@media (max-width: 899px) {
+  .ck-layout {
+    --ck-gutter: var(--sp-3);
+    --ck-card-h: 54px;
+    --ck-board-size: min(
+      calc(100vw - 2 * var(--ck-gutter) - var(--safe-left) - var(--safe-right)),
+      calc(100dvh - var(--topbar-h) - var(--safe-top) - 2 * var(--ck-card-h) - 150px),
+      640px
+    );
+    grid-template-columns: var(--ck-board-size);
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      'top'
+      'board'
+      'bottom'
+      'side';
+    align-content: start;
+    row-gap: 6px;
+  }
+  .ck-side {
+    max-height: none;
+    gap: var(--sp-2);
+  }
+}
+
+/* Landscape phones: board on the left at full height, everything else in a column beside it. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .ck-layout {
+    --ck-gutter: var(--sp-2);
+    --ck-side-w: min(360px, calc(100vw - var(--ck-board-size) - 3 * var(--ck-gutter) - var(--safe-left) - var(--safe-right)));
+    --ck-board-size: min(
+      calc(100dvh - var(--topbar-h) - var(--safe-top) - var(--safe-bottom) - 2 * var(--ck-gutter)),
+      calc(100vw - 260px - 3 * var(--ck-gutter) - var(--safe-left) - var(--safe-right))
+    );
+    grid-template-columns: var(--ck-board-size) var(--ck-side-w);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'board top'
+      'board bottom'
+      'board side';
+    align-content: start;
+    row-gap: 6px;
+  }
+  .ck-side {
+    max-height: none;
+    gap: 6px;
+  }
+}
+
+/* ============================================================ side panel */
+.ck-status {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+.ck-status.is-my-turn {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    var(--shadow-1),
+    0 0 calc(22px * var(--ck-glow)) color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.ck-status__line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.ck-status__swatch {
+  width: 26px;
+  height: 26px;
+}
+.ck-status__text {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.02em;
+  color: var(--text-0);
+  line-height: 1.2;
+  min-width: 0;
+}
+.ck-status.is-my-turn .ck-status__text {
+  color: var(--accent);
+  text-shadow: var(--text-glow);
+}
+.ck-status__must {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: #ffe1e2;
+  background: color-mix(in srgb, var(--ck-hl-must) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ck-hl-must) 55%, transparent);
+}
+.ck-status__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.ck-status__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ck-side__title {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.ck-moves {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  border: 1px solid var(--line);
+}
+.ck-moves .br-moves {
+  flex: 1;
+  min-height: 0;
+}
+.ck-card .br-card__who {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+}
+.ck-card .br-card__line,
+.ck-card .br-card__meta {
+  grid-column: 1;
+}
+.ck-card .br-card__captured {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.ck-captured {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.ck-captured__swatch {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 899px) {
+  .ck-status {
+    padding: var(--sp-2) var(--sp-3);
+    gap: 6px;
+  }
+  .ck-status__text {
+    font-size: var(--fs-md);
+  }
+  .ck-moves {
+    padding: 6px var(--sp-3);
+    flex: none;
+  }
+  .ck-side__title {
+    display: none;
+  }
+  .ck-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'status'
+      'actions'
+      'moves';
+  }
+  .ck-status {
+    grid-area: status;
+  }
+  .ck-actions {
+    grid-area: actions;
+  }
+  .ck-moves {
+    grid-area: moves;
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .ck-status {
+    padding: 6px var(--sp-3);
+    gap: 4px;
+  }
+  .ck-status__text {
+    font-size: var(--fs-sm);
+  }
+  .ck-status__meta,
+  .ck-status__hint,
+  .ck-side__title {
+    display: none;
+  }
+  .ck-moves {
+    padding: 4px var(--sp-2);
+    flex: none;
+  }
+}
+
+/* ================================================================= board */
+.ck-board {
+  width: 100%;
+  height: 100%;
+}
+.ck .br-board {
+  --br-light: var(--ck-sq-light);
+  --br-dark: var(--ck-sq-dark);
+  --br-frame: #140a10;
+  --br-frame-edge: color-mix(in srgb, var(--accent) 60%, #2b1320);
+  --br-last: rgba(255, 210, 63, 0.2);
+  --br-select: rgba(255, 90, 95, 0.32);
+  --br-target: rgba(255, 210, 63, 0.9);
+  --br-target-capture: rgba(255, 210, 63, 0.85);
+  --br-coord-on-dark: var(--ck-sq-num);
+}
+.ck .br-sq[data-dark] {
+  background-image:
+    radial-gradient(120% 120% at 30% 25%, rgba(255, 255, 255, 0.07), transparent 60%),
+    linear-gradient(160deg, var(--ck-sq-dark), var(--ck-sq-dark-2));
+}
+.ck .br-sq[data-dark][data-last]::before {
+  box-shadow: inset 0 0 0 2px var(--ck-hl-last-edge);
+}
+.ck .br-sq[data-dark][data-selected]::before {
+  box-shadow: inset 0 0 0 3px var(--ck-hl-must);
+}
+.ck .br-sq[data-target='move'] .br-sq__target::before {
+  width: 28%;
+  height: 28%;
+  box-shadow: 0 0 calc(12px * var(--ck-glow)) rgba(255, 210, 63, 0.7);
+}
+.ck .br-sq[data-target='capture'] .br-sq__target {
+  background: none;
+}
+.ck .br-sq[data-target='capture'] .br-sq__target::before {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 3px solid var(--br-target-capture);
+  box-shadow:
+    0 0 calc(12px * var(--ck-glow)) rgba(255, 210, 63, 0.6),
+    inset 0 0 calc(10px * var(--ck-glow)) rgba(255, 210, 63, 0.35);
+}
+.ck .br-sq__label {
+  font-weight: 600;
+  opacity: 1;
+  font-size: clamp(8px, 1.7cqi, 12px);
+}
+/* A final destination further down a multi-jump (tap it to play the whole chain). */
+.ck .br-sq[data-mark='dest']::after {
+  inset: 32%;
+  border-radius: 50%;
+  border: 2px dashed color-mix(in srgb, var(--ck-hl-target) 75%, transparent);
+}
+.ck .ck-board.is-over .br-board__grid {
+  filter: saturate(0.75) brightness(0.8);
+}
+
+/* ================================================================= pieces */
+.ck .br-piece > .ck-piece {
+  width: 100%;
+  height: 100%;
+  filter: none;
+}
+.ck-piece {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.ck-piece__art {
+  width: 86%;
+  height: 86%;
+  overflow: visible;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.ck-piece--dark .ck-piece__art {
+  filter: drop-shadow(0 0 calc(5px * var(--ck-glow)) var(--ck-dark-glow));
+}
+.ck-piece--light .ck-piece__art {
+  filter: drop-shadow(0 0 calc(4px * var(--ck-glow)) var(--ck-light-glow));
+}
+.ck .br-sq[data-selected] .ck-piece__art {
+  transform: translateY(-8%) scale(1.06);
+}
+/* Marks drawn by the piece: must-capture pulse, capturable, already jumped in this chain. */
+.ck-piece__mark {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.ck-piece[data-mark='must'] .ck-piece__mark {
+  inset: 0;
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 3px var(--ck-hl-target),
+    inset 0 0 calc(22px * var(--ck-glow) + 4px) color-mix(in srgb, var(--ck-hl-target) 45%, transparent);
+  animation: ck-pulse 1.3s ease-in-out infinite;
+}
+.ck-piece[data-mark='threat'] .ck-piece__mark {
+  inset: 8%;
+  border: 2px dashed var(--ck-hl-must);
+  box-shadow: 0 0 calc(10px * var(--ck-glow)) color-mix(in srgb, var(--ck-hl-must) 55%, transparent);
+}
+.ck-piece[data-mark='jumped'] .ck-piece__art {
+  opacity: 0.45;
+}
+.ck-piece[data-mark='jumped'] .ck-piece__mark {
+  inset: 18%;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 43%, var(--ck-hl-must) 43% 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, var(--ck-hl-must) 43% 57%, transparent 57%);
+  filter: drop-shadow(0 0 calc(6px * var(--ck-glow)) var(--ck-hl-must));
+}
+@keyframes ck-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.ck-piece.is-dim {
+  opacity: 0.35;
+}
+.ck-piece.is-ghost {
+  opacity: 0.72;
+}
+.ck-piece.is-ghost .ck-piece__art {
+  transform: translateY(-8%) scale(1.04);
+}
+.ck-piece.is-captured {
+  animation: ck-captured 420ms var(--ease-in-out) var(--ck-delay, 0ms) both;
+}
+@keyframes ck-captured {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.12);
+    filter: brightness(2.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+}
+.ck-piece.is-crowned .ck-piece__art {
+  animation: ck-crowned 760ms var(--ease-spring) var(--ck-crown-delay, 0ms) both;
+}
+@keyframes ck-crowned {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: translateY(-16%) scale(1.24);
+    filter: brightness(1.7) drop-shadow(0 0 calc(18px * var(--ck-glow) + 2px) var(--ck-crown));
+  }
+  100% {
+    transform: none;
+  }
+}
+:root[data-reduced-motion='true'] .ck-piece.is-captured {
+  animation: none;
+  opacity: 0;
+}
+:root[data-reduced-motion='true'] .ck-piece.is-crowned .ck-piece__art,
+:root[data-reduced-motion='true'] .ck-piece[data-mark='must'] .ck-piece__mark {
+  animation: none;
+}
+
+/* ============================================================ result card */
+/* Floats over the board (same grid area) at every size, like chess: Rematch/Leave never need a
+   scroll on phones (which get the compact card). "View board" collapses it to a slim bar along the
+   bottom edge so the final position stays readable. */
+.ck-result {
+  grid-area: board;
+  align-self: center;
+  justify-self: center;
+  z-index: 5;
+  width: min(92%, 440px);
+  min-width: 0;
+  display: grid;
+}
+/* The card scrolls itself (never its wrapper), so its drop shadow isn't clipped into a hard edge. */
+.ck-result > .br-result {
+  width: 100%;
+  max-height: calc(var(--ck-board-size) - 16px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.ck-result:has(.br-result--bar) {
+  align-self: end;
+  width: calc(100% - 16px);
+  margin-bottom: 8px;
+}
+@media (max-width: 599px), (orientation: landscape) and (max-height: 560px) {
+  .ck-result {
+    width: calc(100% - 16px);
+  }
+}
+
+/* ============================================================== swatches */
+.ck-swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+}
+.ck-swatch svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Inside the player card's corner badge keep the kit's 16px size (1.5em overflowed the 20px disc and
+   covered the first letter of "DARK" / "LIGHT"). */
+.br-card__swatch > .ck-swatch {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================== settings */
+.ck-settings {
+  display: grid;
+  gap: var(--sp-4);
+}
+.ck-rules-card {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--glass-light);
+}
+.ck-rules-card__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ck-rules-card__list {
+  margin: 0;
+  padding-left: 1.1em;
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}

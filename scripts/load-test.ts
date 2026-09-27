@@ -5,6 +5,8 @@
  *   LOAD_URL=http://localhost:2567 CLIENTS=30 pnpm load
  *   LOAD_SCENARIOS=join,chat,reconnect,sketch,wheel,bingo,cleanup pnpm load
  *
+ *   LOAD_SCENARIOS=trivia,deception,masterpiece,words,survey pnpm load   (party games: scripts/load/<id>.ts)
+ *
  * Racing has its own scripted-input bot runner: scripts/load-circuit.ts.
  * Exits non-zero when any scenario fails its thresholds.
  */
@@ -236,6 +238,12 @@ async function main(): Promise<void> {
   await import('./load-scenarios.ts').then((m: { register: (r: typeof registerScenario, ctx: ScenarioContext) => void }) =>
     m.register(registerScenario, { N, URL, createBots, leaveAll, waitFor, sleep, pct, results }),
   ).catch((err: unknown) => console.warn('No game scenarios loaded:', (err as Error).message));
+  // Party games (DAStravaganza): scripts/load/<gameId>.ts, discovered by scripts/load/index.ts.
+  await import('./load/index.ts')
+    .then((m: { register: (r: typeof registerScenario, ctx: ScenarioContext) => Promise<void> }) =>
+      m.register(registerScenario, { N, URL, createBots, leaveAll, waitFor, sleep, pct, results }),
+    )
+    .catch((err: unknown) => console.warn('No party scenarios loaded:', (err as Error).message));
 
   const builtIn: Record<string, () => Promise<void>> = { join: scenarioJoin, chat: scenarioChat, reconnect: scenarioReconnect, cleanup: scenarioCleanup };
   console.log(`DASCADE load simulation → ${URL} with ${N} clients`);
