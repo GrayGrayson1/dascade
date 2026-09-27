@@ -82,9 +82,9 @@ function JukeboxUi() {
   }, []);
   useTrackAnnouncements(announce);
 
-  const open = useCallback(() => {
+  const open = useCallback((opener?: HTMLElement) => {
     const active = document.activeElement;
-    returnFocus.current = active instanceof HTMLElement ? active : null;
+    returnFocus.current = opener ?? (active instanceof HTMLElement && active !== document.body ? active : null);
     jukebox.setExpanded(true);
   }, []);
 
@@ -103,10 +103,10 @@ function JukeboxUi() {
   }, []);
 
   const toggle = useCallback(
-    (from: DockOpener) => {
+    (from: DockOpener, opener?: HTMLElement) => {
       if (useJukebox.getState().expanded) return close();
       setOpenedFrom(from);
-      open();
+      open(opener);
     },
     [open, close],
   );

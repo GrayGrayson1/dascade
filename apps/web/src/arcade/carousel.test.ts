@@ -105,6 +105,22 @@ describe('lineup fit', () => {
     expect(slotX(5, fit.spread) + slotScale(5) / 2).toBeLessThanOrEqual(5.25);
   });
 
+  it('keeps clear of the stage ends when they are taken', () => {
+    for (const half of [1.6, 2.4, 3.1, 3.6, 4.2, 6]) {
+      const fit = lineupFit(half, 11, true);
+      const far = Math.floor(fit.maxVisible);
+      if (far < 5) {
+        // every cabinet still showing fits inside; the next one out is fully faded
+        expect(slotX(far, fit.spread) + slotScale(far) / 2).toBeLessThanOrEqual(half);
+        expect(coverflowSlot(far + 1, fit).opacity).toBe(0);
+      }
+      expect(coverflowSlot(far, fit).opacity).toBe(1);
+      // never shows more than the relaxed fit
+      expect(fit.maxVisible).toBeLessThanOrEqual(lineupFit(half, 11).maxVisible);
+    }
+    expect(lineupFit(40, 11, true).maxVisible).toBeGreaterThanOrEqual(5);
+  });
+
   it('never spreads beyond the cap', () => {
     expect(lineupFit(40, 11).spread).toBeLessThanOrEqual(1.75);
   });

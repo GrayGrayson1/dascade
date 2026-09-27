@@ -350,6 +350,10 @@
     width: clamp(110px, 8.6vw, 170px);
   }
 }
+/* Where the floor's own jukebox and claw machine stand at the row's ends, the store's props give them the spot. */
+:root[data-theme='vhs-after-dark'] .af-floor:has(.af-lineup[data-claw='floor']) .vh-prop {
+  display: none;
+}
 
 /* =====================================================================
  * ARCADE FLOOR — the two cabinets in the corner of the video store

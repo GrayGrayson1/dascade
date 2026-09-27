@@ -186,9 +186,11 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   `apps/web/src/arcade/scheduler.ts`), static at fx MINIMAL / reduced motion, subtle in games.
 - **FloorDecor**: rendered in the floor's `[data-part=floor-decor]` slot (over the room, under the
   carousel). **JukeboxDecor**: inside the expanded jukebox's now-playing screen.
-- **The jukebox is a physical machine in every theme.** On the floor it stands in the corner
-  (`[data-dock=floor]`, `[data-part=machine-open]`, art classes `.jbf-*`): its body uses the theme's
-  `--cabinet-*` tokens and its lights `--jb-accent` / `--jb-accent-2`. Up close (the expanded player),
+- **The jukebox is a physical machine in every theme.** On the floor it stands at the left end of the
+  cabinet row (`[data-dock=floor]`, `[data-part=machine-open]`, art classes `.jbf-*`, hover tag
+  `[data-part=machine-tag]`), built like the cabinets: its body uses the theme's `--cabinet-*` tokens
+  and its lights `--jb-accent` / `--jb-accent-2` (`--jbf-shade` sets how far it's dimmed with the far
+  cabinets). Up close (the expanded player),
   the arched dome glass with the record (`[data-part=dome-glass]`, `[data-part=record]`) sits on top of
   the now-playing screen (`[data-part=display]`, which keeps whatever shape the skin gives it), with
   bubble-tube pillars (`.jb-pillar`), selector keys and title strips (`[data-part=track]`, one per
@@ -197,6 +199,12 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   with `--jb-chrome-hi/-lo/-ink`, `--jb-vinyl`, `--jb-strip-bg/-fg/-muted/-lit/-band/-band-2` and the
   dome's `--jb-arch` rather than overriding colours on the parts. The quick control (`[data-part=mini-open]`,
   `[data-part=mini]`) is the small button in the floor HUD, top bar or shell menu.
+- **The claw machine** stands at the right end of the row (`[data-part=claw-machine]`, `.clw-*`,
+  `apps/web/src/arcade/claw.css`): body from `--cabinet-*`, marquee and trim from `--clw-accent`.
+- **Keep the row's ends free for them.** On floors wide enough for the machines, the lineup carries
+  `data-jukebox="floor"` / `data-claw="floor"`; a FloorDecor prop that would stand in the same spot steps
+  aside with `:root[data-theme='<id>'] .af-floor:has(.af-lineup[data-claw='floor']) .<prop> { display: none }`
+  (see Mall Arcade '92 and VHS After Dark), and still shows where the machines don't fit.
 - Decor components are wrapped in an error boundary: a crash renders nothing instead of breaking the app.
 
 ## Adding a theme end to end

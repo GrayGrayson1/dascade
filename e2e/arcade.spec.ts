@@ -1,8 +1,8 @@
 /**
  * Arcade floor E2E: the cabinet lineup (buttons, keys, wheel, drag, touch
  * swipe, clicking neighbours), multi-game cabinet pickers, title screens,
- * direct links, back navigation, DASino table deep links and the HUD.
- * Runs on every project (desktop + mobile).
+ * direct links, back navigation, DASino table deep links, the HUD and the
+ * claw machine Easter egg. Runs on every project (desktop + mobile).
  */
 import { expect, test, type Page } from '@playwright/test';
 import { roomState, setName } from './helpers';
@@ -447,5 +447,77 @@ test.describe('floor HUD', () => {
     await openFloor(page);
     await page.locator('[data-kiosk]:visible').click();
     await expect(page).toHaveURL(/\/tournaments$/);
+  });
+});
+
+test.describe('the claw machine', () => {
+  /** The next try's plan draws these numbers (then Math.random is itself again): 0.01 wins, 0.99 misses. */
+  async function rig(page: Page, value: number): Promise<void> {
+    await page.evaluate((v) => {
+      const real = Math.random;
+      let n = 0;
+      Math.random = () => (n++ < 7 ? v : real());
+    }, value);
+  }
+  const claw = (page: Page) => page.getByRole('button', { name: /^Claw machine — try your luck/ });
+  const status = (page: Page) => page.locator('.af-claw [role="status"]');
+
+  test('stands at the right end of the row; a try goes for a plush, and a win drops it in the prize door', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'phones have no free floor ends');
+    await openFloor(page);
+    const machine = claw(page);
+    await expect(machine).toBeVisible();
+    const vp = page.viewportSize()!;
+    const box = (await machine.boundingBox())!;
+    expect(box.x).toBeGreaterThan(vp.width * 0.7);
+    // Clear of every cabinet still showing, of the plaque and of the jukebox at the other end.
+    const cabinets = page.locator('.af-slot');
+    for (let i = 0; i < (await cabinets.count()); i++) {
+      const slot = cabinets.nth(i);
+      if (Number(await slot.evaluate((e) => getComputedStyle(e).opacity)) < 0.05) continue;
+      const front = (await slot.locator('[data-part="cabinet-front"]').boundingBox())!;
+      expect(front.x + front.width, `cabinet ${i} runs into the claw machine`).toBeLessThanOrEqual(box.x);
+    }
+    const plaque = (await page.locator('[data-part="plaque"]').boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(plaque.y);
+    await expect(page.locator('.clw-toy')).toHaveCount(11);
+
+    // A miss: the claw comes back up empty.
+    await rig(page, 0.99);
+    await machine.click();
+    await expect(machine).toHaveAttribute('data-state', 'playing');
+    await expect(status(page)).toHaveText(/Missed!/, { timeout: 15_000 });
+    await expect(machine).toHaveAttribute('data-state', 'missed');
+    await expect(page.locator('.clw-toy')).toHaveCount(11);
+
+    // A win: the plush goes down the chute, pops out of the prize door, and the count is kept.
+    await rig(page, 0.01);
+    await machine.click();
+    await expect(machine).toHaveAttribute('data-state', 'won', { timeout: 15_000 });
+    await expect(page.locator('.clw-prize')).toBeVisible();
+    await expect(page.locator('.clw-toy')).toHaveCount(10);
+    await expect(status(page)).toHaveText('You won a plush! Prizes won: 1.', { timeout: 15_000 });
+    await expect(machine).toHaveAccessibleName('Claw machine — try your luck (1 prize won)');
+    expect(await page.evaluate(() => localStorage.getItem('dascade:v1:claw'))).toBe('{"won":1}');
+  });
+
+  test('reduced motion skips straight to the result; it never touches the lineup', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'phones have no free floor ends');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openFloor(page);
+    const before = await active(page);
+    await rig(page, 0.01);
+    await claw(page).press('Enter');
+    await expect(claw(page)).toHaveAttribute('data-state', 'won', { timeout: 1_500 });
+    await expect(status(page)).toHaveText(/You won a plush!/);
+    await expect(page.locator('.clw-confetti')).toHaveCount(0);
+    expect(await active(page)).toBe(before);
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('phones leave it out', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'phone viewports only');
+    await openFloor(page);
+    await expect(page.locator('[data-part="claw-machine"]')).toHaveCount(0);
   });
 });

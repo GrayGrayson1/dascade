@@ -17,9 +17,10 @@ export interface RoomHints {
   rowBottom: number;
   rowLeft: number;
   rowRight: number;
-  /** The jukebox stands in the left corner (the floor reserves it): no change machine there. */
+  /** The floor's jukebox stands at the left end of the row: no change machine there. */
   jukebox?: boolean;
-  /** Room for the claw machine at the right end (wide floors only; default true). */
+  /** Paint the room's own pixel claw machine at the right end (default true; off while the floor's
+   *  interactive claw machine stands there, and on floors whose right end is too narrow). */
   claw?: boolean;
 }
 

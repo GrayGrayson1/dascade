@@ -1,0 +1,243 @@
+/*
+ * The claw machine at the right end of the cabinet row (ClawMachine.tsx). ArcadeFloor places its spot
+ * (.af-claw, arcade.css). Built like the cabinets: the body reads the cabinet tokens, so every theme
+ * restyles it; the machine's own materials (glass, chrome, plush toys, the pink marquee) keep their
+ * colours like the cabinets' printed art — --clw-accent is there for a skin to tune.
+ */
+.clw {
+  --clw-body: var(--cabinet-body, #1d1936);
+  --clw-body-2: var(--cabinet-body-2, #0d0a1c);
+  --clw-accent: #ff4fd8;
+  /* dimmed like the far cabinets it stands with; its own lights stay bright */
+  --clw-shade: 0.34;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--af-ink-0, var(--text-0));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.clw__machine {
+  position: absolute;
+  inset: 0;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.clw-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+@media (hover: hover) {
+  .clw:hover {
+    --clw-shade: 0.08;
+  }
+  .clw:hover .clw__machine {
+    transform: translateY(-2px);
+  }
+}
+.clw:active .clw__machine {
+  transform: scale(0.985);
+}
+.clw[data-state='playing'] {
+  --clw-shade: 0.08;
+  cursor: progress;
+}
+.clw:focus-visible {
+  --clw-shade: 0.08;
+  outline: none;
+}
+.clw:focus-visible .clw__machine::after {
+  content: '';
+  position: absolute;
+  inset: -5px -5px -1px -3px;
+  border: 2px solid var(--focus-ring);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+/* The tag (hover / focus): what it is, and the prize count. */
+.clw__tag {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  min-width: 100%;
+  max-width: 240px;
+  padding: 6px 10px 7px;
+  border: 1px solid color-mix(in srgb, var(--clw-accent) 34%, var(--panel-border));
+  border-radius: min(var(--panel-radius), 8px);
+  background: var(--panel-bg-opaque);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-0);
+  opacity: 0;
+  translate: 0 4px;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    translate var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .clw:hover .clw__tag {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.clw:focus-visible .clw__tag {
+  opacity: 1;
+  translate: 0 0;
+}
+.clw__name {
+  font-family: var(--font-pixel);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.clw__line {
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
+  white-space: nowrap;
+}
+
+/* --- the art (SVG classes) --- */
+.clw-word {
+  fill: #2a0630;
+  font-family: Silkscreen, monospace;
+  letter-spacing: 1.4px;
+}
+.clw-bulb {
+  fill: #ffd23f;
+  animation: clw-chase 1.2s steps(1) infinite;
+}
+.clw-bulb--b {
+  animation-delay: -0.6s;
+}
+.clw[data-state='playing'] .clw-bulb {
+  animation-duration: 0.44s;
+}
+.clw[data-state='playing'] .clw-bulb--b {
+  animation-delay: -0.22s;
+}
+.clw[data-state='won'] .clw-bulb {
+  animation-duration: 0.24s;
+}
+.clw[data-state='won'] .clw-bulb--b {
+  animation-delay: -0.12s;
+}
+.clw[data-state='won'] .clw-word {
+  animation: clw-blink 0.4s steps(1) infinite;
+}
+@keyframes clw-chase {
+  0% {
+    fill: #ffd23f;
+  }
+  50% {
+    fill: #5a3a14;
+  }
+}
+@keyframes clw-blink {
+  0% {
+    fill: #2a0630;
+  }
+  50% {
+    fill: #fff;
+  }
+}
+.clw-edge,
+.clw-led,
+.clw-door-label {
+  fill: var(--clw-accent);
+}
+.clw-door-label {
+  font-family: Silkscreen, monospace;
+  font-size: 5.4px;
+  letter-spacing: 0.8px;
+}
+.clw-coin {
+  fill: #ff4a5e;
+}
+.clw-shade {
+  fill: #000;
+  opacity: var(--clw-shade);
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.clw-go {
+  transition: transform 120ms var(--ease-out);
+}
+.clw[data-state='playing'] .clw-go {
+  transform: translateY(1.2px);
+}
+.clw-flap {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  transition: transform 260ms var(--ease-out);
+}
+.clw-flap[data-open='true'] {
+  transform: scaleY(0.28);
+}
+.clw-prize {
+  animation: clw-pop 420ms var(--ease-out) both;
+}
+@keyframes clw-pop {
+  from {
+    translate: 0 -12px;
+    opacity: 0;
+  }
+  60% {
+    translate: 0 1.5px;
+    opacity: 1;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+/* A restock: fresh plushies tumble into the machine. */
+.clw-toy[data-fresh='true'] {
+  animation: clw-drop 520ms cubic-bezier(0.3, 0, 0.6, 1) both;
+  animation-delay: calc(var(--d, 0) * 45ms);
+}
+@keyframes clw-drop {
+  from {
+    translate: 0 -96px;
+  }
+  80% {
+    translate: 0 1px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+.clw-confetti {
+  position: absolute;
+  left: -170%;
+  top: -75%;
+  width: 270%;
+  max-width: none;
+  height: 175%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Motion + effects settings. */
+:root[data-fx='off'] .clw-bulb,
+:root[data-reduced-motion='true'] .clw-bulb,
+:root[data-reduced-motion='true'] .clw-word,
+:root[data-reduced-motion='true'] .clw-prize,
+:root[data-reduced-motion='true'] .clw-toy {
+  animation: none;
+}
+:root[data-reduced-motion='true'] .clw,
+:root[data-reduced-motion='true'] .clw * {
+  transition: none;
+}

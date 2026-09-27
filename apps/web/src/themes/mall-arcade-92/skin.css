@@ -325,6 +325,12 @@
   }
 }
 
+/* Where the floor's own jukebox and claw machine stand at the row's ends, the token machine and the prize
+   counter (and its ticket dispenser) give them the spot; the velvet rope stays as the jukebox's queue line. */
+:root[data-theme='mall-arcade-92'] .af-floor:has(.af-lineup[data-claw='floor']) :is(.ma-prop--tokens, .ma-prop--counter, .ma-prop--tickets) {
+  display: none;
+}
+
 /* =====================================================================
  * ARCADE FLOOR — HUD, lineup, cabinets, plaque, kiosk
  * ===================================================================== */

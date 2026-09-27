@@ -1,7 +1,8 @@
 /**
  * The collapsed jukebox ("dock"), in two forms:
- *  - the machine: on the arcade floor the jukebox is a physical machine standing in the room's corner
- *    (FloorJukebox.tsx) — walk up to it (click) and the player opens as the machine up close;
+ *  - the machine: on the arcade floor the jukebox is a physical machine standing at the left end of
+ *    the cabinet row (FloorJukebox.tsx) — walk up to it (click) and the player opens as the machine
+ *    up close;
  *  - the compact control, everywhere (the floor's HUD too): a jukebox button with play/pause (and the
  *    track title + next where there's room). It lives in a shell toolbar when the page has one (floor
  *    HUD, room top bar, immersive shell menu) and otherwise floats in a free corner — see placement.ts.
@@ -60,7 +61,8 @@ function useWide(query: string): boolean {
 
 interface DockProps {
   expanded: boolean;
-  onToggleOpen: (from: DockOpener) => void;
+  /** `opener`: the button pressed (focus returns to it on close — Safari doesn't focus buttons on click). */
+  onToggleOpen: (from: DockOpener, opener?: HTMLElement) => void;
   onDock: (info: DockInfo) => void;
 }
 
@@ -225,7 +227,7 @@ export function Dock({ expanded, onToggleOpen, onDock }: DockProps) {
       data-part="mini-open"
       aria-expanded={expanded}
       aria-haspopup="dialog"
-      onClick={() => onToggleOpen('control')}
+      onClick={(e) => onToggleOpen('control', e.currentTarget)}
       aria-label={openLabel}
       title={title ? `Jukebox — ${title}` : 'Jukebox'}
     >
@@ -261,17 +263,15 @@ export function Dock({ expanded, onToggleOpen, onDock }: DockProps) {
             data-needs-gesture={nudge ? 'true' : undefined}
             aria-expanded={expanded}
             aria-haspopup="dialog"
-            onClick={() => onToggleOpen('machine')}
+            onClick={(e) => onToggleOpen('machine', e.currentTarget)}
             aria-label={openLabel}
-            title={title ? `Jukebox — ${playing ? 'now playing' : 'paused'}: ${title}` : 'Jukebox — pick a song'}
           >
             <span className="jb-floor__machine" data-part="machine">
-              <span className="jb-floor__halo" />
-              <span className="jb-floor__pool" />
               <FloorJukeboxArt />
             </span>
-            <span className="jb-floor__plate" data-part="machine-plate" aria-hidden>
-              {/* Whatever a theme calls its music player, the thing standing in the corner is a jukebox. */}
+            {/* Shown on hover / focus (and when it needs a tap): the button's name carries the same text. */}
+            <span className="jb-floor__tag" data-part="machine-tag" aria-hidden>
+              {/* Whatever a theme calls its music player, the thing standing on the floor is a jukebox. */}
               <span className="jb-floor__name">Jukebox</span>
               <span className="jb-floor__now" data-part="machine-now">
                 {title ? <Eq active={playing} /> : null}

@@ -15,9 +15,11 @@
  * Motion is driven by a spring written straight to the DOM (no React renders
  * per frame). No game module or engine is imported here.
  *
- * The jukebox has its own corner: on wider floors the lineup keeps clear of the
- * left end, where [data-jukebox-slot="floor"] is laid out on the row's floor line
- * and the jukebox UI stands its physical machine (jukebox/FloorJukebox.tsx).
+ * Two machines stand at the ends of the row on wider floors, at the depth of its
+ * far cabinets: the jukebox on the left ([data-jukebox-slot="floor"], where the
+ * jukebox UI stands its physical machine — jukebox/FloorJukebox.tsx) and the claw
+ * machine on the right (ClawMachine.tsx, the floor's Easter egg). The lineup keeps
+ * clear of both ends.
  */
 import {
   useCallback,
@@ -39,8 +41,11 @@ import { ArcadeFooter, ArcadeHeader, useServerStatus } from './ArcadeHud.tsx';
 import { ArcadeRoom, type RoomSize } from './ArcadeRoom.tsx';
 import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
-import { JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
+import { CLAW_ART } from './claw.ts';
+import { ClawMachine } from './ClawMachine.tsx';
+import { JUKEBOX_FLOOR, JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
+  COVERFLOW,
   WheelStepper,
   clampIndex,
   coverflowSlot,
@@ -61,6 +66,17 @@ import { FloorDecorSlot, useArcadeRoomVisible } from '../themes/ThemeHost.tsx';
 import './arcade.css';
 
 const COUNT = CABINET_LIST.length;
+/** Cabinets either side of the centred one. */
+const SIDE = Math.floor((COUNT - 1) / 2);
+/** The machines at the ends of the row stand as deep as a cabinet this many slots from the centre. */
+const PROP_DEPTH = 4.3;
+/** Their heights against a cabinet at that depth: a jukebox is a little shorter, a claw machine about as tall. */
+const JUKEBOX_SCALE = 0.86;
+const CLAW_SCALE = 0.96;
+/** The wider machine's width over a cabinet's height at that depth (sizes the row's end margins). */
+const PROP_ASPECT = Math.max((JUKEBOX_SCALE * JUKEBOX_W) / JUKEBOX_H, (CLAW_SCALE * CLAW_ART.w) / CLAW_ART.h);
+/** How far the machines may shrink to keep the whole row in view. */
+const PROP_SIZES = [1, 0.87, 0.75, 0.64] as const;
 
 interface Metrics {
   W: number;
@@ -505,16 +521,41 @@ export function ArcadeFloor() {
       const faceW = Math.max(56, Math.min(byHeight, W * (phone ? 0.46 : 0.27), 340));
       const cabW = (faceW * CAB_W) / FACE_W;
       const cabH = (cabW * CAB_H) / CAB_W;
-      // The jukebox stands in the room's left corner, on the row's floor line (a little shorter than a
-      // cabinet); phones and short floors have no free corner, so it stays a compact control there.
-      const jukebox = !phone && W >= 900 && H >= 420;
-      const jbH = jukebox ? Math.round(Math.min(cabH * 0.66, H - plateH - bottomPad - 24)) : 0;
+      // The floor's two machines stand at the ends of the row, at the depth of its far cabinets (scaled
+      // and lifted like a cabinet in slot ±PROP_DEPTH): the jukebox on the left, a little shorter than
+      // those cabinets, and the claw machine on the right, about their height. Phones and short floors
+      // have no free ends: the jukebox stays a compact control there and the claw machine sits it out.
+      const props = !phone && W >= 900 && H >= 420;
+      const depth = slotScale(PROP_DEPTH);
+      const propBase = H - plateH - bottomPad - (1 - depth) * COVERFLOW.lift * faceW;
+      const propGap = Math.round(Math.max(14, W * 0.012));
+      // Wide stages keep a margin at each end (for the arrows and the room's props). The machines take
+      // what the row leaves them: full size where the row fits between them, a little smaller where it's
+      // long, and only then does the row give up its furthest cabinets (they fade out instead of
+      // peeking in over the machines).
+      const baseMargin = W >= 1600 ? Math.min(200, W * 0.1) : 0;
+      let size = 0;
+      let margin = baseMargin;
+      let fit = lineupFit((W / 2 - margin) / faceW, COUNT);
+      if (props) {
+        let shown = -1;
+        for (const k of PROP_SIZES) {
+          const km = Math.max(baseMargin, cabH * depth * k * PROP_ASPECT + propGap * 2.2);
+          const kf = lineupFit((W / 2 - km) / faceW, COUNT, true);
+          // Shrinking only pays if it brings more of the row into view.
+          if (Math.floor(kf.maxVisible) > shown) {
+            shown = Math.floor(kf.maxVisible);
+            size = k;
+            margin = km;
+            fit = kf;
+          }
+          if (kf.maxVisible >= SIDE) break;
+        }
+      }
+      const jbH = Math.round(cabH * depth * JUKEBOX_SCALE * size);
       const jbW = Math.round((jbH * JUKEBOX_W) / JUKEBOX_H);
-      const jbGap = Math.round(Math.max(14, W * 0.012));
-      // Wide stages keep a margin at each end for the room's claw machine and change machine (and the
-      // arrows); the jukebox's corner widens it where the machine needs more room.
-      const margin = Math.max(W >= 1600 ? Math.min(200, W * 0.1) : 0, jukebox ? jbW + jbGap * 2 : 0);
-      const fit = lineupFit((W / 2 - margin) / faceW, COUNT);
+      const clawH = Math.round(cabH * depth * CLAW_SCALE * size);
+      const clawW = Math.round((clawH * CLAW_ART.w) / CLAW_ART.h);
       const m: Metrics = {
         W,
         H,
@@ -545,15 +586,20 @@ export function ArcadeFloor() {
       setVar(stage, '--arrow-inset', `${Math.round(margin ? Math.max(10, W / 2 - reach - 58) : 10)}px`);
       // With the room's floor props showing, the arrows float higher (level with the marquees) to stay clear of them.
       setVar(stage, '--arrow-top', margin ? `${Math.round(m.baseY - cabH * 0.86)}px` : '46%');
-      // The jukebox's corner: centred in the free floor left of the lineup, standing on the row's floor line.
-      stage.dataset.jukebox = jukebox ? 'floor' : 'none';
-      if (jukebox) {
+      // The machines: each centred in the free floor beyond its end of the lineup, standing on the far
+      // cabinets' floor line.
+      stage.dataset.jukebox = props ? 'floor' : 'none';
+      stage.dataset.claw = props ? 'floor' : 'none';
+      if (props) {
         const free = W / 2 - reach;
-        setVar(stage, '--jbx-x', `${Math.round(Math.max(jbGap, (free - jbW) / 2))}px`);
-        setVar(stage, '--jbx-top', `${Math.round(m.baseY - jbH)}px`);
+        setVar(stage, '--jbx-x', `${Math.round(Math.max(propGap, (free - jbW) / 2))}px`);
+        setVar(stage, '--jbx-top', `${Math.round(propBase - (jbH * JUKEBOX_FLOOR) / JUKEBOX_H)}px`);
         setVar(stage, '--jbx-w', `${jbW}px`);
         setVar(stage, '--jbx-h', `${jbH}px`);
-        setVar(stage, '--jbx-plate', `${Math.max(plateH, 36)}px`);
+        setVar(stage, '--clw-x', `${Math.round(Math.max(propGap, (free - clawW) / 2))}px`);
+        setVar(stage, '--clw-top', `${Math.round(propBase - (clawH * CLAW_ART.floor) / CLAW_ART.h)}px`);
+        setVar(stage, '--clw-w', `${clawW}px`);
+        setVar(stage, '--clw-h', `${clawH}px`);
       }
       const hints = {
         headerBottom: header ? header.getBoundingClientRect().bottom - mr.top : 64,
@@ -561,9 +607,9 @@ export function ArcadeFloor() {
         rowBottom: sr.top - mr.top + m.baseY,
         rowLeft: Math.max(0, sr.left - mr.left + m.cx - reach),
         rowRight: Math.min(mr.width, sr.left - mr.left + m.cx + reach),
-        jukebox,
-        // Below 1600 px the margin is only the jukebox's corner: the right end stays open for the arrow.
-        claw: W >= 1600,
+        jukebox: props,
+        // The floor's own claw machine stands at the right end: the room doesn't paint its pixel one.
+        claw: !props && W >= 1600,
       };
       const next: RoomSize = { w: Math.round(mr.width), h: Math.round(Math.max(main.scrollHeight, mr.height)), hints };
       setRoomSize((prev) => {
@@ -678,8 +724,13 @@ export function ArcadeFloor() {
             <i key={c.id} data-on={i === index ? 'true' : undefined} style={{ '--dot': c.accent.primary } as CSSProperties} />
           ))}
         </div>
-        {/* The jukebox's corner (the jukebox UI portals its machine in here). */}
+        {/* The row's ends: the jukebox (the jukebox UI portals its machine in here) and the claw machine. */}
         <div className="af-jukebox" data-jukebox-slot="floor" data-part="floor-jukebox" />
+        {roomSize?.hints.jukebox ? (
+          <div className="af-claw" data-part="floor-claw">
+            <ClawMachine />
+          </div>
+        ) : null}
       </section>
 
       <div className="af-floor__plaque-wrap" data-part="plaque-wrap">

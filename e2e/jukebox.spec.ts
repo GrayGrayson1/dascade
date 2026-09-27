@@ -283,18 +283,22 @@ test.describe('jukebox', () => {
     expect(census.sources).toBeLessThanOrEqual(1);
   });
 
-  test('the physical jukebox stands in the floor corner; walking up to it opens the machine', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'phones have no free floor corner (covered by the phone test)');
+  test('the physical jukebox stands at the left end of the row; walking up to it opens the machine', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'phones have no room for it on the floor (covered by the phone test)');
     await page.goto('/');
     await libraryReady(page);
     const machine = page.locator('[data-jukebox][data-dock="floor"] [data-part="machine-open"]');
     await expect(machine).toBeVisible();
     await expect(machine).toHaveAccessibleName(/^Jukebox — /);
-    // In the room's left corner, standing on the row's floor line, clear of every cabinet and the plaque.
+    // At the left end of the row, standing on the far cabinets' floor line, clear of every cabinet and the plaque.
     const vp = page.viewportSize()!;
     const box = (await machine.boundingBox())!;
     expect(box.x + box.width).toBeLessThan(vp.width * 0.3);
     await expectNoOverlap(machine, [page.locator('[data-part="cabinet"][aria-current="true"]'), page.locator('[data-part="plaque"]')]);
+    // Hovering shows what it is and what's playing.
+    await machine.hover();
+    await expect(page.locator('[data-part="machine-tag"]')).toHaveCSS('opacity', '1');
+    await expect(page.locator('[data-part="machine-tag"]')).toContainText('Pick a song');
 
     // Walk up to it: the machine up close, rising from where it stands, the record on its turntable.
     await machine.click();

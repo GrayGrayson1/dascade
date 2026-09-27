@@ -312,10 +312,11 @@
 
 /* ------------------------------------------------------------------ floor: the physical jukebox */
 /*
- * The machine standing in the arcade room's corner (FloorJukebox.tsx). The floor lays out the spot
- * ([data-jukebox-slot='floor'], sized by ArcadeFloor); the machine fills it and stands on the row's
- * floor line with its nameplate underneath, like a cabinet's. Colours: cabinet tokens for the body,
- * the jukebox accents for the lights, so a theme's skin restyles it with the usual --jb-* variables.
+ * The machine standing at the left end of the cabinet row (FloorJukebox.tsx). The floor lays out the
+ * spot ([data-jukebox-slot='floor'], sized and placed by ArcadeFloor at the depth of the row's far
+ * cabinets); the machine fills it. Built like the cabinets: cabinet tokens for the body, the jukebox
+ * accents for its lights, so a theme's skin restyles it with the usual --jb-* / --cabinet-* variables.
+ * No caption on the floor — hovering or focusing it shows a small tag with what's playing.
  */
 :where(.jb-dock[data-dock='floor']) {
   position: absolute;
@@ -323,19 +324,14 @@
   display: block;
 }
 :where(.jb-floor) {
-  --jbf-body: var(--cabinet-body);
-  --jbf-body-2: var(--cabinet-body-2);
-  --jbf-edge: var(--cabinet-edge);
-  --jbf-glass: var(--cabinet-screen-bg);
-  --jbf-chrome-hi: var(--jb-chrome-hi);
-  --jbf-chrome-lo: var(--jb-chrome-lo);
-  --jbf-paper: var(--jb-strip-bg);
-  --jbf-ink: var(--jb-strip-fg);
-  --jbf-lit: 0.5;
+  --jbf-body: var(--cabinet-body, #1d1936);
+  --jbf-body-2: var(--cabinet-body-2, #0d0a1c);
+  --jbf-warm: color-mix(in srgb, var(--jb-accent) 45%, #ffd23f);
+  --jbf-lit: 0.45;
+  /* dimmed like the far cabinets it stands with; its own lights stay bright */
+  --jbf-shade: 0.34;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: block;
   width: 100%;
   height: 100%;
   padding: 0;
@@ -343,78 +339,72 @@
   background: transparent;
   color: var(--af-ink-0, var(--text-0));
   font: inherit;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 :where(.jb-dock[data-playing='true']) :where(.jb-floor) {
   --jbf-lit: 1;
+  --jbf-shade: 0.26;
 }
 :where(.jb-floor) :where(.jb-floor__machine) {
-  position: relative;
-  flex: none;
-  width: 100%;
-  height: var(--jbf-machine-h, 100%);
+  position: absolute;
+  inset: 0;
   transition:
     transform var(--dur-2) var(--ease-out),
     filter var(--dur-2) var(--ease-out);
 }
 :where(.jb-floor) :where(.jbf) {
-  position: relative;
-  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-/* Light the machine throws on the wall behind it and pools on the carpet in front. */
-:where(.jb-floor) :where(.jb-floor__halo) {
-  position: absolute;
-  left: -30%;
-  right: -30%;
-  top: -8%;
-  bottom: 10%;
-  z-index: 0;
-  background: radial-gradient(50% 46% at 50% 40%, color-mix(in srgb, var(--jb-accent) 26%, transparent), transparent 70%);
-  opacity: calc(0.35 + var(--jbf-lit) * 0.65);
-  pointer-events: none;
-  transition: opacity var(--dur-3) var(--ease-out);
-}
-:where(.jb-floor) :where(.jb-floor__pool) {
-  position: absolute;
-  left: -24%;
-  right: -24%;
-  bottom: -5%;
-  height: 16%;
-  z-index: 0;
-  background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--jb-accent-2) 36%, transparent), transparent 72%);
-  opacity: calc(0.25 + var(--jbf-lit) * 0.75);
-  pointer-events: none;
-}
-:where(:root[data-fx='off']) :where(.jb-floor) :where(.jb-floor__halo, .jb-floor__pool) {
-  display: none;
-}
 
-/* Nameplate on the floor under the machine (matches the cabinets' plates). */
-:where(.jb-floor) :where(.jb-floor__plate) {
+/* The tag: what the machine is and what it's playing, on hover / focus (and when it needs a tap). */
+:where(.jb-floor) :where(.jb-floor__tag) {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 2px;
   width: max-content;
-  max-width: calc(100% + 40px);
-  min-height: var(--jbf-plate-h, 40px);
-  padding: 0 4px;
+  min-width: 100%;
+  max-width: 240px;
+  padding: 6px 10px 7px;
+  border: 1px solid var(--jb-border);
+  border-radius: min(var(--jb-radius), 8px);
+  background: var(--jb-bg-solid);
+  box-shadow: var(--panel-shadow);
+  opacity: 0;
+  translate: 0 4px;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    translate var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  :where(.jb-floor:hover) :where(.jb-floor__tag) {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+:where(.jb-floor:focus-visible, .jb-floor[data-needs-gesture='true']) :where(.jb-floor__tag) {
+  opacity: 1;
+  translate: 0 0;
+}
+:where(.jb-dock[data-state='expanded']) :where(.jb-floor__tag) {
+  opacity: 0;
 }
 :where(.jb-floor) :where(.jb-floor__name) {
-  color: var(--af-ink-0, var(--text-0));
-  font-family: var(--font-pixel);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.08em;
+  color: var(--jb-fg);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  text-shadow: 0 0 8px color-mix(in srgb, var(--jb-accent) 70%, transparent);
 }
 :where(.jb-floor) :where(.jb-floor__now) {
   display: flex;
@@ -422,9 +412,8 @@
   gap: 6px;
   max-width: 100%;
   overflow: hidden;
-  color: var(--af-ink-2, var(--text-2));
+  color: var(--jb-muted);
   font-size: var(--fs-2xs);
-  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 :where(.jb-floor) :where(.jb-floor__now-text) {
@@ -432,33 +421,35 @@
   text-overflow: ellipsis;
 }
 :where(.jb-dock[data-playing='true']) :where(.jb-floor__now) {
-  color: var(--af-ink-1, var(--text-1));
+  color: var(--jb-fg);
 }
 
-/* Hover / press / focus: the machine leans into the light. */
+/* Hover / press / focus: the machine lights up as you walk over. */
 @media (hover: hover) {
+  :where(.jb-floor:hover) {
+    --jbf-shade: 0.08;
+  }
   :where(.jb-floor:hover) :where(.jb-floor__machine) {
-    transform: translateY(-3px);
-    filter: brightness(1.12) saturate(1.1);
+    transform: translateY(-2px);
   }
 }
 :where(.jb-floor:active) :where(.jb-floor__machine) {
   transform: translateY(0) scale(0.985);
 }
 :where(.jb-floor:focus-visible) {
+  --jbf-shade: 0.08;
   outline: none;
 }
 :where(.jb-floor:focus-visible) :where(.jb-floor__machine)::after {
   content: '';
   position: absolute;
-  inset: -6px -6px -2px;
-  z-index: 2;
+  inset: -5px -3px -1px -5px;
   border: 2px solid var(--focus-ring);
-  border-radius: 46% 46% 6px 6px / 30% 30% 6px 6px;
+  border-radius: 48% 48% 6px 6px / 28% 28% 6px 6px;
   pointer-events: none;
 }
-:where(.jb-dock[data-state='expanded']) :where(.jb-floor__machine) {
-  filter: brightness(1.15);
+:where(.jb-dock[data-state='expanded']) :where(.jb-floor) {
+  --jbf-shade: 0.08;
 }
 /* After a reload the browser wants a tap before audio resumes: the machine asks for it. */
 :where(.jb-floor[data-needs-gesture='true']) :where(.jb-floor__machine) {
@@ -470,146 +461,93 @@
     filter: brightness(1);
   }
   50% {
-    filter: brightness(1.28);
+    filter: brightness(1.3);
   }
 }
 
-/* --- the art (SVG classes; colours only from tokens) --- */
-:where(.jbf) :where(.jbf-stop-body) {
-  stop-color: var(--jbf-body);
-}
-:where(.jbf) :where(.jbf-stop-body2) {
-  stop-color: var(--jbf-body-2);
-}
-:where(.jbf) :where(.jbf-stop-a) {
-  stop-color: var(--jb-accent);
-}
-:where(.jbf) :where(.jbf-stop-b) {
-  stop-color: var(--jb-accent-2);
-}
-:where(.jbf) :where(.jbf-stop-glow) {
-  stop-color: color-mix(in srgb, var(--jb-accent) 34%, var(--jbf-glass));
-}
-:where(.jbf) :where(.jbf-stop-glass) {
-  stop-color: var(--jbf-glass);
-}
-:where(.jbf) :where(.jbf-stop-chrome-hi) {
-  stop-color: var(--jbf-chrome-hi);
-}
-:where(.jbf) :where(.jbf-stop-chrome-lo) {
-  stop-color: var(--jbf-chrome-lo);
-}
-:where(.jbf) :where(.jbf-body) {
-  stroke: var(--jbf-edge);
-  stroke-width: 1.2;
+/* --- the art (SVG classes) --- */
+:where(.jbf) :where(.jbf-shade) {
+  fill: #000;
+  opacity: var(--jbf-shade);
+  transition: opacity var(--dur-2) var(--ease-out);
 }
 :where(.jbf) :where(.jbf-trim) {
   fill: none;
-  stroke: var(--jbf-chrome-lo);
-  stroke-width: 1;
-  opacity: 0.7;
-}
-:where(.jbf) :where(.jbf-tube__glow) {
-  fill: none;
-  stroke: var(--jb-accent);
-  stroke-width: 15;
-  stroke-linecap: round;
-  opacity: calc(var(--jbf-lit) * 0.22);
-}
-:where(.jbf) :where(.jbf-tube__glass) {
-  fill: none;
-  stroke-width: 8.5;
-  stroke-linecap: round;
-  opacity: calc(0.5 + var(--jbf-lit) * 0.5);
-}
-:where(.jbf) :where(.jbf-tube__bubbles) {
-  fill: none;
-  stroke: var(--light);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 0.1 10;
-  opacity: 0;
-}
-:where(.jbf) :where(.jbf-tube__shine) {
-  fill: none;
-  stroke: var(--light);
+  stroke: #6a6690;
   stroke-width: 1.2;
-  stroke-linecap: round;
-  opacity: 0.3;
 }
-:where(.jbf) :where(.jbf-finial) {
-  stroke: var(--jbf-edge);
-  stroke-width: 0.8;
-}
-:where(.jbf) :where(.jbf-dome-rim) {
+:where(.jbf) :where(.jbf-chrome) {
   fill: none;
-  stroke: var(--jbf-chrome-hi);
-  stroke-width: 2;
+  stroke: #8d88ad;
+  stroke-width: 0.9;
+  opacity: 0.85;
 }
-:where(.jbf) :where(.jbf-dome-glare) {
-  fill: var(--light);
-  opacity: 0.13;
+:where(.jbf) :where(.jbf-tube__bed) {
+  fill: none;
+  stroke: #07060e;
+  stroke-width: 10;
 }
-:where(.jbf) :where(.jbf-platter) {
-  fill: var(--jbf-chrome-lo);
-  opacity: 0.55;
+:where(.jbf) :where(.jbf-tube) {
+  fill: none;
+  stroke-width: 7;
+  opacity: calc(0.4 + var(--jbf-lit) * 0.6);
+  transition: opacity var(--dur-3) var(--ease-out);
 }
-:where(.jbf) :where(.jbf-vinyl) {
-  fill: var(--jb-vinyl);
-  stroke: color-mix(in srgb, #fff 22%, transparent);
-  stroke-width: 0.6;
-}
-:where(.jbf) :where(.jbf-groove) {
+:where(.jbf) :where(.jbf-tube__core) {
   fill: none;
   stroke: #fff;
-  stroke-opacity: 0.1;
-  stroke-width: 0.8;
+  stroke-width: 1.1;
+  opacity: calc(0.12 + var(--jbf-lit) * 0.22);
+}
+:where(.jbf) :where(.jbf-bubbles) {
+  fill: #fff;
+  opacity: 0;
+}
+:where(.jbf) :where(.jbf-glass) {
+  fill: #05040b;
+}
+:where(.jbf) :where(.jbf-glow) {
+  opacity: calc(0.15 + var(--jbf-lit) * 0.85);
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+:where(.jbf) :where(.jbf-rim) {
+  fill: none;
+  stroke: #8d88ad;
+  stroke-width: 1;
 }
 :where(.jbf) :where(.jbf-label) {
-  fill: var(--jb-accent-2);
+  fill: var(--jb-accent);
 }
-:where(.jbf) :where(.jbf-label-mark) {
-  fill: var(--light);
-  opacity: 0.6;
-}
-:where(.jbf) :where(.jbf-spindle) {
-  fill: var(--jbf-chrome-hi);
-}
-:where(.jbf) :where(.jbf-vinyl-sheen) {
-  fill: var(--light);
-  opacity: 0.1;
-}
-:where(.jbf) :where(.jbf-record) {
-  transform-box: view-box;
-  transform-origin: 80px 98px;
+:where(.jbf) :where(.jbf-disc) {
+  transform-origin: 0 0;
 }
 :where(.jbf) :where(.jbf-arm) {
-  transform-box: view-box;
-  transform-origin: 110px 76px;
-  transform: rotate(-20deg);
-  transition: transform 900ms var(--ease-in-out);
+  transform-origin: 84px 62px;
+  transform: rotate(-40deg);
+  transition: transform 700ms var(--ease-out);
 }
 :where(.jb-dock[data-playing='true']) :where(.jbf-arm) {
   transform: rotate(0deg);
 }
-:where(.jbf) :where(.jbf-arm__rod) {
-  fill: none;
-  stroke: var(--jbf-chrome-hi);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+:where(.jbf) :where(.jbf-plate, .jbf-rack) {
+  fill: #0a0916;
+  stroke: #6a6690;
+  stroke-width: 0.8;
 }
-:where(.jbf) :where(.jbf-arm__head) {
-  fill: var(--jbf-chrome-lo);
-}
-:where(.jbf) :where(.jbf-window) {
-  fill: color-mix(in srgb, var(--jb-accent-2) 16%, var(--jbf-glass));
-  stroke: var(--jbf-chrome-lo);
-  stroke-width: 1;
+:where(.jbf) :where(.jbf-name) {
+  fill: color-mix(in srgb, var(--jb-accent) 45%, #fff);
+  opacity: calc(0.5 + var(--jbf-lit) * 0.5);
+  font-family: Silkscreen, monospace;
+  font-size: 6.4px;
+  letter-spacing: 1.1px;
 }
 :where(.jbf) :where(.jbf-strip > rect:first-child) {
-  fill: var(--jbf-paper);
-  opacity: calc(0.6 + var(--jbf-lit) * 0.4);
+  fill: var(--jb-strip-bg, #f7f0dc);
+  opacity: calc(0.55 + var(--jbf-lit) * 0.35);
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-strip--lit > rect:first-child) {
+  fill: var(--jb-strip-lit, #ffe79a);
+  opacity: 1;
 }
 :where(.jbf) :where(.jbf-strip__band) {
   fill: var(--jb-accent);
@@ -618,63 +556,62 @@
   fill: var(--jb-accent-2);
 }
 :where(.jbf) :where(.jbf-strip__ink) {
-  fill: var(--jbf-ink);
-  opacity: 0.5;
-}
-:where(.jbf) :where(.jbf-keybed) {
-  fill: var(--jbf-body-2);
-  stroke: var(--jbf-chrome-lo);
-  stroke-width: 0.8;
+  fill: var(--jb-strip-fg, #1c1530);
+  opacity: 0.7;
 }
 :where(.jbf) :where(.jbf-key) {
-  fill: var(--jbf-chrome-hi);
+  fill: #d7d2ec;
+  opacity: 0.75;
 }
 :where(.jbf) :where(.jbf-key--lit) {
   fill: var(--jb-accent);
+  opacity: 1;
 }
-:where(.jbf) :where(.jbf-grille) {
-  fill: color-mix(in srgb, #0c0a12 88%, var(--jb-accent));
+:where(.jbf) :where(.jbf-backlight) {
+  opacity: calc(0.2 + var(--jbf-lit) * 0.7);
 }
 :where(.jbf) :where(.jbf-bar) {
-  opacity: calc(0.2 + var(--jbf-lit) * 0.55);
+  opacity: calc(0.12 + var(--jbf-lit) * 0.6);
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  transform: scaleY(0.3);
+  transform: scaleY(0.4);
+}
+:where(.jbf) :where(.jbf-bar:nth-child(3n + 1)) {
+  transform: scaleY(0.62);
 }
 :where(.jbf) :where(.jbf-slat) {
-  stroke: var(--jbf-chrome-hi);
-  stroke-width: 1.6;
-  opacity: 0.5;
+  fill: #8d88ad;
+  opacity: 0.9;
 }
-:where(.jbf) :where(.jbf-badge) {
-  stroke: var(--jbf-edge);
-  stroke-width: 0.8;
+:where(.jbf) :where(.jbf-star) {
+  fill: var(--jb-accent);
 }
-:where(.jbf) :where(.jbf-badge__star) {
-  fill: var(--jb-accent-2);
-}
-:where(.jbf) :where(.jbf-grille-rim) {
-  fill: none;
-  stroke: var(--jbf-chrome-hi);
-  stroke-width: 1.4;
-  opacity: 0.8;
-}
-:where(.jbf) :where(.jbf-plinth) {
-  stroke: var(--jbf-edge);
-  stroke-width: 0.8;
+:where(.jbf) :where(.jbf-coin) {
+  fill: #ff4a5e;
 }
 :where(.jbf) :where(.jbf-led) {
   fill: var(--jb-accent);
   opacity: calc(0.35 + var(--jbf-lit) * 0.65);
 }
+:where(.jbf) :where(.jbf-led--spill) {
+  opacity: calc(var(--jbf-lit) * 0.14);
+}
+:where(.jbf) :where(.jbf-note) {
+  fill: color-mix(in srgb, var(--jb-accent) 55%, #fff);
+  opacity: 0;
+}
 
-/* Motion: only while playing; the record turns at 33⅓, bubbles rise, the grille lights dance. */
-:where(.jb-dock[data-playing='true']) :where(.jbf-record) {
+/* Motion: only while playing — the record turns at 33⅓, bubbles rise, the grille lights dance and
+   notes drift up out of the crown. */
+:where(.jb-dock[data-playing='true']) :where(.jbf-disc) {
   animation: jbf-spin 1.8s linear infinite;
 }
-:where(.jb-dock[data-playing='true']) :where(.jbf-tube__bubbles) {
-  opacity: 0.7;
-  animation: jbf-bubbles 2.8s linear infinite;
+:where(.jb-dock[data-playing='true']) :where(.jbf-bubbles) {
+  opacity: 0.75;
+  animation: jbf-bubbles 1.6s linear infinite;
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-bubbles--r) {
+  animation-duration: 2.1s;
 }
 :where(.jb-dock[data-playing='true']) :where(.jbf-bar) {
   animation: jbf-bar 0.9s ease-in-out infinite alternate;
@@ -683,6 +620,10 @@
 :where(.jb-dock[data-playing='true']) :where(.jbf-bar:nth-child(even)) {
   animation-duration: 1.3s;
 }
+:where(.jb-dock[data-playing='true']) :where(.jbf-note) {
+  animation: jbf-note 3.6s ease-out infinite;
+  animation-delay: calc(var(--i) * 1.2s);
+}
 @keyframes jbf-spin {
   to {
     transform: rotate(360deg);
@@ -690,7 +631,7 @@
 }
 @keyframes jbf-bubbles {
   to {
-    stroke-dashoffset: -20.1;
+    transform: translateY(-16px);
   }
 }
 @keyframes jbf-bar {
@@ -698,20 +639,33 @@
     transform: scaleY(0.18);
   }
   to {
-    transform: scaleY(0.92);
+    transform: scaleY(0.95);
   }
 }
-/* Lower effects: no bubbles or dancing lights (the record still turns). Off / reduced motion: still. */
-:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-tube__bubbles, .jbf-bar) {
+@keyframes jbf-note {
+  0% {
+    opacity: 0;
+    translate: 0 0;
+  }
+  15% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    translate: 6px -26px;
+  }
+}
+/* Lower effects: no bubbles, notes or dancing lights (the record still turns). Off / reduced motion: still. */
+:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-bubbles, .jbf-bar, .jbf-note) {
   animation: none;
 }
-:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-tube__bubbles) {
+:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-bubbles, .jbf-note) {
   opacity: 0;
 }
-:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-record, .jbf-tube__bubbles, .jbf-bar) {
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-disc, .jbf-bubbles, .jbf-bar, .jbf-note) {
   animation: none;
 }
-:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-tube__bubbles) {
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-bubbles, .jbf-note) {
   opacity: 0;
 }
 :where(:root[data-reduced-motion='true']) :where(.jb-floor, .jb-floor *) {

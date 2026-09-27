@@ -65,8 +65,12 @@ export interface CoverflowOptions {
  * Chooses spacing + visible range for a stage: wide stages spread the lineup so
  * more cabinets fit edge to edge; narrow ones keep the default spacing (the
  * neighbours peek in from the edges). All values in active-face widths.
+ *
+ * `clear`: the stage's ends are taken (the floor's machines stand there), so a
+ * cabinet only shows if it fits entirely inside the half width — the next one
+ * out is fully faded rather than peeking in over them.
  */
-export function lineupFit(halfWidthInFaces: number, count: number): Required<Pick<CoverflowOptions, 'spread' | 'maxVisible'>> {
+export function lineupFit(halfWidthInFaces: number, count: number, clear = false): Required<Pick<CoverflowOptions, 'spread' | 'maxVisible'>> {
   const side = Math.max(1, Math.floor((count - 1) / 2) + 1);
   // Try to show every cabinet on each side; fall back to what fits at the default spread.
   const base = slotX(side, 1);
@@ -74,8 +78,11 @@ export function lineupFit(halfWidthInFaces: number, count: number): Required<Pic
   const spread = Math.max(COVERFLOW.spread, Math.min(1.75, wanted));
   let maxVisible: number = COVERFLOW.maxVisible;
   for (let u = 1; u <= count; u++) {
-    if (slotX(u, spread) - slotScale(u) * 0.5 > halfWidthInFaces + 0.2) {
-      maxVisible = Math.max(1.2, u - 0.5);
+    const overflows = clear
+      ? slotX(u, spread) + slotScale(u) * 0.5 > halfWidthInFaces
+      : slotX(u, spread) - slotScale(u) * 0.5 > halfWidthInFaces + 0.2;
+    if (overflows) {
+      maxVisible = clear ? Math.max(1, u - 1) : Math.max(1.2, u - 0.5);
       break;
     }
     maxVisible = u + 0.5;

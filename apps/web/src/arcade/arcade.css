@@ -756,25 +756,34 @@
   box-shadow: 0 0 8px var(--dot);
 }
 
-/* ---------- The jukebox's corner ---------- */
-/* ArcadeFloor lays out the spot (the machine's box + its floor nameplate) on the row's floor line; the
-   jukebox UI portals its physical machine in here (jukebox/FloorJukebox.tsx, styled in jukebox.css). */
+/* ---------- The row's ends: the jukebox and the claw machine ---------- */
+/* ArcadeFloor lays out both spots on the far cabinets' floor line; the jukebox UI portals its physical
+   machine into .af-jukebox (jukebox/FloorJukebox.tsx, styled in jukebox.css) and .af-claw holds the claw
+   machine (ClawMachine.tsx, claw.css). Their tags pop up above them, so neither clips its overflow. */
 .af-jukebox {
   position: absolute;
   z-index: 1100;
   left: calc(var(--jbx-x, 16px) + var(--safe-left));
   top: var(--jbx-top, 0px);
   width: var(--jbx-w, 0px);
-  height: calc(var(--jbx-h, 0px) + var(--jbx-plate, 40px));
-  --jbf-machine-h: var(--jbx-h, 0px);
-  --jbf-plate-h: var(--jbx-plate, 40px);
+  height: var(--jbx-h, 0px);
+}
+.af-claw {
+  position: absolute;
+  z-index: 1100;
+  right: calc(var(--clw-x, 16px) + var(--safe-right));
+  top: var(--clw-top, 0px);
+  width: var(--clw-w, 0px);
+  height: var(--clw-h, 0px);
 }
 .af-lineup[data-jukebox='none'] .af-jukebox,
-.af-lineup:not([data-jukebox]) .af-jukebox {
+.af-lineup:not([data-jukebox]) .af-jukebox,
+.af-lineup[data-claw='none'] .af-claw,
+.af-lineup:not([data-claw]) .af-claw {
   display: none;
 }
-.af-floor--launching .af-jukebox,
-.af-floor--busy .af-jukebox {
+.af-floor--launching :is(.af-jukebox, .af-claw),
+.af-floor--busy :is(.af-jukebox, .af-claw) {
   pointer-events: none;
 }
 
