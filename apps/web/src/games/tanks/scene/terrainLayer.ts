@@ -25,19 +25,19 @@ let serial = 0;
 export class TerrainLayer {
   private readonly scene: Phaser.Scene;
   private readonly terrain: Terrain;
-  private readonly theme: ThemePalette;
+  private theme: ThemePalette;
   private readonly scorch: Float32Array | null;
   private readonly chunks: Chunk[] = [];
   private readonly rimG: Phaser.GameObjects.Graphics;
   private readonly depthLut: Uint8ClampedArray;
   private readonly strata: Float32Array;
   private readonly wobble: Float32Array;
-  private readonly rimRgb: [number, number, number];
-  private readonly topRgb: [number, number, number];
+  private rimRgb: [number, number, number] = [0, 0, 0];
+  private topRgb: [number, number, number] = [0, 0, 0];
   private readonly h0: Float64Array;
-  private readonly scorchRgb: [number, number, number];
-  private readonly strataRgb: [number, number, number];
-  private readonly ore: Array<[number, number, number]>;
+  private scorchRgb: [number, number, number] = [0, 0, 0];
+  private strataRgb: [number, number, number] = [0, 0, 0];
+  private ore: Array<[number, number, number]> = [];
   private readonly id = ++serial;
   private pending: { x0: number; x1: number } | null = null;
 
@@ -47,30 +47,8 @@ export class TerrainLayer {
     this.theme = theme;
     this.scorch = scorch;
     const H = terrain.height;
-
-    // Colour by depth below the surface.
-    const rim = hexToRgb(theme.rim);
-    const top = hexToRgb(theme.topsoil);
-    const soil = hexToRgb(theme.soil);
-    const rock = hexToRgb(theme.rock);
-    const deep = hexToRgb(theme.deep);
-    this.rimRgb = rim;
-    this.scorchRgb = hexToRgb(theme.scorch);
-    this.strataRgb = hexToRgb(theme.strata);
-    this.ore = theme.ore.map(hexToRgb);
-    this.topRgb = top;
-    // Body colour by depth below the ORIGINAL surface (so craters expose the same strata the
-    // column always had, instead of re-colouring everything beneath them).
     this.depthLut = new Uint8ClampedArray((H + 1) * 3);
-    for (let d = 0; d <= H; d++) {
-      let c: [number, number, number];
-      if (d < 30) c = mixRgb(top, soil, d / 30);
-      else if (d < 150) c = mixRgb(soil, rock, (d - 30) / 120);
-      else c = mixRgb(rock, deep, Math.min(1, (d - 150) / 320));
-      this.depthLut[d * 3] = c[0];
-      this.depthLut[d * 3 + 1] = c[1];
-      this.depthLut[d * 3 + 2] = c[2];
-    }
+    this.setPalette(theme);
     // Strata bands by absolute height, gently wobbling along x.
     this.strata = new Float32Array(H + 64);
     for (let y = 0; y < this.strata.length; y++) {
@@ -100,6 +78,41 @@ export class TerrainLayer {
     this.rimG = scene.add.graphics().setDepth(depth + 1).setBlendMode(Phaser.BlendModes.ADD);
     layer.add(this.rimG);
     this.redraw(0, terrain.width);
+  }
+
+  /** Colour by depth below the surface (palette → lookup tables). */
+  private setPalette(theme: ThemePalette): void {
+    this.theme = theme;
+    const H = this.terrain.height;
+    const rim = hexToRgb(theme.rim);
+    const top = hexToRgb(theme.topsoil);
+    const soil = hexToRgb(theme.soil);
+    const rock = hexToRgb(theme.rock);
+    const deep = hexToRgb(theme.deep);
+    this.rimRgb = rim;
+    this.scorchRgb = hexToRgb(theme.scorch);
+    this.strataRgb = hexToRgb(theme.strata);
+    this.ore = theme.ore.map(hexToRgb);
+    this.topRgb = top;
+    // Body colour by depth below the ORIGINAL surface (so craters expose the same strata the
+    // column always had, instead of re-colouring everything beneath them).
+    for (let d = 0; d <= H; d++) {
+      let c: [number, number, number];
+      if (d < 30) c = mixRgb(top, soil, d / 30);
+      else if (d < 150) c = mixRgb(soil, rock, (d - 30) / 120);
+      else c = mixRgb(rock, deep, Math.min(1, (d - 150) / 320));
+      this.depthLut[d * 3] = c[0];
+      this.depthLut[d * 3 + 1] = c[1];
+      this.depthLut[d * 3 + 2] = c[2];
+    }
+  }
+
+  /** Theme change: repaint every column in place with a new palette (same textures, same terrain). */
+  restyle(theme: ThemePalette): void {
+    if (theme === this.theme) return;
+    this.setPalette(theme);
+    this.pending = null;
+    this.redraw(0, this.terrain.width);
   }
 
   /** Queue columns [x0, x1) for repaint (flushed once per frame). */

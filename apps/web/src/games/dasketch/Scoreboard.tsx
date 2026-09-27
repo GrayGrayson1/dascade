@@ -65,7 +65,7 @@ function Status({ row }: { row: ScoreRow }) {
 
 export function Scoreboard({ rows, meId, spectators }: { rows: ScoreRow[]; meId: string | null; spectators: number }) {
   return (
-    <section className="sk-board" aria-label="Scoreboard">
+    <section className="sk-board" data-part="scoreboard" aria-label="Scoreboard">
       <header className="sk-board__head">
         <span className="dc-label">Scoreboard</span>
         <span className="sk-board__count">

@@ -25,6 +25,7 @@ import {
   createHudStore,
   formatScore,
   useCanvasSurface,
+  useLiveMaterials,
   useFixedLoop,
   useGestures,
   useHud,
@@ -132,6 +133,7 @@ export function BlocksPlay() {
   const [input] = useState(() => new IntentInput<Intent>(SPEC));
   const [hud] = useState(() => createHudStore({ score: 0, level: 1, lines: 0, ticks: 0, hold: '', holdUsed: false, next: '', limit: 0 }));
   const renderer = useRef<BlocksRenderer>(new BlocksRenderer());
+  useLiveMaterials(screenRef, (m) => renderer.current.setMaterials(m));
   const held = useRef({ left: false, right: false, soft: false });
   const flow = useVerifiedFlow<BlocksSim>('blocks', (seed, opts) => createBlocksSim(seed, opts, true), () => {
     renderer.current.reset();

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MATERIAL_KEYS, type ThemeMaterials } from './materials.ts';
 import {
   BUILT_IN_THEMES,
   DEFAULT_THEME_ID,
@@ -61,6 +62,8 @@ function testTheme(overrides: Partial<ThemeDefinition> = {}): ThemeDefinition {
     id: 'test-desktop',
     name: 'Test Desktop',
     description: 'Throwaway test theme',
+    meta: { era: 'Test', tagline: 'Test theme', swatches: ['#008080', '#c0c0c0', '#000080', '#ffffff'], family: 'retro-desktop' },
+    materials: Object.fromEntries(MATERIAL_KEYS.map((k) => [k, '#808080'])) as ThemeMaterials,
     colorScheme: 'light',
     metaThemeColor: '#008080',
     tokens,
@@ -115,8 +118,20 @@ afterEach(() => {
 });
 
 describe('registry', () => {
-  it('ships exactly one theme: Delta Neon', () => {
-    expect(BUILT_IN_THEMES.map((t) => t.id)).toEqual(['delta-neon']);
+  it('ships the eleven themes, Delta Neon first and default', () => {
+    expect(BUILT_IN_THEMES.map((t) => t.id)).toEqual([
+      'delta-neon',
+      'shareware-97',
+      'corporate-98',
+      'cyber-cafe-01',
+      'mall-arcade-92',
+      'vhs-after-dark',
+      'space-casino-2088',
+      'lan-party',
+      'saturday-morning',
+      'executive',
+      'neon-noir',
+    ]);
     expect(DELTA_NEON.name).toBe('Delta Neon');
     expect(DEFAULT_THEME_ID).toBe('delta-neon');
   });
@@ -389,4 +404,39 @@ describe('colours and renderer tokens', () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+describe('material ink pairs stay legible (per game, after gameMaterials)', () => {
+  const lum = (css: string) => {
+    const c = parseCssColor(css)!;
+    const ch = (v: number) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+  };
+  const ratio = (a: string, b: string) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const PAIRS = [
+    ['cardFace', 'cardInk'],
+    ['paper', 'paperInk'],
+  ] as const;
+  for (const theme of BUILT_IN_THEMES) {
+    const base = theme.materials as Partial<ThemeMaterials> | undefined;
+    if (!base) continue;
+    const variants: [string, Partial<ThemeMaterials>][] = [['*', base]];
+    for (const [game, nudge] of Object.entries(theme.gameMaterials ?? {})) variants.push([game, { ...base, ...nudge }]);
+    for (const [game, m] of variants) {
+      for (const [face, ink] of PAIRS) {
+        const f = m[face];
+        const i = m[ink];
+        if (!f || !i || !parseCssColor(f) || !parseCssColor(i)) continue;
+        it(`${theme.id} [${game}] ${ink} on ${face} is AA (≥ 4.5:1)`, () => {
+          expect(ratio(f, i)).toBeGreaterThanOrEqual(4.5);
+        });
+      }
+    }
+  }
 });

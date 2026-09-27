@@ -24,7 +24,7 @@ import { lettersOnly } from './hooks.ts';
 export function LetterTile({ letter, size = 'md', state, className, style }: { letter: string; size?: 'sm' | 'md' | 'lg' | 'xl'; state?: 'on' | 'used' | 'good' | 'bad' | 'ban'; className?: string; style?: CSSProperties }) {
   const label = tileLabel(letter);
   return (
-    <span className={cx('wd-tile', `wd-tile--${size}`, className)} data-state={state} data-long={label.length > 1 ? 'true' : undefined} style={style} aria-hidden="true">
+    <span className={cx('wd-tile', `wd-tile--${size}`, className)} data-part="tile" data-state={state} data-long={label.length > 1 ? 'true' : undefined} style={style} aria-hidden="true">
       <span className="wd-tile__face">{label}</span>
     </span>
   );
@@ -198,7 +198,7 @@ export function EntryList({ entries, title = 'Your words', empty, onHover, compa
   const bad = entries.filter((e) => e.status === 'rejected').reverse().slice(0, 6);
   const total = good.reduce((n, e) => n + (e.status === 'ok' ? e.points : 0), 0);
   return (
-    <section className={cx('wd-entries', compact && 'wd-entries--compact')} aria-label={title}>
+    <section className={cx('wd-entries', compact && 'wd-entries--compact')} data-part="word-list" aria-label={title}>
       <header className="wd-entries__head">
         <h3 className="wd-entries__title">{title}</h3>
         <span className="wd-entries__sum">

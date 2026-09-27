@@ -1,4 +1,8 @@
-/* DAS Chess (.ch-*). Board/piece art colours live in the boardroom kit (.br-board vars) and pieces.tsx. */
+/*
+ * DAS Chess (.ch-*). Board/piece art colours live in the boardroom kit (.br-board vars) and pieces.tsx.
+ * Theme materials (--mat-board-*, --mat-piece-*) re-cast the board, pieces and promotion tiles; every
+ * value falls back to the Delta Neon art, so the default theme is unchanged (see "Theme materials" below).
+ */
 
 .ch {
   position: relative;
@@ -19,7 +23,7 @@
   background:
     radial-gradient(ellipse 55% 60% at 38% 48%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
     radial-gradient(ellipse 40% 50% at 92% 10%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 70%),
-    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.6) 100%);
+    radial-gradient(ellipse at 50% 50%, transparent 55%, color-mix(in srgb, var(--shade) 60%, transparent) 100%);
 }
 .ch::after {
   /* Faint pixel grid on the floor. */
@@ -30,8 +34,8 @@
   pointer-events: none;
   opacity: 0.35;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--light) 2.5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--light) 2.5%, transparent) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: radial-gradient(ellipse at 50% 60%, black, transparent 75%);
 }
@@ -111,7 +115,7 @@
   flex-direction: column;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.28);
+  background: color-mix(in srgb, var(--shade) 28%, transparent);
   overflow: hidden;
 }
 .ch-side__moves .br-moves {
@@ -149,7 +153,7 @@
   gap: 4px;
   padding: 10px 12px;
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--light) 3.5%, transparent);
   border: 1px solid var(--line);
   min-height: 44px;
 }
@@ -223,7 +227,7 @@
   place-items: center;
   padding: 10px;
   overflow-y: auto;
-  background: radial-gradient(ellipse at center, rgba(5, 4, 11, 0.35), rgba(5, 4, 11, 0.55));
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--bg-0) 35%, transparent), color-mix(in srgb, var(--bg-0) 55%, transparent));
   border-radius: 4px;
 }
 .ch-result-layer:has(.br-result--bar) {
@@ -242,7 +246,7 @@
   z-index: 25;
   display: grid;
   place-items: center;
-  background: rgba(5, 4, 11, 0.55);
+  background: color-mix(in srgb, var(--bg-0) 55%, transparent);
   border-radius: 4px;
   animation: ch-fade var(--dur-2) var(--ease-out);
 }
@@ -276,12 +280,12 @@
   width: clamp(58px, 16vw, 86px);
   padding: 8px 6px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #d9c9a8, #b89e76);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, var(--mat-board-light, #d9c9a8), var(--ch-promo-light-2-t, #b89e76));
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--shade) 25%, transparent);
   cursor: pointer;
 }
 .ch-promo__btn:nth-child(even) {
-  background: linear-gradient(180deg, #8a6c52, #6d533c);
+  background: linear-gradient(180deg, var(--ch-promo-dark-1-t, #8a6c52), var(--ch-promo-dark-2-t, #6d533c));
 }
 .ch-promo__btn:hover,
 .ch-promo__btn:focus-visible {
@@ -297,10 +301,10 @@
   font-family: var(--font-pixel);
   font-size: var(--fs-2xs);
   text-transform: uppercase;
-  color: #1d140c;
+  color: var(--ch-promo-ink-light-t, #1d140c);
 }
 .ch-promo__btn:nth-child(even) .ch-promo__name {
-  color: #f1e6cb;
+  color: var(--ch-promo-ink-dark-t, #f1e6cb);
 }
 @keyframes ch-fade {
   from {
@@ -369,7 +373,7 @@
 .ch--stack .br-moves--strip {
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.28);
+  background: color-mix(in srgb, var(--shade) 28%, transparent);
   min-height: 44px;
 }
 .ch--stack .br-actions__row {
@@ -408,8 +412,53 @@
 }
 .ch--short .br-moves--strip {
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.28);
+  background: color-mix(in srgb, var(--shade) 28%, transparent);
 }
 .ch--short .br-prompt {
   padding: 6px 8px;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Theme materials                                                                                 */
+/* Every --*-t value below references a --mat-* material with no fallback: under Delta Neon (no     */
+/* materials) it is invalid, so each var(--*-t, <art colour>) use falls back to the original art.   */
+/* ---------------------------------------------------------------------------------------------- */
+.ch {
+  --ch-promo-light-2-t: color-mix(in srgb, var(--mat-board-light) 84%, var(--mat-piece-edge));
+  --ch-promo-dark-1-t: color-mix(in srgb, var(--mat-board-dark) 88%, var(--mat-board-light));
+  --ch-promo-dark-2-t: color-mix(in srgb, var(--mat-board-dark) 86%, var(--mat-piece-edge));
+  --ch-promo-ink-light-t: color-mix(in srgb, var(--mat-board-dark) 45%, var(--mat-piece-edge));
+  --ch-promo-ink-dark-t: color-mix(in srgb, var(--mat-board-light) 90%, white);
+}
+/* Pieces (pieces.tsx draws each layer as var(--ch-<w|b>-<layer>, <Delta Neon colour>)). Light and
+   dark sets keep their identity in every theme: a light body / dark body split, a shared dark edge,
+   and a bright detail band on the dark set so it never melts into a dark square. */
+svg[data-piece] {
+  --ch-w-outline: var(--mat-piece-edge);
+  --ch-w-body: var(--mat-piece-light);
+  --ch-w-hi: color-mix(in srgb, var(--mat-piece-light) 50%, white);
+  --ch-w-glint: color-mix(in srgb, var(--mat-piece-light) 20%, white);
+  --ch-w-shade: color-mix(in srgb, var(--mat-piece-light) 76%, var(--mat-piece-edge));
+  --ch-w-detail: color-mix(in srgb, var(--mat-board-highlight) 62%, var(--mat-piece-edge));
+  --ch-b-outline: var(--mat-piece-edge);
+  --ch-b-body: var(--mat-piece-dark);
+  --ch-b-hi: color-mix(in srgb, var(--mat-piece-dark) 66%, var(--mat-piece-light));
+  --ch-b-glint: color-mix(in srgb, var(--mat-piece-dark) 42%, var(--mat-piece-light));
+  --ch-b-shade: color-mix(in srgb, var(--mat-piece-dark) 58%, var(--mat-piece-edge));
+  --ch-b-detail: var(--mat-board-highlight);
+}
+
+/* Themed chrome: a light theme turns --text-* dark, so the warning ink follows the theme there. */
+:root[data-theme]:not([data-theme='delta-neon']) .ch-status[data-tone='warn'] .ch-status__text {
+  color: var(--danger);
+}
+
+/* Themed chrome: accent-as-text is mixed toward the theme's body ink so it stays readable on light
+   themes (corporate-98) as well as dark ones; the status line keeps an accent marker. */
+:root[data-theme]:not([data-theme='delta-neon']) :is(.ch-head__brand, .ch-promo__title, .ch-rules h3),
+:root[data-theme]:not([data-theme='delta-neon']) .ch-status[data-tone='accent'] .ch-status__text {
+  color: color-mix(in srgb, var(--accent) 60%, var(--text-0));
+}
+:root[data-theme]:not([data-theme='delta-neon']) .ch-status[data-tone='accent'] {
+  box-shadow: inset 3px 0 0 var(--accent);
 }

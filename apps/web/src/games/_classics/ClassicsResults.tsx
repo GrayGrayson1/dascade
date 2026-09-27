@@ -39,7 +39,7 @@ export function ClassicsResults({ info }: { info: ClassicsGameInfo }) {
 
   return (
     <GameStage gameId={info.gameId} className="cl-stage cl-results">
-      <div className="cl-results__inner">
+      <div className="cl-results__inner" data-part="results">
         <header className="cl-results__head">
           <p className="cl-card__kicker">
             {game.title} · Match {meta?.matchNo ?? 1}
@@ -54,7 +54,7 @@ export function ClassicsResults({ info }: { info: ClassicsGameInfo }) {
           ) : null}
         </header>
 
-        <ol className="cl-podium" aria-label="Podium">
+        <ol className="cl-podium" data-part="podium" aria-label="Podium">
           {podium.map((r, i) => {
             // Height/medal follow the (possibly shared) final rank; position: winner centre, then left, then right.
             const place = Math.min(3, r.rank || i + 1);

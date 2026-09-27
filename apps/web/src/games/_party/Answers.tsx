@@ -65,6 +65,7 @@ export function AnswerButton({ index, label, ariaLabel, state = 'idle', disabled
     <button
       type="button"
       className="pk-answer"
+      data-part="answer-card"
       data-slot={index % 6}
       data-state={state}
       disabled={disabled}
@@ -128,6 +129,7 @@ export function AnswerGrid({
   return (
     <div
       className={cx('pk-answers', columns === 1 && 'pk-answers--single', options.length > 4 && 'pk-answers--many')}
+      data-part="answer-grid"
       role="group"
       aria-label={label}
     >
@@ -286,7 +288,7 @@ export function AnsweredStrip({ players, seats, meId, verb = 'locked in', max = 
   const shown = ordered.slice(0, max);
   const extra = ordered.length - shown.length;
   return (
-    <div className="pk-strip" aria-label={`${answered.length} of ${eligible.length} ${verb}`} role="status">
+    <div className="pk-strip" data-part="answered-strip" aria-label={`${answered.length} of ${eligible.length} ${verb}`} role="status">
       <span className="pk-strip__count dc-num" aria-hidden="true">
         {answered.length}
         <span className="pk-strip__of">/{eligible.length}</span>
@@ -361,7 +363,7 @@ export function VoteGrid({
 }: VoteGridProps) {
   const maxVotes = Math.max(1, ...entries.map((e) => e.votes ?? 0));
   return (
-    <ul className={cx('pk-votes', entries.length > 4 && 'pk-votes--many')} aria-label={label}>
+    <ul className={cx('pk-votes', entries.length > 4 && 'pk-votes--many')} data-part="vote-grid" aria-label={label}>
       {entries.map((e, i) => {
         const own = ownIds.includes(e.id);
         const picked = selected === e.id;
@@ -369,6 +371,7 @@ export function VoteGrid({
           <li
             key={e.id}
             className="pk-vote"
+            data-part="vote-card"
             data-own={own ? 'true' : undefined}
             data-picked={picked ? 'true' : undefined}
             data-winner={revealed && e.winner ? 'true' : undefined}

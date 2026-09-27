@@ -123,7 +123,7 @@ function StatusLine({
     if (ctl.premove) hints.push(`Premove queued: ${ctl.premove.from}→${ctl.premove.to} (Esc cancels)`);
   }
   return (
-    <div className="ch-status" data-tone={tone} role="status" aria-live="polite">
+    <div className="ch-status" data-part="status" data-tone={tone} role="status" aria-live="polite">
       <span className="ch-status__text">{text}</span>
       {hints.map((h) => (
         <span key={h} className="ch-status__hint">
@@ -415,7 +415,7 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
             {board}
             {card(bottomSide, 'bottom', false)}
           </div>
-          <aside className="ch-side" aria-label="Game panel" ref={sideRef}>
+          <aside className="ch-side" data-part="hud" aria-label="Game panel" ref={sideRef}>
             {header}
             <StatusLine state={state} ctl={ctl} room={room} />
             <div className="ch-side__moves">{moveList('table')}</div>
@@ -436,7 +436,7 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
       ) : (
         <div className="ch-layout">
           {board}
-          <aside className="ch-side" aria-label="Game panel">
+          <aside className="ch-side" data-part="hud" aria-label="Game panel">
             {card(topSide, 'top', true)}
             <StatusLine state={state} ctl={ctl} room={room} />
             {moveList('strip')}

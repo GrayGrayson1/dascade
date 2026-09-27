@@ -5,12 +5,14 @@ import { COURSE_NAME, NEON_NINE, getHole } from '@dascade/game-core/putt';
 import { Segmented, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
 import type { SettingsPanelProps } from '../types.ts';
 import { drawHoleThumb } from './game/thumb.ts';
+import { usePuttArt } from './game/usePuttArt.ts';
 
 function HoleThumb({ number, w = 92, h = 54 }: { number: number; w?: number; h?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const art = usePuttArt(ref);
   useEffect(() => {
-    if (ref.current) drawHoleThumb(ref.current, getHole(number), w, h);
-  }, [number, w, h]);
+    if (ref.current) drawHoleThumb(ref.current, getHole(number), w, h, art);
+  }, [number, w, h, art]);
   return <canvas ref={ref} className="pt-thumb" aria-hidden style={{ width: w, height: h }} />;
 }
 

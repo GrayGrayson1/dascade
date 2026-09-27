@@ -1,0 +1,1675 @@
+/* =====================================================================
+ * MALL ARCADE '92 — structural skin. Every rule is scoped under
+ * :root[data-theme='mall-arcade-92'].
+ * Physical arcade hardware: laminate panels with chrome T-molding, lit
+ * marquee title strips, convex push-buttons, token brass, a geometric
+ * carpet under fluorescent tubes. Honors data-fx and reduced motion.
+ * ===================================================================== */
+
+/* ---------- Local vars ---------- */
+:root[data-theme='mall-arcade-92'] {
+  --ma-molding: linear-gradient(180deg, #d9d3e6, #8d86a0 45%, #5d5770 55%, #b9b2c9);
+  --ma-laminate:
+    radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.04) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.03) 0 1px, transparent 1.4px) 0 0 / 9px 9px,
+    linear-gradient(180deg, #1c1330, #140c24);
+  --ma-marquee-strip: linear-gradient(180deg, #ff5a72 0%, #e21f44 48%, #b3122f 52%, #d61b3e 100%);
+  --ma-led: #ff3b4e;
+  --ma-token: #ffcc33;
+  --game-backdrop:
+    radial-gradient(1100px 520px at 50% -12%, rgba(216, 236, 255, 0.07), transparent 65%),
+    radial-gradient(800px 500px at 0% 100%, rgba(255, 59, 92, 0.07), transparent 60%),
+    radial-gradient(800px 500px at 100% 100%, rgba(77, 141, 255, 0.07), transparent 60%), linear-gradient(180deg, #150d26, #0d0818 70%);
+  --entry-backdrop: linear-gradient(180deg, rgba(13, 8, 24, 0.55), rgba(13, 8, 24, 0.85));
+}
+
+/* =====================================================================
+ * ENVIRONMENT — ceiling, far wall, carpet
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .ma-env {
+  --ma-horizon: 46%;
+  --ma-ceil: 17%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0b0714;
+  contain: strict;
+  transition:
+    opacity 500ms ease,
+    filter 500ms ease;
+}
+:root[data-theme='mall-arcade-92'] .ma-env > * {
+  position: absolute;
+  pointer-events: none;
+}
+/* The ceiling: a perspective plane of tiles and fluorescent troffers. */
+:root[data-theme='mall-arcade-92'] .ma-env__ceiling {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--ma-ceil);
+  overflow: hidden;
+  perspective: 420px;
+  perspective-origin: 50% 100%;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__ceiling-plane {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 300%;
+  transform-origin: 50% 100%;
+  transform: rotateX(-74deg);
+  background: var(--ma-ceiling) 0 0 / 200px 100px repeat;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__ceiling::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(11, 7, 20, 0) 0%, rgba(11, 7, 20, 0.35) 70%, rgba(11, 7, 20, 0.9) 100%);
+}
+/* Far wall with a lit row of distant cabinets. */
+:root[data-theme='mall-arcade-92'] .ma-env__wall {
+  left: 0;
+  right: 0;
+  top: var(--ma-ceil);
+  height: calc(var(--ma-horizon) - var(--ma-ceil));
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 30%), repeating-linear-gradient(90deg, #1a1030 0 118px, #170e2b 118px 120px),
+    #1a1030;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__row,
+:root[data-theme='mall-arcade-92'] .ma-env__screens {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(62%, 104px);
+  background-position: 50% 100%;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__row {
+  background-image: var(--ma-wall-row);
+  opacity: 0.55;
+  filter: blur(0.6px) saturate(0.7);
+}
+:root[data-theme='mall-arcade-92'] .ma-env__screens {
+  background-image: var(--ma-wall-screens);
+  opacity: 0.5;
+  filter: blur(1px);
+}
+:root[data-theme='mall-arcade-92'] .ma-env__posters {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22%;
+  height: min(34%, 84px);
+  background: var(--ma-posters) 50% 0 / auto 100% repeat-x;
+  opacity: 0.5;
+  filter: saturate(0.8) brightness(0.8);
+}
+:root[data-theme='mall-arcade-92'] .ma-env__neon {
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__neon--hi {
+  position: absolute;
+  top: 16%;
+  background: linear-gradient(90deg, #ff3b5c 0 33%, #b77bff 33% 66%, #4d8dff 66%);
+  box-shadow:
+    0 0 8px rgba(255, 59, 92, 0.6),
+    0 0 26px rgba(183, 123, 255, 0.4);
+  opacity: 0.85;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__neon--lo {
+  position: absolute;
+  bottom: 0;
+  height: 5px;
+  background: #0a0613;
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+/* The carpet: a big plane receding to the wall. */
+:root[data-theme='mall-arcade-92'] .ma-env__carpet {
+  left: 0;
+  right: 0;
+  top: var(--ma-horizon);
+  bottom: 0;
+  overflow: hidden;
+  perspective: 700px;
+  perspective-origin: 50% 0%;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__carpet-plane {
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  top: 0;
+  height: 190%;
+  transform-origin: 50% 0;
+  transform: rotateX(64deg);
+  background: var(--ma-carpet) 50% 0 / 190px 190px repeat;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__carpet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 7, 20, 0.95) 0%,
+    rgba(11, 7, 20, 0.55) 25%,
+    rgba(11, 7, 20, 0.3) 60%,
+    rgba(11, 7, 20, 0.5) 100%
+  );
+}
+/* Red / purple / blue light pooling on the carpet, fluorescent wash from above. */
+:root[data-theme='mall-arcade-92'] .ma-env__pools {
+  inset: 0;
+  background:
+    radial-gradient(38% 30% at 14% 78%, rgba(255, 59, 92, 0.22), transparent 70%),
+    radial-gradient(40% 32% at 50% 70%, rgba(183, 123, 255, 0.18), transparent 70%),
+    radial-gradient(38% 30% at 86% 78%, rgba(77, 141, 255, 0.22), transparent 70%);
+  mix-blend-mode: screen;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__tubes {
+  inset: 0;
+  background:
+    radial-gradient(60% 24% at 50% 0%, rgba(226, 242, 255, 0.16), transparent 75%),
+    radial-gradient(18% 14% at 22% 6%, rgba(226, 242, 255, 0.1), transparent 70%),
+    radial-gradient(18% 14% at 78% 6%, rgba(226, 242, 255, 0.1), transparent 70%);
+  mix-blend-mode: screen;
+}
+:root[data-theme='mall-arcade-92'] .ma-env__vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 90% 80% at 50% 48%, transparent 55%, rgba(4, 2, 8, 0.7) 100%);
+}
+/* Motion (fx high only): one tube stutters, distant screens shimmer. */
+:root[data-theme='mall-arcade-92'] .ma-env[data-animate='true'] .ma-env__tubes {
+  animation: ma-tube 9s steps(1, end) infinite;
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-animate='true'] .ma-env__screens {
+  animation: ma-screens 3.2s ease-in-out infinite alternate;
+}
+@keyframes ma-tube {
+  0%,
+  61%,
+  63%,
+  64.5%,
+  100% {
+    opacity: 1;
+  }
+  62%,
+  64% {
+    opacity: 0.55;
+  }
+}
+@keyframes ma-screens {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+/* Places: the floor gets the full room; screens with panels get a quieter room; games get calm. */
+:root[data-theme='mall-arcade-92'] .ma-env[data-place='lobby'],
+:root[data-theme='mall-arcade-92'] .ma-env[data-place='tournament'],
+:root[data-theme='mall-arcade-92'] .ma-env[data-place='other'] {
+  filter: brightness(0.8);
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-place='game'] {
+  opacity: 0.35;
+  filter: saturate(0.6);
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-fx='low'] .ma-env__pools {
+  opacity: 0.7;
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-fx='off'] .ma-env__pools,
+:root[data-theme='mall-arcade-92'] .ma-env[data-fx='off'] .ma-env__tubes,
+:root[data-theme='mall-arcade-92'] .ma-env[data-fx='off'] .ma-env__screens {
+  display: none;
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-fx='off'] .ma-env__neon--hi {
+  box-shadow: none;
+}
+@media (max-width: 700px) {
+  :root[data-theme='mall-arcade-92'] .ma-env {
+    --ma-horizon: 38%;
+    --ma-ceil: 13%;
+  }
+}
+@media (max-height: 500px) {
+  :root[data-theme='mall-arcade-92'] .ma-env {
+    --ma-horizon: 40%;
+    --ma-ceil: 12%;
+  }
+}
+
+/* =====================================================================
+ * FLOOR PROPS (FloorDecor)
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .ma-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+:root[data-theme='mall-arcade-92'] .ma-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+:root[data-theme='mall-arcade-92'] .ma-prop {
+  position: absolute;
+  display: none;
+}
+:root[data-theme='mall-arcade-92'] .ma-prop__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+:root[data-theme='mall-arcade-92'] .ma-prop__glow {
+  filter: drop-shadow(0 0 6px currentColor);
+}
+:root[data-theme='mall-arcade-92'] .ma-decor[data-animate='true'] .ma-prop__blink {
+  animation: dc-blink 1.4s steps(2) infinite;
+}
+@media (min-width: 1280px) and (min-height: 700px) {
+  :root[data-theme='mall-arcade-92'] .ma-prop {
+    display: block;
+    bottom: calc(var(--plaque-h, 150px) + 70px);
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--tokens {
+    left: 1.2vw;
+    width: clamp(70px, 6vw, 118px);
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--rope {
+    left: calc(1.2vw + clamp(60px, 5.6vw, 110px));
+    width: clamp(110px, 9vw, 180px);
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--counter {
+    right: 0.6vw;
+    width: clamp(140px, 9.6vw, 190px);
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--tickets {
+    display: none;
+  }
+}
+/* Laptop widths (1280–1599): the cabinet row already spans almost the whole floor, so the full-size
+   token machine, rope and prize counter crowded into the end cabinets. Keep just a slim token machine and
+   a compact prize counter tucked into the side gutters, set a touch lower so they read as foreground. */
+@media (min-width: 1280px) and (max-width: 1599px) and (min-height: 700px) {
+  :root[data-theme='mall-arcade-92'] .ma-prop {
+    bottom: calc(var(--plaque-h, 150px) + 40px);
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--tokens {
+    left: 0.6vw;
+    width: 58px;
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--rope {
+    display: none;
+  }
+  :root[data-theme='mall-arcade-92'] .ma-prop--counter {
+    right: 0.4vw;
+    width: 104px;
+  }
+}
+@media (min-width: 1800px) and (min-height: 800px) {
+  :root[data-theme='mall-arcade-92'] .ma-prop--tickets {
+    display: block;
+    right: calc(0.6vw + 9.6vw + 4px);
+    bottom: calc(var(--plaque-h, 150px) + 150px);
+    width: 40px;
+    opacity: 0.85;
+  }
+}
+
+/* =====================================================================
+ * ARCADE FLOOR — HUD, lineup, cabinets, plaque, kiosk
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .af-floor {
+  --af-ink-0: #fff7ea;
+  --af-ink-1: #e6dcf2;
+  --af-ink-2: #b4a6cc;
+  --af-ink-3: #a295bd;
+}
+:root[data-theme='mall-arcade-92'] .af-hud {
+  background: linear-gradient(180deg, rgba(11, 7, 20, 0.9), rgba(11, 7, 20, 0.55) 70%, rgba(11, 7, 20, 0));
+}
+:root[data-theme='mall-arcade-92'] .af-hud__word {
+  filter: drop-shadow(0 0 4px rgba(255, 59, 92, 0.9)) drop-shadow(0 0 14px rgba(255, 59, 92, 0.45));
+}
+:root[data-theme='mall-arcade-92'] .af-hud__sub {
+  color: #ffd76a;
+  text-shadow: 0 0 8px rgba(255, 204, 51, 0.5);
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='mall-arcade-92'] .af-hud__profile {
+  border-radius: 10px;
+  border-width: 2px;
+  background: var(--ma-laminate);
+}
+:root[data-theme='mall-arcade-92'] .af-hud__profile:hover {
+  border-color: var(--ma-token);
+  background: var(--ma-laminate);
+}
+:root[data-theme='mall-arcade-92'] .af-hud__profile-name[data-empty='true'] {
+  color: var(--ma-token);
+}
+/* The spotlight on the centred cabinet: a warm fluorescent wash rather than a neon cone. */
+:root[data-theme='mall-arcade-92'] .af-lineup::before {
+  background:
+    radial-gradient(34% 24% at 50% 94%, color-mix(in srgb, var(--sel, #ff3b5c) 30%, transparent), transparent 72%),
+    radial-gradient(30% 60% at 50% 0%, rgba(226, 242, 255, 0.1), transparent 80%);
+}
+/* Carpet doesn't reflect: a matte contact shadow instead of the glossy floor ring. */
+:root[data-theme='mall-arcade-92'] .af-cab__reflect::before {
+  background: radial-gradient(50% 40% at 50% 10%, rgba(0, 0, 0, 0.7), transparent 100%);
+  mix-blend-mode: normal;
+  opacity: 0.8;
+}
+:root[data-theme='mall-arcade-92'] .af-slot[data-active='true'] .af-cab__reflect::before {
+  background:
+    radial-gradient(50% 40% at 50% 10%, rgba(0, 0, 0, 0.75), transparent 100%),
+    radial-gradient(60% 60% at 50% 20%, color-mix(in srgb, var(--p) 40%, transparent), transparent 100%);
+  opacity: 0.9;
+}
+:root[data-theme='mall-arcade-92'] .af-slot[data-active='true'] .af-cab__reflect::after {
+  display: none;
+}
+/* Wood-grain laminate sides (pattern defined by FloorDecor); side art reads as a sticker on it. */
+:root[data-theme='mall-arcade-92'] .af-cab__side > g > polygon:first-child {
+  fill: url(#ma-wood);
+}
+:root[data-theme='mall-arcade-92'] .af-cab__side > g > g {
+  opacity: 0.82;
+}
+/* Chrome T-molding. */
+:root[data-theme='mall-arcade-92'] .af-cab__mold {
+  fill: #b8b0c8;
+}
+/* Scuffed, lovingly imperfect plastic over the whole front. */
+:root[data-theme='mall-arcade-92'] .af-cab__body::after {
+  content: '';
+  position: absolute;
+  inset: 0 12%;
+  z-index: 3;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cg stroke='%23fff' stroke-width='.6' opacity='.7' fill='none'%3E%3Cpath d='M10 20l40 8M80 5l-20 35M100 90l30-12M20 110l25-30M70 120l50 6M120 30l-8 40M40 60l12 3M4 70l18-4M88 64l6 22'/%3E%3C/g%3E%3C/svg%3E")
+    0 0 / 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.35;
+  pointer-events: none;
+}
+/* The lit marquee: bright backlight bleeding through, fluorescent-white core. */
+:root[data-theme='mall-arcade-92'] .af-cab__marquee::before {
+  inset: -40% -12% -10%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--p) 55%, #fff), transparent);
+}
+:root[data-theme='mall-arcade-92'] .af-slot[data-active='true'] .af-cab__marquee::before {
+  opacity: 0.55;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .af-cab__marquee::before {
+  display: none;
+}
+/* Name plate: an engraved brass plate screwed to the carpet riser. */
+:root[data-theme='mall-arcade-92'] .af-cab__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+:root[data-theme='mall-arcade-92'] .af-slot[data-active='true'] .af-cab__name {
+  color: #fff7ea;
+  text-shadow: 0 2px 0 #000;
+}
+:root[data-theme='mall-arcade-92'] .af-slot[data-active='true'] .af-cab__family {
+  color: #ffd76a;
+}
+/* Pager: a row of little marquee bulbs. */
+:root[data-theme='mall-arcade-92'] .af-lineup__pager i {
+  border-radius: 50%;
+}
+/* Prev/next: big round arcade buttons. */
+:root[data-theme='mall-arcade-92'] .af-lineup__arrow {
+  border-radius: 50%;
+  --btn-bg: #3a78f0;
+  --btn-bg-2: #2455c4;
+  --btn-edge: #0a1a44;
+  --btn-fg: #fff;
+}
+
+/* ---------- Plaque: the machine's instruction card under plexiglass ---------- */
+:root[data-theme='mall-arcade-92'] .af-plaque {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 30%), var(--ma-laminate);
+  border: 3px solid transparent;
+  border-radius: 12px;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 3px #7f7894,
+    0 0 0 4px #0a0612,
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 30px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 22px 50px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='mall-arcade-92'] .af-plaque::before {
+  /* the lit accent stripe along the top edge, like a marquee light box */
+  top: -3px;
+  left: 18px;
+  right: 18px;
+  width: auto;
+  height: 4px;
+  border: 0;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  filter: none;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+:root[data-theme='mall-arcade-92'] .af-plaque::after {
+  /* four chrome screws */
+  inset: 7px;
+  width: auto;
+  height: auto;
+  border: 0;
+  filter: none;
+  background:
+    radial-gradient(circle, #d9d3e6 0 2px, #4a4458 2.5px, transparent 3.5px) 0 0 / 7px 7px no-repeat,
+    radial-gradient(circle, #d9d3e6 0 2px, #4a4458 2.5px, transparent 3.5px) 100% 0 / 7px 7px no-repeat,
+    radial-gradient(circle, #d9d3e6 0 2px, #4a4458 2.5px, transparent 3.5px) 0 100% / 7px 7px no-repeat,
+    radial-gradient(circle, #d9d3e6 0 2px, #4a4458 2.5px, transparent 3.5px) 100% 100% / 7px 7px no-repeat;
+}
+:root[data-theme='mall-arcade-92'] .af-plaque__kicker {
+  color: #ffd76a;
+}
+:root[data-theme='mall-arcade-92'] .af-plaque__games li {
+  border-radius: 6px;
+}
+
+/* ---------- Tournament kiosk: the giant high-score board over the prize counter ---------- */
+:root[data-theme='mall-arcade-92'] .af-kiosk {
+  --k-led: #ff3b4e;
+  --k-led-2: #ffcc33;
+  border-radius: 6px;
+  border: 3px solid #3a2e52;
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.14) 0 1.2px, transparent 1.6px) 0 0 / 5px 5px,
+    linear-gradient(180deg, #120408, #060103);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 0 0 0 2px #000,
+    inset 0 0 22px rgba(255, 59, 78, 0.12),
+    0 0 22px rgba(255, 59, 78, 0.18),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 0 6px rgba(255, 59, 78, 0.7);
+}
+:root[data-theme='mall-arcade-92'] .af-kiosk:hover {
+  border-color: #ff3b4e;
+}
+:root[data-theme='mall-arcade-92'] .af-kiosk__trophy {
+  color: var(--ma-token);
+}
+:root[data-theme='mall-arcade-92'] .af-kiosk--board::before {
+  background:
+    linear-gradient(#8d86a0, #5d5770) left / 3px 100% no-repeat,
+    linear-gradient(#8d86a0, #5d5770) right / 3px 100% no-repeat;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .af-kiosk {
+  text-shadow: none;
+}
+
+/* =====================================================================
+ * CORE CHROME — panels, buttons, dialogs, top bar, toasts
+ * ===================================================================== */
+/* Panel headers are backlit marquee strips on a chrome rail. */
+:root[data-theme='mall-arcade-92'] .dc-panel__header {
+  position: relative;
+  border-bottom: 2px solid #0a0612;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.06);
+  border-radius: 6px 6px 0 0;
+}
+:root[data-theme='mall-arcade-92'] .dc-panel__title {
+  text-shadow: 0 0 8px rgba(255, 215, 106, 0.45);
+}
+:root[data-theme='mall-arcade-92'] .dc-panel__title::before {
+  /* a round indicator bulb */
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 8px #ff3b5c;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .dc-panel__title {
+  text-shadow: none;
+}
+/* Chrome T-molding around every panel: a light edge on top of the dark border. */
+:root[data-theme='mall-arcade-92'] .dc-panel {
+  box-shadow:
+    0 0 0 1px #0a0612,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    var(--shadow-2);
+}
+:root[data-theme='mall-arcade-92'] .dc-panel--glow {
+  box-shadow: var(--panel-glow-shadow);
+}
+/* Dialogs: a lit marquee across the top. */
+:root[data-theme='mall-arcade-92'] [data-part='dialog-frame'] > .dc-panel__header {
+  background: var(--ma-marquee-strip);
+  color: #fff;
+}
+:root[data-theme='mall-arcade-92'] [data-part='dialog-frame'] > .dc-panel__header .dc-panel__title {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 0 rgba(90, 6, 20, 0.8);
+}
+:root[data-theme='mall-arcade-92'] [data-part='dialog-frame'] > .dc-panel__header .dc-panel__title::before {
+  background: #ffcc33;
+  box-shadow:
+    0 0 0 2px #5a0614,
+    0 0 8px #ffcc33;
+}
+:root[data-theme='mall-arcade-92'] [data-part='dialog-frame'] > .dc-panel__header .dc-btn--ghost {
+  color: #fff;
+}
+:root[data-theme='mall-arcade-92'] .dc-modal::backdrop {
+  background: radial-gradient(ellipse at 50% 0%, rgba(226, 242, 255, 0.06), transparent 60%), rgba(8, 4, 16, 0.78);
+}
+
+/* Push-buttons: convex plastic with a pronounced lip. */
+:root[data-theme='mall-arcade-92'] .dc-btn {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+  box-shadow:
+    0 0 0 var(--button-edge-width) var(--btn-edge),
+    0 4px 0 var(--button-edge-width) var(--btn-edge),
+    inset 0 2px 0 var(--button-bevel-hi),
+    inset 0 -3px 0 var(--button-bevel-lo),
+    0 0 18px 0 var(--btn-glow);
+  margin-bottom: calc(var(--px) + 4px);
+}
+:root[data-theme='mall-arcade-92'] .dc-btn:active:not(:disabled) {
+  box-shadow:
+    0 0 0 var(--button-edge-width) var(--btn-edge),
+    0 1px 0 var(--button-edge-width) var(--btn-edge),
+    inset 0 2px 0 var(--button-bevel-hi),
+    inset 0 -1px 0 var(--button-bevel-lo);
+}
+:root[data-theme='mall-arcade-92'] .dc-btn--ghost {
+  background: transparent;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+:root[data-theme='mall-arcade-92'] .dc-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+:root[data-theme='mall-arcade-92'] .dc-btn--icon {
+  border-radius: 50%;
+}
+:root[data-theme='mall-arcade-92'] .dc-btn--ghost.dc-btn--icon {
+  border-radius: 10px;
+}
+
+/* Inputs: recessed into the laminate. */
+:root[data-theme='mall-arcade-92'] .dc-input--code {
+  color: #ff3b4e;
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.1) 0 1px, transparent 1.4px) 0 0 / 4px 4px,
+    #0a0304;
+  text-shadow: 0 0 8px rgba(255, 59, 78, 0.55);
+}
+:root[data-theme='mall-arcade-92'] .dc-toggle__track {
+  border-radius: 14px;
+}
+:root[data-theme='mall-arcade-92'] .dc-toggle__thumb {
+  border-radius: 50%;
+}
+:root[data-theme='mall-arcade-92'] .dc-segmented__item {
+  border-radius: 6px;
+}
+:root[data-theme='mall-arcade-92'] .dc-badge {
+  border-radius: 4px;
+}
+:root[data-theme='mall-arcade-92'] .dc-progress {
+  border-radius: 6px;
+}
+:root[data-theme='mall-arcade-92'] .dc-progress::after {
+  background: repeating-linear-gradient(90deg, var(--ma-token) 0 6px, #c78a0a 6px 8px);
+  box-shadow: 0 0 10px rgba(255, 204, 51, 0.6);
+}
+/* Toasts: a redemption ticket. */
+:root[data-theme='mall-arcade-92'] .dc-toast {
+  border-radius: 6px;
+  border-left-width: 6px;
+  background:
+    radial-gradient(circle at 0 50%, transparent 5px, transparent 5px) left / 12px 100% no-repeat,
+    var(--ma-laminate);
+}
+:root[data-theme='mall-arcade-92'] .dc-avatar {
+  border-radius: 8px;
+}
+
+/* ---------- Top bar: the chrome rail under the ceiling ---------- */
+:root[data-theme='mall-arcade-92'] .topbar {
+  border-bottom: 0;
+  box-shadow:
+    0 1px 0 #0a0612,
+    0 3px 0 -1px rgba(255, 255, 255, 0.08),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='mall-arcade-92'] .topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 3px;
+  background: linear-gradient(90deg, #ff3b5c, #b77bff 50%, #4d8dff);
+  box-shadow: 0 0 10px rgba(183, 123, 255, 0.5);
+  pointer-events: none;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .topbar::after {
+  box-shadow: none;
+}
+:root[data-theme='mall-arcade-92'] .code-chip,
+:root[data-theme='mall-arcade-92'] [data-part='room-code-chip'] {
+  border-radius: 8px;
+}
+:root[data-theme='mall-arcade-92'] .code-chip__code {
+  color: #ff3b4e;
+  text-shadow: 0 0 6px rgba(255, 59, 78, 0.55);
+}
+
+/* =====================================================================
+ * LOBBY / ROOM
+ * ===================================================================== */
+/* The lobby is a spot on the arcade floor: let the room show through, dimmed. */
+:root[data-theme='mall-arcade-92'][data-place='lobby'] .dc-game-backdrop {
+  background: linear-gradient(180deg, rgba(13, 8, 24, 0.78), rgba(13, 8, 24, 0.9));
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'][data-place='lobby'] .dc-game-backdrop {
+  background: var(--bg-0);
+}
+/* Room code: token-slot digit windows with red LED numerals. */
+:root[data-theme='mall-arcade-92'] .lobby-code__value span {
+  border-radius: 6px;
+  border: 2px solid #7f7894;
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.12) 0 1px, transparent 1.4px) 0 0 / 4px 4px,
+    linear-gradient(180deg, #16060a, #070203);
+  color: #ff3b4e;
+  text-shadow: 0 0 10px rgba(255, 59, 78, 0.65);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 0 3px 0 rgba(0, 0, 0, 0.6),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.06);
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .lobby-code__value span {
+  text-shadow: none;
+}
+:root[data-theme='mall-arcade-92'] .player-list__item,
+:root[data-theme='mall-arcade-92'] [data-part='player-row'] {
+  border-radius: 8px;
+}
+:root[data-theme='mall-arcade-92'] .ready-pill {
+  border-radius: 999px;
+}
+:root[data-theme='mall-arcade-92'] .lobby__actions,
+:root[data-theme='mall-arcade-92'] [data-part='lobby-actions'] {
+  border-top: 0;
+  box-shadow:
+    0 -3px 0 -1px rgba(255, 255, 255, 0.06),
+    0 -1px 0 #0a0612,
+    0 -10px 28px rgba(0, 0, 0, 0.45);
+}
+
+/* =====================================================================
+ * TITLE SCREEN (cabinet entry): you're standing at the machine
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .af-entry {
+  --af-ink-0: #fff7ea;
+  --af-ink-1: #e6dcf2;
+  --af-ink-2: #b4a6cc;
+  --af-ink-3: #a295bd;
+}
+/* The monitor sits in a black bezel with chrome T-molding around it. */
+:root[data-theme='mall-arcade-92'] .af-entry__screen {
+  inset: clamp(4px, 1.4vw, 24px);
+  border-radius: clamp(6px, 1.2vw, 18px);
+  box-shadow:
+    0 0 0 clamp(3px, 0.5vw, 8px) #07050c,
+    0 0 0 clamp(5px, 0.72vw, 11px) #8d86a0,
+    0 0 0 clamp(6px, 0.85vw, 13px) #0a0612,
+    0 0 60px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+:root[data-theme='mall-arcade-92'] .af-entry__marquee {
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2a1d42, #120b20);
+  box-shadow:
+    0 0 0 2px #8d86a0,
+    0 0 0 4px #0a0612,
+    0 0 40px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+}
+/* The coin door. */
+:root[data-theme='mall-arcade-92'] .af-entry__card {
+  border: 0;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #1d1331, #120b20);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 0 5px #6d6780,
+    0 0 0 7px #0a0612,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 40px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='mall-arcade-92'] .af-entry__card::before,
+:root[data-theme='mall-arcade-92'] .af-entry__card::after {
+  /* chrome screws instead of neon brackets */
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  filter: none;
+  background: radial-gradient(circle at 35% 35%, #f4f0fb, #8d86a0 55%, #3a3448);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .af-entry__card::before {
+  top: 8px;
+  left: 8px;
+}
+:root[data-theme='mall-arcade-92'] .af-entry__card::after {
+  right: 8px;
+  bottom: 8px;
+}
+:root[data-theme='mall-arcade-92'] .af-entry__card-head {
+  margin: 6px 6px 0;
+  border-radius: 6px 6px 0 0;
+  border-bottom: 2px solid #0a0612;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #57536a, #33304a 60%, #2a2740);
+}
+:root[data-theme='mall-arcade-92'] .af-entry__card-head h2 {
+  color: #fff7ea;
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme='mall-arcade-92'] .af-entry__credit {
+  color: #ffd76a;
+}
+:root[data-theme='mall-arcade-92'] .af-entry__head::before,
+:root[data-theme='mall-arcade-92'] .af-entry__details::before {
+  background: rgba(11, 7, 20, 0.76);
+  box-shadow: 0 0 44px 26px rgba(11, 7, 20, 0.76);
+}
+:root[data-theme='mall-arcade-92'] .af-entry__controls {
+  border-radius: 8px;
+}
+
+/* =====================================================================
+ * CABINET PICKER (multi-game): the machine's game-select
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .cp {
+  --af-ink-0: #fff7ea;
+  --af-ink-1: #e6dcf2;
+  --af-ink-2: #b4a6cc;
+  --af-ink-3: #a295bd;
+}
+:root[data-theme='mall-arcade-92'] .cp .cp__marquee {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px #8d86a0,
+    0 0 0 4px #0a0612,
+    0 0 40px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* Each game is a control-panel strip: laminate, a coloured T-molding edge, a bezelled screen. */
+:root[data-theme='mall-arcade-92'] .cp .cp-item {
+  border-radius: 10px;
+  border: 0;
+  border-left: 0;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #211636, #150d26);
+  box-shadow:
+    inset 5px 0 0 color-mix(in srgb, var(--ip) 75%, #fff),
+    0 0 0 2px #0a0612,
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='mall-arcade-92'] .cp .cp-item:hover,
+:root[data-theme='mall-arcade-92'] .cp .cp-item.is-selected {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(90deg, color-mix(in srgb, var(--ip) 18%, #211636), #150d26);
+  box-shadow:
+    inset 5px 0 0 color-mix(in srgb, var(--ip) 75%, #fff),
+    0 0 0 2px color-mix(in srgb, var(--ip) 70%, #0a0612),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 24px color-mix(in srgb, var(--ip) 25%, transparent),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='mall-arcade-92'] .cp .cp-item__screen {
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 3px #07050c,
+    0 0 0 4px #5d5770;
+}
+:root[data-theme='mall-arcade-92'] .cp .cp__preview {
+  border: 0;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.03) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #1d1331, #120b20);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 0 5px #6d6780,
+    0 0 0 7px #0a0612,
+    0 0 40px color-mix(in srgb, var(--ip) 16%, transparent),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='mall-arcade-92'] .cp .cp-screen {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 6px #07050c,
+    0 0 0 7px #3a3448,
+    0 0 30px color-mix(in srgb, var(--ip) 25%, transparent);
+}
+:root[data-theme='mall-arcade-92'] .cp .cp__tourney {
+  border-radius: 6px;
+}
+
+/* =====================================================================
+ * TOURNAMENT CENTER — the giant high-score board over the prize counter
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .tc-hero {
+  border: 0;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.16) 0 1.3px, transparent 1.8px) 0 0 / 7px 7px,
+    radial-gradient(ellipse at 20% 30%, rgba(255, 204, 51, 0.1), transparent 55%),
+    linear-gradient(180deg, #14050a, #070204);
+  box-shadow:
+    0 0 0 3px #0a0612,
+    0 0 0 7px #3a2e52,
+    0 0 0 9px #0a0612,
+    inset 0 0 40px rgba(255, 59, 78, 0.1),
+    0 0 40px rgba(255, 59, 78, 0.16),
+    var(--shadow-2);
+  margin-bottom: 64px;
+  overflow: visible;
+}
+/* Chase bulbs around the board. */
+:root[data-theme='mall-arcade-92'] .tc-hero::before {
+  inset: -7px;
+  border-radius: 12px;
+  mask-image: none;
+  opacity: 1;
+  background:
+    radial-gradient(circle, #ffe08a 0 2.4px, transparent 3px) 0 0 / 22px 7px repeat-x,
+    radial-gradient(circle, #ffe08a 0 2.4px, transparent 3px) 11px 100% / 22px 7px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(255, 204, 51, 0.8));
+}
+/* The prize counter underneath. */
+:root[data-theme='mall-arcade-92'] .tc-hero::after {
+  content: '';
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: calc(100% + 12px);
+  height: 44px;
+  border-radius: 4px 4px 0 0;
+  background:
+    radial-gradient(circle at 8% 45%, #ff7ab6 0 7px, transparent 8px), radial-gradient(circle at 14% 50%, #ffcc33 0 8px, transparent 9px),
+    radial-gradient(circle at 21% 45%, #4d8dff 0 7px, transparent 8px), radial-gradient(circle at 30% 50%, #3fe07e 0 6px, transparent 7px),
+    radial-gradient(circle at 40% 48%, #b77bff 0 8px, transparent 9px), radial-gradient(circle at 52% 50%, #ff8c2e 0 7px, transparent 8px),
+    radial-gradient(circle at 63% 45%, #3fd4ff 0 8px, transparent 9px), radial-gradient(circle at 72% 50%, #ff3b5c 0 6px, transparent 7px),
+    radial-gradient(circle at 82% 48%, #fff7ea 0 7px, transparent 8px), radial-gradient(circle at 91% 50%, #ffcc33 0 8px, transparent 9px),
+    linear-gradient(180deg, rgba(191, 230, 255, 0.14), rgba(191, 230, 255, 0.04)), #120b20;
+  box-shadow:
+    inset 0 3px 0 #f4fbff,
+    inset 0 0 0 2px #8d86a0,
+    0 8px 0 #d8d2e4,
+    0 12px 22px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .tc-hero::before {
+  filter: none;
+}
+:root[data-theme='mall-arcade-92'] .tc-marquee__title {
+  color: #ffcc33;
+  text-shadow:
+    0 3px 0 #7a1024,
+    0 0 16px rgba(255, 204, 51, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .tc-marquee__kicker {
+  color: #ff3b4e;
+}
+:root[data-theme='mall-arcade-92'] .tc-marquee__sub {
+  color: #f0e4d0;
+}
+:root[data-theme='mall-arcade-92'] [data-part='tournament-card'] {
+  border-radius: 8px;
+}
+:root[data-theme='mall-arcade-92'] .tc-center {
+  background: linear-gradient(180deg, rgba(13, 8, 24, 0.55), rgba(13, 8, 24, 0.85) 40%);
+}
+@media (max-width: 700px) {
+  :root[data-theme='mall-arcade-92'] .tc-hero {
+    margin-bottom: 48px;
+  }
+  :root[data-theme='mall-arcade-92'] .tc-hero::after {
+    height: 32px;
+  }
+}
+
+/* =====================================================================
+ * RESULTS, LOADING, EMPTY, ERROR
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .results-shell__title,
+:root[data-theme='mall-arcade-92'] [data-part='results-title'] {
+  color: #ffcc33;
+}
+:root[data-theme='mall-arcade-92'] .dc-empty__icon {
+  color: #ff3b5c;
+}
+:root[data-theme='mall-arcade-92'] .dc-spinner i {
+  border-radius: 50%;
+  background: #ffcc33;
+}
+:root[data-theme='mall-arcade-92'] .dc-spinner i:nth-child(2) {
+  background: #ff3b5c;
+}
+:root[data-theme='mall-arcade-92'] .dc-spinner i:nth-child(3) {
+  background: #4d8dff;
+}
+:root[data-theme='mall-arcade-92'] .notice-card,
+:root[data-theme='mall-arcade-92'] .reconnect-card {
+  border-radius: 12px;
+}
+
+/* =====================================================================
+ * GAME CHROME + KITS
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] .dc-timer {
+  box-shadow:
+    0 0 0 3px #0a0612,
+    0 0 0 5px #6d6780,
+    0 0 14px color-mix(in srgb, var(--tone) 40%, transparent);
+}
+/* Boardroom: the board sits in a cabinet-style deck; clocks are LED readouts. */
+:root[data-theme='mall-arcade-92'] [data-part='board-frame'] {
+  border-radius: 10px;
+}
+:root[data-theme='mall-arcade-92'] .br-clock {
+  border-radius: 6px;
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.1) 0 1px, transparent 1.4px) 0 0 / 4px 4px,
+    #0a0304;
+  border: 2px solid #3a2e52;
+  color: #ff8a8a;
+}
+:root[data-theme='mall-arcade-92'] [data-part='player-card'] {
+  border-radius: 10px;
+}
+/* Classics: the screen is a real cabinet monitor in a thick black bezel with chrome molding. */
+:root[data-theme='mall-arcade-92'] .cl-screen {
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--cl-edge, #000),
+    0 0 0 9px #07050c,
+    0 0 0 11px #8d86a0,
+    0 0 0 13px #0a0612,
+    var(--glow-md),
+    var(--shadow-3);
+}
+/* Party kit: game-show stage lit by marquee bulbs. */
+:root[data-theme='mall-arcade-92'] [data-part='prompt-card'] {
+  border-radius: 12px;
+}
+:root[data-theme='mall-arcade-92'] [data-part='answer-card'] {
+  border-radius: 10px;
+}
+:root[data-theme='mall-arcade-92'] .pk-podium__block {
+  border-radius: 6px 6px 0 0;
+}
+
+/* =====================================================================
+ * JUKEBOX — a physical illuminated jukebox in its own corner
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] [data-jukebox] {
+  --jb-accent: #ff3b5c;
+  --jb-accent-2: #ffcc33;
+  --jb-radius: 14px;
+  --jb-font-title: var(--font-display);
+  --jb-blur: none;
+}
+/* The cabinet: an arched top, wood-grain sides, chrome trim. */
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='panel'] {
+  border: 0;
+  border-radius: 90px 90px 14px 14px / 60px 60px 14px 14px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #2a1a44, #150d26 40%, #120b20);
+  box-shadow:
+    0 0 0 3px #0a0612,
+    0 0 0 7px #6b4424,
+    0 0 0 9px #3a2412,
+    0 0 0 11px #0a0612,
+    0 0 50px rgba(255, 59, 92, 0.25),
+    var(--shadow-3);
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='header'],
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='title-bar'] {
+  background: transparent;
+  border-bottom: 0;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='title-bar'] {
+  justify-content: center;
+  color: #ffd76a;
+  text-shadow: 0 0 10px rgba(255, 204, 51, 0.6);
+}
+/* The selector window: a lit glass display with the tubes on either side. */
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='display'] {
+  position: relative;
+  border-radius: 12px;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 204, 51, 0.12), transparent 60%), #0a0612;
+  box-shadow:
+    inset 0 0 0 2px #8d86a0,
+    inset 0 0 22px rgba(0, 0, 0, 0.7);
+  padding-inline: 34px;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='track-title'] {
+  color: #fff7ea;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='track-artist'] {
+  color: #ffd76a;
+}
+/* Track list: the selector cards — cream title strips with a red stripe, like a real jukebox. */
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='track'] {
+  border-radius: 4px;
+  background: linear-gradient(180deg, #fbf3dd, #efe2bf);
+  color: #1d1228;
+  box-shadow:
+    inset 0 -3px 0 #c81e3a,
+    0 1px 0 rgba(0, 0, 0, 0.4);
+  margin-bottom: 4px;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='track'] * {
+  color: inherit;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='track'][data-current] {
+  background: linear-gradient(180deg, #fff6b8, #ffd76a);
+  box-shadow:
+    inset 0 -3px 0 #c81e3a,
+    0 0 12px rgba(255, 204, 51, 0.5);
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='play'] {
+  border-radius: 50%;
+}
+:root[data-theme='mall-arcade-92'] [data-jukebox] [data-part='mini'] {
+  border-radius: 999px;
+  border: 2px solid #6b4424;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, transparent 1.4px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #2a1a44, #150d26);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 18px rgba(255, 59, 92, 0.2),
+    var(--shadow-2);
+}
+/* Decor: arch + bubble tubes (JukeboxDecor). */
+:root[data-theme='mall-arcade-92'] .ma-jb {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__arch {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: -3px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ff3b5c, #ffcc33, #3fe07e, #4d8dff, #b77bff);
+  opacity: var(--ma-jb-glow, 0.6);
+  box-shadow: 0 0 10px rgba(255, 204, 51, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__tube {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 16px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ff3b5c, #ffcc33 35%, #3fe07e 65%, #4d8dff);
+  opacity: var(--ma-jb-glow, 0.6);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.35),
+    inset 3px 0 4px rgba(255, 255, 255, 0.5),
+    0 0 14px rgba(255, 204, 51, 0.45);
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__tube--l {
+  left: 8px;
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__tube--r {
+  right: 8px;
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__tube i {
+  position: absolute;
+  left: 4px;
+  bottom: calc(var(--i) * 16%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.2);
+}
+:root[data-theme='mall-arcade-92'] .ma-jb[data-animate='true'] .ma-jb__tube i {
+  animation: ma-bubble 2.8s linear infinite;
+  animation-delay: calc(var(--i) * -0.47s);
+}
+:root[data-theme='mall-arcade-92'] .ma-jb__tube--r i {
+  animation-duration: 3.3s;
+}
+@keyframes ma-bubble {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-160px);
+    opacity: 0.6;
+  }
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .ma-jb__tube,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .ma-jb__arch {
+  box-shadow: none;
+}
+
+/* Party prompt: a lit sign with marquee bulbs along the top and bottom edges. */
+:root[data-theme='mall-arcade-92'] .pk-prompt::before,
+:root[data-theme='mall-arcade-92'] .pk-prompt::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 7px;
+  background: radial-gradient(circle, #ffe08a 0 2.4px, transparent 3px) 0 50% / 20px 7px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(255, 204, 51, 0.7));
+  pointer-events: none;
+}
+:root[data-theme='mall-arcade-92'] .pk-prompt::before {
+  top: -4px;
+}
+:root[data-theme='mall-arcade-92'] .pk-prompt::after {
+  bottom: -4px;
+  background-position: 10px 50%;
+}
+:root[data-theme='mall-arcade-92'][data-fx='high']:not([data-reduced-motion='true']) .pk-prompt::before,
+:root[data-theme='mall-arcade-92'][data-fx='high']:not([data-reduced-motion='true']) .pk-prompt::after {
+  animation: ma-chase 1.2s steps(2) infinite;
+}
+@keyframes ma-chase {
+  to {
+    background-position-x: 20px;
+  }
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-prompt::before,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-prompt::after {
+  filter: none;
+}
+
+/* 404 / crash: an operator's hand-lettered sign taped to the machine. */
+:root[data-theme='mall-arcade-92'] [data-part='not-found-screen'] .notice-card::before,
+:root[data-theme='mall-arcade-92'] [data-part='crash-screen'] .notice-card::before {
+  content: 'OUT OF ORDER';
+  content: 'OUT OF ORDER' / '';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  width: auto;
+  height: auto;
+  padding: 4px 14px;
+  border: 0;
+  filter: none;
+  transform: translateX(-50%) rotate(-3deg);
+  background: #fff7ea;
+  color: #c81e3a;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.1em;
+  box-shadow:
+    -14px -4px 0 -8px rgba(255, 255, 240, 0.55),
+    14px -4px 0 -8px rgba(255, 255, 240, 0.55),
+    0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* =====================================================================
+ * IN-GAME CABINET HARDWARE
+ * Inside a game you are still standing at a machine on the arcade floor:
+ *  · the room (carpet, cabinet row) stays faintly visible under the stage,
+ *  · status bars are lit marquee strips with a row of bulbs,
+ *  · scoreboards are dot-matrix LED score panels in a chrome bezel,
+ *  · control docks are control panels with printed speed-stripe art,
+ *  · boards sit under the glass of a cocktail-table cabinet,
+ *  · results read like the high-score entry screen.
+ * Decoration only: no text colours that carry meaning change, every
+ * glow drops at fx=off, and nothing here animates under reduced motion.
+ * ===================================================================== */
+:root[data-theme='mall-arcade-92'] {
+  --ma-bulbs: radial-gradient(circle, #ffe08a 0 2.2px, rgba(255, 204, 51, 0.35) 2.6px, transparent 3.2px);
+  --ma-bulbs-off: radial-gradient(circle, #6b5a3a 0 2.2px, transparent 2.8px);
+  --ma-dotmatrix: radial-gradient(circle, rgba(255, 59, 78, 0.1) 0 1px, transparent 1.4px) 0 0 / 4px 4px;
+  --ma-led-panel: var(--ma-dotmatrix), linear-gradient(180deg, #10060d, #07030a);
+  /* Printed control-panel art: three racing stripes along the top edge. */
+  --ma-stripes: linear-gradient(
+      180deg,
+      #ff3b5c 0 3px,
+      transparent 3px 4px,
+      #ff8c2e 4px 6px,
+      transparent 6px 7px,
+      #ffcc33 7px 8px,
+      transparent 8px
+    )
+    0 0 / 100% 8px no-repeat;
+  --ma-cpo: var(--ma-stripes), var(--ma-laminate);
+  --ma-bezel-ring: 0 0 0 2px #0a0612, 0 0 0 4px #6d6780, 0 0 0 6px #0a0612;
+}
+
+/* ---------- The room under the stage ---------- */
+/* The game stage lets the (already dimmed, calm) arcade room show through at the bottom:
+   the carpet and the far cabinet row read as "you're at a machine in the arcade". */
+:root[data-theme='mall-arcade-92'] .game-stage.dc-game-backdrop {
+  background:
+    radial-gradient(900px 260px at 50% -6%, rgba(216, 236, 255, 0.08), transparent 70%),
+    radial-gradient(700px 420px at 0% 100%, rgba(255, 59, 92, 0.08), transparent 60%),
+    radial-gradient(700px 420px at 100% 100%, rgba(77, 141, 255, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(13, 8, 24, 0.97) 0%, rgba(13, 8, 24, 0.93) 45%, rgba(13, 8, 24, 0.8) 100%);
+}
+:root[data-theme='mall-arcade-92'] .ma-env[data-place='game'] {
+  opacity: 0.55;
+  filter: saturate(0.75);
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .game-stage.dc-game-backdrop {
+  background: var(--bg-0);
+}
+
+/* ---------- Marquee strips (top status bars) ---------- */
+:root[data-theme='mall-arcade-92'] .pk-topbar,
+:root[data-theme='mall-arcade-92'] .cl-top,
+:root[data-theme='mall-arcade-92'] .hd-hud {
+  background: radial-gradient(120% 160% at 50% -60%, rgba(255, 59, 92, 0.2), transparent 62%), var(--ma-laminate);
+  border-color: #8d86a0;
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='mall-arcade-92'] .pk-topbar,
+:root[data-theme='mall-arcade-92'] .cl-top {
+  position: relative;
+}
+/* A row of marquee bulbs along the top edge of the strip. */
+:root[data-theme='mall-arcade-92'] .pk-topbar::before,
+:root[data-theme='mall-arcade-92'] .cl-top::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: -4px;
+  height: 7px;
+  background: var(--ma-bulbs) 0 50% / 18px 7px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(255, 204, 51, 0.7));
+  pointer-events: none;
+}
+/* Holdem's bar spans the full width: a lit chrome rule under it instead of bulbs. */
+:root[data-theme='mall-arcade-92'] .hd-hud {
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow:
+    inset 0 -2px 0 #8d86a0,
+    inset 0 -4px 0 #0a0612,
+    0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- LED score panels ---------- */
+:root[data-theme='mall-arcade-92'] .pk-board,
+:root[data-theme='mall-arcade-92'] .pk-teamboard,
+:root[data-theme='mall-arcade-92'] .pt-board,
+:root[data-theme='mall-arcade-92'] .cl-board,
+:root[data-theme='mall-arcade-92'] .tk-roster,
+:root[data-theme='mall-arcade-92'] [data-part='results'] [data-part='standings'] {
+  background: var(--ma-led-panel);
+  border-color: #3a2e52;
+  box-shadow:
+    var(--ma-bezel-ring),
+    inset 0 0 26px rgba(255, 59, 78, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .pk-board__title,
+:root[data-theme='mall-arcade-92'] [data-part='results'] [data-part='standings'] > h2 {
+  color: #ffcc33;
+  text-shadow: 0 0 8px rgba(255, 204, 51, 0.45);
+}
+/* Scores on the panels glow like LED numerals (numbers keep --font-num). */
+:root[data-theme='mall-arcade-92'] .pk-row__score,
+:root[data-theme='mall-arcade-92'] .pk-standing__score,
+:root[data-theme='mall-arcade-92'] .pk-podium__score {
+  color: #ffd76a;
+  text-shadow: 0 0 8px rgba(255, 204, 51, 0.45);
+}
+:root[data-theme='mall-arcade-92'] .pk-row__place,
+:root[data-theme='mall-arcade-92'] .pk-standing__place {
+  color: #ff6b78;
+}
+
+/* ---------- Control panels (docks) ---------- */
+:root[data-theme='mall-arcade-92'] .pt-dock,
+:root[data-theme='mall-arcade-92'] .tk-deck,
+:root[data-theme='mall-arcade-92'] .qs-votebar,
+:root[data-theme='mall-arcade-92'] .hd-dock {
+  background: var(--ma-cpo);
+  border-color: #8d86a0;
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.45),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='mall-arcade-92'] .pt-dock {
+  padding-top: 12px;
+}
+:root[data-theme='mall-arcade-92'] .hd-dock {
+  border-top: 0;
+  box-shadow:
+    inset 0 2px 0 #8d86a0,
+    inset 0 4px 0 #0a0612,
+    0 -10px 28px rgba(0, 0, 0, 0.45);
+  background:
+    linear-gradient(
+        180deg,
+        transparent 4px,
+        #ff3b5c 4px 7px,
+        transparent 7px 9px,
+        #ff8c2e 9px 11px,
+        transparent 11px 13px,
+        #ffcc33 13px 14px,
+        transparent 14px
+      )
+      0 0 / 100% 16px no-repeat,
+    var(--ma-laminate);
+}
+:root[data-theme='mall-arcade-92'] .hd-dock[data-turn='true'] {
+  box-shadow:
+    inset 0 2px 0 #ff3b5c,
+    inset 0 4px 0 #0a0612,
+    0 -10px 34px rgba(255, 59, 92, 0.22);
+}
+
+/* ---------- Cocktail-table cabinet (chess / checkers) ---------- */
+/* The board sits under the glass of a sit-down cocktail cabinet: black top, chrome T-molding. */
+:root[data-theme='mall-arcade-92'] .br-board[data-part='board-frame'] {
+  box-shadow:
+    0 0 0 4px var(--br-frame),
+    0 0 0 10px #07050c,
+    0 0 0 12px #8d86a0,
+    0 0 0 13px #4a4460,
+    0 0 0 15px #0a0612,
+    0 24px 50px rgba(0, 0, 0, 0.6),
+    0 0 50px rgba(255, 59, 92, 0.14);
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .br-board[data-part='board-frame'] {
+  box-shadow:
+    0 0 0 4px var(--br-frame),
+    0 0 0 10px #07050c,
+    0 0 0 12px #8d86a0,
+    0 0 0 13px #4a4460,
+    0 0 0 15px #0a0612;
+}
+/* Glass glare across the cabinet top (very faint; never over a piece's legibility). */
+:root[data-theme='mall-arcade-92'] .br-board[data-part='board-frame']::after {
+  background: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.03) 22%,
+    transparent 23%,
+    transparent 74%,
+    rgba(255, 255, 255, 0.04) 75%,
+    transparent 84%
+  );
+}
+@media (max-width: 600px) {
+  :root[data-theme='mall-arcade-92'] .br-board[data-part='board-frame'] {
+    box-shadow:
+      0 0 0 3px var(--br-frame),
+      0 0 0 6px #07050c,
+      0 0 0 7.5px #8d86a0,
+      0 0 0 9px #0a0612,
+      0 16px 34px rgba(0, 0, 0, 0.55);
+  }
+}
+/* Player stations: laminate plates with a token-brass edge; the side to move is lit. */
+:root[data-theme='mall-arcade-92'] .br-card {
+  background: var(--ma-laminate);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 4px 0 0 #5d5770,
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='mall-arcade-92'] .br-card[data-active] {
+  box-shadow:
+    0 0 0 2px #0a0612,
+    inset 4px 0 0 #ffcc33,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 22px rgba(255, 204, 51, 0.2),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* The move list is the cabinet's LED readout. */
+:root[data-theme='mall-arcade-92'] [data-part='move-list'] {
+  background: var(--ma-led-panel);
+  box-shadow:
+    inset 0 0 0 2px #2a2040,
+    inset 0 0 20px rgba(255, 59, 78, 0.08);
+}
+
+/* ---------- Party answers: quiz-machine push-buttons ---------- */
+/* The letter badge becomes a round convex arcade button in the slot colour. */
+:root[data-theme='mall-arcade-92'] .pk-answer__badge {
+  border-radius: 999px;
+  background: radial-gradient(90% 70% at 50% 22%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 60%), var(--slot);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 0 4px #8d86a0,
+    0 0 0 5px #0a0612,
+    inset 0 -4px 0 rgba(0, 0, 0, 0.28);
+}
+:root[data-theme='mall-arcade-92'] .pk-answer {
+  border-radius: 10px;
+}
+
+/* ---------- Quest: an adventure cabinet ---------- */
+/* The scene art sits in a monitor bezel (drawn inside: the column clips outer shadows). */
+:root[data-theme='mall-arcade-92'] .qs-scene {
+  border-radius: 12px;
+}
+:root[data-theme='mall-arcade-92'] .qs-scene > .qs-scene__vignette {
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 7px #07050c,
+    inset 0 0 0 9px #8d86a0,
+    inset 0 0 0 10px #0a0612,
+    inset 0 0 30px 10px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .qs-choice__key {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  color: #1a0308;
+  background: radial-gradient(90% 70% at 50% 22%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%), #ff3b5c;
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 0 3.5px #8d86a0,
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- Hold'em: a token-redemption table rimmed with marquee bulbs ---------- */
+:root[data-theme='mall-arcade-92'] .hd-felt {
+  outline: 5px dotted rgba(255, 224, 138, 0.85);
+  outline-offset: 5px;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .hd-felt {
+  outline-color: rgba(255, 224, 138, 0.5);
+}
+
+/* ---------- Tournament room (kiosk): the high-score board ---------- */
+:root[data-theme='mall-arcade-92'] .tk-head {
+  background:
+    radial-gradient(circle, rgba(255, 59, 78, 0.12) 0 1.2px, transparent 1.7px) 0 0 / 7px 7px,
+    radial-gradient(ellipse at 20% 30%, rgba(255, 204, 51, 0.08), transparent 55%),
+    linear-gradient(180deg, #14050a, #070204);
+  box-shadow:
+    0 0 0 3px #0a0612,
+    0 0 0 6px #3a2e52,
+    0 0 0 8px #0a0612,
+    inset 0 0 40px rgba(255, 59, 78, 0.08),
+    var(--shadow-2);
+}
+
+/* ---------- Lobby: the front of the cabinet ---------- */
+:root[data-theme='mall-arcade-92'] .lobby-hero {
+  position: relative;
+  padding: clamp(14px, 2vw, 22px) clamp(14px, 2.4vw, 28px);
+  border-radius: 12px;
+  background:
+    radial-gradient(90% 140% at 20% -30%, rgba(255, 59, 92, 0.22), transparent 60%),
+    radial-gradient(70% 120% at 100% 120%, rgba(77, 141, 255, 0.16), transparent 60%), linear-gradient(180deg, #1d1232, #120b20);
+  box-shadow:
+    0 0 0 2px #0a0612,
+    0 0 0 5px #6d6780,
+    0 0 0 7px #0a0612,
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 20px 50px rgba(0, 0, 0, 0.5);
+}
+/* Marquee bulbs along the top and bottom of the cabinet front. */
+:root[data-theme='mall-arcade-92'] .lobby-hero::before,
+:root[data-theme='mall-arcade-92'] .lobby-hero::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  height: 7px;
+  background: var(--ma-bulbs) 0 50% / 20px 7px repeat-x;
+  filter: drop-shadow(0 0 3px rgba(255, 204, 51, 0.7));
+  pointer-events: none;
+}
+:root[data-theme='mall-arcade-92'] .lobby-hero::before {
+  top: -9px;
+}
+:root[data-theme='mall-arcade-92'] .lobby-hero::after {
+  bottom: -9px;
+  background-position: 10px 50%;
+}
+/* INSERT COIN, blinking in the coin door of the action bar (wide screens only). */
+@media (min-width: 1200px) {
+  :root[data-theme='mall-arcade-92'] .lobby__actions::after {
+    content: 'INSERT COIN  ·  1 CREDIT';
+    content: 'INSERT COIN  ·  1 CREDIT' / '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 6px 14px;
+    border-radius: 6px;
+    white-space: pre;
+    font-family: var(--font-pixel);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.16em;
+    color: #ff5a6a;
+    background: var(--ma-led-panel);
+    box-shadow:
+      0 0 0 2px #0a0612,
+      0 0 0 3px #5d5770;
+    text-shadow: 0 0 8px rgba(255, 59, 78, 0.6);
+    pointer-events: none;
+  }
+  :root[data-theme='mall-arcade-92'][data-fx='high']:not([data-reduced-motion='true']) .lobby__actions::after {
+    animation: ma-blink 1.6s steps(1) infinite;
+  }
+}
+@keyframes ma-blink {
+  50% {
+    color: #6a1a24;
+    text-shadow: none;
+  }
+}
+
+/* ---------- Results: the high-score entry screen ---------- */
+:root[data-theme='mall-arcade-92'] .pk-results__title,
+:root[data-theme='mall-arcade-92'] [data-part='results'] h1 {
+  color: #ffcc33;
+  text-shadow:
+    0 3px 0 #7a1024,
+    0 0 18px rgba(255, 204, 51, 0.4);
+}
+:root[data-theme='mall-arcade-92'] .pk-standing {
+  border-radius: 4px;
+  background: rgba(255, 59, 78, 0.05);
+  box-shadow: inset 0 -1px 0 rgba(255, 59, 78, 0.14);
+}
+:root[data-theme='mall-arcade-92'] .pk-standing.is-me {
+  background: rgba(255, 204, 51, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 204, 51, 0.55);
+}
+/* Podium pedestals: cabinets with chrome T-molding and a bulb row on top. */
+:root[data-theme='mall-arcade-92'] .pk-podium__block {
+  position: relative;
+  box-shadow:
+    inset 3px 0 0 #8d86a0,
+    inset -3px 0 0 #8d86a0,
+    inset 0 3px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 2px #0a0612,
+    0 12px 26px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='mall-arcade-92'] .pk-podium__block::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -4px;
+  height: 7px;
+  background: var(--ma-bulbs) 0 50% / 16px 7px repeat-x;
+  pointer-events: none;
+}
+
+/* fx=off: no glows on the new hardware. Reduced motion: nothing here moves anyway. */
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-topbar::before,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .cl-top::before,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .lobby-hero::before,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .lobby-hero::after {
+  filter: none;
+}
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-board__title,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-row__score,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-standing__score,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-podium__score,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .pk-results__title,
+:root[data-theme='mall-arcade-92'][data-fx='off'] .lobby__actions::after {
+  text-shadow: none;
+}

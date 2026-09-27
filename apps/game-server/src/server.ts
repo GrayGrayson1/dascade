@@ -150,11 +150,13 @@ function serveWebClient(app: express.Application): void {
           res.setHeader('Content-Security-Policy', csp);
           res.setHeader('Cache-Control', 'no-cache');
         }
+        // The jukebox manifest changes whenever songs are added; MP3s/art keep the 1h default (ETag revalidates).
+        else if (filePath.endsWith(`${path.sep}audio${path.sep}jukebox${path.sep}manifest.json`)) res.setHeader('Cache-Control', 'no-cache');
       },
     }),
   );
-  // SPA fallback for client routes (never for API / matchmaking).
-  app.get(/^\/(?!api\/|matchmake\/|assets\/).*/, (_req, res) => {
+  // SPA fallback for client routes (never for API / matchmaking / static media: a missing song is a 404, not HTML).
+  app.get(/^\/(?!api\/|matchmake\/|assets\/|audio\/).*/, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Content-Security-Policy', csp);
     res.sendFile(index);

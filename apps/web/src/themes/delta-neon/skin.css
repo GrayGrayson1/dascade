@@ -1,0 +1,49 @@
+/* =====================================================================
+ * DELTA NEON — house-style skin. The look itself is tokens.css :root +
+ * components.css; this file only adds the page-level environment and
+ * small consistency polish. Every rule scoped under :root[data-theme='delta-neon'].
+ * ===================================================================== */
+
+/* ---------- Environment (lobby, Tournament Center, loading/error) ---------- */
+:root[data-theme='delta-neon'] .dn-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+:root[data-theme='delta-neon'] .dn-env__nebula {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(167, 139, 250, 0.1), transparent 62%),
+    radial-gradient(760px 460px at 96% 4%, rgba(255, 79, 216, 0.07), transparent 60%),
+    radial-gradient(1200px 500px at 50% 112%, rgba(34, 211, 238, 0.07), transparent 64%);
+}
+/* A neon perspective floor receding into the dark (static; transforms only at layout). */
+:root[data-theme='delta-neon'] .dn-env__floor {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: -8%;
+  height: 58%;
+  transform-origin: 50% 100%;
+  transform: perspective(520px) rotateX(62deg);
+  background:
+    linear-gradient(90deg, rgba(255, 79, 216, 0.16) 1px, transparent 1px) 50% 0 / 64px 64px,
+    linear-gradient(0deg, rgba(34, 211, 238, 0.12) 1px, transparent 1px) 0 0 / 64px 64px;
+  mask-image: linear-gradient(0deg, rgba(0, 0, 0, 0.7), transparent 78%);
+  -webkit-mask-image: linear-gradient(0deg, rgba(0, 0, 0, 0.7), transparent 78%);
+  opacity: 0.55;
+}
+:root[data-theme='delta-neon'][data-fx='low'] .dn-env__floor {
+  opacity: 0.35;
+}
+:root[data-theme='delta-neon'][data-fx='off'] .dn-env__floor {
+  display: none;
+}
+:root[data-theme='delta-neon'] .dn-env__motes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}

@@ -10,7 +10,7 @@ export function Scorecard({ state, playerId, highlight }: { state: PuttPublicSta
   const parTotal = route.slice(0, regulation).reduce((s, _n, i) => s + (holeAt(state, i)?.par ?? 0), 0);
   return (
     <div className="pt-card-scroll">
-      <table className="pt-scorecard">
+      <table className="pt-scorecard" data-part="scorecard">
         <caption className="visually-hidden">Scorecard</caption>
         <thead>
           <tr>

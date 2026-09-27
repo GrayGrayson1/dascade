@@ -26,7 +26,7 @@ export function BracketView({
   if (!hasMatches) return <p className="dc-muted tc-empty">The bracket is drawn when the organizer starts the tournament.</p>;
   const tree = wide && mode === 'tree';
   return (
-    <div className="tc-bracket">
+    <div className="tc-bracket" data-part="bracket">
       {wide ? (
         <div className="tc-bracket__bar">
           <Segmented<Mode>

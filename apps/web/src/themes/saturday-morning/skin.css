@@ -1,0 +1,1884 @@
+/* =====================================================================
+ * SATURDAY MORNING — structural skin.
+ * Loud 1990s TV studio / game show / cartoon energy (original, no network
+ * branding): thick ink outlines, hard offset shadows, candy colours,
+ * chunky Lilita One type, checkerboards, bulbs, squiggles, confetti.
+ * Boards and HUDs stay calm and readable.
+ * EVERY selector is scoped under :root[data-theme='saturday-morning'].
+ * Motion honours data-fx (high/low/off) and data-reduced-motion.
+ * ===================================================================== */
+
+:root[data-theme='saturday-morning'] {
+  --sm-ink: #120833;
+  --sm-y: #ffe14d;
+  --sm-p: #ff4fa3;
+  --sm-t: #2ee6e6;
+  --sm-l: #c1f23a;
+  --sm-o: #ff9a2e;
+  --sm-v: #7048f0;
+  --sm-lilita: 'Lilita One', 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif;
+  --sm-checks: repeating-conic-gradient(#7a5cf5 0 25%, #2a1580 0 50%);
+  --sm-bulb: radial-gradient(circle, #fffbe0 0 3px, #ffd21a 3.5px 5px, transparent 5.5px);
+}
+/* Floor / title / picker inks: arcade.css declares --af-ink-* on these containers, so the theme's
+   values must be set there too (on :root they were shadowed and the default lilac inks showed). */
+:root[data-theme='saturday-morning'] :is(.af-floor, .af-entry, .cp) {
+  --af-ink-0: #ffffff;
+  --af-ink-1: #f0eeff;
+  --af-ink-2: #d6d2ff;
+  --af-ink-3: #c2bcf5;
+}
+
+/* ---------------------------------------------------------------------
+ * Environment: the studio
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .sm-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  --sm-scale: 1;
+  background:
+    radial-gradient(120% 80% at 50% 30%, #3a55e6 0%, #2437c9 45%, #1a28a0 100%);
+}
+:root[data-theme='saturday-morning'] .sm-env__burst {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  /* 150vmax still covers the farthest corner from the (50%, 34%) pivot at any aspect ratio (≈ 70vmax
+     radius needed) while compositing ~40% of the pixels a 240vmax layer did on every frame. */
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.075) 0 7.5deg, transparent 7.5deg 15deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 4vmax, #000 14vmax, rgba(0, 0, 0, 0.35) 60vmax);
+  mask: radial-gradient(circle, transparent 0 4vmax, #000 14vmax, rgba(0, 0, 0, 0.35) 60vmax);
+}
+:root[data-theme='saturday-morning'] .sm-env[data-live='true'][data-fx='high'] .sm-env__burst {
+  will-change: transform;
+  animation: sm-spin 140s linear infinite;
+}
+:root[data-theme='saturday-morning'] .sm-env__lights {
+  position: absolute;
+  inset: 0;
+}
+:root[data-theme='saturday-morning'] .sm-env__light {
+  position: absolute;
+  top: -20%;
+  width: 60vmax;
+  height: 120vmax;
+  border-radius: 50%;
+  opacity: 0.5;
+}
+:root[data-theme='saturday-morning'] .sm-env__light--a {
+  left: -18vmax;
+  background: radial-gradient(closest-side, rgba(255, 79, 163, 0.45), transparent 70%);
+}
+:root[data-theme='saturday-morning'] .sm-env__light--b {
+  right: -18vmax;
+  background: radial-gradient(closest-side, rgba(46, 230, 230, 0.4), transparent 70%);
+}
+:root[data-theme='saturday-morning'] .sm-env__light--c {
+  left: 30%;
+  top: -40%;
+  background: radial-gradient(closest-side, rgba(255, 225, 77, 0.3), transparent 70%);
+}
+:root[data-theme='saturday-morning'] .sm-env[data-live='true'][data-fx='high'] .sm-env__light--a {
+  animation: sm-sweep-a 11s ease-in-out infinite alternate;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-live='true'][data-fx='high'] .sm-env__light--b {
+  animation: sm-sweep-b 13s ease-in-out infinite alternate;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-fx='off'] .sm-env__lights {
+  display: none;
+}
+:root[data-theme='saturday-morning'] .sm-env__shapes {
+  position: absolute;
+  inset: 0;
+}
+:root[data-theme='saturday-morning'] .sm-shape {
+  position: absolute;
+  width: calc(var(--s) * var(--sm-scale));
+  height: calc(var(--s) * var(--sm-scale));
+  translate: -50% -50%;
+  rotate: var(--r);
+  filter: drop-shadow(4px 4px 0 rgba(18, 8, 51, 0.55));
+}
+:root[data-theme='saturday-morning'] .sm-shape svg {
+  display: block;
+  overflow: visible;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-live='true'] .sm-shape {
+  will-change: transform;
+  animation: sm-float var(--d) ease-in-out var(--dl) infinite alternate;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-live='true'] .sm-shape[data-spin='true'] svg {
+  animation: sm-spin calc(var(--d) * 1.6) linear var(--dl) infinite;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-fx='low'] .sm-shape {
+  filter: none;
+  animation-duration: calc(var(--d) * 1.6);
+}
+/* Lobby / tournament / settings screens: shapes step back a little. */
+:root[data-theme='saturday-morning'] .sm-env[data-place='lobby'] .sm-env__shapes,
+:root[data-theme='saturday-morning'] .sm-env[data-place='tournament'] .sm-env__shapes,
+:root[data-theme='saturday-morning'] .sm-env[data-place='other'] .sm-env__shapes {
+  opacity: 0.7;
+}
+:root[data-theme='saturday-morning'] .sm-env[data-calm='true'] {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.06) 0 2px, transparent 2.5px) 0 0 / 34px 34px,
+    linear-gradient(180deg, #1c1480, #140c5c 75%);
+}
+:root[data-theme='saturday-morning'] .sm-env[data-calm='true'] .sm-env__burst,
+:root[data-theme='saturday-morning'] .sm-env[data-calm='true'] .sm-env__lights {
+  display: none;
+}
+@media (max-width: 700px) {
+  :root[data-theme='saturday-morning'] .sm-env {
+    --sm-scale: 0.62;
+  }
+  :root[data-theme='saturday-morning'] .sm-shape[data-top='true'] {
+    display: none;
+  }
+}
+@keyframes sm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sm-float {
+  from {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate(10px, -16px) rotate(14deg);
+  }
+}
+@keyframes sm-sweep-a {
+  from {
+    transform: translateX(0) rotate(-8deg);
+  }
+  to {
+    transform: translateX(22vw) rotate(10deg);
+  }
+}
+@keyframes sm-sweep-b {
+  from {
+    transform: translateX(0) rotate(8deg);
+  }
+  to {
+    transform: translateX(-24vw) rotate(-10deg);
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Arcade floor → Studio B
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .af-floor,
+:root[data-theme='saturday-morning'] .af-room {
+  background: transparent;
+}
+:root[data-theme='saturday-morning'] .sm-set {
+  position: absolute;
+  inset: 0;
+}
+/* The set wall: rounded panel with chasing marquee bulbs and diagonal candy stripes. */
+:root[data-theme='saturday-morning'] .sm-set__wall {
+  position: absolute;
+  left: clamp(8px, 5vw, 110px);
+  right: clamp(8px, 5vw, 110px);
+  top: clamp(84px, 13vh, 150px);
+  bottom: 40%;
+  border-radius: 36px 36px 0 0;
+  background:
+    radial-gradient(70% 90% at 50% 100%, rgba(255, 225, 77, 0.18), transparent 70%),
+    linear-gradient(180deg, #5a2fd6, #3b1ca8);
+  box-shadow:
+    inset 0 0 0 4px var(--sm-ink),
+    inset 0 0 0 14px #ff4fa3,
+    inset 0 0 0 18px var(--sm-ink),
+    0 0 0 4px var(--sm-ink);
+  overflow: hidden;
+}
+:root[data-theme='saturday-morning'] .sm-set__stripes {
+  position: absolute;
+  inset: 18px;
+  border-radius: 20px 20px 0 0;
+  background: repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.06) 0 26px, transparent 26px 52px);
+}
+:root[data-theme='saturday-morning'] .sm-set__bulbs {
+  position: absolute;
+  inset: 4px;
+  border-radius: 32px 32px 0 0;
+  background:
+    var(--sm-bulb) 0 0 / 28px 10px repeat-x,
+    var(--sm-bulb) 14px 100% / 28px 10px repeat-x;
+  pointer-events: none;
+}
+:root[data-theme='saturday-morning'] .sm-set__bulbs--a {
+  background:
+    var(--sm-bulb) 0 0 / 28px 10px repeat-x,
+    var(--sm-bulb) 0 0 / 10px 28px repeat-y,
+    var(--sm-bulb) 100% 0 / 10px 28px repeat-y;
+}
+:root[data-theme='saturday-morning'] .sm-set__bulbs--b {
+  background:
+    var(--sm-bulb) 14px 0 / 28px 10px repeat-x,
+    var(--sm-bulb) 0 14px / 10px 28px repeat-y,
+    var(--sm-bulb) 100% 14px / 10px 28px repeat-y;
+  opacity: 0.35;
+}
+:root[data-theme='saturday-morning'] .sm-set[data-fx='high'] .sm-set__bulbs--a {
+  animation: sm-chase 0.9s steps(1, end) infinite;
+}
+:root[data-theme='saturday-morning'] .sm-set[data-fx='high'] .sm-set__bulbs--b {
+  animation: sm-chase 0.9s steps(1, end) -0.45s infinite;
+}
+@keyframes sm-chase {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.3;
+  }
+}
+/* APPLAUSE light box (top-left of the set). */
+:root[data-theme='saturday-morning'] .sm-set__sign {
+  position: absolute;
+  left: calc(clamp(8px, 5vw, 110px) + 34px);
+  top: calc(clamp(84px, 13vh, 150px) + 30px);
+  padding: 6px 14px 4px;
+  border-radius: 10px;
+  background: #e8243f;
+  box-shadow:
+    0 0 0 3px var(--sm-ink),
+    4px 5px 0 3px var(--sm-ink);
+  rotate: -4deg;
+}
+:root[data-theme='saturday-morning'] .sm-set__sign span {
+  font-family: var(--sm-lilita);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .sm-set[data-fx='high'] .sm-set__sign {
+  animation: sm-applause 6s steps(1, end) infinite;
+}
+@keyframes sm-applause {
+  0%,
+  70% {
+    filter: brightness(1);
+  }
+  72%,
+  76%,
+  80%,
+  84% {
+    filter: brightness(1.35);
+  }
+  74%,
+  78%,
+  82% {
+    filter: brightness(0.75);
+  }
+}
+/* ON AIR lamp (top-right of the set). */
+:root[data-theme='saturday-morning'] .sm-set__onair {
+  position: absolute;
+  right: calc(clamp(8px, 5vw, 110px) + 34px);
+  top: calc(clamp(84px, 13vh, 150px) + 30px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 4px 8px;
+  border-radius: 999px;
+  background: var(--sm-ink);
+  box-shadow: 0 0 0 3px #fff, 4px 5px 0 3px var(--sm-ink);
+  rotate: 3deg;
+}
+:root[data-theme='saturday-morning'] .sm-set__onair i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff3355;
+  box-shadow: 0 0 10px #ff3355;
+}
+:root[data-theme='saturday-morning'] .sm-set__onair span {
+  font-family: var(--sm-lilita);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #fff;
+}
+/* Checkerboard stage floor. */
+:root[data-theme='saturday-morning'] .sm-set__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 60%;
+  bottom: 0;
+  overflow: hidden;
+  perspective: 480px;
+  perspective-origin: 50% 0;
+  background: #1a0b3d;
+  border-top: 6px solid var(--sm-ink);
+  box-shadow: inset 0 6px 0 #ffe14d;
+}
+:root[data-theme='saturday-morning'] .sm-set__checks {
+  position: absolute;
+  left: -80%;
+  right: -80%;
+  top: 0;
+  height: 300%;
+  transform-origin: 50% 0;
+  transform: rotateX(64deg);
+  background: var(--sm-checks) 0 0 / 88px 88px;
+  opacity: 0.9;
+}
+:root[data-theme='saturday-morning'] .sm-set__floor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(46% 70% at 50% 0%, rgba(255, 225, 77, 0.3), transparent 70%),
+    linear-gradient(180deg, rgba(26, 11, 61, 0.1) 0%, rgba(26, 11, 61, 0.35) 45%, rgba(26, 11, 61, 0.85));
+}
+@media (max-width: 700px) {
+  :root[data-theme='saturday-morning'] .sm-set__sign,
+  :root[data-theme='saturday-morning'] .sm-set__onair {
+    display: none;
+  }
+  :root[data-theme='saturday-morning'] .sm-set__wall {
+    left: 6px;
+    right: 6px;
+    top: 72px;
+    bottom: 44%;
+    border-radius: 24px 24px 0 0;
+  }
+}
+@media (max-height: 520px) {
+  :root[data-theme='saturday-morning'] .sm-set__sign,
+  :root[data-theme='saturday-morning'] .sm-set__onair {
+    display: none;
+  }
+}
+
+/* Floor HUD. */
+:root[data-theme='saturday-morning'] .af-hud {
+  background: linear-gradient(180deg, rgba(26, 15, 102, 0.96), rgba(26, 15, 102, 0.75) 70%, rgba(26, 15, 102, 0));
+}
+:root[data-theme='saturday-morning'] .af-hud__word {
+  filter: drop-shadow(2px 2px 0 #120833) drop-shadow(-1px -1px 0 #120833) drop-shadow(3px 3px 0 #ff4fa3);
+}
+:root[data-theme='saturday-morning'] .af-hud__sub {
+  font-family: var(--sm-lilita);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: #ffe14d;
+  text-shadow: 2px 2px 0 #120833;
+}
+:root[data-theme='saturday-morning'] .af-floor .dc-btn {
+  font-family: var(--sm-lilita);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] .af-floor .dc-btn--lg,
+:root[data-theme='saturday-morning'] .af-floor .dc-btn--xl {
+  font-size: 20px;
+}
+@media (max-width: 1100px) {
+  :root[data-theme='saturday-morning'] .af-floor .dc-btn {
+    font-size: 14px;
+  }
+  :root[data-theme='saturday-morning'] .af-hud__sub {
+    font-size: 12px;
+  }
+}
+:root[data-theme='saturday-morning'] .af-srv,
+:root[data-theme='saturday-morning'] .af-hud__profile {
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  background: #28157f;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+
+/* Tournament kiosk → a game-show scoreboard with bulbs. */
+:root[data-theme='saturday-morning'] .af-kiosk {
+  --k-led: #ffe14d;
+  --k-led-2: #ffffff;
+  border-radius: 14px;
+  border: 3px solid var(--sm-ink);
+  background:
+    var(--sm-bulb) 4px 2px / 18px 10px repeat-x,
+    var(--sm-bulb) 13px calc(100% - 2px) / 18px 10px repeat-x,
+    #c41a68;
+  box-shadow: 4px 4px 0 var(--sm-ink);
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+:root[data-theme='saturday-morning'] .af-kiosk:hover {
+  border-color: var(--sm-ink);
+  box-shadow: 6px 6px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-kiosk::before {
+  background:
+    linear-gradient(#120833, #120833) left / 3px 100% no-repeat,
+    linear-gradient(#120833, #120833) right / 3px 100% no-repeat;
+}
+:root[data-theme='saturday-morning'] .af-kiosk__trophy {
+  color: #ffe14d;
+  filter: drop-shadow(2px 2px 0 #120833);
+}
+:root[data-theme='saturday-morning'] .af-kiosk__title {
+  font-family: var(--sm-lilita);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-kiosk__track {
+  font-family: var(--sm-lilita);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #fff6b0;
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-kiosk__go {
+  color: #fff;
+}
+
+/* Carousel arrows / pager: big candy buttons. */
+:root[data-theme='saturday-morning'] .af-lineup__arrow {
+  border-radius: 50%;
+}
+:root[data-theme='saturday-morning'] .af-lineup__pager i {
+  border: 2px solid var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-lineup__pager i[data-on='true'] {
+  background: #ffe14d;
+}
+
+/* Cabinets: ink outlines on marquee/screen, spotlight on the selected one, chunky plate. */
+:root[data-theme='saturday-morning'] [data-part='cabinet-marquee'] {
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-part='cabinet-screen'] {
+  box-shadow: 0 0 0 3px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-slot[data-active='true'] .af-cab__reflect {
+  background: radial-gradient(50% 50% at 50% 50%, rgba(255, 225, 77, 0.6), rgba(255, 225, 77, 0.18) 55%, transparent 72%);
+}
+:root[data-theme='saturday-morning'] .af-cab__name {
+  font-family: var(--sm-lilita);
+  font-size: 1.15em;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-cab__family {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.04em;
+  color: #ffe14d;
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+
+/* Plaque → the show card. */
+:root[data-theme='saturday-morning'] .af-plaque {
+  --accent: #ffe14d;
+  border-radius: 22px;
+  border: 4px solid var(--sm-ink);
+  background:
+    repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.04) 0 18px, transparent 18px 36px),
+    #28157f;
+  box-shadow: 8px 9px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-plaque::before,
+:root[data-theme='saturday-morning'] .af-plaque::after {
+  /* candy corner stickers instead of pixel brackets */
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--sm-ink);
+  border-radius: 50%;
+  background: #ff4fa3;
+  filter: none;
+}
+:root[data-theme='saturday-morning'] .af-plaque::before {
+  top: -12px;
+  left: -12px;
+}
+:root[data-theme='saturday-morning'] .af-plaque::after {
+  bottom: -12px;
+  right: -12px;
+  background: #2ee6e6;
+}
+:root[data-theme='saturday-morning'] .af-plaque__kicker {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 8px 0;
+  border-radius: 7px;
+  font-family: var(--sm-lilita);
+  font-size: 13px;
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  color: var(--sm-ink);
+  background: #ffe14d;
+  box-shadow: 2px 2px 0 var(--sm-ink);
+  rotate: -2deg;
+}
+:root[data-theme='saturday-morning'] :is(.af-plaque__count, .af-plaque__players) {
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-plaque__title .af-pw {
+  filter: drop-shadow(3px 3px 0 #120833);
+}
+:root[data-theme='saturday-morning'] .af-plaque__games li {
+  border: 2px solid var(--sm-ink);
+  border-radius: 999px;
+  background: #3a24ad;
+  box-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-plaque__games li:nth-child(4n + 1) {
+  background: #d9246f;
+}
+:root[data-theme='saturday-morning'] .af-plaque__games li:nth-child(4n + 2) {
+  background: #0b7f8c;
+}
+:root[data-theme='saturday-morning'] .af-plaque__games li:nth-child(4n + 3) {
+  background: #5430d8;
+}
+:root[data-theme='saturday-morning'] .af-foot__status {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.04em;
+}
+/* The footer sits on the bright studio floor (checks up to #6e51dd): white ink with an ink drop. */
+:root[data-theme='saturday-morning'] .af-foot {
+  --af-ink-2: #ffffff;
+  --af-ink-3: #f6f4ff;
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+
+/* ---------------------------------------------------------------------
+ * Global chrome: panels, dialogs, headers, buttons, controls
+ * ------------------------------------------------------------------- */
+/* Yellow title strips need ink for everything inside them. */
+:root[data-theme='saturday-morning'] .dc-panel__header {
+  --text-0: #1a0b3d;
+  --text-1: #1a0b3d;
+  --text-2: #2e1a60;
+  --text-3: #3a2470;
+  --accent: #b0105a;
+  color: #1a0b3d;
+  border-bottom: 3px solid var(--sm-ink);
+  border-radius: calc(var(--panel-radius) - 3px) calc(var(--panel-radius) - 3px) 0 0;
+}
+:root[data-theme='saturday-morning'] .dc-panel__header .dc-btn--ghost {
+  --btn-fg: #1a0b3d;
+}
+:root[data-theme='saturday-morning'] .dc-panel__header .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(18, 8, 51, 0.12);
+}
+:root[data-theme='saturday-morning'] .dc-panel__title {
+  font-weight: 400;
+}
+/* Games sometimes use .dc-panel__title outside a title bar: keep it light there. */
+:root[data-theme='saturday-morning'] .dc-panel__title:not(.dc-panel__header .dc-panel__title) {
+  color: var(--text-0);
+  text-shadow: none;
+}
+:root[data-theme='saturday-morning'] .dc-panel__title::before {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--sm-ink);
+}
+/* Dialogs: rotate the header colour per dialog type? No — one bold pink frame, yellow strip. */
+:root[data-theme='saturday-morning'] [data-part='dialog-frame'] {
+  box-shadow:
+    0 0 0 6px #ff4fa3,
+    0 0 0 9px var(--sm-ink),
+    12px 14px 0 9px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .dc-modal[open] {
+  animation: sm-boing var(--dur-3) var(--ease-spring);
+}
+@keyframes sm-boing {
+  from {
+    transform: scale(0.8) rotate(-2deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Buttons: chunky candy buttons with an ink outline and a hard drop shadow. */
+:root[data-theme='saturday-morning'] .dc-btn {
+  font-weight: 400;
+  box-shadow:
+    0 0 0 3px var(--btn-edge),
+    4px 4px 0 3px var(--btn-edge),
+    inset 0 3px 0 0 var(--button-bevel-hi),
+    inset 0 -4px 0 0 var(--button-bevel-lo);
+}
+:root[data-theme='saturday-morning'] .dc-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow:
+    0 0 0 3px var(--btn-edge),
+    5px 5px 0 3px var(--btn-edge),
+    inset 0 3px 0 0 var(--button-bevel-hi),
+    inset 0 -4px 0 0 var(--button-bevel-lo);
+}
+:root[data-theme='saturday-morning'] .dc-btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow:
+    0 0 0 3px var(--btn-edge),
+    1px 1px 0 3px var(--btn-edge),
+    inset 0 3px 0 0 var(--button-bevel-lo);
+}
+:root[data-theme='saturday-morning'] .dc-btn--ghost,
+:root[data-theme='saturday-morning'] .dc-btn--ghost:hover:not(:disabled),
+:root[data-theme='saturday-morning'] .dc-btn--ghost:active:not(:disabled) {
+  --btn-fg: var(--text-0);
+  box-shadow: none;
+  margin: 0;
+  transform: none;
+}
+:root[data-theme='saturday-morning'] .dc-btn--secondary {
+  --btn-bg: #3ad1d1;
+  --btn-bg-2: #19b3b8;
+  --btn-fg: #0b1a3d;
+}
+
+/* Titles: big, fat and outlined. */
+:root[data-theme='saturday-morning'] .dc-title {
+  letter-spacing: 0.01em;
+}
+
+/* Inputs, toggles, segmented, tabs, badges. */
+:root[data-theme='saturday-morning'] .dc-input,
+:root[data-theme='saturday-morning'] .dc-select,
+:root[data-theme='saturday-morning'] .dc-textarea {
+  border-width: 3px;
+}
+:root[data-theme='saturday-morning'] .dc-input--code {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.24em;
+  color: #ffe14d;
+}
+:root[data-theme='saturday-morning'] .dc-segmented,
+:root[data-theme='saturday-morning'] .dc-tabs {
+  border: 3px solid var(--sm-ink);
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .dc-segmented__item,
+:root[data-theme='saturday-morning'] .dc-tab {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] .dc-badge {
+  border: 2px solid var(--sm-ink);
+  border-radius: 999px;
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] .dc-label,
+:root[data-theme='saturday-morning'] .dc-field__label {
+  font-size: max(12px, var(--fs-2xs));
+  letter-spacing: 0.06em;
+}
+:root[data-theme='saturday-morning'] .dc-toggle__track {
+  border: 3px solid var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .dc-avatar {
+  box-shadow: 0 0 0 2px var(--sm-ink);
+}
+
+/* Toasts: cue cards. */
+:root[data-theme='saturday-morning'] .dc-toast {
+  border: 3px solid var(--sm-ink);
+  border-left: 10px solid var(--tone);
+  border-radius: 14px;
+}
+
+/* Room top bar: studio control strip with a candy checker rule. */
+:root[data-theme='saturday-morning'] .topbar::after {
+  height: 5px;
+  bottom: -5px;
+}
+:root[data-theme='saturday-morning'] .topbar__title {
+  font-family: var(--sm-lilita);
+  font-size: var(--fs-md);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #ffe14d;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .topbar__cabinet {
+  color: #d6d2ff;
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .code-chip {
+  border: 3px solid var(--sm-ink);
+  border-radius: 12px;
+  background: #ffe14d;
+  color: var(--sm-ink);
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .code-chip__label {
+  color: #3a2470;
+}
+:root[data-theme='saturday-morning'] .code-chip__code {
+  font-family: var(--font-num);
+  font-weight: 800;
+  color: var(--sm-ink);
+}
+
+/* ---------------------------------------------------------------------
+ * Title screens + cabinet picker
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .af-entry,
+:root[data-theme='saturday-morning'] .cp {
+  background: transparent;
+}
+:root[data-theme='saturday-morning'] .af-entry__bg {
+  background: linear-gradient(180deg, rgba(26, 15, 102, 0.2), rgba(20, 10, 74, 0.6));
+}
+:root[data-theme='saturday-morning'] .af-entry__screen {
+  border-radius: clamp(0px, 2vw, 32px);
+  box-shadow:
+    0 0 0 4px var(--sm-ink),
+    0 0 0 clamp(0px, 0.8vw, 12px) #ff9a2e,
+    0 0 0 clamp(0px, 1vw, 15px) var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-entry__scan {
+  display: none;
+}
+:root[data-theme='saturday-morning'] .af-entry__card {
+  border: 4px solid var(--sm-ink);
+  border-radius: 22px;
+  background: #28157f;
+  box-shadow: 9px 10px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-entry__card::before,
+:root[data-theme='saturday-morning'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='saturday-morning'] .af-entry__card-head {
+  border-radius: 18px 18px 0 0;
+  background: #ffe14d;
+  border-bottom: 3px solid var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-entry__card-head h2 {
+  font-family: var(--sm-lilita);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-entry__credit {
+  font-family: var(--sm-lilita);
+  font-size: 13px;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .af-entry__kicker,
+:root[data-theme='saturday-morning'] .cp-detail__kicker {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 10px 2px;
+  border-radius: 8px;
+  font-family: var(--sm-lilita);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--sm-ink);
+  background: #ffe14d;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+  rotate: -2deg;
+}
+:root[data-theme='saturday-morning'] .cpb {
+  background: transparent;
+}
+:root[data-theme='saturday-morning'] .cpb > :not(.cpb__vignette) {
+  opacity: 0.3;
+}
+:root[data-theme='saturday-morning'] .cpb__vignette {
+  display: none;
+}
+:root[data-theme='saturday-morning'] .cp__marquee {
+  background: #ff9a2e;
+  box-shadow: 0 0 0 4px var(--sm-ink), 5px 6px 0 4px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .cp-item {
+  border: 3px solid var(--sm-ink);
+  border-left: 12px solid var(--ip);
+  border-radius: 16px;
+  background: #28157f;
+  box-shadow: 5px 5px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .cp-item:hover,
+:root[data-theme='saturday-morning'] .cp-item.is-selected {
+  border-color: var(--sm-ink);
+  border-left-color: var(--ip);
+  background: #3a24ad;
+  box-shadow: 7px 7px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .cp-item.is-selected::before {
+  color: #ffe14d;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+  font-size: 16px;
+}
+:root[data-theme='saturday-morning'] .cp-item__screen,
+:root[data-theme='saturday-morning'] .cp-screen {
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .cp-item__title,
+:root[data-theme='saturday-morning'] .cp-detail__title {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------
+ * Lobby: the green room
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .lobby-hero__title {
+  font-family: var(--sm-lilita);
+  text-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .lobby-code__value {
+  font-family: var(--font-num);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #ffe14d;
+  text-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .player-list__item {
+  border-radius: 12px;
+}
+:root[data-theme='saturday-morning'] .ready-pill {
+  border: 2px solid var(--sm-ink);
+  border-radius: 999px;
+  font-family: var(--sm-lilita);
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+
+/* ---------------------------------------------------------------------
+ * Results: game-show scoreboard + confetti (shared ResultsShell and the
+ * party / classics / wheel result heroes)
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .results-shell__header,
+:root[data-theme='saturday-morning'] .pk-results__head,
+:root[data-theme='saturday-morning'] .cl-results__head,
+:root[data-theme='saturday-morning'] .wh-results__hero {
+  --text-0: #ffffff;
+  --text-1: #ffffff;
+  --text-2: #fff4c2;
+  --text-3: #fff4c2;
+  position: relative;
+  width: min(100%, 980px);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 26px clamp(14px, 3vw, 36px);
+  border-radius: 22px;
+  background:
+    var(--sm-bulb) 6px 4px / 22px 10px repeat-x,
+    var(--sm-bulb) 17px calc(100% - 4px) / 22px 10px repeat-x,
+    repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.06) 0 20px, transparent 20px 40px),
+    #c41a68;
+  box-shadow: 0 0 0 4px var(--sm-ink), 7px 8px 0 4px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .results-shell__header {
+  margin-top: var(--sp-6);
+}
+/* Laptop heights: the marquee banner must not push Play again / Leave below the fold. */
+@media (max-height: 960px) {
+  :root[data-theme='saturday-morning'] .results-shell__header,
+  :root[data-theme='saturday-morning'] .pk-results__head,
+  :root[data-theme='saturday-morning'] .cl-results__head,
+  :root[data-theme='saturday-morning'] .wh-results__hero {
+    padding-block: 16px;
+  }
+  :root[data-theme='saturday-morning'] .pk-results__title {
+    font-size: clamp(1.8rem, 4.2vw, 2.9rem);
+  }
+}
+:root[data-theme='saturday-morning'] .results-shell__header .dc-title,
+:root[data-theme='saturday-morning'] .pk-results__head .dc-title,
+:root[data-theme='saturday-morning'] .cl-results__head .dc-title,
+:root[data-theme='saturday-morning'] .wh-results__hero .dc-title,
+:root[data-theme='saturday-morning'] .pk-results__title,
+:root[data-theme='saturday-morning'] .cl-results__title {
+  color: #fff;
+  text-shadow: 3px 3px 0 var(--sm-ink), 6px 6px 0 #7048f0;
+}
+:root[data-theme='saturday-morning'] .results-shell__header .dc-label,
+:root[data-theme='saturday-morning'] .pk-results__head .dc-label,
+:root[data-theme='saturday-morning'] .cl-results__head .dc-label,
+:root[data-theme='saturday-morning'] .wh-results__hero .dc-label,
+:root[data-theme='saturday-morning'] .results-shell__kicker {
+  display: inline-block;
+  padding: 3px 10px 2px;
+  border-radius: 8px;
+  font-family: var(--sm-lilita);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--sm-ink);
+  background: #ffe14d;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+  rotate: -2deg;
+}
+:root[data-theme='saturday-morning'] .results-shell__header::after,
+:root[data-theme='saturday-morning'] .pk-results__head::after,
+:root[data-theme='saturday-morning'] .cl-results__head::after,
+:root[data-theme='saturday-morning'] .wh-results__hero::after {
+  /* confetti burst (decorative) — a short fall, FULL fx only, never under reduced motion */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -40px;
+  height: 260px;
+  pointer-events: none;
+  background:
+    linear-gradient(#ffe14d, #ffe14d) 6% 10% / 8px 14px no-repeat,
+    linear-gradient(#2ee6e6, #2ee6e6) 18% 30% / 12px 7px no-repeat,
+    linear-gradient(#ffffff, #ffffff) 28% 6% / 7px 12px no-repeat,
+    linear-gradient(#c1f23a, #c1f23a) 40% 22% / 10px 8px no-repeat,
+    linear-gradient(#ff9a2e, #ff9a2e) 52% 4% / 8px 13px no-repeat,
+    linear-gradient(#ffe14d, #ffe14d) 63% 28% / 13px 7px no-repeat,
+    linear-gradient(#2ee6e6, #2ee6e6) 74% 12% / 7px 12px no-repeat,
+    linear-gradient(#ffffff, #ffffff) 84% 34% / 11px 7px no-repeat,
+    linear-gradient(#c1f23a, #c1f23a) 94% 8% / 8px 12px no-repeat,
+    linear-gradient(#ff4fa3, #ff4fa3) 12% 50% / 9px 9px no-repeat,
+    linear-gradient(#ffe14d, #ffe14d) 34% 44% / 7px 11px no-repeat,
+    linear-gradient(#ffffff, #ffffff) 58% 52% / 10px 7px no-repeat,
+    linear-gradient(#ff9a2e, #ff9a2e) 80% 58% / 8px 11px no-repeat;
+  opacity: 0;
+}
+:root[data-theme='saturday-morning'][data-fx='high']:not([data-reduced-motion='true']) .results-shell__header::after,
+:root[data-theme='saturday-morning'][data-fx='high']:not([data-reduced-motion='true']) .pk-results__head::after,
+:root[data-theme='saturday-morning'][data-fx='high']:not([data-reduced-motion='true']) .cl-results__head::after,
+:root[data-theme='saturday-morning'][data-fx='high']:not([data-reduced-motion='true']) .wh-results__hero::after {
+  animation: sm-confetti 2.6s cubic-bezier(0.3, 0.2, 0.6, 1) 0.15s 2 both;
+}
+@keyframes sm-confetti {
+  0% {
+    opacity: 1;
+    transform: translateY(-30px);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(160px);
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Tournament Center: The Big Championship Show
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .tc-center {
+  background: transparent;
+}
+:root[data-theme='saturday-morning'] .tc-marquee {
+  padding: 26px clamp(14px, 2vw, 26px);
+  border-radius: 24px;
+  background:
+    var(--sm-bulb) 8px 4px / 24px 10px repeat-x,
+    var(--sm-bulb) 20px calc(100% - 4px) / 24px 10px repeat-x,
+    repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.07) 0 20px, transparent 20px 40px),
+    #5430d8;
+  box-shadow: 0 0 0 4px var(--sm-ink), 8px 9px 0 4px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .tc-marquee__title {
+  font-family: var(--sm-lilita);
+  color: #ffe14d;
+  text-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .tc-marquee__kicker,
+:root[data-theme='saturday-morning'] .tc-marquee__sub {
+  font-family: var(--sm-lilita);
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+/* the cyan kicker on the violet marquee measured 3.6:1 */
+:root[data-theme='saturday-morning'] .tc-marquee__kicker {
+  color: #9ff6ff;
+}
+:root[data-theme='saturday-morning'] .tc-row,
+:root[data-theme='saturday-morning'] [data-part='tournament-card'] {
+  border: 3px solid var(--sm-ink);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .tc-chip {
+  border: 2px solid var(--sm-ink);
+  border-radius: 999px;
+  font-family: var(--sm-lilita);
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] [data-part='bracket-match'] {
+  border-radius: 12px;
+}
+
+/* ---------------------------------------------------------------------
+ * In-game chrome — CALM: outlines and hard shadows only, no motion
+ * ------------------------------------------------------------------- */
+/* Boardroom: a game-show chess match, but the board is sacred. */
+:root[data-theme='saturday-morning'] .br-board {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 4px var(--sm-ink),
+    7px 8px 0 4px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .br-clock {
+  border: 3px solid var(--sm-ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .br-clock[data-running]:not([data-low]) {
+  border-color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .br-clock:not([data-running]):not([data-low]):not([data-flagged]) {
+  background: #10083a;
+  color: #d6d2ff;
+}
+:root[data-theme='saturday-morning'] .br-card {
+  border-radius: 14px;
+}
+/* Party kit: the natural habitat. */
+:root[data-theme='saturday-morning'] .pk-prompt {
+  border: 4px solid var(--sm-ink);
+  border-radius: 22px;
+  box-shadow: 8px 9px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-prompt__text {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.01em;
+}
+:root[data-theme='saturday-morning'] .pk-answer {
+  border: 3px solid var(--sm-ink);
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-answer__letter {
+  border: 2px solid var(--sm-ink);
+  border-radius: 50%;
+  font-family: var(--sm-lilita);
+}
+:root[data-theme='saturday-morning'] .pk-podium__block {
+  border: 3px solid var(--sm-ink);
+  border-radius: 14px 14px 4px 4px;
+  background:
+    repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.1) 0 12px, transparent 12px 24px),
+    color-mix(in srgb, var(--player) 70%, #28157f);
+  box-shadow: 5px 5px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-podium__place {
+  font-family: var(--sm-lilita);
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-podium__name,
+:root[data-theme='saturday-morning'] .pk-results__title,
+:root[data-theme='saturday-morning'] .pk-interstitial__title,
+:root[data-theme='saturday-morning'] .pk-board__title,
+:root[data-theme='saturday-morning'] .pk-panel__title {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] .pk-timerbar {
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+}
+:root[data-theme='saturday-morning'] .pk-panel,
+:root[data-theme='saturday-morning'] .pk-board {
+  border: 3px solid var(--sm-ink);
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 var(--sm-ink);
+}
+/* Classics: chunky orange bezel. */
+:root[data-theme='saturday-morning'] .cl-screen {
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px var(--sm-ink),
+    0 0 0 10px #ff9a2e,
+    0 0 0 13px var(--sm-ink),
+    10px 12px 0 13px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .cl-tbtn {
+  border: 3px solid var(--sm-ink);
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+
+/* ---------------------------------------------------------------------
+ * Loading / empty / error
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] .loading-card,
+:root[data-theme='saturday-morning'] .notice-card,
+:root[data-theme='saturday-morning'] .reconnect-card {
+  border-radius: 22px;
+}
+:root[data-theme='saturday-morning'] .notice-card__title,
+:root[data-theme='saturday-morning'] .reconnect-card__title {
+  font-family: var(--sm-lilita);
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] .dc-empty__icon {
+  filter: drop-shadow(3px 3px 0 var(--sm-ink));
+}
+
+/* ---------------------------------------------------------------------
+ * Jukebox: the Music Video Booth
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'] [data-jukebox] {
+  --jb-accent: #ffe14d;
+  --jb-accent-2: #ff4fa3;
+  --jb-bg: repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.04) 0 18px, transparent 18px 36px), #28157f;
+  --jb-border: var(--sm-ink);
+  --jb-radius: 22px;
+  --jb-shadow: 0 0 0 3px var(--sm-ink), 8px 9px 0 3px var(--sm-ink);
+  --jb-blur: none;
+  --jb-font-title: var(--sm-lilita);
+  --jb-font-label: var(--sm-lilita);
+  --accent: #ffe14d;
+  --accent-2: #ff4fa3;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='header'] {
+  --text-0: #1a0b3d;
+  --text-1: #1a0b3d;
+  --text-2: #2e1a60;
+  color: #1a0b3d;
+  background: #ff4fa3;
+  border-bottom: 3px solid var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='title-bar'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='header'] h2 {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='close'] {
+  color: #1a0b3d;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='display'] {
+  position: relative;
+  border: 3px solid var(--sm-ink);
+  border-radius: 18px;
+  background:
+    radial-gradient(90% 90% at 50% 110%, rgba(255, 225, 77, 0.25), transparent 60%),
+    #10083a;
+  box-shadow: 4px 4px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='art'] {
+  border-radius: 14px;
+  box-shadow: 0 0 0 3px var(--sm-ink), 4px 4px 0 3px var(--sm-ink);
+  rotate: -3deg;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track-artist'] {
+  color: #ffe14d;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='display'] [data-part='track-title'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='display'] [data-part='track-artist'] {
+  margin-right: 76px;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='play'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='prev'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='next'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='shuffle'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='repeat'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='mute'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='mini-toggle'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='mini-next'] {
+  border: 3px solid var(--sm-ink);
+  border-radius: 50%;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='prev'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='next'] {
+  background: #2ee6e6;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='play'] {
+  background: #ffe14d;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='shuffle'][aria-pressed='true'],
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='repeat']:not([data-mode='off']) {
+  background: #c1f23a;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track'] {
+  border-radius: 12px;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track'][data-current] {
+  background: #ffe14d;
+  color: var(--sm-ink);
+  box-shadow: 0 0 0 3px var(--sm-ink);
+  --text-0: #1a0b3d;
+  --text-1: #1a0b3d;
+  --text-2: #2e1a60;
+  --jb-fg: #1a0b3d;
+  --jb-muted: #2e1a60;
+}
+/* The white-with-ink-shadow track title vanished on the yellow "now playing" row. */
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track'][data-current] .jb-track__title,
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='track'][data-current] .jb-track__artist {
+  color: var(--sm-ink);
+  text-shadow: none;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='mini'] {
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  background: #28157f;
+  box-shadow: 4px 4px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='mini-title'] {
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.02em;
+}
+:root[data-theme='saturday-morning'] [data-jukebox] [data-part='tabs'] {
+  font-family: var(--sm-lilita);
+}
+/* Booth decor (JukeboxDecor) */
+:root[data-theme='saturday-morning'] .sm-booth {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+:root[data-theme='saturday-morning'] .sm-booth__spk {
+  position: absolute;
+  top: 10px;
+  width: 26px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ff4fa3;
+  box-shadow: 0 0 0 3px var(--sm-ink);
+  opacity: 0.9;
+}
+:root[data-theme='saturday-morning'] .sm-booth__spk b {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #120833 0 3px, #ffe14d 4px 6px, #120833 7px 8px, #2ee6e6 9px);
+  box-shadow: 0 0 0 2px var(--sm-ink);
+  transform: scale(calc(1 + var(--lv) * 0.28));
+}
+:root[data-theme='saturday-morning'] .sm-booth__spk--l {
+  right: 46px;
+}
+:root[data-theme='saturday-morning'] .sm-booth__spk--r {
+  right: 14px;
+  background: #2ee6e6;
+}
+:root[data-theme='saturday-morning'] .sm-booth[data-live='true'] .sm-booth__spk {
+  transform: translateY(calc(var(--lv) * -3px)) rotate(calc(var(--lv) * 4deg));
+}
+:root[data-theme='saturday-morning'] .sm-booth__star {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 22px;
+  height: 22px;
+  background: #ffe14d;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+:root[data-theme='saturday-morning'] .sm-booth[data-live='true'] .sm-booth__star {
+  animation: sm-spin 5s linear infinite;
+}
+
+/* ---------------------------------------------------------------------
+ * Motion + effects budgets
+ * ------------------------------------------------------------------- */
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-shape,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-shape svg,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-env__burst,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-env__light,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-set__bulbs,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-set__sign,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .sm-booth__star,
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] .dc-modal[open] {
+  animation: none !important;
+}
+:root[data-theme='saturday-morning'][data-fx='off'] .sm-shape {
+  filter: none;
+}
+:root[data-theme='saturday-morning'][data-fx='off'] .sm-set__floor::after {
+  display: none;
+}
+
+/* Focus rings on this theme's pale title bars / plates: the default light ring measured < 3:1 there, so
+   controls inside them get a dark ring instead (a11y review). */
+:root[data-theme='saturday-morning'] .dc-panel__header {
+  --focus-ring: #1a0b3d;
+}
+
+/* DAS Boardroom as a game-show match: the board sits in a chunky ink-outlined set piece with a
+   marquee-bulb rim. Frame only — squares, pieces and move dots stay material-driven. */
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='chess'] [data-part='board'],
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='checkers'] [data-part='board'] {
+  box-shadow:
+    0 0 0 4px var(--sm-ink),
+    0 0 0 14px #ff4fa3,
+    0 0 0 18px var(--sm-ink),
+    10px 12px 0 18px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='chess'] [data-part='board-frame'],
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='checkers'] [data-part='board-frame'] {
+  position: relative;
+}
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='chess'] [data-part='board-frame']::after,
+:root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='checkers'] [data-part='board-frame']::after {
+  /* bulbs ride the pink rim (top + bottom rows) */
+  content: '';
+  position: absolute;
+  left: -9px;
+  right: -9px;
+  top: -13px;
+  bottom: -13px;
+  pointer-events: none;
+  background:
+    var(--sm-bulb) 4px 0 / 22px 10px repeat-x,
+    var(--sm-bulb) 15px 100% / 22px 10px repeat-x;
+}
+@media (max-width: 699px) {
+  :root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='chess'] [data-part='board'],
+  :root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='checkers'] [data-part='board'] {
+    box-shadow:
+      0 0 0 3px var(--sm-ink),
+      0 0 0 7px #ff4fa3,
+      0 0 0 9px var(--sm-ink);
+  }
+  :root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='chess'] [data-part='board-frame']::after,
+  :root[data-theme='saturday-morning'] [data-part='game-stage'][data-game='checkers'] [data-part='board-frame']::after {
+    display: none;
+  }
+}
+
+/* =====================================================================
+ * SPORTS GAMES AS A GAME SHOW — scoreboard panels with fat ink outlines and offset shadows,
+ * yellow scoreboard digits on ink tiles, chunky outlined keys and a pink buzzer for FIRE.
+ * The playfields stay calm: no frames, no confetti over play.
+ * ===================================================================== */
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-glass,
+:root[data-theme='saturday-morning'] [data-game='circuit'] .ci-glass,
+:root[data-theme='saturday-morning'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='saturday-morning'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 3px solid var(--sm-ink);
+  border-radius: 18px;
+  background: repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.045) 0 16px, transparent 16px 32px), #2a1790;
+  color: #fff;
+  box-shadow: 5px 6px 0 var(--sm-ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='saturday-morning'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='saturday-morning'] [data-game='ships'] .sh-panel--active {
+  border-color: var(--sm-ink);
+  box-shadow:
+    0 0 0 3px var(--sm-y),
+    5px 6px 0 3px var(--sm-ink);
+}
+/* Chunky outlined keys. */
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-hold {
+  border: 3px solid var(--sm-ink);
+  border-radius: 14px;
+  color: var(--sm-ink);
+  background: var(--sm-t);
+  box-shadow: 0 4px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  border-color: var(--sm-ink);
+  background: #6ff2f2;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-hold:active:not(:disabled) {
+  transform: translateY(3px);
+  background: var(--sm-t);
+  box-shadow: 0 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-weapon__current {
+  border: 3px solid var(--sm-ink);
+  border-radius: 14px;
+  background: var(--sm-v);
+  box-shadow: 0 3px 0 var(--sm-ink);
+}
+/* Scoreboard digits: yellow on ink tiles. */
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='saturday-morning'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='saturday-morning'] [data-game='circuit'] .ci-clock {
+  padding: 3px 10px 2px;
+  border-radius: 10px;
+  background: var(--sm-ink);
+  color: var(--sm-y);
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-dial__value b {
+  color: var(--sm-y);
+  text-shadow: none;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-dial__value small,
+:root[data-theme='saturday-morning'] [data-game='tanks'] .tk-dial__label {
+  color: #fff4c2;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: var(--sm-ink);
+}
+/* FIRE: the big pink buzzer. */
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire'] {
+  border: 3px solid var(--sm-ink);
+  border-radius: 50% / 48%;
+  color: #fff;
+  background:
+    radial-gradient(ellipse 55% 32% at 50% 22%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(circle at 50% 60%, #ff8fc4, #ff4fa3 50%, #c2186f);
+  box-shadow: 0 6px 0 var(--sm-ink);
+  text-shadow:
+    2px 2px 0 var(--sm-ink),
+    -1px -1px 0 var(--sm-ink),
+    1px -1px 0 var(--sm-ink),
+    -1px 1px 0 var(--sm-ink);
+  animation: none;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire'] .tk-fire__label {
+  font-family: var(--sm-lilita);
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: satm-buzzer 1.3s ease-in-out infinite;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire']:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #fff;
+  background: #6c63a8;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(18, 8, 51, 0.35);
+  text-shadow: none;
+}
+:root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint {
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: none;
+}
+@keyframes satm-buzzer {
+  50% {
+    transform: scale(1.04);
+    filter: brightness(1.1);
+  }
+}
+:root[data-theme='saturday-morning'] [data-game='putt'] .pt-dock__putt {
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--sm-ink);
+}
+/* Ships: scoreboard title pills. */
+:root[data-theme='saturday-morning'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  padding: 2px 12px 1px;
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  color: var(--sm-ink);
+  background: var(--sm-y);
+  box-shadow: 3px 3px 0 var(--sm-ink);
+  font-family: var(--sm-lilita);
+  letter-spacing: 0.03em;
+}
+:root[data-theme='saturday-morning'] [data-game='ships'] .sh-panel--incoming .sh-panel__title {
+  background: var(--sm-p);
+  color: #fff;
+  text-shadow: 1px 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  min-height: 34px;
+}
+:root[data-theme='saturday-morning'] [data-game='ships'] [data-part='board-frame'] {
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 3px var(--sm-ink),
+    4px 5px 0 3px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 3px var(--sm-ink),
+    0 0 0 6px var(--sm-y),
+    4px 5px 0 6px var(--sm-ink);
+}
+/* Circuit: the start gantry is a bulb-lit game-show sign. */
+:root[data-theme='saturday-morning'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 3px solid var(--sm-ink);
+  border-radius: 20px;
+  background: var(--sm-v);
+  box-shadow: 6px 7px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__pod {
+  border-radius: 14px;
+  background: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__title {
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  color: var(--sm-ink);
+  background: var(--sm-y);
+  font-family: var(--sm-lilita);
+}
+:root[data-theme='saturday-morning'] [data-game='circuit'] [data-part='minimap'] {
+  border: 3px solid var(--sm-ink);
+  border-radius: 18px;
+  box-shadow: 5px 6px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='circuit'] .ci-touch__btn {
+  border: 3px solid var(--sm-ink);
+  box-shadow: 0 4px 0 var(--sm-ink);
+}
+/* Desktop: a studio title card on the gunner deck / putt dock, marquee bulbs round the turn card. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='saturday-morning'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch),
+  :root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='turn'] {
+    position: relative;
+  }
+  :root[data-theme='saturday-morning'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='saturday-morning'] [data-game='putt'] [data-part='controls']::before {
+    content: 'TANK ATTACK!' / '';
+    position: absolute;
+    top: -20px;
+    right: 30px;
+    padding: 3px 16px 2px;
+    white-space: nowrap;
+    font: 400 17px/1.1 var(--sm-lilita);
+    letter-spacing: 0.04em;
+    color: var(--sm-ink);
+    background: var(--sm-y);
+    border: 3px solid var(--sm-ink);
+    border-radius: 999px;
+    box-shadow: 3px 4px 0 var(--sm-ink);
+    transform: rotate(-3deg);
+    pointer-events: none;
+  }
+  :root[data-theme='saturday-morning'] [data-game='putt'] [data-part='controls']::before {
+    content: 'PUTT-PUTT PANIC!' / '';
+    background: var(--sm-l);
+  }
+  :root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='turn'].is-mine::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+    border-radius: 24px;
+    background:
+      var(--sm-bulb) 0 0 / 14px 14px repeat-x,
+      var(--sm-bulb) 0 100% / 14px 14px repeat-x;
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  /* Keep the top bar's centre column narrow so the turn card keeps its words. */
+  :root[data-theme='saturday-morning'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+    padding: 2px;
+  }
+  :root[data-theme='saturday-morning'] [data-game='tanks'] .tk-glass,
+  :root[data-theme='saturday-morning'] [data-game='circuit'] .ci-glass,
+  :root[data-theme='saturday-morning'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+  :root[data-theme='saturday-morning'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+    border-width: 2px;
+    border-radius: 14px;
+    box-shadow: 3px 4px 0 var(--sm-ink);
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza: a LOUD Saturday-morning game show (party kit — trivia, survey, DASterpiece,
+ * DASwords, DASception). Studio set with coloured spotlights and a checkerboard floor; the
+ * question sits on a sunburst title card; answers are big contestant buzzer cards in their slot
+ * colour (letter + shape on a round buzzer). Presentation only.
+ * ===================================================================== */
+:root[data-theme='saturday-morning'] .pk-stage {
+  --pk-stage-set: none;
+  background:
+    conic-gradient(from 160deg at 6% -6%, transparent 0deg, rgba(255, 225, 77, 0.22) 12deg, transparent 26deg),
+    conic-gradient(from 176deg at 94% -6%, transparent 0deg, rgba(46, 230, 230, 0.2) 12deg, transparent 26deg),
+    conic-gradient(from 168deg at 50% -10%, transparent 0deg, rgba(255, 79, 163, 0.16) 10deg, transparent 22deg),
+    linear-gradient(180deg, transparent 78%, rgba(18, 8, 51, 0.35) 78%),
+    repeating-conic-gradient(#3a22b8 0 25%, #2a1690 0 50%) 0 100% / 48px 48px,
+    linear-gradient(180deg, #2a1896, #221590);
+}
+/* Title card: white card with a thick ink outline on a spinning-free sunburst. */
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt {
+  border: 4px solid var(--sm-ink);
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fff 50%, #fff6c8),
+    #fff;
+  box-shadow: 8px 9px 0 var(--sm-ink);
+  isolation: isolate;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt::before {
+  /* Title-card sunburst: rays fade out toward the centre so the question keeps a clean plate. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: repeating-conic-gradient(from 0deg at 50% 60%, rgba(255, 225, 77, 0.6) 0 9deg, rgba(255, 79, 163, 0.28) 9deg 18deg);
+  -webkit-mask: radial-gradient(farthest-side at 50% 55%, transparent 38%, #000 90%);
+  mask: radial-gradient(farthest-side at 50% 55%, transparent 38%, #000 90%);
+  pointer-events: none;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt__text {
+  font-family: var(--sm-lilita);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt__kicker {
+  display: inline-block;
+  padding: 4px 14px;
+  border: 3px solid var(--sm-ink);
+  border-radius: 999px;
+  background: var(--sm-y);
+  color: var(--sm-ink);
+  font-family: var(--sm-lilita);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+  transform: rotate(-2deg);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt .pk-chip {
+  border: 2px solid var(--sm-ink);
+  background: #fff;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-prompt[data-tone='final'] {
+  background: radial-gradient(120% 90% at 50% 0%, #fffbe0 40%, #ffe14d);
+}
+/* Contestant buzzer cards: solid slot colour, ink outline, hard shadow, round buzzer badge. */
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer {
+  --mat-card-ink: var(--sm-ink);
+  --pk-card-ink: var(--sm-ink);
+  border: 4px solid var(--sm-ink);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 46%),
+    color-mix(in srgb, var(--slot) 72%, #fff);
+  box-shadow: 6px 6px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__badge {
+  grid-template-columns: auto;
+  justify-items: center;
+  gap: 0;
+  min-width: 0;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 3px solid var(--sm-ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 30%, #f3f0ff 60%, #d8d2f5);
+  color: var(--sm-ink);
+  box-shadow:
+    inset 0 -4px 0 rgba(18, 8, 51, 0.18),
+    2px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__badge .pk-shape {
+  width: 12px;
+  height: 12px;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__letter {
+  border: 0;
+  border-radius: 0;
+  font-family: var(--sm-lilita);
+  font-size: 1.35rem;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__label {
+  font-family: var(--sm-lilita);
+  font-weight: 400;
+  font-size: clamp(1.1rem, 0.7vw + 0.9rem, 1.4rem);
+  letter-spacing: 0.01em;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer:hover:not(:disabled) {
+  transform: translate(-2px, -3px) rotate(-0.4deg);
+  box-shadow: 9px 10px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 1px 1px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  border-color: var(--sm-ink);
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 10px, transparent 10px 20px),
+    color-mix(in srgb, var(--slot) 88%, #fff);
+  box-shadow:
+    0 0 0 5px #fff,
+    0 0 0 9px var(--sm-ink),
+    8px 10px 0 9px rgba(18, 8, 51, 0.6);
+  transform: scale(1.015);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer[data-state='correct'] {
+  border-color: var(--sm-ink);
+  background:
+    repeating-conic-gradient(from 0deg at 12% 50%, rgba(255, 255, 255, 0.35) 0 12deg, transparent 12deg 24deg),
+    #6ef08f;
+  box-shadow:
+    0 0 0 5px var(--sm-y),
+    0 0 0 9px var(--sm-ink),
+    8px 10px 0 9px rgba(18, 8, 51, 0.6);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer[data-state='wrong'] {
+  border-color: var(--sm-ink);
+  background: repeating-linear-gradient(45deg, #ff8a8a 0 12px, #ffb0b0 12px 24px);
+  box-shadow:
+    0 0 0 5px #ff3b5c,
+    0 0 0 9px var(--sm-ink);
+  opacity: 1;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer:is([data-state='correct'], [data-state='wrong']) .pk-answer__mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--sm-ink);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer[data-state='dim'] {
+  opacity: 0.5;
+  filter: saturate(0.5);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__bar {
+  background: repeating-linear-gradient(-45deg, rgba(18, 8, 51, 0.16) 0 8px, rgba(18, 8, 51, 0.08) 8px 16px);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-answer__count {
+  font-family: var(--sm-lilita);
+  font-size: 1.6rem;
+}
+/* Vote cards: ink-outlined score cards with a colour tab. */
+:root[data-theme='saturday-morning'] .pk-stage .pk-vote {
+  border: 4px solid var(--sm-ink);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 72%, #fff) 0 12px, var(--sm-ink) 12px 15px, #fff 15px);
+  box-shadow: 6px 6px 0 var(--sm-ink);
+  padding-top: calc(var(--sp-4) + 12px);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-vote[data-picked='true'] {
+  border-color: var(--sm-ink);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--slot) 80%, #fff),
+    0 0 0 9px var(--sm-ink),
+    6px 8px 0 9px rgba(18, 8, 51, 0.6);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-vote[data-winner='true'] {
+  border-color: var(--sm-ink);
+  box-shadow:
+    0 0 0 5px var(--sm-y),
+    0 0 0 9px var(--sm-ink),
+    6px 8px 0 9px rgba(18, 8, 51, 0.6);
+}
+/* Chunky studio clock bar + scoreboard. */
+:root[data-theme='saturday-morning'] .pk-stage .pk-timerbar {
+  height: 16px;
+  border: 3px solid var(--sm-ink);
+  background: #fff;
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-timerbar__fill {
+  background: repeating-linear-gradient(-45deg, var(--sm-y) 0 10px, var(--sm-o) 10px 20px);
+  box-shadow: none;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background: repeating-linear-gradient(-45deg, #ff3b5c 0 10px, var(--sm-p) 10px 20px);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-strip {
+  border: 3px solid var(--sm-ink);
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-row {
+  border: 2px solid rgba(18, 8, 51, 0.6);
+  border-radius: 10px;
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-row.is-me {
+  border-color: var(--sm-y);
+  box-shadow: 3px 3px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage :is(.pk-row__score, .pk-strip__count, .pk-standing__score) {
+  font-family: var(--font-num);
+  color: var(--sm-y);
+  text-shadow: 2px 2px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-interstitial__icon {
+  border: 4px solid var(--sm-ink);
+  border-radius: 50%;
+  background: var(--sm-y);
+  color: var(--sm-ink);
+  box-shadow: 6px 6px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-interstitial__title {
+  font-family: var(--sm-lilita);
+  text-shadow: 4px 4px 0 var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] .pk-stage .pk-podium {
+  background:
+    conic-gradient(from 160deg at 50% -20%, transparent 0deg, rgba(255, 225, 77, 0.3) 20deg, transparent 40deg),
+    radial-gradient(60% 60% at 50% 100%, rgba(255, 225, 77, 0.3), transparent 72%);
+}
+@media (max-width: 560px) {
+  :root[data-theme='saturday-morning'] .pk-stage .pk-answer__badge {
+    width: 44px;
+    height: 44px;
+  }
+}
+/* DASterpiece: cartoon gallery — ink-outlined sunny frames and an ink placard. */
+:root[data-theme='saturday-morning'] [data-game='masterpiece'] .mp-exhibit__frame {
+  padding: 8px;
+  background:
+    repeating-linear-gradient(-45deg, var(--sm-y) 0 10px, var(--sm-p) 10px 20px);
+  filter: drop-shadow(0 0 0 var(--sm-ink)) drop-shadow(3px 0 0 var(--sm-ink)) drop-shadow(0 3px 0 var(--sm-ink)) drop-shadow(-3px 0 0 var(--sm-ink)) drop-shadow(0 -3px 0 var(--sm-ink)) drop-shadow(5px 5px 0 var(--sm-ink));
+}
+:root[data-theme='saturday-morning'] [data-game='masterpiece'] .mp-exhibit__hit {
+  box-shadow: inset 0 0 0 3px var(--sm-ink);
+}
+:root[data-theme='saturday-morning'] [data-game='masterpiece'] .mp-exhibit.is-picked .mp-exhibit__hit {
+  box-shadow: inset 0 0 0 3px var(--sm-ink), inset 0 0 0 7px var(--accent);
+}
+:root[data-theme='saturday-morning'] [data-game='masterpiece'] .mp-exhibit__text {
+  font-family: var(--sm-lilita);
+  font-weight: 400;
+}
+:root[data-theme='saturday-morning'] [data-game='masterpiece'] .mp-placard {
+  border: 4px solid var(--sm-ink);
+  border-radius: 22px;
+  box-shadow: 8px 9px 0 var(--sm-ink);
+}

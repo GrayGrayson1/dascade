@@ -112,6 +112,7 @@ export function DiceOverlay({ roll, onClose, instant = false }: { roll: QuestRol
 
   return (
     <div
+      data-part="dice"
       className="qs-roll"
       role="dialog"
       aria-modal="false"

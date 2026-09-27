@@ -94,7 +94,7 @@ export function HoldemView() {
       className={sideDock ? 'hd hd--side' : 'hd'}
       style={{ '--hd-fx': fx === 'off' ? 0 : fx === 'low' ? 0.5 : 1 } as CSSProperties}
     >
-      <div className="hd-hud">
+      <div className="hd-hud" data-part="hud">
         <div className="hd-hud__left">
           <span className="hd-hud__brand">
             <PixelIcon name="spade" /> Hold’em

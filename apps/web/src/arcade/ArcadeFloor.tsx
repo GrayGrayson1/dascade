@@ -52,6 +52,7 @@ import {
 import { Plaque, plaqueAnnouncement } from './Plaque.tsx';
 import { TournamentKiosk } from './TournamentKiosk.tsx';
 import { lastCabinet, rememberCabinet, runViewTransition } from './transition.ts';
+import { FloorDecorSlot, useArcadeRoomVisible } from '../themes/ThemeHost.tsx';
 import './arcade.css';
 
 const COUNT = CABINET_LIST.length;
@@ -108,6 +109,7 @@ function prefetchScreens(multi: boolean): void {
 export function ArcadeFloor() {
   const navigate = useNavigate();
   const reduced = useApp((s) => s.settings.reducedMotion);
+  const showRoom = useArcadeRoomVisible();
   const touch = useMedia('(hover: none)');
   const wide = useMedia('(min-width: 1280px) and (min-height: 640px)');
   const status = useServerStatus();
@@ -580,15 +582,18 @@ export function ArcadeFloor() {
       ref={mainRef}
       className={cx('af-floor', launching && 'af-floor--busy')}
       data-arcade-floor
+      data-part="arcade-floor"
       tabIndex={-1}
       style={{ '--sel': cabinet.accent.primary, '--sel-2': cabinet.accent.secondary } as CSSProperties}
     >
-      <ArcadeRoom size={roomSize} />
+      {showRoom ? <ArcadeRoom size={roomSize} /> : null}
+      <FloorDecorSlot />
       <ArcadeHeader status={status} kiosk={headerKiosk} />
 
       <section
         ref={stageRef}
         className="af-lineup"
+        data-part="carousel"
         aria-roledescription="carousel"
         aria-label="Arcade cabinets"
         data-active-cabinet={cabinet.id}
@@ -596,7 +601,13 @@ export function ArcadeFloor() {
         <p className="visually-hidden" id="lineup-help">
           Use the left and right arrow keys, Home and End to browse the cabinets. Press Enter to open the centred cabinet.
         </p>
-        <ul className="af-lineup__track" ref={trackRef} aria-describedby="lineup-help" onKeyDown={onTrackKeyDown}>
+        <ul
+          className="af-lineup__track"
+          data-part="carousel-track"
+          ref={trackRef}
+          aria-describedby="lineup-help"
+          onKeyDown={onTrackKeyDown}
+        >
           {CABINET_LIST.map((c, i) => (
             <Cabinet
               key={c.id}
@@ -622,6 +633,7 @@ export function ArcadeFloor() {
           label="Previous cabinet"
           variant="secondary"
           className="af-lineup__arrow af-lineup__arrow--prev"
+          data-part="carousel-arrow"
           disabled={index <= 0}
           onClick={() => goTo(target.current - 1)}
         />
@@ -630,19 +642,20 @@ export function ArcadeFloor() {
           label="Next cabinet"
           variant="secondary"
           className="af-lineup__arrow af-lineup__arrow--next"
+          data-part="carousel-arrow"
           disabled={index >= COUNT - 1}
           onClick={() => goTo(target.current + 1)}
         />
-        <div className="af-lineup__pager" aria-hidden>
+        <div className="af-lineup__pager" data-part="carousel-pager" aria-hidden>
           {CABINET_LIST.map((c, i) => (
             <i key={c.id} data-on={i === index ? 'true' : undefined} style={{ '--dot': c.accent.primary } as CSSProperties} />
           ))}
         </div>
       </section>
 
-      <div className="af-floor__plaque-wrap">
+      <div className="af-floor__plaque-wrap" data-part="plaque-wrap">
         <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} />
-        <div className="af-floor__extras">
+        <div className="af-floor__extras" data-part="floor-extras">
           {wide ? null : <TournamentKiosk variant="strip" />}
           <Button
             variant="ghost"

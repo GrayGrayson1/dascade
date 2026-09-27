@@ -39,6 +39,7 @@ import {
   classicSfx,
   formatScore,
   useCanvasSurface,
+  useLiveMaterials,
   useFixedLoop,
   useMyStanding,
   usePersonalBest,
@@ -135,6 +136,7 @@ export function AsteroidsGame() {
   const surface = useCanvasSurface(screenRef, canvasRef, portrait ? WORLD.height : WORLD.width, portrait ? WORLD.width : WORLD.height);
   const net = useMemo(() => new AsteroidsNet(), []);
   const renderer = useMemo(() => new BeltRenderer(), []);
+  useLiveMaterials(screenRef, (m) => renderer.setMaterials(m));
   const input = useMemo(() => new IntentInput<Intent>(INTENTS), []);
   const stickRef = useRef<StickState>({ active: false, x: 0, y: 0, mag: 0 });
   const looksRef = useRef(new Map<number, PilotLook>());

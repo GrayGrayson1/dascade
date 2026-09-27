@@ -4,9 +4,12 @@
  * ===================================================================== */
 
 .sh {
-  --sh-sea-1: #062846;
-  --sh-sea-2: #03172a;
-  --sh-sea-3: #020d19;
+  /* Playfield water follows the theme's sea materials; the fallbacks are DAS Ships' own neon sea. */
+  --sh-sea-1: var(--mat-water, #062846);
+  --sh-sea-2: var(--mat-water-deep, #03172a);
+  --sh-sea-3: var(--mat-water-deep, #020d19);
+  --sh-grid-rgb: var(--mat-grid-line, rgb(125, 211, 252));
+  --sh-radar: var(--mat-radar, var(--accent));
   --sh-rim: color-mix(in srgb, var(--accent) 45%, transparent);
   --sh-rim-soft: color-mix(in srgb, var(--accent) 18%, transparent);
   --sh-incoming: var(--accent-2);
@@ -147,8 +150,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    repeating-linear-gradient(115deg, transparent 0 18px, rgba(160, 230, 255, 0.035) 18px 20px),
-    repeating-linear-gradient(65deg, transparent 0 26px, rgba(160, 230, 255, 0.025) 26px 28px);
+    repeating-linear-gradient(115deg, transparent 0 18px, var(--sh-caustic-1, rgba(160, 230, 255, 0.035)) 18px 20px),
+    repeating-linear-gradient(65deg, transparent 0 26px, var(--sh-caustic-2, rgba(160, 230, 255, 0.025)) 26px 28px);
   opacity: var(--sh-glow, 1);
 }
 .sh-board.is-active .sh-board__sea {
@@ -158,7 +161,19 @@
     inset 0 0 36px rgba(0, 0, 0, 0.5);
 }
 .sh-board--own .sh-board__sea {
-  --sh-sea-1: #07243b;
+  --sh-sea-1: var(--mat-water, #07243b);
+}
+/* Themes tint the caustic shimmer with their grid-line material (Delta Neon keeps the literal above). */
+:root[data-theme]:not([data-theme='delta-neon']) .sh {
+  --sh-caustic-1: color-mix(in srgb, var(--sh-grid-rgb) 4%, transparent);
+  --sh-caustic-2: color-mix(in srgb, var(--sh-grid-rgb) 3%, transparent);
+}
+/* Grid lines (SVG): the theme's gridLine at the game's own low alpha. */
+.sh-grid-lines {
+  stroke: color-mix(in srgb, var(--sh-grid-rgb) 16%, transparent);
+}
+.sh-grid-edge {
+  stroke: color-mix(in srgb, var(--sh-grid-rgb) 30%, transparent);
 }
 .sh-board__art,
 .sh-board__marks {
@@ -230,8 +245,8 @@
   background: conic-gradient(
     from 0deg,
     transparent 0deg 290deg,
-    color-mix(in srgb, var(--accent) 18%, transparent) 352deg,
-    color-mix(in srgb, var(--accent) 34%, transparent) 359deg,
+    color-mix(in srgb, var(--sh-radar) 18%, transparent) 352deg,
+    color-mix(in srgb, var(--sh-radar) 34%, transparent) 359deg,
     transparent 360deg
   );
   mix-blend-mode: screen;
@@ -268,6 +283,14 @@
 }
 .sh-mark--miss.is-new > rect {
   animation: sh-fade-in 0.4s ease-out both;
+}
+/* Themed seas can be lighter than the neon default: a thin dark keyline keeps splash / burst
+ * markers readable on any water (Delta Neon keeps its original look). */
+:root[data-theme]:not([data-theme='delta-neon']) .sh-mark--miss {
+  filter: drop-shadow(0 0 0.6px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 0.6px rgba(0, 0, 0, 0.9));
+}
+:root[data-theme]:not([data-theme='delta-neon']) .sh-mark--hit {
+  filter: drop-shadow(0 0 0.8px rgba(0, 0, 0, 0.85));
 }
 @keyframes sh-ripple {
   from {

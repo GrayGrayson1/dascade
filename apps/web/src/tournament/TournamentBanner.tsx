@@ -36,13 +36,11 @@ export function TournamentBannerView({ info, compact }: { info: TournamentMatchI
   if (info.seriesStatus === 'waiting') {
     const missing = info.participants.filter((p) => !p.playerId);
     status = missing.length === 1 ? `Waiting for ${missing[0]!.name} to join` : 'Waiting for both players';
-  }
-  else if (info.seriesStatus === 'intermission') {
+  } else if (info.seriesStatus === 'intermission') {
     // Only games with sides (chess colours, first shot, first serve…) swap them between games.
     const sided = info.participants.some((p) => p.side);
     status = nextIn > 0 ? `Next game in ${Math.ceil(nextIn / 1000)}s${sided ? ' · sides swap' : ''}` : 'Next game starting…';
-  }
-  else if (info.seriesStatus === 'decided')
+  } else if (info.seriesStatus === 'decided')
     status = winner
       ? `${winner.name} wins the match${info.result?.note ? ` · ${info.result.note}` : ''}`
       : `Drawn match${info.result?.note ? ` · ${info.result.note}` : ''}`;
@@ -66,7 +64,13 @@ export function TournamentBannerView({ info, compact }: { info: TournamentMatchI
   useReserveTopSpace(ref, compact);
 
   return (
-    <aside ref={ref} className={cx('tb', compact && 'tb--compact')} data-over={over || undefined} aria-label="Tournament match">
+    <aside
+      ref={ref}
+      className={cx('tb', compact && 'tb--compact')}
+      data-part="tournament-banner"
+      data-over={over || undefined}
+      aria-label="Tournament match"
+    >
       <span className="tb__tag">
         <PixelIcon name="trophy" /> <span className="tb__tag-text">Tournament</span>
       </span>

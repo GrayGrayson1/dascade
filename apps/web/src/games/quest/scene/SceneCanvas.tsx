@@ -5,12 +5,13 @@
  * bloom scale with the visual-effects setting.
  */
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { cx } from '@dascade/ui';
+import { cx, readThemeTokens, subscribeThemeTokens } from '@dascade/ui';
 import { QUEST_THEMES, type QuestThemeId } from '@dascade/shared/games/quest';
 import { useApp } from '../../../app/store.ts';
 import { H, W, type Paint } from './pixel.ts';
 import { THEMES, THEME_TINT, paintFallback } from './themes.ts';
 import { PROPS } from './props.ts';
+import { createSceneGrade, installGrade, sceneEffects, sceneTint, type SceneGrade } from '../themeAdapter.ts';
 
 function seedOf(key: string): number {
   let h = 2166136261;
@@ -64,6 +65,25 @@ export function SceneCanvas({ theme, art = [], seed, label, className, children 
       pointer.y = 0;
     };
     const start = performance.now();
+    // Theme adapter: every colour goes through the current theme's scene grade (null under
+    // Delta Neon = authored colours). A theme switch re-reads it in place: no restart, same clock.
+    const baseTint = safeTheme ? THEME_TINT[safeTheme] : '#a3e635';
+    let grade: SceneGrade | null = null;
+    const readTheme = () => {
+      const t = readThemeTokens(wrap);
+      grade = createSceneGrade(t.materials);
+      const tint = sceneTint(t.materials, baseTint);
+      if (tint === baseTint) wrap.style.removeProperty('--qs-mat-tint');
+      else wrap.style.setProperty('--qs-mat-tint', tint);
+      const e = sceneEffects(t.materials, t.effects, t.fx);
+      wrap.toggleAttribute('data-quest-mat', grade !== null);
+      if (e.crt > 0) wrap.style.setProperty('--qs-crt', String(e.crt));
+      else wrap.style.removeProperty('--qs-crt');
+      if (e.grain > 0) wrap.style.setProperty('--qs-grain', String(e.grain));
+      else wrap.style.removeProperty('--qs-grain');
+    };
+    readTheme();
+    const uninstall = [installGrade(g, () => grade), installGrade(glow, () => grade)];
     const paint = (now: number) => {
       const t = motion ? Math.max(0, now - start) / 1000 : 2.4;
       pointer.sx += (pointer.x - pointer.sx) * 0.08;
@@ -76,7 +96,15 @@ export function SceneCanvas({ theme, art = [], seed, label, className, children 
       for (const id of props) PROPS[id]?.(p);
     };
     paint(performance.now());
-    if (!motion) return;
+    const offTheme = subscribeThemeTokens(() => {
+      readTheme();
+      if (!motion) paint(performance.now());
+    });
+    const disposeTheme = () => {
+      offTheme();
+      for (const u of uninstall) u();
+    };
+    if (!motion) return disposeTheme;
 
     let raf = 0;
     let last = 0;
@@ -93,6 +121,7 @@ export function SceneCanvas({ theme, art = [], seed, label, className, children 
     const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => (visible = entries.some((e) => e.isIntersecting))) : null;
     io?.observe(wrap);
     return () => {
+      disposeTheme();
       cancelAnimationFrame(raf);
       io?.disconnect();
       wrap.removeEventListener('pointermove', onMove);
@@ -107,11 +136,13 @@ export function SceneCanvas({ theme, art = [], seed, label, className, children 
       role="img"
       aria-label={label}
       data-theme={theme}
+      data-part="scene"
       style={{ '--tint': safeTheme ? THEME_TINT[safeTheme] : '#a3e635' } as CSSProperties}
     >
       <canvas ref={pixRef} width={W} height={H} className="qs-scene__px" />
       <canvas ref={glowRef} width={W} height={H} className="qs-scene__glow" aria-hidden />
       <span className="qs-scene__vignette" aria-hidden />
+      <span className="qs-scene__fx" aria-hidden />
       {children}
     </div>
   );

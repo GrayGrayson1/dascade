@@ -42,6 +42,28 @@
   background: rgba(8, 9, 22, 0.9);
 }
 
+/* Themed HUD chrome: every theme except Delta Neon (whose hand-tuned glass above stays exact)
+   frames the HUD with the shared --hud-* tokens, so skins restyle it like the rest of the app. */
+:root[data-theme]:not([data-theme='delta-neon']) .ci-glass {
+  background: var(--hud-bg);
+  border: var(--panel-border-width, 1px) solid var(--hud-border);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: var(--hud-blur);
+  -webkit-backdrop-filter: var(--hud-blur);
+}
+:root[data-theme]:not([data-theme='delta-neon'])[data-fx='off'] .ci-glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--hud-bg-strong);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .ci-minimap {
+  background: var(--mat-screen, var(--hud-bg-strong));
+  border: var(--panel-border-width, 1px) solid var(--hud-border);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-shadow);
+}
+
 /* ---------- HUD root ---------- */
 .ci-hud {
   position: absolute;

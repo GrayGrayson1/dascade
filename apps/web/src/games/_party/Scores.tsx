@@ -133,7 +133,7 @@ export function Leaderboard({
   }, [rows]);
 
   return (
-    <section className={cx('pk-board', dense && 'pk-board--dense', className)} aria-label={title}>
+    <section className={cx('pk-board', dense && 'pk-board--dense', className)} data-part="leaderboard" aria-label={title}>
       <h3 className="pk-board__title">
         <PixelIcon name="trophy" size={14} /> {title}
       </h3>
@@ -218,7 +218,7 @@ export function TeamBoard({
   const max = Math.max(1, ...list.map((t) => Math.abs(t.score)));
   if (list.length === 0) return null;
   return (
-    <section className="pk-teamboard" aria-label={title}>
+    <section className="pk-teamboard" data-part="leaderboard" aria-label={title}>
       <h3 className="pk-board__title">
         <PixelIcon name="users" size={14} /> {title}
         {scoring ? <span className="pk-teamboard__mode">{scoring === 'average' ? 'average per player' : 'total points'}</span> : null}

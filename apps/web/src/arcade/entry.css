@@ -9,7 +9,7 @@
   isolation: isolate;
   min-height: 100dvh;
   color: var(--af-ink-0);
-  background: color-mix(in srgb, var(--accent-deep) 55%, #05040b);
+  background: var(--entry-backdrop, color-mix(in srgb, var(--accent-deep) 55%, #05040b));
 }
 
 /* ---------- Screen (background) ---------- */
@@ -18,9 +18,11 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
+  background: var(
+    --entry-backdrop,
     radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 70%, #0b0918), #040309);
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 70%, #0b0918), #040309)
+  );
 }
 .af-entry__screen {
   position: absolute;

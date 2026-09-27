@@ -1,0 +1,1329 @@
+/* =====================================================================
+ * Cyber Café 2001 — structural skin.
+ * Y2K broadband optimism: CRT-blue glass, translucent blue plastic panels,
+ * brushed-chrome title bars, bulbous aqua/lime gel buttons, glowing LEDs,
+ * ping bars and a café network behind everything.
+ * Every rule is scoped under :root[data-theme='cyber-cafe-01'].
+ * ===================================================================== */
+
+/* ---------- Environment ---------- */
+:root[data-theme='cyber-cafe-01'] .cc-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 60% at 50% -8%, rgba(62, 224, 255, 0.22), transparent 62%),
+    radial-gradient(60% 50% at 100% 100%, rgba(125, 255, 74, 0.07), transparent 70%),
+    linear-gradient(180deg, #0b3c80 0%, #072c63 38%, #041c44 70%, #031530 100%);
+}
+:root[data-theme='cyber-cafe-01'] .cc-env__canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+:root[data-theme='cyber-cafe-01'] .cc-env__glass {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 10, 30, 0.16) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 90% 80% at 50% 45%, transparent 60%, rgba(0, 6, 22, 0.55) 100%);
+  opacity: 0.8;
+}
+:root[data-theme='cyber-cafe-01'][data-fx='off'] .cc-env__glass {
+  background: radial-gradient(ellipse 90% 80% at 50% 45%, transparent 60%, rgba(0, 6, 22, 0.55) 100%);
+}
+
+/* ---------- Scrollbars / selection ---------- */
+:root[data-theme='cyber-cafe-01'] {
+  scrollbar-color: #7f9bb8 #041a3c;
+}
+:root[data-theme='cyber-cafe-01'] ::selection {
+  background: rgba(62, 224, 255, 0.4);
+  color: #fff;
+}
+
+/* ---------- Buttons: bulbous gel pills ---------- */
+:root[data-theme='cyber-cafe-01'] .dc-btn:not(.dc-btn--ghost) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.2) 46%, rgba(255, 255, 255, 0) 52%),
+    radial-gradient(90% 60% at 50% 100%, rgba(255, 255, 255, 0.35), transparent 70%),
+    linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -3px 5px rgba(0, 30, 70, 0.22),
+    0 3px 6px rgba(0, 10, 30, 0.35),
+    0 0 18px var(--btn-glow);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] .dc-btn--danger:not(.dc-btn--ghost),
+:root[data-theme='cyber-cafe-01'] .dc-btn--success:not(.dc-btn--ghost) {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+:root[data-theme='cyber-cafe-01'] .dc-btn--ghost {
+  --btn-fg: var(--text-0);
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(120, 210, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(170, 225, 255, 0.35);
+}
+:root[data-theme='cyber-cafe-01'] .dc-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* ---------- Panels: translucent plastic with a chrome title strip ---------- */
+:root[data-theme='cyber-cafe-01'] .dc-panel__header {
+  border-radius: calc(var(--panel-radius) - 1px) calc(var(--panel-radius) - 1px) 0 0;
+  border-bottom-color: rgba(60, 90, 130, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  color: var(--titlebar-fg);
+}
+:root[data-theme='cyber-cafe-01'] .dc-panel__title::before {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #eaffd8, var(--titlebar-marker, #7dff4a) 45%, #2f8f10 100%);
+  box-shadow: 0 0 6px rgba(125, 255, 74, 0.8);
+}
+:root[data-theme='cyber-cafe-01'][data-fx='off'] .dc-panel__title::before {
+  box-shadow: none;
+}
+:root[data-theme='cyber-cafe-01'] .dc-panel__header .dc-btn--ghost {
+  --btn-fg: #0b2548;
+}
+:root[data-theme='cyber-cafe-01'] .dc-panel__header .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(11, 37, 72, 0.1);
+}
+
+/* Dialogs: a frosted "application window". */
+:root[data-theme='cyber-cafe-01'] [data-part='dialog-frame'] {
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 1px rgba(2, 16, 40, 0.6),
+    0 0 0 5px rgba(170, 200, 225, 0.18),
+    0 30px 80px rgba(0, 8, 26, 0.65);
+}
+
+/* Inputs: recessed CRT glass. */
+:root[data-theme='cyber-cafe-01'] .dc-input,
+:root[data-theme='cyber-cafe-01'] .dc-select,
+:root[data-theme='cyber-cafe-01'] .dc-textarea {
+  background:
+    linear-gradient(180deg, rgba(0, 10, 30, 0.35), transparent 40%),
+    var(--input-bg);
+}
+
+/* Segmented controls / tabs: chrome rails with a gel "on" state. */
+:root[data-theme='cyber-cafe-01'] .dc-segmented {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(2, 16, 40, 0.8), rgba(8, 36, 80, 0.7));
+  box-shadow: inset 0 2px 4px rgba(0, 8, 24, 0.55), 0 1px 0 rgba(170, 225, 255, 0.2);
+}
+:root[data-theme='cyber-cafe-01'] .dc-segmented__item {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .dc-segmented__item[aria-checked='true'],
+:root[data-theme='cyber-cafe-01'] .dc-segmented__item[aria-selected='true'] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.15) 48%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, #a8f4ff, #0aa3e0);
+  color: #021a30;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 0 1px #05608c, 0 0 12px rgba(62, 224, 255, 0.35);
+}
+:root[data-theme='cyber-cafe-01'] .dc-tab[aria-selected='true']::after {
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(62, 224, 255, 0.7);
+}
+
+/* Toggles: a glossy capsule. */
+:root[data-theme='cyber-cafe-01'] .dc-toggle__track {
+  border-radius: 999px;
+  box-shadow: inset 0 2px 3px rgba(0, 8, 24, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] .dc-toggle__thumb {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c9d6e3 55%, #8ea5bc 100%);
+  box-shadow: 0 1px 2px rgba(0, 10, 30, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .dc-slider::-webkit-slider-thumb {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c9d6e3 55%, #8ea5bc 100%);
+}
+:root[data-theme='cyber-cafe-01'] .dc-slider::-moz-range-thumb {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c9d6e3 55%, #8ea5bc 100%);
+}
+:root[data-theme='cyber-cafe-01'] .dc-progress {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Badges: little plastic tags. */
+:root[data-theme='cyber-cafe-01'] .dc-badge {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .dc-kbd {
+  border-radius: 6px;
+  background: linear-gradient(180deg, #eef4fa, #b8c9da);
+  color: #0a2244;
+  border-color: #6b87a6;
+}
+
+/* Toasts: an instant-message pop-up with a status LED. */
+:root[data-theme='cyber-cafe-01'] .dc-toast {
+  border-radius: 14px;
+  border: 1px solid rgba(170, 225, 255, 0.45);
+}
+
+/* ---------- Top bar (in rooms): a chrome device strip ---------- */
+:root[data-theme='cyber-cafe-01'] .topbar {
+  box-shadow: inset 0 1px 0 rgba(190, 235, 255, 0.28), inset 0 -1px 0 rgba(0, 10, 30, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .topbar::after {
+  height: 2px;
+  bottom: -2px;
+  opacity: 0.9;
+}
+:root[data-theme='cyber-cafe-01'] .code-chip {
+  border-radius: 999px;
+  border-style: solid;
+  border-color: rgba(170, 225, 255, 0.45);
+  background: linear-gradient(180deg, rgba(0, 10, 30, 0.6), rgba(6, 34, 78, 0.6));
+  box-shadow: inset 0 2px 3px rgba(0, 8, 24, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .conn-dot {
+  border-radius: 999px;
+}
+
+/* ---------- Arcade floor ---------- */
+:root[data-theme='cyber-cafe-01'] .af-hud {
+  background: linear-gradient(180deg, rgba(3, 20, 50, 0.85), rgba(3, 20, 50, 0.5) 62%, rgba(3, 20, 50, 0));
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__word {
+  filter: drop-shadow(0 0 4px rgba(62, 224, 255, 0.8)) drop-shadow(0 0 14px rgba(62, 224, 255, 0.35));
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__word path:nth-child(1) {
+  stroke: #3ee0ff;
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__word path:nth-child(2) {
+  stroke: #7fe9ff;
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__word path:nth-child(3) {
+  stroke: #ffffff;
+}
+:root[data-theme='cyber-cafe-01'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__sub {
+  color: #9ef0ff;
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__badge {
+  color: #7dff4a;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: rgba(2, 16, 40, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #7dff4a;
+  box-shadow: 0 0 6px #7dff4a;
+  vertical-align: 1px;
+}
+:root[data-theme='cyber-cafe-01'] .af-hud__profile {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(16, 64, 132, 0.85), rgba(4, 28, 66, 0.88));
+  border-color: rgba(170, 225, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+:root[data-theme='cyber-cafe-01'] .af-srv {
+  border-radius: 999px;
+}
+
+/* Tournament kiosk: a blue LCD news ticker instead of a gold marquee. */
+:root[data-theme='cyber-cafe-01'] .af-kiosk {
+  --k-led: #9ef2ff;
+  --k-led-2: #7dff4a;
+  border-radius: 12px;
+  border-color: rgba(170, 225, 255, 0.5);
+  background:
+    radial-gradient(circle, rgba(62, 224, 255, 0.12) 0 1px, transparent 1.5px) 0 0 / 4px 4px,
+    linear-gradient(180deg, #03183a, #01091c);
+  box-shadow:
+    inset 0 0 0 2px #010816,
+    inset 0 0 18px rgba(62, 224, 255, 0.1),
+    0 0 0 3px rgba(170, 200, 225, 0.35),
+    0 8px 22px rgba(0, 8, 28, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .af-kiosk:hover {
+  box-shadow:
+    inset 0 0 0 2px #010816,
+    inset 0 0 22px rgba(62, 224, 255, 0.16),
+    0 0 0 3px rgba(190, 225, 250, 0.55),
+    0 0 26px rgba(62, 224, 255, 0.3),
+    0 8px 22px rgba(0, 8, 28, 0.5);
+}
+
+/* Plaque: a translucent plastic console with a chrome lip. */
+:root[data-theme='cyber-cafe-01'] .af-plaque {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 30%, transparent 50%),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(14, 60, 126, 0.9), rgba(4, 26, 62, 0.94));
+  border: 1px solid rgba(170, 225, 255, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 0 rgba(0, 10, 30, 0.35),
+    0 0 0 4px rgba(160, 190, 220, 0.16),
+    0 0 26px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 22px 50px rgba(0, 8, 28, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] .af-plaque {
+  /* the plaque's blue glass + accent tint: lighter inks keep the kicker and count ≥ 4.5:1 */
+  --af-ink-2: #c3d9f0;
+}
+:root[data-theme='cyber-cafe-01'] .af-plaque__kicker {
+  color: color-mix(in srgb, var(--accent) 45%, #ffffff);
+}
+:root[data-theme='cyber-cafe-01'] .af-plaque::before,
+:root[data-theme='cyber-cafe-01'] .af-plaque::after {
+  display: none;
+}
+:root[data-theme='cyber-cafe-01'] .af-plaque__games > *,
+:root[data-theme='cyber-cafe-01'] .af-plaque__badges > * {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .af-lineup__arrow {
+  border-radius: 50%;
+}
+:root[data-theme='cyber-cafe-01'] .af-cab__plate {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .af-foot {
+  color: #a0c4e2;
+}
+
+/* ---------- Title screen (cabinet entry) ---------- */
+:root[data-theme='cyber-cafe-01'] .af-entry__bg {
+  background: rgba(3, 21, 48, 0.35);
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__screen {
+  border-radius: 26px;
+  box-shadow:
+    0 0 0 1px rgba(190, 235, 255, 0.35),
+    0 0 0 6px rgba(150, 180, 210, 0.28),
+    0 0 0 7px rgba(2, 16, 40, 0.7),
+    0 0 60px rgba(62, 224, 255, 0.22);
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__scrim {
+  background:
+    linear-gradient(90deg, rgba(3, 22, 52, 0.94) 0%, rgba(3, 22, 52, 0.84) 44%, rgba(3, 22, 52, 0.5) 72%, rgba(3, 22, 52, 0.6) 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 6, 22, 0.55) 100%);
+}
+@media (max-width: 900px) {
+  :root[data-theme='cyber-cafe-01'] .af-entry__scrim {
+    background:
+      linear-gradient(180deg, rgba(3, 22, 52, 0.55) 0%, rgba(3, 22, 52, 0.84) 30%, rgba(3, 22, 52, 0.92) 100%),
+      radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 6, 22, 0.55) 100%);
+  }
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__scan {
+  background: repeating-linear-gradient(180deg, rgba(0, 20, 50, 0.3) 0 1px, transparent 1px 3px);
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__card {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(14, 58, 122, 0.92), rgba(4, 26, 62, 0.95));
+  border-color: rgba(170, 225, 255, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 4px rgba(160, 190, 220, 0.16),
+    0 0 36px rgba(62, 224, 255, 0.16),
+    0 30px 70px rgba(0, 8, 28, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__card::before,
+:root[data-theme='cyber-cafe-01'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__card-head {
+  border-radius: 17px 17px 0 0;
+  background: linear-gradient(180deg, #f6f9fc 0%, #d7e2ec 44%, #b3c4d5 50%, #c8d5e2 78%, #e4ecf3 100%);
+  color: #0b2548;
+  box-shadow: inset 0 1px 0 #fff;
+  --af-ink-0: #0b2548;
+  --af-ink-1: #1c3a60;
+  --af-ink-2: #2e4d73;
+}
+/* The light card head: the game-accent credit ('1P') would be accent-on-pale; use the head's ink. */
+:root[data-theme='cyber-cafe-01'] .af-entry__card-head .af-entry__credit {
+  color: var(--af-ink-1);
+}
+:root[data-theme='cyber-cafe-01'] .af-entry__marquee,
+:root[data-theme='cyber-cafe-01'] .cp__marquee {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #d9e4ee, #8ea5bc);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 1px #4d6a8a,
+    0 0 30px rgba(62, 224, 255, 0.3),
+    0 10px 30px rgba(0, 8, 28, 0.5);
+}
+
+/* ---------- Cabinet picker ---------- */
+:root[data-theme='cyber-cafe-01'] .cp {
+  background: transparent;
+}
+:root[data-theme='cyber-cafe-01'] .cpb {
+  background: rgba(3, 21, 48, 0.3);
+}
+:root[data-theme='cyber-cafe-01'] .cpb > :not(.cpb__vignette) {
+  display: none;
+}
+:root[data-theme='cyber-cafe-01'] .cp-item {
+  border-radius: 14px;
+  border-left-width: 1px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 40%),
+    linear-gradient(90deg, color-mix(in srgb, var(--ip) 14%, rgba(10, 46, 100, 0.9)), rgba(5, 28, 66, 0.9));
+  border-color: rgba(170, 225, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 26px rgba(0, 8, 28, 0.4);
+}
+:root[data-theme='cyber-cafe-01'] .cp-item:hover,
+:root[data-theme='cyber-cafe-01'] .cp-item.is-selected {
+  border-color: rgba(62, 224, 255, 0.75);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 40%),
+    linear-gradient(90deg, color-mix(in srgb, var(--ip) 22%, rgba(14, 60, 126, 0.95)), rgba(6, 34, 78, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 1px rgba(62, 224, 255, 0.35),
+    0 0 24px rgba(62, 224, 255, 0.22),
+    0 12px 28px rgba(0, 8, 28, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] .cp-item__screen,
+:root[data-theme='cyber-cafe-01'] .cp-screen {
+  border-radius: 10px;
+}
+:root[data-theme='cyber-cafe-01'] .cp__tourney {
+  color: #9ef2ff;
+  border-radius: 999px;
+  border-color: rgba(170, 225, 255, 0.5);
+  background:
+    radial-gradient(circle, rgba(62, 224, 255, 0.1) 0 1px, transparent 1.5px) 0 0 / 4px 4px,
+    linear-gradient(180deg, #03183a, #01091c);
+  text-shadow: 0 0 6px rgba(62, 224, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(160, 190, 220, 0.25);
+}
+
+/* Desktop preview: a chrome-framed CRT monitor. */
+:root[data-theme='cyber-cafe-01'] .cp__preview {
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 24%),
+    linear-gradient(180deg, rgba(14, 58, 122, 0.92), rgba(4, 26, 62, 0.95));
+  border-color: rgba(170, 225, 255, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 4px rgba(160, 190, 220, 0.16),
+    0 0 40px rgba(62, 224, 255, 0.14),
+    0 24px 60px rgba(0, 8, 28, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] .cp-screen {
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px #010816,
+    0 0 0 7px #9fb4c8,
+    0 0 0 8px #4d6a8a,
+    0 0 30px rgba(62, 224, 255, 0.25);
+}
+
+/* ---------- Lobby / room ---------- */
+:root[data-theme='cyber-cafe-01'] .lobby-code__value span {
+  border-radius: 10px;
+  border: 1px solid rgba(170, 225, 255, 0.5);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 45%),
+    linear-gradient(180deg, #03183a, #010a1e);
+  color: #9ef2ff;
+  text-shadow: 0 0 10px rgba(62, 224, 255, 0.7);
+  box-shadow:
+    inset 0 0 0 2px #010816,
+    inset 0 0 14px rgba(62, 224, 255, 0.12),
+    0 0 0 3px rgba(160, 190, 220, 0.25);
+}
+:root[data-theme='cyber-cafe-01'][data-fx='off'] .lobby-code__value span {
+  text-shadow: none;
+}
+:root[data-theme='cyber-cafe-01'] .lobby-status__item {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .seat-meter {
+  border-radius: 999px;
+  overflow: hidden;
+}
+/* Player rows: a user session on the café LAN — link LED + ping bars. */
+:root[data-theme='cyber-cafe-01'] .player-list__item {
+  border-radius: 12px;
+  padding-right: 34px;
+  background: linear-gradient(180deg, rgba(160, 220, 255, 0.08), rgba(160, 220, 255, 0.02));
+  border-color: rgba(150, 215, 255, 0.22);
+}
+:root[data-theme='cyber-cafe-01'] .player-list__item.is-me::before {
+  border-radius: 3px;
+}
+:root[data-theme='cyber-cafe-01'] .player-list__item::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 16px;
+  height: 12px;
+  margin-top: -6px;
+  background:
+    linear-gradient(#7dff4a, #7dff4a) 0 100% / 3px 4px no-repeat,
+    linear-gradient(#7dff4a, #7dff4a) 4px 100% / 3px 7px no-repeat,
+    linear-gradient(#7dff4a, #7dff4a) 8px 100% / 3px 10px no-repeat,
+    linear-gradient(rgba(125, 255, 74, 0.3), rgba(125, 255, 74, 0.3)) 12px 100% / 3px 12px no-repeat;
+  filter: drop-shadow(0 0 3px rgba(125, 255, 74, 0.6));
+}
+:root[data-theme='cyber-cafe-01'] .player-list__item.is-away::after {
+  background:
+    linear-gradient(#ff5f6d, #ff5f6d) 0 100% / 3px 4px no-repeat,
+    linear-gradient(rgba(255, 95, 109, 0.3), rgba(255, 95, 109, 0.3)) 4px 100% / 3px 7px no-repeat,
+    linear-gradient(rgba(255, 95, 109, 0.3), rgba(255, 95, 109, 0.3)) 8px 100% / 3px 10px no-repeat,
+    linear-gradient(rgba(255, 95, 109, 0.3), rgba(255, 95, 109, 0.3)) 12px 100% / 3px 12px no-repeat;
+  filter: none;
+}
+:root[data-theme='cyber-cafe-01'] .player-list__open-slot,
+:root[data-theme='cyber-cafe-01'] .player-list__open {
+  border-radius: 12px;
+}
+:root[data-theme='cyber-cafe-01'] .player-list__open::after,
+:root[data-theme='cyber-cafe-01'] .player-list__open-slot::after {
+  display: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme='cyber-cafe-01']:not([data-reduced-motion='true']):not([data-fx='off']) .player-list__item {
+    animation: cc-login 700ms var(--ease-out) both;
+  }
+}
+@keyframes cc-login {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+    box-shadow: 0 0 0 1px rgba(62, 224, 255, 0.9), 0 0 22px rgba(62, 224, 255, 0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: none;
+    box-shadow: 0 0 0 1px rgba(62, 224, 255, 0.6), 0 0 14px rgba(62, 224, 255, 0.3);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+:root[data-theme='cyber-cafe-01'] .ready-pill {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .chat__msg {
+  border-radius: 10px;
+}
+:root[data-theme='cyber-cafe-01'] .lobby__actions {
+  box-shadow: inset 0 1px 0 rgba(190, 235, 255, 0.25), 0 -10px 30px rgba(0, 8, 28, 0.45);
+}
+
+/* Results / notices / loading */
+:root[data-theme='cyber-cafe-01'] .results-shell__icon,
+:root[data-theme='cyber-cafe-01'] .notice-card__icon {
+  filter: drop-shadow(0 0 10px rgba(62, 224, 255, 0.45));
+}
+:root[data-theme='cyber-cafe-01'] .reconnect-card__bars > * {
+  border-radius: 2px;
+}
+:root[data-theme='cyber-cafe-01'] .countdown-overlay__num {
+  color: #eaffff;
+  text-shadow:
+    0 0 20px rgba(62, 224, 255, 0.8),
+    0 4px 0 #03244a;
+}
+
+/* ---------- Game chrome ---------- */
+:root[data-theme='cyber-cafe-01'] .dc-timer {
+  border-radius: 999px;
+}
+
+/* ---------- Tournament Center: the café league server console ---------- */
+:root[data-theme='cyber-cafe-01'] .tc-hero {
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 0 4px rgba(160, 190, 220, 0.16),
+    0 24px 60px rgba(0, 8, 28, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] .tc-chip {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .tc-row,
+:root[data-theme='cyber-cafe-01'] .tc-game,
+:root[data-theme='cyber-cafe-01'] .tc-format,
+:root[data-theme='cyber-cafe-01'] .tc-board,
+:root[data-theme='cyber-cafe-01'] .tc-join,
+:root[data-theme='cyber-cafe-01'] .tc-wiz {
+  border-radius: 16px;
+}
+:root[data-theme='cyber-cafe-01'] .tc-board {
+  border-style: solid;
+  border-color: rgba(150, 215, 255, 0.28);
+  background:
+    linear-gradient(rgba(120, 200, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(120, 200, 255, 0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+    rgba(2, 16, 40, 0.7);
+}
+:root[data-theme='cyber-cafe-01'] .tb {
+  border-radius: 999px;
+}
+
+/* ---------- Kits ---------- */
+/* Boardroom (chess/checkers): a LAN chess client — board in a chrome monitor bezel. */
+:root[data-theme='cyber-cafe-01'] [data-part='game-stage'] [data-part='board'] {
+  border-radius: 10px;
+}
+:root[data-theme='cyber-cafe-01'] [data-part='clock'] {
+  border-radius: 12px;
+}
+
+/* ---------- Jukebox: a Y2K MP3 player ---------- */
+:root[data-theme='cyber-cafe-01'] [data-jukebox] {
+  --jb-radius: 18px;
+  --jb-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.03) 22%, transparent 40%),
+    linear-gradient(180deg, #1a5aa8 0%, #0b3470 55%, #06224f 100%);
+  --jb-border: rgba(190, 235, 255, 0.55);
+  --jb-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 4px rgba(160, 190, 220, 0.22), 0 20px 50px rgba(0, 8, 28, 0.6);
+  --jb-font-title: var(--font-display);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='title-bar'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='header'] {
+  background: linear-gradient(180deg, #f6f9fc 0%, #d7e2ec 44%, #b3c4d5 50%, #c8d5e2 78%, #e4ecf3 100%);
+  color: #0b2548;
+  border-radius: 17px 17px 0 0;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='header'] button {
+  color: #0b2548;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='display'] {
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 20, 50, 0.3) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 0%, rgba(62, 224, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, #03183a, #010a1e);
+  box-shadow: inset 0 0 0 2px #010816, inset 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(160, 190, 220, 0.3);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='track-title'] {
+  color: #eaffff;
+  text-shadow: 0 0 8px rgba(62, 224, 255, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='track-artist'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='time'] {
+  color: #9ef2ff;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='play'] {
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.2) 46%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, #a8f4ff, #0aa3e0);
+  color: #021a30;
+  box-shadow: 0 0 0 1px #05608c, inset 0 1px 0 #fff, 0 0 16px rgba(62, 224, 255, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='prev'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='next'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='shuffle'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='repeat'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='mute'] {
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.15) 48%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, #eef4fa, #9fb4c8);
+  color: #0a2244;
+  box-shadow: 0 0 0 1px #6b87a6, inset 0 1px 0 #fff;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='shuffle'][aria-pressed='true'],
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='repeat']:not([data-mode='off']),
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='mute'][aria-pressed='true'] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.15) 48%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, #d6ffb0, #57d62a);
+  color: #0b2303;
+  box-shadow: 0 0 0 1px #2f7d14, inset 0 1px 0 #fff, 0 0 10px rgba(125, 255, 74, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='visualizer'] {
+  border-radius: 8px;
+  background: #010a1e;
+  box-shadow: inset 0 0 0 1px rgba(62, 224, 255, 0.25);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='track'] {
+  border-radius: 10px;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='track'][data-current] {
+  background: linear-gradient(90deg, rgba(62, 224, 255, 0.22), rgba(62, 224, 255, 0.04));
+  box-shadow: inset 0 0 0 1px rgba(62, 224, 255, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='mini'] {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='dj-status']::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #7dff4a;
+  box-shadow: 0 0 6px #7dff4a;
+  vertical-align: 1px;
+}
+
+/* Jukebox decor: broadband signal orb in the display corner. */
+:root[data-theme='cyber-cafe-01'] .cc-jbd {
+  --l: 0;
+  position: absolute;
+  right: -46px;
+  top: -46px;
+  width: 150px;
+  height: 150px;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__ring,
+:root[data-theme='cyber-cafe-01'] .cc-jbd__orb {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__orb {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), rgba(62, 224, 255, 0.25) 40%, rgba(10, 80, 160, 0.3) 75%, rgba(190, 235, 255, 0.5) 100%);
+  box-shadow: 0 0 18px rgba(62, 224, 255, 0.3);
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__ring {
+  border: 1px solid rgba(62, 224, 255, 0.35);
+  transform: scale(calc(1 + var(--l) * 0.12));
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__ring--1 {
+  width: 88px;
+  height: 88px;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__ring--2 {
+  width: 116px;
+  height: 116px;
+  opacity: 0.7;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__ring--3 {
+  width: 146px;
+  height: 146px;
+  opacity: 0.4;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__led {
+  position: absolute;
+  left: 38px;
+  bottom: 40px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1d4a2c;
+}
+:root[data-theme='cyber-cafe-01'] .cc-jbd__led[data-on='true'] {
+  background: #7dff4a;
+  box-shadow: 0 0 6px #7dff4a;
+}
+
+/* ---------- Place-aware layering ---------- */
+/* In the lobby the café network shows through the frosted glass. */
+:root[data-theme='cyber-cafe-01'][data-place='lobby'] .game-stage.dc-game-backdrop {
+  background: linear-gradient(180deg, rgba(3, 21, 48, 0.55), rgba(3, 21, 48, 0.35) 40%, rgba(3, 21, 48, 0.65));
+}
+/* Cabinet screens get a chrome CRT lip. */
+:root[data-theme='cyber-cafe-01'] .af-cab__screen {
+  border-radius: 3cqi;
+  box-shadow:
+    0 0 0 0.7cqi #9fb4c8,
+    0 0 0 0.9cqi #3d5a7a;
+}
+/* Classics touch pad labels sit on the frosted-white keys: navy ink, not the dark-theme text grey. */
+:root[data-theme='cyber-cafe-01'] .cl-tbtn__text {
+  color: #1d3a63;
+}
+
+/* Focus rings on this theme's pale title bars / plates: the default light ring measured < 3:1 there, so
+   controls inside them get a dark ring instead (a11y review). */
+:root[data-theme='cyber-cafe-01'] .dc-panel__header,
+:root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='header'] {
+  --focus-ring: #0b2548;
+}
+/* Badges parked in a pale chrome title strip (e.g. DASQuest "0 PTS") were light-tinted ink on near-white:
+   keep the badge hue as a frame but ink it dark navy. */
+:root[data-theme='cyber-cafe-01'] .dc-panel__header .dc-badge:not(.dc-badge--solid) {
+  color: color-mix(in srgb, var(--badge, var(--accent)) 30%, #0b2548);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* Chat bubbles are mid blue (#234c8a): muted chat inks lifted to ≥ 4.5:1. */
+:root[data-theme='cyber-cafe-01'] [data-part='chat-message'] {
+  --text-2: #bcd4ec;
+  --text-3: #b0cae6;
+}
+
+/* =====================================================================
+ * SPORTS GAMES AS LAN CLIENTS — translucent blue plastic windows with a glossy lip, chrome rims,
+ * aqua gel buttons, blue LCD read-outs and a lime gel FIRE orb. Playfields untouched; the chrome
+ * bezel sits on the viewport edge only. (No fake latency numbers: the real ping lives in the top bar.)
+ * ===================================================================== */
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-glass,
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] .ci-glass,
+:root[data-theme='cyber-cafe-01'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 1px solid rgba(200, 238, 255, 0.6);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 30%),
+    linear-gradient(180deg, rgba(18, 70, 142, 0.9), rgba(6, 34, 82, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -10px 18px rgba(0, 10, 40, 0.35),
+    0 0 0 3px rgba(160, 190, 220, 0.25),
+    0 12px 30px rgba(0, 8, 28, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] .sh-panel--active {
+  border-color: rgba(190, 255, 150, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -10px 18px rgba(0, 10, 40, 0.35),
+    0 0 0 3px rgba(125, 255, 74, 0.45),
+    0 0 26px rgba(125, 255, 74, 0.3),
+    0 12px 30px rgba(0, 8, 28, 0.55);
+}
+/* Aqua gel buttons. */
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-hold {
+  border: 1px solid rgba(210, 244, 255, 0.75);
+  border-radius: 999px;
+  color: #fff;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 58%), linear-gradient(180deg, #3fb4ff, #0a58b8);
+  box-shadow:
+    inset 0 -3px 6px rgba(0, 20, 70, 0.45),
+    0 2px 6px rgba(0, 10, 40, 0.5);
+  filter: drop-shadow(0 1px 0 rgba(0, 20, 60, 0.6));
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  border-color: #fff;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 58%), linear-gradient(180deg, #5cc4ff, #1068cc);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-weapon__current {
+  border-radius: 12px;
+  border: 1px solid rgba(200, 238, 255, 0.55);
+  background: rgba(2, 18, 40, 0.65);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+/* Blue LCD read-outs. */
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='cyber-cafe-01'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] .ci-clock {
+  padding: 3px 10px 2px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #02101f, #062540);
+  color: #8ff6ff;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.75),
+    0 1px 0 rgba(255, 255, 255, 0.28);
+  text-shadow: 0 0 8px rgba(62, 224, 255, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-dial__value b {
+  color: #8ff6ff;
+  text-shadow: 0 0 10px rgba(62, 224, 255, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #02101f;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+/* FIRE: a lime gel orb in a chrome ring. */
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='fire'] {
+  border-radius: 999px;
+  color: #062a00;
+  background:
+    radial-gradient(ellipse 70% 42% at 50% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(180deg, #c2ff7a, #5fdc22 55%, #1f8a08);
+  box-shadow:
+    inset 0 -6px 12px rgba(10, 70, 0, 0.45),
+    0 0 0 2px #0b2548,
+    0 0 0 5px #cfdcea,
+    0 0 0 6px #5b7390,
+    0 0 26px rgba(125, 255, 74, 0.45);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  animation: none;
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: cc01-fire-glow 1.8s ease-in-out infinite;
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #d6e6f6;
+  text-shadow: 0 1px 0 #000;
+  background:
+    radial-gradient(ellipse 70% 42% at 50% 16%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(180deg, #6f8aa8, #3a5070 60%, #1d2c44);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(6, 42, 0, 0.18);
+}
+:root[data-theme='cyber-cafe-01'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: none;
+}
+@keyframes cc01-fire-glow {
+  50% {
+    filter: brightness(1.12) drop-shadow(0 0 12px rgba(125, 255, 74, 0.7));
+  }
+}
+:root[data-theme='cyber-cafe-01'] [data-game='putt'] .pt-dock__putt {
+  border-radius: 999px;
+}
+/* Chrome bezel on the playfield edge. */
+:root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='cyber-cafe-01'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px #0b2548,
+    inset 0 0 0 4px #b9c9dc,
+    inset 0 0 0 5px #f2f8ff,
+    inset 0 0 0 6px #5b7390,
+    inset 0 0 24px rgba(62, 224, 255, 0.18);
+}
+/* Ships: gel title tabs, chrome-ringed sonar screens. */
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  margin: -8px -12px 4px -8px;
+  padding: 4px 8px 4px 12px;
+  min-height: 30px;
+  border-radius: 15px 15px 0 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.05) 55%, rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, #2f8fe6, #0b4a9e);
+  border-bottom: 1px solid rgba(200, 238, 255, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] [data-part='panel'] .sh-panel__meta {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(2, 16, 36, 0.8);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 20, 60, 0.7);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px #0b2548,
+    0 0 0 4px #b9c9dc,
+    0 0 0 5px #5b7390,
+    inset 0 0 36px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px #0b2548,
+    0 0 0 4px #b6ff7a,
+    0 0 0 5px #3f9a1c,
+    0 0 22px rgba(125, 255, 74, 0.35),
+    inset 0 0 36px rgba(0, 0, 0, 0.45);
+}
+/* Circuit: chrome start gantry + minimap monitor. */
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 1px solid #eef6ff;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #dfe9f5, #8aa0b8 55%, #c9d6e6);
+  box-shadow:
+    0 0 0 2px #0b2548,
+    0 14px 40px rgba(0, 8, 28, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__pod {
+  border-radius: 14px;
+  background: #031020;
+}
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='minimap'] {
+  border-radius: 18px;
+  border: 1px solid rgba(200, 238, 255, 0.7);
+  box-shadow:
+    0 0 0 3px #8aa0b8,
+    0 0 0 4px #0b2548,
+    0 12px 30px rgba(0, 8, 28, 0.55);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='circuit'] .ci-touch__btn {
+  border-radius: 999px;
+}
+/* Desktop: LAN-client status tabs clipped onto the big windows. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='cyber-cafe-01'] [data-game='putt'] [data-part='controls']::before,
+  :root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: '\25CF  LAN LINK OK \00B7  SERVER 01 \00B7  TANKS CLIENT v2.01' / '';
+    position: absolute;
+    top: -23px;
+    right: 22px;
+    height: 22px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    font: 700 11px/1 var(--font-tech);
+    letter-spacing: 0.08em;
+    color: #eaffdf;
+    border: 1px solid rgba(200, 238, 255, 0.6);
+    border-bottom: 0;
+    border-radius: 11px 11px 0 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 60%), linear-gradient(180deg, #1f6fc4, #0b3f86);
+    text-shadow: 0 0 6px rgba(125, 255, 74, 0.6);
+    pointer-events: none;
+  }
+  :root[data-theme='cyber-cafe-01'] [data-game='putt'] [data-part='controls']::before {
+    content: '\25CF  LAN LINK OK \00B7  SERVER 01 \00B7  PUTT CLIENT v2.01' / '';
+  }
+  :root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: '\25CF  LAN RACE \00B7  SERVER 01' / '';
+    top: auto;
+    bottom: -23px;
+    right: auto;
+    left: 14px;
+    border: 1px solid rgba(200, 238, 255, 0.6);
+    border-top: 0;
+    border-radius: 0 0 11px 11px;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  /* Keep the top bar's centre column narrow so the turn card keeps its words. */
+  :root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+    padding: 2px;
+  }
+  :root[data-theme='cyber-cafe-01'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='cyber-cafe-01'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='cyber-cafe-01'] [data-game='circuit'] [data-part='race']::after {
+    box-shadow:
+      inset 0 0 0 1px #0b2548,
+      inset 0 0 0 3px #b9c9dc,
+      inset 0 0 0 4px #5b7390;
+  }
+  :root[data-theme='cyber-cafe-01'] [data-game='tanks'] .tk-glass,
+  :root[data-theme='cyber-cafe-01'] [data-game='circuit'] .ci-glass {
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 0 2px rgba(160, 190, 220, 0.25),
+      0 8px 20px rgba(0, 8, 28, 0.5);
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza: the café's online quiz client, v2.0 (party kit — trivia, survey, DASterpiece,
+ * DASwords, DASception). The question is a frosted application window with a chrome title bar
+ * and gel window buttons; answers are big translucent gel buttons in their slot colour with a
+ * chrome orb carrying the letter + shape. Presentation only.
+ * ===================================================================== */
+:root[data-theme='cyber-cafe-01'] .pk-stage {
+  --pk-stage-set: inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2) rgba(62, 224, 255, 0.12);
+  background:
+    radial-gradient(60% 40% at 50% 0%, rgba(62, 224, 255, 0.2), transparent 70%),
+    radial-gradient(40% 30% at 100% 100%, rgba(125, 255, 74, 0.1), transparent 70%),
+    linear-gradient(0deg, rgba(62, 224, 255, 0.06) 1px, transparent 1px) 0 0 / 100% 32px,
+    linear-gradient(90deg, rgba(62, 224, 255, 0.06) 1px, transparent 1px) 0 0 / 32px 100%,
+    linear-gradient(180deg, #06285a, #041a3e 70%, #031330);
+}
+/* The client window. */
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt {
+  --mat-card-ink: #0b1c33;
+  --pk-card-ink: #0b1c33;
+  padding-top: calc(clamp(18px, 3vw, 34px) + 30px);
+  border: 1px solid rgba(2, 16, 40, 0.7);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(62, 224, 255, 0.22), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 242, 255, 0.94));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 0 5px rgba(170, 200, 225, 0.22),
+    0 0 30px rgba(62, 224, 255, 0.25),
+    0 24px 50px rgba(0, 8, 26, 0.55);
+  overflow: hidden;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt::before {
+  content: 'DASquiz Online 2.0' / '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 30px;
+  padding: 0 84px 0 14px;
+  display: flex;
+  align-items: center;
+  background: var(--titlebar-bg);
+  border-bottom: 1px solid rgba(60, 90, 130, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  color: var(--titlebar-fg);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-align: left;
+  pointer-events: none;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 12px;
+  width: 64px;
+  height: 16px;
+  background:
+    radial-gradient(circle at 8px 8px, #eaffd8 0 1.5px, #7dff4a 3px, #2f8f10 7px, transparent 7.5px),
+    radial-gradient(circle at 32px 8px, #fff8d0 0 1.5px, #ffd23f 3px, #b58300 7px, transparent 7.5px),
+    radial-gradient(circle at 56px 8px, #ffe0e6 0 1.5px, #ff5a78 3px, #a3102c 7px, transparent 7.5px);
+  pointer-events: none;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt__kicker {
+  color: #0b5fa8;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt .pk-chip {
+  border-color: rgba(11, 95, 168, 0.4);
+  background: linear-gradient(180deg, #fff, #d6ecff);
+  color: #0b1c33;
+}
+/* Gel buttons. */
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer {
+  --mat-card-ink: #041634;
+  --pk-card-ink: #041634;
+  border: 1px solid color-mix(in srgb, var(--slot) 55%, #021028);
+  border-radius: 999px;
+  padding: 10px 26px 10px 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.25) 46%, rgba(255, 255, 255, 0) 50%),
+    radial-gradient(120% 80% at 50% 110%, color-mix(in srgb, var(--slot) 40%, #fff), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 55%, #fff), color-mix(in srgb, var(--slot) 85%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -3px 8px color-mix(in srgb, var(--slot) 45%, transparent),
+    0 0 0 3px rgba(170, 200, 225, 0.2),
+    0 6px 14px rgba(0, 8, 26, 0.45),
+    0 0 18px color-mix(in srgb, var(--slot) 30%, transparent);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer__badge {
+  grid-template-columns: auto;
+  justify-items: center;
+  gap: 0;
+  min-width: 0;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 50%;
+  color: #041634;
+  background:
+    radial-gradient(circle at 38% 28%, #fff 0 18%, rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, #f4f8fc, #b9c8d8 55%, #e6eef6);
+  box-shadow:
+    inset 0 0 0 3px var(--slot),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(2, 16, 40, 0.5),
+    0 2px 4px rgba(0, 8, 26, 0.35);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer__badge .pk-shape {
+  width: 11px;
+  height: 11px;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer__letter {
+  font-family: 'Audiowide', var(--font-ui);
+  font-size: 1.15rem;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -3px 8px color-mix(in srgb, var(--slot) 45%, transparent),
+    0 0 0 3px rgba(170, 200, 225, 0.3),
+    0 8px 18px rgba(0, 8, 26, 0.45),
+    0 0 28px color-mix(in srgb, var(--slot) 55%, transparent);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer:active:not(:disabled) {
+  box-shadow:
+    inset 0 3px 8px rgba(0, 8, 26, 0.35),
+    0 0 0 3px rgba(170, 200, 225, 0.2),
+    0 2px 4px rgba(0, 8, 26, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  border-color: #021028;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.15) 46%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 80%, #fff), var(--slot));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 3px #fff,
+    0 0 0 6px var(--slot),
+    0 0 32px color-mix(in srgb, var(--slot) 70%, transparent);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer[data-state='correct'] {
+  border-color: #0e4a10;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.2) 46%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, #c8ffb0, #7dff4a);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 3px #fff,
+    0 0 0 6px #4fd61a,
+    0 0 34px rgba(125, 255, 74, 0.65);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer[data-state='wrong'] {
+  border-color: #5a0716;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 3px #fff,
+    0 0 0 6px #ff4a6a;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer[data-state='correct'] .pk-answer__mark {
+  color: #0b5a14;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer[data-state='wrong'] .pk-answer__mark {
+  color: #a3102c;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer__bar {
+  background: linear-gradient(180deg, rgba(4, 22, 52, 0.12), rgba(4, 22, 52, 0.2));
+}
+/* Vote cards: little frosted client windows with a gel title strip in the slot colour. */
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-vote {
+  --mat-card-ink: #0b1c33;
+  --pk-card-ink: #0b1c33;
+  --pk-card-ink-muted: rgba(11, 28, 51, 0.72);
+  color: #0b1c33;
+  border: 1px solid rgba(2, 16, 40, 0.7);
+  border-radius: 14px;
+  padding-top: calc(var(--sp-4) + 12px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 6px, transparent 6px) 0 0 / 100% 12px no-repeat,
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 70%, #fff), var(--slot)) 0 0 / 100% 12px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 242, 255, 0.94));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 0 4px rgba(170, 200, 225, 0.2),
+    0 12px 26px rgba(0, 8, 26, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-vote[data-picked='true'] {
+  border-color: #021028;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px var(--slot),
+    0 0 30px color-mix(in srgb, var(--slot) 55%, transparent);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-vote[data-winner='true'] {
+  border-color: #021028;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px #ffd23f,
+    0 0 30px rgba(255, 210, 63, 0.5);
+}
+/* Download-progress timer and chrome readouts. */
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-timerbar {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #021028, #0a2a55);
+  border: 1px solid rgba(170, 200, 225, 0.55);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-timerbar__fill {
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 50%),
+    repeating-linear-gradient(-45deg, #3ee0ff 0 8px, #1aa8e0 8px 16px);
+  box-shadow: 0 0 12px rgba(62, 224, 255, 0.6);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 50%),
+    repeating-linear-gradient(-45deg, #ff5a78 0 8px, #d61a44 8px 16px);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage :is(.pk-row__score, .pk-strip__count, .pk-standing__score) {
+  color: #7dff4a;
+  text-shadow: 0 0 8px rgba(125, 255, 74, 0.45);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-row {
+  border-radius: 999px;
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-interstitial__icon {
+  border-radius: 50%;
+  border: 1px solid rgba(2, 16, 40, 0.7);
+  background:
+    radial-gradient(circle at 38% 28%, #fff 0 14%, rgba(255, 255, 255, 0) 40%),
+    linear-gradient(180deg, #7ff0ff, #1aa8e0);
+  color: #041634;
+  box-shadow: 0 0 0 4px rgba(170, 200, 225, 0.25), 0 0 30px rgba(62, 224, 255, 0.55);
+}
+@media (max-width: 560px) {
+  :root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer {
+    border-radius: 30px;
+  }
+  :root[data-theme='cyber-cafe-01'] .pk-stage .pk-answer__badge {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  :root[data-theme='cyber-cafe-01'] .pk-stage .pk-prompt {
+    padding-top: 34px;
+  }
+}
+/* Chrome-plastic podium blocks: navy place numbers on the light plastic. */
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-podium__block {
+  border-radius: 14px 14px 4px 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1) 40%, transparent 50%),
+    linear-gradient(180deg, color-mix(in srgb, var(--player) 45%, #fff), color-mix(in srgb, var(--player) 70%, #9fb4c8));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 1px rgba(2, 16, 40, 0.7),
+    0 0 24px color-mix(in srgb, var(--player) 40%, transparent);
+}
+:root[data-theme='cyber-cafe-01'] .pk-stage .pk-podium__place {
+  color: #041634;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+/* DASterpiece: gallery of translucent blue-plastic frames; the placard is a client window edge. */
+:root[data-theme='cyber-cafe-01'] [data-game='masterpiece'] .mp-exhibit__frame {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 40%),
+    linear-gradient(135deg, #7ff0ff, #1aa8e0 45%, #0b6fc2 70%, #3ee0ff);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='masterpiece'] .mp-exhibit__hit {
+  box-shadow: inset 0 0 0 2px #0b5fa8, inset 0 0 22px rgba(11, 95, 168, 0.12);
+}
+:root[data-theme='cyber-cafe-01'] [data-game='masterpiece'] .mp-placard {
+  border: 1px solid rgba(2, 16, 40, 0.7);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 0 5px rgba(170, 200, 225, 0.22),
+    0 0 30px rgba(62, 224, 255, 0.25);
+}

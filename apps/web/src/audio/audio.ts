@@ -1,11 +1,15 @@
 /**
- * DASCADE audio: 100% procedural WebAudio (no audio files).
- *  - The AudioContext is created lazily on the first user gesture (autoplay-safe).
- *  - Master → (SFX bus, Music bus) gain structure driven by app settings.
+ * DASCADE game audio: procedural WebAudio SFX + "game music", on the shared mixer (mixer.ts).
+ *  - The ONE AudioContext is created lazily on the first user gesture (autoplay-safe).
+ *  - Buses: sfx / gameMusic / jukebox → master → compressor (policy: mixPolicy.ts).
  *  - `sfx(name)` plays a short synthesized sound; `music.start(mood)` runs a subtle
- *    lookahead-scheduled synthwave loop.
+ *    lookahead-scheduled synthwave loop (ducked/muted while the jukebox plays, per settings).
+ *  - The MP3 jukebox lives in ./jukebox/ (engine singleton) and is booted by installAudio().
  */
 import { useApp, type AppSettings } from '../app/store.ts';
+import { installJukebox } from './jukebox/engine.ts';
+import { mixer } from './mixer.ts';
+import { SFX_DUCK_MIN_GAIN, type MixSettings } from './mixPolicy.ts';
 
 export type SfxName =
   | 'hover'
@@ -39,65 +43,53 @@ export type SfxName =
   | 'bingo'
   | 'message';
 
-let ctx: AudioContext | null = null;
-let master: GainNode | null = null;
-let sfxBus: GainNode | null = null;
-let musicBus: GainNode | null = null;
-let noiseBuffer: AudioBuffer | null = null;
 let unlocked = false;
 
-function ensureContext(): AudioContext | null {
-  if (ctx) return ctx;
-  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return null;
-  try {
-    ctx = new AC({ latencyHint: 'interactive' });
-  } catch {
-    return null;
-  }
-  master = ctx.createGain();
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -14;
-  comp.ratio.value = 4;
-  master.connect(comp).connect(ctx.destination);
-  sfxBus = ctx.createGain();
-  musicBus = ctx.createGain();
-  sfxBus.connect(master);
-  musicBus.connect(master);
-  noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  applyVolumes(useApp.getState().settings);
-  return ctx;
+/** Mixer inputs from app settings. */
+function mixSettings(s: AppSettings): MixSettings {
+  return {
+    masterVolume: s.masterVolume,
+    sfxVolume: s.sfxVolume,
+    musicVolume: s.musicVolume,
+    musicEnabled: s.musicEnabled,
+    muted: s.muted,
+    jukeboxVolume: s.jukeboxVolume,
+    gameMusicWithJukebox: s.gameMusicWithJukebox,
+  };
 }
 
-function applyVolumes(s: AppSettings): void {
-  if (!ctx || !master || !sfxBus || !musicBus) return;
-  const t = ctx.currentTime;
-  master.gain.setTargetAtTime(s.muted ? 0 : s.masterVolume, t, 0.02);
-  sfxBus.gain.setTargetAtTime(s.sfxVolume, t, 0.02);
-  musicBus.gain.setTargetAtTime(s.musicEnabled ? s.musicVolume * 0.5 : 0, t, 0.2);
-}
+const ctxNow = (): AudioContext | null => mixer.context();
 
-/** Call once at startup: unlocks audio on the first gesture and tracks settings. */
+let audioInstalled = false;
+
+/** Call once at startup: unlocks audio on the first gesture, tracks settings, boots the jukebox. */
 export function installAudio(): void {
-  const unlock = () => {
-    if (unlocked) return;
-    const c = ensureContext();
+  if (audioInstalled) return;
+  audioInstalled = true;
+  mixer.setSettings(mixSettings(useApp.getState().settings));
+  // Every activation-granting gesture: create the context once, and resume it whenever the
+  // browser suspended/interrupted it (iOS after a call, a backgrounded tab…). Cheap after the first.
+  const onGesture = (e: Event) => {
+    if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Escape') return;
+    const c = mixer.ensureContext();
     if (!c) return;
-    void c.resume().then(() => {
+    if (unlocked && c.state === 'running') return;
+    void mixer.resume().then((running) => {
+      if (!running || unlocked) return;
       unlocked = true;
       if (useApp.getState().settings.musicEnabled) music.start();
     });
   };
-  window.addEventListener('pointerdown', unlock, { capture: true });
-  window.addEventListener('keydown', unlock, { capture: true });
+  for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click'] as const) {
+    window.addEventListener(type, onGesture, { capture: true, passive: true });
+  }
   useApp.subscribe((state, prev) => {
     if (state.settings === prev.settings) return;
-    applyVolumes(state.settings);
+    mixer.setSettings(mixSettings(state.settings));
     if (state.settings.musicEnabled && !prev.settings.musicEnabled) music.start();
     if (!state.settings.musicEnabled && prev.settings.musicEnabled) music.stop();
   });
+  installJukebox();
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +107,8 @@ interface ToneOpts {
   detune?: number;
 }
 
-function tone({ type = 'square', freq, to, start = 0, dur, gain = 0.2, attack = 0.005, bus = sfxBus, detune = 0 }: ToneOpts): void {
+function tone({ type = 'square', freq, to, start = 0, dur, gain = 0.2, attack = 0.005, bus = mixer.buses()?.sfx ?? null, detune = 0 }: ToneOpts): void {
+  const ctx = ctxNow();
   if (!ctx || !bus) return;
   const t0 = ctx.currentTime + start;
   const osc = ctx.createOscillator();
@@ -133,6 +126,9 @@ function tone({ type = 'square', freq, to, start = 0, dur, gain = 0.2, attack = 
 }
 
 function noise({ start = 0, dur, gain = 0.2, freq = 2000, q = 1, type = 'bandpass' as BiquadFilterType, to }: { start?: number; dur: number; gain?: number; freq?: number; q?: number; type?: BiquadFilterType; to?: number }): void {
+  const ctx = ctxNow();
+  const sfxBus = mixer.buses()?.sfx;
+  const noiseBuffer = mixer.noiseBuffer();
   if (!ctx || !sfxBus || !noiseBuffer) return;
   const t0 = ctx.currentTime + start;
   const src = ctx.createBufferSource();
@@ -216,16 +212,19 @@ const SOUNDS: Record<SfxName, () => void> = {
 };
 
 const lastPlayed = new Map<SfxName, number>();
+/** UI chatter that must not pump the jukebox (see mixPolicy.ts, policy 3). */
+const QUIET_SFX: ReadonlySet<SfxName> = new Set(['hover', 'tick', 'message', 'click']);
 
 /** Play a UI/game sound effect. Safe to call anywhere; no-ops until audio is unlocked. */
 export function sfx(name: SfxName, minGapMs = 30): void {
-  if (!unlocked || !ctx) return;
+  if (!unlocked || !ctxNow()) return;
   const s = useApp.getState().settings;
   if (s.muted || s.masterVolume <= 0 || s.sfxVolume <= 0) return;
   const now = performance.now();
   if (now - (lastPlayed.get(name) ?? 0) < minGapMs) return;
   lastPlayed.set(name, now);
   try {
+    if (!QUIET_SFX.has(name)) mixer.sfxPriority();
     SOUNDS[name]();
   } catch {
     /* never let audio break gameplay */
@@ -235,17 +234,23 @@ export function sfx(name: SfxName, minGapMs = 30): void {
 /** Direct synth access for games that want custom procedural sounds. */
 export const synth = {
   tone: (opts: ToneOpts) => {
-    if (unlocked) tone(opts);
+    if (!unlocked) return;
+    if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN && (!opts.bus || opts.bus === mixer.buses()?.sfx)) mixer.sfxPriority();
+    tone(opts);
   },
   noise: (opts: Parameters<typeof noise>[0]) => {
-    if (unlocked) noise(opts);
+    if (!unlocked) return;
+    if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN) mixer.sfxPriority();
+    noise(opts);
   },
+  /** Sustained sound (engine hum, loops): hold a gentle jukebox dip while `on` (mixPolicy 3b). */
+  hold: (key: string, on: boolean) => mixer.sfxHold(key, on),
   note: NOTE,
   get context(): AudioContext | null {
-    return unlocked ? ctx : null;
+    return unlocked ? mixer.context() : null;
   },
   get sfxBus(): GainNode | null {
-    return sfxBus;
+    return mixer.buses()?.sfx ?? null;
   },
 };
 
@@ -267,12 +272,20 @@ let step = 0;
 let mood: Mood = 'arcade';
 
 function scheduleStep(time: number): void {
+  const ctx = ctxNow();
+  const musicBus = mixer.buses()?.gameMusic;
   if (!ctx || !musicBus) return;
   const m = MOODS[mood];
   const bar = Math.floor(step / 16) % m.prog.length;
   const chord = m.prog[bar] ?? [0, 3, 7];
   const s16 = step % 16;
   const offset = time - ctx.currentTime;
+  // Fully silenced by the mixer policy (e.g. the jukebox is playing, mode 'mute'): keep the
+  // transport running (so it resumes in time) but don't spend oscillators on inaudible notes.
+  if (mixer.gameMusicSilenced()) {
+    step++;
+    return;
+  }
   if (s16 % 4 === 0) tone({ type: 'triangle', freq: NOTE(m.root + (chord[0] ?? 0) - 12), start: offset, dur: 0.35, gain: 0.16, bus: musicBus });
   if (s16 % 2 === 0) {
     const n = chord[(step / 2) % chord.length] ?? 0;
@@ -285,11 +298,11 @@ function scheduleStep(time: number): void {
 export const music = {
   start(next: Mood = mood): void {
     mood = next;
+    const ctx = ctxNow();
     if (!unlocked || !ctx || musicTimer) return;
     if (!useApp.getState().settings.musicEnabled) return;
     nextNoteTime = ctx.currentTime + 0.1;
     musicTimer = setInterval(() => {
-      if (!ctx) return;
       const secPer16 = 60 / MOODS[mood].bpm / 4;
       while (nextNoteTime < ctx.currentTime + 0.2) {
         scheduleStep(nextNoteTime);

@@ -12,7 +12,8 @@ import { usePartyFx } from './hooks.ts';
 import { TeamBadge } from './Scores.tsx';
 import { ArtIcon } from './Stage.tsx';
 
-const CONFETTI_COLORS = ['#ff4fd8', '#ffd23f', '#22d3ee', '#2de38f', '#a78bfa', '#ff8a3d'];
+// The first colour follows the theme's stage lights (Delta Neon has no materials → the kit's pink).
+const CONFETTI_COLORS = ['var(--mat-stage-light, #ff4fd8)', '#ffd23f', '#22d3ee', '#2de38f', '#a78bfa', '#ff8a3d'];
 
 /** CSS confetti burst (none with reduced motion / fx off; fewer on low fx). */
 export function Confetti({ count }: { count?: number }) {
@@ -73,7 +74,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
       if (winners.length === 1)
         return (
           <>
-            <span style={{ color: winners[0]!.color }}>{winners[0]!.name}</span> wins!
+            <span className="pk-winner-name" style={{ '--winner': winners[0]!.color } as CSSProperties}>{winners[0]!.name}</span> wins!
           </>
         );
       if (winners.length > 1) return <>It’s a tie between {winners.map((t) => t.name).join(' & ')}!</>;
@@ -83,7 +84,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
     if (winners.length === 1)
       return (
         <>
-          <span style={{ color: winners[0]!.color }}>{winners[0]!.name}</span> wins!
+          <span className="pk-winner-name" style={{ '--winner': winners[0]!.color } as CSSProperties}>{winners[0]!.name}</span> wins!
         </>
       );
     if (winners.length > 1) return <>A {winners.length}-way tie for first!</>;
@@ -97,7 +98,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
   return (
     <GameStage gameId={gameId} className="pk-stage pk-results">
       {iWon || podium.winnerIds.length > 0 ? <Confetti count={Math.round(fx.particles * (iWon ? 1.4 : 0.8))} /> : null}
-      <div className="pk-results__inner">
+      <div className="pk-results__inner" data-part="results">
         <header className="pk-results__head">
           <span className="dc-label">{kicker}</span>
           <h1 className="pk-results__title">{headline}</h1>
@@ -115,7 +116,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
         </header>
 
         {podium.teams ? (
-          <section className="pk-teampodium" aria-label="Team standings">
+          <section className="pk-teampodium" data-part="podium" aria-label="Team standings">
             {podium.teams.map((t) => (
               <div
                 key={t.id}
@@ -140,7 +141,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
             ))}
           </section>
         ) : (
-          <section className="pk-podium" aria-label="Podium">
+          <section className="pk-podium" data-part="podium" aria-label="Podium">
             {slots.map((p) => (
               <div
                 key={p.id}
@@ -154,7 +155,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
                   {p.score.toLocaleString('en-US')} {unit}
                 </span>
                 {statFor ? <span className="pk-podium__stat">{statFor(p)}</span> : null}
-                <div className="pk-podium__block">
+                <div className="pk-podium__block" data-part="podium-block">
                   <span className="pk-podium__place dc-num">{p.place}</span>
                 </div>
               </div>
@@ -162,7 +163,7 @@ export function PartyResults({ gameId, kicker, podium, meId, statFor, unit = 'pt
           </section>
         )}
 
-        <section className="pk-panel" aria-label="Final standings">
+        <section className="pk-panel" data-part="standings" aria-label="Final standings">
           <h2 className="pk-panel__title">Standings</h2>
           <ol className="pk-standings">
             {podium.players.map((p) => (

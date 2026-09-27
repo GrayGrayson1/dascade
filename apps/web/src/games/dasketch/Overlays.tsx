@@ -23,18 +23,19 @@ export function ChooseWordOverlay({ choices, endsAt }: { choices: SketchChoice[]
   const [picked, setPicked] = useState<number | null>(null);
   return (
     <div className="sk-overlay sk-overlay--choose" role="dialog" aria-modal="false" aria-labelledby="sk-choose-title">
-      <div className="sk-card sk-card--choose">
+      <div className="sk-card sk-card--choose" data-part="prompt-card">
         <PixelArt rows={SKETCH_ICONS.easel} className="sk-card__art" />
         <h2 id="sk-choose-title" className="sk-card__title">
           Pick your word
         </h2>
         <p className="sk-card__sub">Only you can see these. No letters or numbers in your drawing!</p>
-        <div className="sk-choices">
+        <div className="sk-choices" data-part="answer-grid">
           {choices.map((c, i) => (
             <button
               key={c.word}
               type="button"
               className="sk-choice"
+              data-part="word-card"
               aria-label={`Draw “${c.word}”`}
               disabled={picked !== null}
               data-picked={picked === i ? 'true' : undefined}
@@ -62,7 +63,7 @@ export function ChooseWordOverlay({ choices, endsAt }: { choices: SketchChoice[]
 export function WaitingOverlay({ artist, round, totalRounds }: { artist: PlayerView | undefined; round: number; totalRounds: number }) {
   return (
     <div className="sk-overlay sk-overlay--wait" aria-live="polite">
-      <div className="sk-card sk-card--wait">
+      <div className="sk-card sk-card--wait" data-part="prompt-card">
         <span className="dc-label">
           Round {Math.max(1, round)} of {Math.max(1, totalRounds)}
         </span>
@@ -84,7 +85,7 @@ export function WaitingOverlay({ artist, round, totalRounds }: { artist: PlayerV
 export function GetReadyOverlay() {
   return (
     <div className="sk-overlay sk-overlay--ready">
-      <div className="sk-card sk-card--wait">
+      <div className="sk-card sk-card--wait" data-part="prompt-card">
         <PixelArt rows={SKETCH_ICONS.easel} className="sk-card__art" />
         <h2 className="sk-card__title">Sharpen your pencils</h2>
         <p className="sk-card__sub">The first artist is up in a moment.</p>
@@ -112,7 +113,7 @@ export function RevealOverlay({ state, players, meId }: { state: DasketchPublicS
   const nobody = state.guessedCount === 0;
   return (
     <div className="sk-overlay sk-overlay--reveal" aria-live="polite">
-      <div className="sk-card sk-card--reveal">
+      <div className="sk-card sk-card--reveal" data-part="reveal-card">
         <span className="dc-label">{REASON_TEXT[state.revealReason] ?? 'Turn over'}</span>
         <p className="sk-reveal__lead">The word was</p>
         <h2 className="sk-reveal__word">{state.word || '—'}</h2>

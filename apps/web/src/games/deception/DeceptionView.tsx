@@ -413,7 +413,7 @@ function Hero({ stage, state, me, meId, spectator, nodeMap, dawn, verdict, iDone
   }
   const label = STAGE_LABEL[stage];
   return (
-    <section className="dx-hero" data-stage={stage} aria-live="polite">
+    <section className="dx-hero" data-part="stage-banner" data-stage={stage} aria-live="polite">
       <p className="dx-hero__kicker">
         {label.kicker} {stage === 'boot' ? '' : <span className="dc-num">{state.cycle}</span>}
       </p>
@@ -607,7 +607,7 @@ function Dock(props: DockProps) {
     return null;
   }
   return (
-    <div className="dx-dock" data-stage={stage}>
+    <div className="dx-dock" data-part="action-dock" data-stage={stage}>
       {content}
     </div>
   );
@@ -658,7 +658,7 @@ function SidePanel({ stage, me, meId, nodeMap, teamLines, log, spectator, hidden
         <RoleCard me={me} nodes={nodeMap} meId={meId} variant="compact" hidden={hidden} onToggleHidden={setHidden} />
       ) : null}
       {me && stage !== 'boot' && !(hidden && me) ? <IntelPanel me={me} nodes={nodeMap} /> : null}
-      <section className="dx-panel dx-comms" aria-label="Chat and timeline">
+      <section className="dx-panel dx-comms" data-part="comms" aria-label="Chat and timeline">
         <Tabs label="Chat and timeline" value={current} tabs={tabs} onChange={setTab} className="dx-comms__tabs" />
         {current === 'chat' ? (
           <DeceptionChat mode={chatMode} />

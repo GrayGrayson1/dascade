@@ -1,0 +1,1413 @@
+/* =====================================================================
+ * NEON NOIR — structural skin. Rain on glass, neon in puddles.
+ * Every rule is scoped under :root[data-theme='neon-noir'].
+ *
+ * Direction: deep ink blacks, smoked wet glass (blur + cool sheen + hairline
+ * edges), restrained neon — sodium teal for the house, rose for emphasis,
+ * amber for warmth — letter-spaced Space Grotesk signage, cinematic
+ * vignettes. Games keep their accents; the chrome around them goes quiet.
+ * ===================================================================== */
+
+/* ---------- Page + environment ---------- */
+:root[data-theme='neon-noir'] {
+  --nn-teal: #46d9ec;
+  --nn-rose: #ff4d8d;
+  --nn-amber: #f4c25b;
+  --nn-ink: #030407;
+  --nn-glass: rgba(9, 13, 20, 0.58);
+  --nn-glass-hi: rgba(210, 232, 255, 0.07);
+  --nn-edge: rgba(185, 212, 240, 0.16);
+  --nn-edge-hi: rgba(215, 235, 255, 0.3);
+  --nn-sheen: linear-gradient(165deg, rgba(215, 235, 255, 0.075) 0%, rgba(215, 235, 255, 0.015) 30%, transparent 55%);
+}
+:root[data-theme='neon-noir'] body {
+  background: radial-gradient(120% 90% at 50% 100%, #0a1220 0%, #04060b 55%, #020306 100%) fixed, var(--nn-ink);
+}
+:root[data-theme='neon-noir'] .nn-env {
+  position: absolute;
+  inset: 0;
+}
+:root[data-theme='neon-noir'] .nn-env__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+/* A cinematic grade over the district: darker away from the floor, calmest in games. */
+:root[data-theme='neon-noir'] .nn-env__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(2, 3, 7, 0.25), rgba(2, 3, 7, 0) 30%, rgba(2, 3, 7, 0) 70%, rgba(2, 3, 7, 0.35));
+  transition: background var(--dur-4) var(--ease-out);
+}
+:root[data-theme='neon-noir'] .nn-env[data-place='lobby'] .nn-env__shade,
+:root[data-theme='neon-noir'] .nn-env[data-place='tournament'] .nn-env__shade,
+:root[data-theme='neon-noir'] .nn-env[data-place='other'] .nn-env__shade {
+  background: rgba(2, 3, 7, 0.5);
+}
+:root[data-theme='neon-noir'] .nn-env[data-place='entry'] .nn-env__shade,
+:root[data-theme='neon-noir'] .nn-env[data-place='cabinet'] .nn-env__shade {
+  background: rgba(2, 3, 7, 0.42);
+}
+:root[data-theme='neon-noir'] .nn-env[data-place='game'] .nn-env__shade {
+  background: rgba(2, 3, 7, 0.72);
+}
+
+/* Selection + focus: amber hairline, never a neon blob. */
+:root[data-theme='neon-noir'] ::selection {
+  background: rgba(70, 217, 236, 0.32);
+  color: #fff;
+}
+
+/* ---------- Typography: sophisticated signage ---------- */
+:root[data-theme='neon-noir'] .dc-title {
+  font-family: var(--font-tech);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+:root[data-theme='neon-noir'] .dc-label,
+:root[data-theme='neon-noir'] .dc-field__label {
+  font-family: var(--font-tech);
+  font-weight: 600;
+}
+:root[data-theme='neon-noir'] .dc-pixel {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+/* ---------- Buttons: smoked glass keys with hairline edges ---------- */
+:root[data-theme='neon-noir'] .dc-btn {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: calc(var(--fs-md) * 0.84);
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 0 0 1px var(--btn-edge),
+    inset 0 1px 0 0 var(--button-bevel-hi),
+    0 8px 22px -10px rgba(0, 0, 0, 0.8),
+    0 0 20px -4px var(--btn-glow);
+  margin: 0;
+}
+:root[data-theme='neon-noir'] .dc-btn--sm {
+  font-size: calc(var(--fs-sm) * 0.86);
+}
+:root[data-theme='neon-noir'] .dc-btn--lg {
+  font-size: var(--fs-md);
+}
+:root[data-theme='neon-noir'] .dc-btn--xl {
+  font-size: var(--fs-lg);
+}
+:root[data-theme='neon-noir'] .dc-btn--block {
+  width: 100%;
+}
+/* Primary: the game's accent as light behind glass, not a slab of paint. */
+:root[data-theme='neon-noir'] .dc-btn--primary {
+  --btn-bg: color-mix(in srgb, var(--accent) 34%, rgba(10, 14, 22, 0.9));
+  --btn-bg-2: color-mix(in srgb, var(--accent) 20%, rgba(6, 9, 14, 0.94));
+  --btn-fg: color-mix(in srgb, var(--accent) 22%, #fff);
+  --btn-edge: color-mix(in srgb, var(--accent) 70%, transparent);
+  --btn-glow: color-mix(in srgb, var(--accent) 30%, transparent);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+:root[data-theme='neon-noir'] .dc-btn--primary:hover:not(:disabled) {
+  --btn-glow: color-mix(in srgb, var(--accent) 55%, transparent);
+  --btn-bg: color-mix(in srgb, var(--accent) 44%, rgba(10, 14, 22, 0.9));
+}
+:root[data-theme='neon-noir'] .dc-btn--secondary {
+  --btn-edge: color-mix(in srgb, var(--accent) 38%, rgba(190, 215, 240, 0.2));
+}
+:root[data-theme='neon-noir'] .dc-btn--ghost {
+  box-shadow: none;
+}
+:root[data-theme='neon-noir'] :focus-visible {
+  outline-color: var(--focus-ring);
+}
+
+/* ---------- Panels & dialogs: wet glass ---------- */
+:root[data-theme='neon-noir'] .dc-panel {
+  background: var(--nn-sheen), var(--panel-bg);
+}
+:root[data-theme='neon-noir'] .dc-panel::after {
+  /* a single cool highlight along the top edge, like light on a glass pane */
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(215, 235, 255, 0.45), transparent);
+  pointer-events: none;
+}
+:root[data-theme='neon-noir'] .dc-panel--brackets::before {
+  display: none;
+}
+:root[data-theme='neon-noir'] .dc-panel--brackets::after {
+  border: 0;
+  width: auto;
+  height: 1px;
+  bottom: auto;
+  right: 12%;
+  top: -1px;
+  left: 12%;
+  filter: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 70%, #fff), transparent);
+}
+:root[data-theme='neon-noir'] .dc-panel--glow {
+  border-color: color-mix(in srgb, var(--accent) 30%, rgba(185, 212, 240, 0.16));
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.08),
+    inset 0 0 40px color-mix(in srgb, var(--accent) 5%, transparent),
+    0 0 30px -8px color-mix(in srgb, var(--accent) 35%, transparent),
+    var(--shadow-2);
+}
+:root[data-theme='neon-noir'] .dc-panel__title {
+  font-weight: 600;
+}
+:root[data-theme='neon-noir'] .dc-panel__title::before {
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--titlebar-marker, var(--accent));
+}
+:root[data-theme='neon-noir'] .dc-modal::backdrop {
+  background: radial-gradient(80% 70% at 50% 40%, rgba(4, 8, 14, 0.62), rgba(1, 2, 4, 0.86));
+}
+:root[data-theme='neon-noir'] .dc-modal__frame,
+:root[data-theme='neon-noir'] [data-part='dialog-frame'] {
+  background: var(--nn-sheen), rgba(7, 10, 16, 0.97);
+  border-color: rgba(185, 212, 240, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 50px 120px rgba(0, 0, 0, 0.75);
+}
+
+/* ---------- Inputs + controls ---------- */
+:root[data-theme='neon-noir'] .dc-input:focus,
+:root[data-theme='neon-noir'] .dc-select:focus,
+:root[data-theme='neon-noir'] .dc-textarea:focus {
+  border-color: rgba(70, 217, 236, 0.6);
+  box-shadow:
+    var(--input-inset),
+    0 0 0 3px rgba(70, 217, 236, 0.14);
+}
+:root[data-theme='neon-noir'] .dc-input--code {
+  font-family: var(--font-num);
+  letter-spacing: 0.4em;
+}
+:root[data-theme='neon-noir'] .dc-toggle__track {
+  border-width: 1px;
+  border-radius: 999px;
+}
+:root[data-theme='neon-noir'] .dc-toggle__thumb {
+  top: 3px;
+  left: 3px;
+  border-radius: 50%;
+}
+:root[data-theme='neon-noir'] .dc-toggle input:checked + .dc-toggle__track .dc-toggle__thumb {
+  background: #f4fbff;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--control-accent, var(--accent)) 80%, transparent);
+}
+:root[data-theme='neon-noir'] .dc-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--control-accent, var(--accent)) var(--fill), rgba(190, 215, 240, 0.16) var(--fill));
+}
+:root[data-theme='neon-noir'] .dc-slider::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6.5px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4fbff;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--control-accent, var(--accent)) 22%, transparent),
+    0 0 12px color-mix(in srgb, var(--control-accent, var(--accent)) 70%, transparent);
+}
+:root[data-theme='neon-noir'] .dc-slider::-moz-range-track {
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(190, 215, 240, 0.16);
+}
+:root[data-theme='neon-noir'] .dc-slider::-moz-range-progress {
+  height: 3px;
+  border-radius: 3px;
+}
+:root[data-theme='neon-noir'] .dc-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4fbff;
+}
+:root[data-theme='neon-noir'] .dc-segmented {
+  border-radius: 12px;
+}
+:root[data-theme='neon-noir'] .dc-segmented__item {
+  font-family: var(--font-tech);
+  font-weight: 500;
+  border-radius: 9px;
+}
+:root[data-theme='neon-noir'] .dc-segmented__item[aria-checked='true'],
+:root[data-theme='neon-noir'] .dc-segmented__item[aria-selected='true'] {
+  background: color-mix(in srgb, var(--control-accent, var(--accent)) 24%, rgba(10, 14, 22, 0.9));
+  color: color-mix(in srgb, var(--control-accent, var(--accent)) 25%, #fff);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--control-accent, var(--accent)) 70%, transparent),
+    0 0 16px -4px color-mix(in srgb, var(--control-accent, var(--accent)) 60%, transparent);
+}
+:root[data-theme='neon-noir'] .dc-tab {
+  font-family: var(--font-tech);
+}
+:root[data-theme='neon-noir'] .dc-badge {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  border-radius: 999px;
+}
+:root[data-theme='neon-noir'] .dc-chip {
+  border-radius: 999px;
+}
+:root[data-theme='neon-noir'] .dc-kbd {
+  font-family: var(--font-num);
+  border-radius: 5px;
+}
+:root[data-theme='neon-noir'] .dc-toast {
+  border-radius: 12px;
+}
+
+/* =====================================================================
+ * ARCADE FLOOR — the cabinets stand on the wet street.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] .af-floor,
+:root[data-theme='neon-noir'] .af-entry,
+:root[data-theme='neon-noir'] .cp {
+  --af-ink-0: #eef3f8;
+  --af-ink-1: #c4ced9;
+  --af-ink-2: #94a1b0;
+  --af-ink-3: #808d9c;
+}
+:root[data-theme='neon-noir'] .af-floor,
+:root[data-theme='neon-noir'] .af-room {
+  background: transparent;
+}
+:root[data-theme='neon-noir'] .af-hud {
+  background: linear-gradient(180deg, rgba(2, 3, 7, 0.86), rgba(2, 3, 7, 0.4) 62%, rgba(2, 3, 7, 0));
+}
+/* The DASCADE wordmark as a white neon tube with a cold teal halo. */
+:root[data-theme='neon-noir'] .af-hud__word {
+  --pw-ink: #f4f8fc;
+  --pw-ink-2: #cfe9f0;
+  --pw-ol: #0a1a22;
+  --pw-shadow: rgba(70, 217, 236, 0.28);
+  filter: drop-shadow(0 0 4px rgba(120, 230, 245, 0.55)) drop-shadow(0 0 18px rgba(70, 217, 236, 0.28));
+}
+:root[data-theme='neon-noir'] .af-hud__sub {
+  font-family: var(--font-tech);
+  font-weight: 500;
+  font-size: clamp(9px, 0.66vw, 11px);
+  letter-spacing: 0.42em;
+  color: rgba(200, 222, 240, 0.72);
+  text-shadow: none;
+}
+:root[data-theme='neon-noir'] .af-floor .dc-btn {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+:root[data-theme='neon-noir'] .af-floor .dc-btn--lg,
+:root[data-theme='neon-noir'] .af-floor .dc-btn--xl {
+  font-size: 15px;
+}
+:root[data-theme='neon-noir'] .af-srv {
+  font-family: var(--font-tech);
+  border-radius: 999px;
+  background: rgba(6, 9, 14, 0.6);
+  border-color: rgba(185, 212, 240, 0.14);
+}
+:root[data-theme='neon-noir'] .af-hud__profile {
+  border-radius: 10px;
+  background: rgba(8, 11, 18, 0.84);
+  border-color: rgba(185, 212, 240, 0.16);
+}
+:root[data-theme='neon-noir'] .af-hud__profile-name {
+  color: var(--af-ink-0);
+}
+
+/* Spotlight: a cold key light from above instead of a coloured cone. */
+:root[data-theme='neon-noir'] .af-lineup::before {
+  background:
+    radial-gradient(34% 22% at 50% 94%, color-mix(in srgb, var(--sel, #46d9ec) 18%, transparent), transparent 72%),
+    conic-gradient(
+      from 180deg at 50% -8%,
+      transparent 0 170deg,
+      rgba(210, 232, 255, 0.045) 174deg 186deg,
+      transparent 190deg
+    );
+}
+
+/* Cabinets: night-time objects. Bodies sink into the dark; marquee and screen carry the light. */
+:root[data-theme='neon-noir'] .af-cab__svg {
+  filter: saturate(0.5) brightness(0.62) contrast(1.08);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .af-cab__svg {
+  filter: saturate(0.55) brightness(0.66);
+}
+:root[data-theme='neon-noir'] .af-cab__halo {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--p) 30%, transparent), transparent);
+}
+:root[data-theme='neon-noir'] .af-cab__sparks {
+  display: none;
+}
+/* Wet-pavement reflection of every cabinet (Chromium/WebKit; elsewhere the glow pool stands in). */
+/* Only the centred cabinet: a reflection must re-rasterise whenever its attract screen repaints. */
+:root[data-theme='neon-noir'][data-fx='high'] .af-slot[data-active='true'] .af-cab__body {
+  -webkit-box-reflect: below 1px linear-gradient(180deg, transparent 50%, rgba(255, 255, 255, 0.1) 78%, rgba(255, 255, 255, 0.34));
+}
+:root[data-theme='neon-noir'] .af-cab__reflect::before {
+  left: -4%;
+  right: -4%;
+  height: calc(var(--cab-w) * 0.5);
+  background:
+    radial-gradient(50% 30% at 50% 0%, color-mix(in srgb, var(--p) 60%, transparent), transparent 100%),
+    repeating-linear-gradient(180deg, transparent 0 3px, rgba(2, 3, 7, 0.5) 3px 4px);
+  opacity: 0.12;
+}
+:root[data-theme='neon-noir'] .af-slot[data-active='true'] .af-cab__reflect::before {
+  opacity: 0.42;
+}
+/* The "you are here" ring becomes a thin rain-ripple ellipse. */
+:root[data-theme='neon-noir'] .af-slot[data-active='true'] .af-cab__reflect::after {
+  border-width: 1px;
+  border-color: color-mix(in srgb, var(--p) 55%, #dff6ff);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--p) 40%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--p) 25%, transparent);
+  opacity: 0.7;
+}
+:root[data-theme='neon-noir'] .af-cab__name {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+:root[data-theme='neon-noir'] .af-slot[data-active='true'] .af-cab__name {
+  text-shadow: 0 0 14px color-mix(in srgb, var(--p) 45%, transparent), 0 1px 0 #000;
+}
+:root[data-theme='neon-noir'] .af-cab__family {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+}
+:root[data-theme='neon-noir'] .af-cab__focus {
+  --c: var(--nn-amber);
+  --t: 2px;
+}
+
+/* Carousel chrome */
+:root[data-theme='neon-noir'] .af-lineup__arrow {
+  border-radius: 50% !important;
+}
+:root[data-theme='neon-noir'] .af-lineup__pager i {
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(210, 232, 255, 0.2);
+}
+
+/* Plaque: a smoked-glass display case. */
+:root[data-theme='neon-noir'] .af-plaque {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 42%),
+    var(--nn-sheen),
+    rgba(7, 10, 16, 0.86);
+  border: 1px solid rgba(185, 212, 240, 0.15);
+  border-top-color: rgba(215, 235, 255, 0.24);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    0 0 40px -12px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .af-plaque {
+  background: rgba(7, 10, 16, 0.94);
+}
+:root[data-theme='neon-noir'] .af-plaque::before {
+  display: none;
+}
+:root[data-theme='neon-noir'] .af-plaque::after {
+  border: 0;
+  width: auto;
+  height: 1px;
+  left: 8%;
+  right: 8%;
+  top: -1px;
+  bottom: auto;
+  filter: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 80%, #fff), transparent);
+}
+:root[data-theme='neon-noir'] .af-plaque__kicker {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+}
+:root[data-theme='neon-noir'] .af-plaque__title {
+  --pw-ink: #f4f8fc;
+  --pw-ink-2: color-mix(in srgb, var(--accent) 22%, #fff);
+  --pw-shadow: rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='neon-noir'] .af-plaque__title .af-pw {
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 30%, transparent));
+}
+:root[data-theme='neon-noir'] .af-plaque__games li {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: rgba(10, 14, 22, 0.7);
+  border-color: color-mix(in srgb, var(--accent) 28%, rgba(185, 212, 240, 0.16));
+}
+
+/* Tournament kiosk: a backlit glass sign on the wall instead of an LED board. */
+:root[data-theme='neon-noir'] .af-kiosk {
+  --k-led: #f6e2b0;
+  --k-led-2: rgba(200, 222, 240, 0.8);
+  background: var(--nn-sheen), rgba(8, 11, 18, 0.88);
+  border: 1px solid rgba(244, 194, 91, 0.3);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 210, 0.08),
+    0 0 26px -8px rgba(244, 194, 91, 0.35),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='neon-noir'] .af-kiosk:hover {
+  border-color: rgba(244, 194, 91, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 210, 0.1),
+    0 0 34px -6px rgba(244, 194, 91, 0.5),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='neon-noir'] .af-kiosk::before {
+  background:
+    linear-gradient(rgba(150, 170, 195, 0.3), rgba(150, 170, 195, 0.3)) left / 1px 100% no-repeat,
+    linear-gradient(rgba(150, 170, 195, 0.3), rgba(150, 170, 195, 0.3)) right / 1px 100% no-repeat;
+}
+:root[data-theme='neon-noir'] .af-kiosk__title {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  color: #f6e2b0;
+  text-shadow: 0 0 10px rgba(244, 194, 91, 0.45);
+}
+@media (max-width: 1279px), (max-height: 639px) {
+  :root[data-theme='neon-noir'] .af-kiosk--strip .af-kiosk__title {
+    letter-spacing: 0.14em;
+  }
+}
+:root[data-theme='neon-noir'] .af-kiosk__track {
+  font-family: var(--font-tech);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-shadow: none;
+}
+:root[data-theme='neon-noir'] .af-kiosk__track span::after {
+  content: '·';
+  content: '·' / '';
+  font-size: 11px;
+  color: rgba(244, 194, 91, 0.7);
+}
+:root[data-theme='neon-noir'] .af-kiosk__trophy {
+  color: var(--nn-amber);
+  filter: drop-shadow(0 0 6px rgba(244, 194, 91, 0.45));
+}
+:root[data-theme='neon-noir'] .af-kiosk__go {
+  color: var(--nn-amber);
+}
+:root[data-theme='neon-noir'] .af-foot {
+  color: var(--af-ink-3);
+}
+:root[data-theme='neon-noir'] .af-foot__keys .dc-kbd {
+  background: rgba(8, 11, 18, 0.7);
+}
+
+/* Wordmark tubes: ice-white glass with a cold teal halo (overrides the SVG's pink strokes). */
+:root[data-theme='neon-noir'] .af-hud__word {
+  filter: drop-shadow(0 0 10px rgba(70, 217, 236, 0.35));
+}
+:root[data-theme='neon-noir'] .af-hud__word path:nth-child(1) {
+  stroke: #46d9ec;
+  stroke-opacity: 0.22;
+}
+:root[data-theme='neon-noir'] .af-hud__word path:nth-child(2) {
+  stroke: #9fe6f2;
+}
+:root[data-theme='neon-noir'] .af-hud__word path:nth-child(3) {
+  stroke: #ffffff;
+}
+:root[data-theme='neon-noir'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='neon-noir'] .af-hud__badge {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border-color: rgba(255, 77, 141, 0.55);
+  color: #ffb3cc;
+}
+:root[data-theme='neon-noir'] .af-ticker {
+  font-family: var(--font-tech);
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: var(--af-ink-3);
+}
+:root[data-theme='neon-noir'] .af-ticker__item + .af-ticker__item::before {
+  width: 4px;
+  height: 4px;
+  background: rgba(70, 217, 236, 0.7);
+  box-shadow: none;
+}
+
+/* Foreground rain: a few long streaks falling in front of the lineup (compositor-only transform loop). */
+:root[data-theme='neon-noir'][data-fx='high'] .af-lineup::after {
+  content: '';
+  position: absolute;
+  z-index: 1100;
+  left: 0;
+  right: 0;
+  top: -220px;
+  bottom: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='170' height='220'><g stroke='%23d4e8f7' stroke-linecap='round'><path d='M12 8l5 30' stroke-opacity='.32'/><path d='M61 96l4 24' stroke-opacity='.22'/><path d='M104 30l6 36' stroke-opacity='.28'/><path d='M140 150l4 26' stroke-opacity='.2'/><path d='M34 170l5 32' stroke-opacity='.26'/><path d='M88 190l3 18' stroke-opacity='.18'/></g></svg>");
+  background-size: 170px 220px;
+  opacity: 0.55;
+  will-change: transform;
+  animation: nn-rain-front 0.42s linear infinite;
+}
+:root[data-theme='neon-noir'][data-reduced-motion='true'] .af-lineup::after {
+  display: none;
+}
+@keyframes nn-rain-front {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 220px, 0);
+  }
+}
+
+/* =====================================================================
+ * TITLE SCREEN (/play/:id) — the attract art ghosts over the rainy
+ * district like a reflection in a shop window. Rain beads on the glass.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] {
+  --entry-backdrop: transparent;
+  --picker-backdrop: transparent;
+}
+:root[data-theme='neon-noir'] .af-entry__screen {
+  background: rgba(2, 3, 7, 0.35);
+  border-radius: clamp(0px, 1.4vw, 22px);
+  box-shadow:
+    0 0 0 1px rgba(200, 225, 250, 0.1),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 60px -10px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+:root[data-theme='neon-noir'] .af-entry__art {
+  opacity: 0.4;
+  filter: saturate(0.55) brightness(0.8) contrast(1.05);
+}
+:root[data-theme='neon-noir'] .af-entry__scan {
+  opacity: 0.18;
+}
+:root[data-theme='neon-noir'] .af-entry__scrim {
+  background:
+    linear-gradient(90deg, rgba(2, 3, 7, 0.9) 0%, rgba(2, 3, 7, 0.72) 44%, rgba(2, 3, 7, 0.35) 72%, rgba(2, 3, 7, 0.5) 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%);
+}
+/* Rain on the glass: beads (static) + a slow sheen. */
+:root[data-theme='neon-noir'] .af-entry__glass,
+:root[data-theme='neon-noir'] .cp-screen__glass {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><g fill='%23dcecf8'><circle cx='20' cy='30' r='1.6' fill-opacity='.18'/><circle cx='64' cy='12' r='1' fill-opacity='.14'/><circle cx='112' cy='54' r='2.2' fill-opacity='.14'/><circle cx='170' cy='22' r='1.2' fill-opacity='.18'/><circle cx='214' cy='70' r='1.8' fill-opacity='.12'/><circle cx='40' cy='120' r='1.2' fill-opacity='.16'/><circle cx='96' cy='150' r='1.6' fill-opacity='.12'/><circle cx='150' cy='118' r='1' fill-opacity='.18'/><circle cx='196' cy='170' r='2.4' fill-opacity='.1'/><circle cx='26' cy='206' r='2' fill-opacity='.12'/><circle cx='130' cy='214' r='1.2' fill-opacity='.16'/><circle cx='228' cy='228' r='1' fill-opacity='.16'/></g><g stroke='%23dcecf8' stroke-opacity='.08' stroke-width='1.2' fill='none'><path d='M112 56c1 18-2 30 0 48'/><path d='M196 172c-1 14 2 26 0 40'/></g></svg>") 0 0 / 240px 240px,
+    linear-gradient(118deg, rgba(220, 238, 255, 0.08) 0%, rgba(220, 238, 255, 0.02) 30%, transparent 31%),
+    radial-gradient(140% 100% at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .af-entry__glass,
+:root[data-theme='neon-noir'][data-fx='off'] .cp-screen__glass {
+  background: radial-gradient(140% 100% at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+}
+:root[data-theme='neon-noir'] .af-entry__marquee,
+:root[data-theme='neon-noir'] .cp__marquee {
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(24, 32, 45, 0.9), rgba(6, 9, 14, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(200, 225, 250, 0.14),
+    inset 0 1px 0 rgba(220, 238, 255, 0.1),
+    0 0 40px -6px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 16px 40px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='neon-noir'] .af-entry__kicker,
+:root[data-theme='neon-noir'] .af-entry__label,
+:root[data-theme='neon-noir'] .af-entry__credit,
+:root[data-theme='neon-noir'] .cp__label,
+:root[data-theme='neon-noir'] .cp-detail__kicker,
+:root[data-theme='neon-noir'] .cp-item__meta {
+  font-family: var(--font-tech);
+  font-weight: 600;
+}
+:root[data-theme='neon-noir'] .af-entry__title,
+:root[data-theme='neon-noir'] .cp__title,
+:root[data-theme='neon-noir'] .cp-detail__title {
+  --pw-ink: #f4f8fc;
+  --pw-ink-2: color-mix(in srgb, var(--accent) 20%, #fff);
+  --pw-shadow: rgba(0, 0, 0, 0.65);
+  --pw-ol: #05070b;
+}
+:root[data-theme='neon-noir'] .af-entry__title .af-pw,
+:root[data-theme='neon-noir'] .cp__title .af-pw {
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 22%, transparent));
+}
+:root[data-theme='neon-noir'] .af-entry .dc-btn,
+:root[data-theme='neon-noir'] .cp .dc-btn {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+:root[data-theme='neon-noir'] .af-entry .dc-btn--lg,
+:root[data-theme='neon-noir'] .af-entry .dc-btn--xl,
+:root[data-theme='neon-noir'] .cp .dc-btn--lg,
+:root[data-theme='neon-noir'] .cp .dc-btn--xl {
+  font-size: 15px;
+}
+:root[data-theme='neon-noir'] .af-entry__top .dc-btn.af-entry__back,
+:root[data-theme='neon-noir'] .af-entry__top .dc-btn.af-entry__help {
+  border-radius: 999px;
+  background: rgba(6, 9, 14, 0.84);
+  box-shadow: inset 0 0 0 1px rgba(200, 225, 250, 0.16);
+}
+@media (max-width: 560px) {
+  :root[data-theme='neon-noir'] .af-entry .dc-btn.af-entry__help {
+    font-size: 0;
+    letter-spacing: 0;
+  }
+}
+:root[data-theme='neon-noir'] .af-entry__card {
+  background: var(--nn-sheen), rgba(7, 10, 16, 0.88);
+  border: 1px solid rgba(190, 215, 240, 0.16);
+  border-top-color: rgba(220, 238, 255, 0.26);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    0 0 50px -14px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 40px 90px rgba(0, 0, 0, 0.65);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .af-entry__card {
+  background: rgba(7, 10, 16, 0.96);
+}
+:root[data-theme='neon-noir'] .af-entry__card::before {
+  display: none;
+}
+:root[data-theme='neon-noir'] .af-entry__card::after {
+  border: 0;
+  width: auto;
+  height: 1px;
+  left: 10%;
+  right: 10%;
+  top: -1px;
+  bottom: auto;
+  filter: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 80%, #fff), transparent);
+}
+:root[data-theme='neon-noir'] .af-entry__card-head h2 {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.32em;
+}
+:root[data-theme='neon-noir'] .af-entry__slot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nn-rose);
+  box-shadow:
+    0 0 10px var(--nn-rose),
+    0 0 0 3px rgba(255, 77, 141, 0.12);
+}
+:root[data-theme='neon-noir'] .af-entry__controls {
+  border-radius: 12px;
+  background: rgba(6, 9, 14, 0.55);
+  border-color: rgba(190, 215, 240, 0.12);
+}
+:root[data-theme='neon-noir'] .af-entry__crumbs [aria-current='page'],
+:root[data-theme='neon-noir'] .cp__crumbs [aria-current='page'] {
+  color: var(--accent);
+}
+
+/* =====================================================================
+ * CABINET PICKER — each cabinet's world, glimpsed through the rain.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] .cpb {
+  background: transparent;
+}
+:root[data-theme='neon-noir'] .cpb > *:not(.cpb__vignette) {
+  opacity: 0.22;
+  filter: saturate(0.35) brightness(0.7);
+}
+:root[data-theme='neon-noir'] .cpb__vignette {
+  background:
+    radial-gradient(ellipse 90% 80% at 50% 45%, transparent 45%, rgba(1, 2, 5, 0.78) 100%),
+    linear-gradient(180deg, rgba(2, 3, 7, 0.6), transparent 22%, transparent 70%, rgba(2, 3, 7, 0.7));
+}
+:root[data-theme='neon-noir'] .cp__tourney {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: #f6e2b0;
+  background: rgba(8, 11, 18, 0.86);
+  border: 1px solid rgba(244, 194, 91, 0.35);
+  border-radius: 999px;
+  text-shadow: none;
+  box-shadow: 0 0 20px -6px rgba(244, 194, 91, 0.4);
+}
+:root[data-theme='neon-noir'] .cp-item {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ip) 8%, rgba(8, 11, 18, 0.86)), rgba(6, 9, 14, 0.84));
+  border: 1px solid rgba(190, 215, 240, 0.12);
+  border-left: 1px solid color-mix(in srgb, var(--ip) 55%, transparent);
+  border-radius: 12px;
+}
+:root[data-theme='neon-noir'] .cp-item:hover,
+:root[data-theme='neon-noir'] .cp-item.is-selected {
+  border-color: color-mix(in srgb, var(--ip) 55%, rgba(190, 215, 240, 0.2));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ip) 16%, rgba(8, 11, 18, 0.9)), rgba(8, 11, 18, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    0 0 30px -8px color-mix(in srgb, var(--ip) 45%, transparent),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='neon-noir'] .cp-item.is-selected::before {
+  content: '';
+  left: -14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ip);
+  box-shadow: 0 0 10px var(--ip);
+  animation: none;
+}
+:root[data-theme='neon-noir'] .cp-item__screen {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    0 0 0 2px color-mix(in srgb, var(--ip) 28%, rgba(190, 215, 240, 0.12));
+}
+:root[data-theme='neon-noir'] .cp-item__title {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+:root[data-theme='neon-noir'] .cp__preview {
+  background: var(--nn-sheen), rgba(7, 10, 16, 0.88);
+  border: 1px solid rgba(190, 215, 240, 0.15);
+  border-top-color: rgba(220, 238, 255, 0.24);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    0 0 50px -14px color-mix(in srgb, var(--ip) 40%, transparent),
+    0 40px 90px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .cp__preview,
+:root[data-theme='neon-noir'][data-fx='off'] .cp-item {
+  background: rgba(7, 10, 16, 0.95);
+}
+:root[data-theme='neon-noir'] .cp-screen {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 0 2px color-mix(in srgb, var(--ip) 30%, rgba(190, 215, 240, 0.14)),
+    0 0 40px -8px color-mix(in srgb, var(--ip) 40%, transparent);
+}
+
+/* =====================================================================
+ * SHELL — top bar, code chip, lobby, players, results, notices.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] .topbar__title {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: none;
+}
+:root[data-theme='neon-noir'] .code-chip {
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, rgba(190, 215, 240, 0.14));
+  border-radius: 999px;
+  background: rgba(4, 6, 10, 0.6);
+}
+:root[data-theme='neon-noir'] .code-chip:hover {
+  background: color-mix(in srgb, var(--accent) 10%, rgba(4, 6, 10, 0.7));
+}
+:root[data-theme='neon-noir'] .code-chip__label {
+  font-family: var(--font-tech);
+  font-weight: 600;
+}
+:root[data-theme='neon-noir'] .lobby-hero__name {
+  font-family: var(--font-tech);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+/* Room code: glass tiles lit from behind by the game's accent. */
+:root[data-theme='neon-noir'] .lobby-code__value span {
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(220, 238, 255, 0.07), rgba(220, 238, 255, 0) 45%),
+    color-mix(in srgb, var(--accent) 8%, rgba(4, 6, 10, 0.8));
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, rgba(190, 215, 240, 0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.1),
+    inset 0 -10px 20px -12px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 24px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--accent) 30%, #fff);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+:root[data-theme='neon-noir'] .player-list__item {
+  border-radius: 10px;
+}
+:root[data-theme='neon-noir'] .ready-pill {
+  border-radius: 999px;
+  font-family: var(--font-tech);
+  font-weight: 600;
+}
+:root[data-theme='neon-noir'] .seat-meter {
+  border-radius: 999px;
+}
+:root[data-theme='neon-noir'] .results-shell__title {
+  font-family: var(--font-tech);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+:root[data-theme='neon-noir'] .notice-card,
+:root[data-theme='neon-noir'] .reconnect-card,
+:root[data-theme='neon-noir'] .loading-card,
+:root[data-theme='neon-noir'] .join-prompt {
+  border-radius: 16px;
+}
+:root[data-theme='neon-noir'] .notice-card__title,
+:root[data-theme='neon-noir'] .reconnect-card__title {
+  font-family: var(--font-tech);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+:root[data-theme='neon-noir'] .countdown-overlay__num {
+  font-family: var(--font-num);
+  font-weight: 300;
+  color: color-mix(in srgb, var(--accent) 25%, #fff);
+  text-shadow:
+    0 0 30px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 0 90px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+/* In-game stage backdrop: the game's accent as a low street glow over ink. */
+:root[data-theme='neon-noir'] .dc-game-backdrop {
+  background:
+    radial-gradient(1100px 520px at 50% 118%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 62%),
+    radial-gradient(900px 460px at 110% -10%, color-mix(in srgb, var(--accent-2) 7%, transparent), transparent 60%),
+    linear-gradient(180deg, rgba(3, 5, 9, 0.9), rgba(2, 3, 6, 0.94));
+}
+
+/* =====================================================================
+ * TOURNAMENT CENTER
+ * ===================================================================== */
+:root[data-theme='neon-noir'] .tc-center {
+  background: transparent;
+}
+:root[data-theme='neon-noir'] .tc-hero {
+  background:
+    radial-gradient(ellipse at 14% 30%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%),
+    var(--nn-sheen),
+    rgba(7, 10, 16, 0.86);
+  border: 1px solid rgba(190, 215, 240, 0.15);
+  border-top-color: rgba(220, 238, 255, 0.26);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    0 0 60px -20px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 40px 90px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='neon-noir'] .tc-hero::before {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 70%, #fff), transparent) 50% 0 / 76% 1px no-repeat;
+  mask-image: none;
+  opacity: 0.9;
+}
+:root[data-theme='neon-noir'] .tc-marquee__kicker {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.34em;
+}
+:root[data-theme='neon-noir'] .tc-marquee__title {
+  font-family: var(--font-tech);
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+:root[data-theme='neon-noir'] .tc-marquee__trophy {
+  filter: saturate(0.7) drop-shadow(0 0 22px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+:root[data-theme='neon-noir'] .tc-board__title,
+:root[data-theme='neon-noir'] .tc-how__title,
+:root[data-theme='neon-noir'] .tc-board__empty {
+  font-family: var(--font-tech);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+}
+:root[data-theme='neon-noir'] .tc-lamp {
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+}
+:root[data-theme='neon-noir'] .tc-board__state,
+:root[data-theme='neon-noir'] .tc-steps li,
+:root[data-theme='neon-noir'] .tc-row {
+  background: var(--nn-sheen), rgba(7, 10, 16, 0.84);
+  border-color: rgba(190, 215, 240, 0.13);
+}
+:root[data-theme='neon-noir'] .tc-board__state {
+  border-style: solid;
+  border-radius: 16px;
+}
+:root[data-theme='neon-noir'] .tc-row {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--g) 9%, transparent), transparent 40%), rgba(7, 10, 16, 0.86);
+  border-left: 1px solid color-mix(in srgb, var(--g) 70%, transparent);
+  border-radius: 12px;
+}
+:root[data-theme='neon-noir'] .tc-steps li {
+  border-radius: 14px;
+}
+:root[data-theme='neon-noir'] .tc-steps__n {
+  border-radius: 50%;
+  font-family: var(--font-num);
+  font-weight: 500;
+  box-shadow: 0 0 18px -4px var(--accent);
+}
+:root[data-theme='neon-noir'][data-fx='off'] .tc-hero,
+:root[data-theme='neon-noir'][data-fx='off'] .tc-row,
+:root[data-theme='neon-noir'][data-fx='off'] .tc-steps li,
+:root[data-theme='neon-noir'][data-fx='off'] .tc-board__state {
+  background-color: rgba(7, 10, 16, 0.96);
+}
+
+/* =====================================================================
+ * GAME CHROME — kits
+ * ===================================================================== */
+/* Boardroom (chess/checkers): a pane of smoked glass on a steel frame, rain beading on top. */
+:root[data-theme='neon-noir'] [data-part='board-frame'] {
+  --br-frame-edge: color-mix(in srgb, var(--accent) 28%, rgba(200, 225, 250, 0.4));
+  border-radius: 8px;
+}
+:root[data-theme='neon-noir'] [data-part='board-frame']::after {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><g fill='%23e6f2fb'><circle cx='24' cy='40' r='1.4' fill-opacity='.2'/><circle cx='90' cy='18' r='1' fill-opacity='.16'/><circle cx='150' cy='76' r='1.8' fill-opacity='.14'/><circle cx='60' cy='130' r='1.2' fill-opacity='.18'/><circle cx='176' cy='160' r='1' fill-opacity='.2'/><circle cx='118' cy='186' r='1.5' fill-opacity='.12'/></g></svg>") 0 0 / 200px 200px,
+    linear-gradient(125deg, rgba(225, 240, 255, 0.13) 0%, rgba(225, 240, 255, 0.02) 30%, rgba(225, 240, 255, 0) 56%, rgba(225, 240, 255, 0.05) 100%);
+}
+:root[data-theme='neon-noir'][data-fx='off'] [data-part='board-frame']::after {
+  background: linear-gradient(125deg, rgba(225, 240, 255, 0.08) 0%, rgba(225, 240, 255, 0) 32%);
+}
+:root[data-theme='neon-noir'] [data-part='clock'] {
+  border-radius: 10px;
+}
+:root[data-theme='neon-noir'] [data-part='player-card'] {
+  border-radius: 14px;
+}
+
+/* =====================================================================
+ * JUKEBOX — an elegant glass music console: minimal controls, a deep
+ * black screen and a spectrum that glows like neon on wet glass.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] [data-jukebox] {
+  --jb-bg: var(--nn-sheen), rgba(6, 9, 14, 0.97);
+  --jb-border: rgba(190, 215, 240, 0.16);
+  --jb-radius: 18px;
+  --jb-shadow: inset 0 1px 0 rgba(220, 238, 255, 0.08), 0 0 50px -18px rgba(70, 217, 236, 0.45);
+  --jb-font-title: var(--font-tech);
+  --jb-font-label: var(--font-tech);
+  --jb-vis-h: 84px;
+  --jb-screen: #020306;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='panel']::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: 14%;
+  right: 14%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(120, 230, 245, 0.8), rgba(255, 120, 170, 0.6), transparent);
+  pointer-events: none;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='header'] {
+  padding: 10px 10px 10px 18px;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='header']::after {
+  opacity: 0;
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-titlebar__title {
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='display'] {
+  border-radius: 14px;
+  border-color: rgba(190, 215, 240, 0.12);
+  background:
+    radial-gradient(120% 80% at 50% 120%, rgba(70, 217, 236, 0.1), transparent 60%),
+    linear-gradient(180deg, #05080d, #020306);
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.06),
+    inset 0 0 40px rgba(0, 0, 0, 0.8);
+}
+/* Glass reflection across the screen instead of scanlines. */
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='display']::after {
+  background: linear-gradient(120deg, rgba(220, 238, 255, 0.07) 0%, rgba(220, 238, 255, 0.015) 34%, transparent 35%);
+  opacity: 1;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='art'] {
+  border-radius: 10px;
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-now__label {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--font-tech);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+/* Hairline seek + volume with round, lit thumbs. */
+:root[data-theme='neon-noir'] [data-jukebox] .jb-seek::-webkit-slider-runnable-track,
+:root[data-theme='neon-noir'] [data-jukebox] .jb-volume::-webkit-slider-runnable-track {
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #46d9ec, color-mix(in srgb, #46d9ec 40%, #ff4d8d) var(--fill), rgba(190, 215, 240, 0.16) var(--fill));
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-seek::-webkit-slider-thumb,
+:root[data-theme='neon-noir'] [data-jukebox] .jb-volume::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4fbff;
+  box-shadow:
+    0 0 0 3px rgba(70, 217, 236, 0.25),
+    0 0 12px rgba(70, 217, 236, 0.7);
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-seek::-moz-range-track,
+:root[data-theme='neon-noir'] [data-jukebox] .jb-volume::-moz-range-track {
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(190, 215, 240, 0.16);
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-seek::-moz-range-progress,
+:root[data-theme='neon-noir'] [data-jukebox] .jb-volume::-moz-range-progress {
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #46d9ec, #ff4d8d);
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-seek::-moz-range-thumb,
+:root[data-theme='neon-noir'] [data-jukebox] .jb-volume::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4fbff;
+  box-shadow: 0 0 12px rgba(70, 217, 236, 0.7);
+}
+/* Minimal round transport; the play key is a ring of light. */
+:root[data-theme='neon-noir'] [data-jukebox] .jb-btn {
+  border-radius: 999px;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='play'] {
+  border-radius: 50%;
+  border: 1px solid rgba(120, 230, 245, 0.7);
+  background: radial-gradient(circle at 50% 30%, rgba(70, 217, 236, 0.28), rgba(6, 12, 18, 0.9) 70%);
+  color: #f4fbff;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 238, 255, 0.2),
+    0 0 0 4px rgba(70, 217, 236, 0.08),
+    0 0 24px rgba(70, 217, 236, 0.4);
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='play']:hover:not(:disabled) {
+  background: radial-gradient(circle at 50% 30%, rgba(70, 217, 236, 0.42), rgba(6, 12, 18, 0.9) 72%);
+  color: #fff;
+  border-color: rgba(160, 240, 250, 0.9);
+}
+:root[data-theme='neon-noir'][data-fx='off'] [data-jukebox] [data-part='play'] {
+  box-shadow: inset 0 1px 0 rgba(220, 238, 255, 0.2);
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-btn--toggle[aria-pressed='true']::after {
+  border-radius: 50%;
+}
+:root[data-theme='neon-noir'] [data-jukebox] .jb-tab {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: var(--fs-xs);
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='search'],
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='sort'] select {
+  border-radius: 10px;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='track'],
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='queue-item'] {
+  border-radius: 10px;
+}
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='track'][data-current='true']::before {
+  border-radius: 2px;
+}
+/* The dock: a small glass puck. */
+:root[data-theme='neon-noir'] [data-jukebox] [data-part='mini'] {
+  border-radius: 14px;
+  background: var(--nn-sheen), rgba(6, 9, 14, 0.9);
+  border-color: rgba(190, 215, 240, 0.16);
+}
+/* Rain beads trickling down the console glass (JukeboxDecor). */
+:root[data-theme='neon-noir'] .nn-jb-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+:root[data-theme='neon-noir'] .nn-jb-decor i {
+  position: absolute;
+  top: -8%;
+  left: var(--x);
+  width: var(--s);
+  height: calc(var(--s) * 1.35);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, rgba(240, 250, 255, 0.9), rgba(160, 225, 240, 0.35) 45%, transparent 70%);
+  opacity: calc(0.25 + var(--nn-level, 0.3) * 0.5);
+  box-shadow: 0 0 6px rgba(70, 217, 236, calc(var(--nn-level, 0.3) * 0.6));
+  animation: nn-bead var(--d) cubic-bezier(0.5, 0, 0.9, 0.6) var(--delay) infinite;
+}
+:root[data-theme='neon-noir'] .nn-jb-decor[data-still] i {
+  animation: none;
+  top: calc(20% + var(--s) * 12);
+}
+@keyframes nn-bead {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  70% {
+    transform: translate3d(0, 60px, 0);
+  }
+  100% {
+    transform: translate3d(0, 170px, 0);
+  }
+}
+
+/* Wheel of DAStiny: the SPIN key is the default amber slab, but the noir primary recipe lightens its ink —
+   pale text on amber (≈1.6:1). Give it the same lit-glass treatment as every other noir primary key,
+   warm amber behind smoked glass, with bright ink (≥ 7:1). */
+:root[data-theme='neon-noir'] .wh-spin.dc-btn {
+  --btn-bg: color-mix(in srgb, #ffb020 38%, rgba(10, 14, 22, 0.92));
+  --btn-bg-2: color-mix(in srgb, #ff7a2f 22%, rgba(6, 9, 14, 0.95));
+  --btn-fg: #fff3dc;
+  --btn-edge: color-mix(in srgb, #ffb020 75%, transparent);
+  --btn-glow: color-mix(in srgb, #ffb020 38%, transparent);
+  background: linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+  color: var(--btn-fg);
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 14px color-mix(in srgb, #ffb020 60%, transparent);
+}
+
+/* =====================================================================
+ * SPORTS GAMES AFTER DARK — elegant smoked-glass HUD with a single neon hairline, thin rims,
+ * quiet read-outs and a rose-rimmed FIRE key that breathes when armed. A soft cinematic
+ * vignette and a hairline edge frame the view. Restraint over ornament; playfields untouched.
+ * ===================================================================== */
+:root[data-theme='neon-noir'] [data-game='tanks'] .tk-glass,
+:root[data-theme='neon-noir'] [data-game='circuit'] .ci-glass,
+:root[data-theme='neon-noir'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='neon-noir'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 1px solid var(--nn-edge);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, transparent 8%, rgba(70, 217, 236, 0.55) 50%, transparent 92%) 50% 0 / 100% 1px no-repeat,
+    var(--nn-sheen),
+    rgba(7, 10, 16, 0.72);
+  box-shadow:
+    inset 0 1px 0 var(--nn-glass-hi),
+    0 0 0 1px rgba(3, 4, 7, 0.6),
+    0 24px 48px -16px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+:root[data-theme='neon-noir'][data-fx='off'] [data-game='tanks'] .tk-glass,
+:root[data-theme='neon-noir'][data-fx='off'] [data-game='circuit'] .ci-glass,
+:root[data-theme='neon-noir'][data-fx='off']
+  [data-game='putt']
+  :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='neon-noir'][data-fx='off'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(7, 10, 16, 0.94);
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='neon-noir'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='neon-noir'] [data-game='ships'] .sh-panel--active {
+  border-color: rgba(70, 217, 236, 0.5);
+  box-shadow:
+    inset 0 1px 0 var(--nn-glass-hi),
+    0 0 0 1px rgba(3, 4, 7, 0.6),
+    0 0 36px -10px rgba(70, 217, 236, 0.55),
+    0 24px 48px -16px rgba(0, 0, 0, 0.8);
+}
+/* Glass keys with a thin rim. */
+:root[data-theme='neon-noir'] [data-game='tanks'] .tk-hold {
+  border: 1px solid var(--nn-edge-hi);
+  border-radius: 12px;
+  color: #eef3f8;
+  background: linear-gradient(180deg, rgba(215, 235, 255, 0.09), rgba(215, 235, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(215, 235, 255, 0.12);
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  border-color: rgba(70, 217, 236, 0.6);
+  background: linear-gradient(180deg, rgba(70, 217, 236, 0.16), rgba(70, 217, 236, 0.04));
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] .tk-weapon__current {
+  border: 1px solid var(--nn-edge-hi);
+  border-radius: 12px;
+  background: rgba(215, 235, 255, 0.04);
+}
+/* Quiet read-outs: light digits, a faint teal halo. */
+:root[data-theme='neon-noir'] [data-game='tanks'] .tk-dial__value b,
+:root[data-theme='neon-noir'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='neon-noir'] [data-game='circuit'] .ci-clock {
+  color: #f4f8fc;
+  text-shadow: 0 0 14px rgba(70, 217, 236, 0.35);
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i {
+  width: 4px;
+  border-radius: 2px;
+  background: rgba(215, 235, 255, 0.08);
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i[data-on='true'] {
+  background: var(--wind-c, var(--cyan));
+}
+/* FIRE: smoked glass with a rose neon rim; it breathes when armed. */
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='fire'] {
+  border: 1px solid rgba(255, 77, 141, 0.85);
+  border-radius: 14px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 40%),
+    linear-gradient(180deg, rgba(255, 77, 141, 0.42), rgba(120, 20, 60, 0.55));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 235, 0.3),
+    0 0 26px -4px rgba(255, 77, 141, 0.7);
+  text-shadow: 0 0 12px rgba(255, 77, 141, 0.8);
+  animation: none;
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: nn-fire-breathe 2.4s ease-in-out infinite;
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='fire']:disabled {
+  border-color: var(--nn-edge);
+  color: #94a1b0;
+  text-shadow: none;
+  background: rgba(215, 235, 255, 0.04);
+  box-shadow: none;
+}
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme='neon-noir'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: none;
+}
+@keyframes nn-fire-breathe {
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 220, 235, 0.35),
+      0 0 40px -2px rgba(255, 77, 141, 0.85);
+  }
+}
+/* Cinematic framing: a soft vignette and a hairline edge. */
+:root[data-theme='neon-noir'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='neon-noir'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='neon-noir'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(185, 212, 240, 0.14),
+    inset 0 0 160px rgba(3, 4, 7, 0.5);
+}
+/* Ships: titles on a teal hairline, glass-rimmed seas. */
+:root[data-theme='neon-noir'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  padding-bottom: 5px;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, rgba(70, 217, 236, 0.5), transparent 70%) 1;
+}
+:root[data-theme='neon-noir'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  font-family: var(--font-tech);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: #eef3f8;
+}
+:root[data-theme='neon-noir'] [data-game='ships'] [data-part='board-frame'] {
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px var(--nn-edge-hi),
+    0 0 0 4px rgba(7, 10, 16, 0.8),
+    0 0 0 5px var(--nn-edge),
+    inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='neon-noir'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 1px rgba(70, 217, 236, 0.7),
+    0 0 0 4px rgba(7, 10, 16, 0.8),
+    0 0 0 5px rgba(70, 217, 236, 0.3),
+    0 0 40px -8px rgba(70, 217, 236, 0.55),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+/* Circuit: glass gantry and minimap. */
+:root[data-theme='neon-noir'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 1px solid var(--nn-edge-hi);
+  border-radius: 16px;
+  background: var(--nn-sheen), rgba(7, 10, 16, 0.85);
+}
+:root[data-theme='neon-noir'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__pod {
+  border-radius: 12px;
+}
+:root[data-theme='neon-noir'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__title {
+  border-radius: 999px;
+  border-color: var(--nn-edge-hi);
+  font-family: var(--font-tech);
+  letter-spacing: 0.3em;
+}
+:root[data-theme='neon-noir'] [data-game='circuit'] [data-part='minimap'] {
+  border: 1px solid var(--nn-edge-hi);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.8);
+}
+@media (max-width: 640px), (max-height: 560px) {
+  :root[data-theme='neon-noir'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='neon-noir'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='neon-noir'] [data-game='circuit'] [data-part='race']::after {
+    box-shadow: inset 0 0 80px rgba(3, 4, 7, 0.4);
+  }
+}

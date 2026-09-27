@@ -15,7 +15,7 @@ import { useHighScores } from './useClassics.ts';
 
 function Card({ children, className, label, wide }: { children: ReactNode; className?: string; label: string; wide?: boolean }) {
   return (
-    <section className={cx('cl-card', wide && 'cl-card--wide', className)} role="dialog" aria-modal="false" aria-label={label}>
+    <section className={cx('cl-card', wide && 'cl-card--wide', className)} data-part="card" role="dialog" aria-modal="false" aria-label={label}>
       <span className="cl-card__corner cl-card__corner--tl" aria-hidden />
       <span className="cl-card__corner cl-card__corner--br" aria-hidden />
       {children}
@@ -151,7 +151,7 @@ export function CountdownCard({ startAt, label = 'Get ready', sub, ready }: { st
   if (left <= -700) return null;
   const n = Math.ceil(left / 1000);
   return (
-    <div className="cl-countdown" role="status" aria-live="assertive" aria-label={left > 0 ? `Starting in ${n}` : 'Go'}>
+    <div className="cl-countdown" data-part="countdown" role="status" aria-live="assertive" aria-label={left > 0 ? `Starting in ${n}` : 'Go'}>
       <span className="cl-countdown__label">{left > 0 ? label : ''}</span>
       <span key={left > 0 ? (ready ? 'ready' : n) : 'go'} className={cx('cl-countdown__num', left <= 0 && 'is-go')}>
         {left > 0 ? (n > 3 || ready ? 'READY' : n) : 'GO!'}

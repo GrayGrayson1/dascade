@@ -103,7 +103,7 @@ export function HeroCard({ hero, player, me, voted, votingOpen, catalog }: HeroC
 
 export function PartyStrip({ heroes, myId, votes, onOpen }: { heroes: QuestHeroView[]; myId: string | null; votes: Record<string, string>; onOpen: (panel: 'party' | 'bag' | 'log') => void }) {
   return (
-    <div className="qs-strip" role="group" aria-label="Party">
+    <div className="qs-strip" data-part="party-strip" role="group" aria-label="Party">
       <button type="button" className="qs-strip__heroes" onClick={() => onOpen('party')} aria-label="Show party details">
         {heroes.map((h) => (
           <span key={h.playerId} className={cx('qs-strip__hero', h.playerId === myId && 'is-me')} style={{ '--hero': h.color } as CSSProperties}>
@@ -147,7 +147,7 @@ export function Inventory({
     .sort((a, b) => Number(b.def?.usable ?? false) - Number(a.def?.usable ?? false) || (a.def?.name ?? a.id).localeCompare(b.def?.name ?? b.id));
   const selected = items.find((i) => i.id === open);
   return (
-    <div className="qs-bag">
+    <div className="qs-bag" data-part="inventory">
       <div className="qs-bag__credits">
         <PixelIcon name="chip" /> <b className="dc-num">{credits}</b> credits
       </div>

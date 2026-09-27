@@ -117,12 +117,13 @@ export function CabinetEntry() {
       className="af-entry"
       id="main"
       data-cabinet-entry={gameId}
+      data-part="title-screen"
       data-game={gameId}
       data-table={variant ?? undefined}
       style={{ '--p': game.accent.primary, '--s': game.accent.secondary, '--d': game.accent.deep } as CSSProperties}
     >
-      <div className="af-entry__bg" aria-hidden>
-        <div className="af-entry__screen">
+      <div className="af-entry__bg" data-part="title-backdrop" aria-hidden>
+        <div className="af-entry__screen" data-part="title-hero">
           <AttractCanvas
             scenes={scenesForGame(gameId, variant)}
             title={title.toUpperCase()}
@@ -140,8 +141,8 @@ export function CabinetEntry() {
         </div>
       </div>
 
-      <div className="af-entry__frame">
-        <header className="af-entry__top">
+      <div className="af-entry__frame" data-part="title-frame">
+        <header className="af-entry__top" data-part="title-header">
           <Button
             variant="ghost"
             icon="arrow-left"
@@ -153,6 +154,7 @@ export function CabinetEntry() {
           </Button>
           <div
             className="af-entry__marquee"
+            data-part="title-marquee"
             style={cabinet ? ({ '--p': cabinet.accent.primary, '--s': cabinet.accent.secondary } as CSSProperties) : undefined}
           >
             <MarqueeLogo subject={cabinet ?? game} />
@@ -163,7 +165,7 @@ export function CabinetEntry() {
         </header>
 
         <div className="af-entry__grid">
-          <div className="af-entry__head">
+          <div className="af-entry__head" data-part="title-heading">
             <nav className="af-entry__crumbs" aria-label="Breadcrumb">
               <ol>
                 <li>
@@ -180,22 +182,24 @@ export function CabinetEntry() {
             <p className="af-entry__kicker">
               {CATEGORY_LABEL[game.category]} · {playerRange(game)} players
             </p>
-            <h1 id="ce-title" className="af-entry__title">
+            <h1 id="ce-title" className="af-entry__title" data-part="title-title">
               <span className="visually-hidden">{title}</span>
               <PixelWord text={title} variant="title" />
             </h1>
-            <p className="af-entry__tagline">{tagline}</p>
+            <p className="af-entry__tagline" data-part="title-tagline">
+              {tagline}
+            </p>
           </div>
 
-          <section className="af-entry__card" aria-labelledby="ce-coin">
-            <header className="af-entry__card-head">
+          <section className="af-entry__card" data-part="title-card" aria-labelledby="ce-coin">
+            <header className="af-entry__card-head" data-part="title-card-header">
               <span className="af-entry__slot" aria-hidden />
               <h2 id="ce-coin">Insert coin</h2>
               <span className="af-entry__credit" aria-hidden>
                 1P
               </span>
             </header>
-            <div className="af-entry__card-body">
+            <div className="af-entry__card-body" data-part="title-actions">
               <ProfileEditor compact />
               {error ? (
                 <div className="af-entry__error" role="alert">
@@ -229,6 +233,7 @@ export function CabinetEntry() {
               {showJoin ? (
                 <form
                   className="af-entry__join"
+                  data-part="title-join"
                   onSubmit={(e) => {
                     e.preventDefault();
                     void join();
@@ -271,7 +276,7 @@ export function CabinetEntry() {
             </div>
           </section>
 
-          <div className="af-entry__details">
+          <div className="af-entry__details" data-part="title-details">
             <p className="af-entry__desc">{description}</p>
             <div className="af-entry__badges">
               <Badge icon="users">{playerRange(game)} players</Badge>
@@ -281,7 +286,7 @@ export function CabinetEntry() {
                 </Badge>
               ))}
             </div>
-            <div className="af-entry__controls">
+            <div className="af-entry__controls" data-part="title-controls">
               <h2 className="af-entry__label">Controls</h2>
               <ul>
                 {game.controls.map((c) => (

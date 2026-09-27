@@ -71,6 +71,7 @@ export const Cabinet = memo(function Cabinet({
     <li
       ref={(el) => setSlot(index, el)}
       className="af-slot"
+      data-part="cabinet-slot"
       data-index={index}
       data-active={active ? 'true' : undefined}
       style={
@@ -85,6 +86,7 @@ export const Cabinet = memo(function Cabinet({
         ref={(el) => setButton(index, el)}
         type="button"
         className="af-cab"
+        data-part="cabinet"
         id={`cabinet-${cabinet.id}`}
         data-cabinet={cabinet.id}
         data-active={active ? 'true' : undefined}
@@ -105,13 +107,13 @@ export const Cabinet = memo(function Cabinet({
         <span className="visually-hidden" id={describedBy}>
           {`${index + 1} of ${count}. ${multi ? `Games: ${cabinet.games.map((g) => g.title).join(', ')}. ` : ''}${cabinet.tagline}`}
         </span>
-        <span className="af-cab__body">
+        <span className="af-cab__body" data-part="cabinet-body">
           <span className="af-cab__halo" aria-hidden />
           <CabinetArt cabinet={cabinet} uid={uid} />
-          <span className="af-cab__marquee" style={LAYOUT.marquee}>
+          <span className="af-cab__marquee" data-part="cabinet-marquee" style={LAYOUT.marquee}>
             <MarqueeLogo subject={cabinet} />
           </span>
-          <span className="af-cab__screen" ref={(el) => setScreen(index, el)} style={LAYOUT.screen}>
+          <span className="af-cab__screen" data-part="cabinet-screen" ref={(el) => setScreen(index, el)} style={LAYOUT.screen}>
             <AttractCanvas
               scenes={CABINET_PLAYLISTS[cabinet.id]}
               title={cabinet.marquee}
@@ -129,8 +131,8 @@ export const Cabinet = memo(function Cabinet({
           </span>
           <span className="af-cab__focus" aria-hidden style={{ left: LAYOUT.face.left, width: LAYOUT.face.width }} />
         </span>
-        <span className="af-cab__reflect" aria-hidden />
-        <span className="af-cab__plate" aria-hidden>
+        <span className="af-cab__reflect" data-part="cabinet-reflection" aria-hidden />
+        <span className="af-cab__plate" data-part="cabinet-plate" aria-hidden>
           <span className="af-cab__name">{cabinet.title}</span>
           <span className="af-cab__family">
             {cabinet.family}

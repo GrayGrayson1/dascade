@@ -4,6 +4,8 @@
  */
 import { CLEAR_DELAY, COLS, HIDDEN, LOCK_DELAY, ROWS, SHAPES, VISIBLE_ROWS, type BlocksEvent, type BlocksSim, type PieceId } from '@dascade/game-core/blocks';
 import { Particles, Popups, Shake, alpha, beginFrame, blockSprite, canvasFonts, drawBlock, fxSettings, type Surface } from '../_classics/index.ts';
+import type { Materials } from '../_classics/palette.ts';
+import { WELL_ART, wellArt, type WellArt } from './palette.ts';
 
 /** Cell value (1–7) → colour. Index 0 unused. */
 export const BLOCK_COLORS = ['#000000', '#ff4fd8', '#2dd4bf', '#ffb020', '#a78bfa', '#a3e635', '#ff6b6b', '#60a5fa'] as const;
@@ -21,9 +23,6 @@ export const CELL = 32;
 export const WELL_W = COLS * CELL;
 export const WELL_H = VISIBLE_ROWS * CELL;
 
-const GRID_INK = 'rgba(160, 150, 255, 0.07)';
-const WELL_TOP = '#0b0a1d';
-const WELL_BOTTOM = '#05040d';
 
 interface Flash {
   cells: Array<[number, number]>;
@@ -49,6 +48,12 @@ export class BlocksRenderer {
   private overAt: number | null = null;
   private levelFlash = 0;
   private fonts = canvasFonts();
+  private well: WellArt = WELL_ART;
+
+  /** Theme materials changed: the well re-colours on the next frame (render-only). */
+  setMaterials(m: Materials): void {
+    this.well = wellArt(m);
+  }
 
   reset(): void {
     this.particles.clear();
@@ -157,11 +162,11 @@ export class BlocksRenderer {
 
     // Well backdrop + grid.
     const bg = ctx.createLinearGradient(0, 0, 0, WELL_H);
-    bg.addColorStop(0, WELL_TOP);
-    bg.addColorStop(1, WELL_BOTTOM);
+    bg.addColorStop(0, this.well.top);
+    bg.addColorStop(1, this.well.bottom);
     ctx.fillStyle = bg;
     ctx.fillRect(-12, -12, WELL_W + 24, WELL_H + 24);
-    ctx.strokeStyle = GRID_INK;
+    ctx.strokeStyle = this.well.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 1; x < COLS; x++) {
@@ -309,7 +314,7 @@ export class BlocksRenderer {
 
   private drawPaused(ctx: CanvasRenderingContext2D): void {
     // The well is hidden while paused (no pause-to-think).
-    ctx.fillStyle = 'rgba(124, 245, 255, 0.05)';
+    ctx.fillStyle = this.well.pausedInk;
     for (let y = 0; y < VISIBLE_ROWS; y++) for (let x = (y % 2) * 1; x < COLS; x += 2) ctx.fillRect(x * CELL + 6, y * CELL + 6, CELL - 12, CELL - 12);
   }
 }
@@ -333,10 +338,10 @@ export function drawPiecePreview(ctx: CanvasRenderingContext2D, id: PieceId | nu
 }
 
 /** Tiny stack preview (opponents / spectators) from a 200-char board string. */
-export function drawMiniBoard(ctx: CanvasRenderingContext2D, board: string, w: number, h: number, scale: number): void {
+export function drawMiniBoard(ctx: CanvasRenderingContext2D, board: string, w: number, h: number, scale: number, art: WellArt = WELL_ART): void {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = WELL_BOTTOM;
+  ctx.fillStyle = art.bottom;
   ctx.fillRect(0, 0, w, h);
   const c = Math.min(w / COLS, h / VISIBLE_ROWS);
   const ox = (w - c * COLS) / 2;

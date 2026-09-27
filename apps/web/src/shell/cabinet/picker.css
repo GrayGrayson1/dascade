@@ -9,7 +9,7 @@
   min-height: 100dvh;
   overflow-x: clip;
   color: var(--af-ink-0);
-  background: color-mix(in srgb, var(--accent-deep) 60%, #05040b);
+  background: var(--picker-backdrop, color-mix(in srgb, var(--accent-deep) 60%, #05040b));
 }
 
 /* ---------- Backdrops ---------- */
@@ -19,7 +19,7 @@
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  background: color-mix(in srgb, var(--accent-deep) 70%, #05040b);
+  background: var(--picker-backdrop, color-mix(in srgb, var(--accent-deep) 70%, #05040b));
 }
 .cpb > * {
   position: absolute;

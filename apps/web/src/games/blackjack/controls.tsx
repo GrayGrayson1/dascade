@@ -131,7 +131,7 @@ function BettingControls({ seat, rules, state, send }: { seat: BlackjackSeatView
 
   return (
     <div className="bj-ctl bj-ctl--bet">
-      <div className="bj-rail" role="group" aria-label="Chips">
+      <div className="bj-rail" data-part="chip-tray" role="group" aria-label="Chips">
         {chips.map((v, i) => (
           <button
             key={v}
@@ -412,7 +412,7 @@ export function ControlBar({
   }
 
   return (
-    <footer className="bj-bar" data-stage={stage}>
+    <footer className="bj-bar" data-part="hud" data-stage={stage}>
       <div className="bj-bar__inner">
         {seat ? (
           <div className="bj-bar__wallet" aria-label="Your chips">

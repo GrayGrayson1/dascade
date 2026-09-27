@@ -60,6 +60,7 @@ export function RoleCard({ me, nodes, meId, variant, hidden, onToggleHidden }: R
   return (
     <section
       className={cx('dx-rolecard', `dx-rolecard--${variant}`, concealed && 'is-concealed', !me.alive && 'is-offline')}
+      data-part="role-card"
       style={{ '--role': ROLE_COLOR[role], '--team': TEAM_COLOR[team] } as CSSProperties}
       aria-label={concealed ? 'Your role (hidden)' : `Your role: ${info.name}`}
     >

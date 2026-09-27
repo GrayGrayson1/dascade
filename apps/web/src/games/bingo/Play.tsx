@@ -233,7 +233,7 @@ function Play({ game }: { game: Game }) {
 
   return (
     <div className="bg-play" data-spectator={isSpectator ? 'true' : undefined}>
-      <div className="bg-hud">
+      <div className="bg-hud" data-part="hud">
         <CallerPanel
           state={state}
           items={items}
@@ -341,7 +341,7 @@ function Play({ game }: { game: Game }) {
 
       <aside className="bg-side">
         {!isSpectator ? (
-          <section className="bg-side__board dc-panel" aria-label="Call board">
+          <section className="bg-side__board dc-panel" data-part="scoreboard" aria-label="Call board">
             <header className="bg-side__head">
               <span className="dc-panel__title">{mode === 'numbers' ? 'Call board' : 'Called squares'}</span>
               <Badge color="var(--accent)">

@@ -96,7 +96,7 @@ export function RoundReveal({ state, reveal, players, meId, uniqueOnly }: { stat
   const longestBy = reveal.longest ? reveal.longest.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? reveal.players.find((p) => p.id === id)?.name ?? 'Player') : [];
 
   return (
-    <div className="wd-reveal">
+    <div className="wd-reveal" data-part="reveal">
       <header className="wd-reveal__head">
         <ModeGlyph mode={reveal.mode} className="wd-reveal__glyph" />
         <div>

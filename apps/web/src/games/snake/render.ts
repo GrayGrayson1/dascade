@@ -6,6 +6,8 @@
  */
 import { DX, DY, type SnakeSnapshot, type SnapSnake } from '@dascade/game-core/snake';
 import { Particles, Popups, Shake, alpha, beginFrame, canvasFonts, fxSettings, shade, type Surface } from '../_classics/index.ts';
+import type { Materials } from '../_classics/palette.ts';
+import { ARENA_ART, arenaArt, type ArenaArt } from './palette.ts';
 
 export const CELL = 20;
 
@@ -47,6 +49,16 @@ export class SnakeRenderer {
   private portrait = false;
   private arenaW = 0;
   private readonly tags: Array<{ x: number; y: number; name: string; color: string }> = [];
+
+  private arena: ArenaArt = ARENA_ART;
+
+  /** Theme materials changed: re-colour the arena on the next frame (render-only). */
+  setMaterials(m: Materials): void {
+    const next = arenaArt(m);
+    if (next === this.arena) return;
+    this.arena = next;
+    this.bg = null;
+  }
 
   setPortrait(p: boolean): void {
     this.portrait = p;
@@ -98,23 +110,24 @@ export class SnakeRenderer {
     const g = c.getContext('2d')!;
     g.scale(s.scale, s.scale);
     const grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, SNAKE_ART.floorTop);
-    grad.addColorStop(1, SNAKE_ART.floorBottom);
+    const art = this.arena;
+    grad.addColorStop(0, art.floorTop);
+    grad.addColorStop(1, art.floorBottom);
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
     // Faint checker for depth + a dot lattice at cell corners.
-    g.fillStyle = 'rgba(120, 255, 190, 0.018)';
+    g.fillStyle = art.checker;
     for (let y = 0; y < rows; y++) for (let x = (y & 1); x < cols; x += 2) g.fillRect(x * CELL, y * CELL, CELL, CELL);
-    g.fillStyle = SNAKE_ART.lattice;
+    g.fillStyle = art.lattice;
     for (let y = 1; y < rows; y++) for (let x = 1; x < cols; x++) g.fillRect(x * CELL - 1, y * CELL - 1, 2, 2);
     // Soft pools of light.
     const pool = g.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, Math.max(W, H) * 0.6);
-    pool.addColorStop(0, 'rgba(94, 242, 181, 0.08)');
-    pool.addColorStop(1, 'rgba(94, 242, 181, 0)');
+    pool.addColorStop(0, art.pool);
+    pool.addColorStop(1, art.poolClear);
     g.fillStyle = pool;
     g.fillRect(0, 0, W, H);
     // Rim.
-    g.strokeStyle = alpha(SNAKE_ART.rim, 0.55);
+    g.strokeStyle = art.rim;
     g.lineWidth = 3;
     g.strokeRect(1.5, 1.5, W - 3, H - 3);
     this.bg = { key, canvas: c };

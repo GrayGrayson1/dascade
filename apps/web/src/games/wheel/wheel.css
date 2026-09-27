@@ -10,11 +10,48 @@
   --wh-amber: #ffb020;
   --wh-pink: #ff4f81;
   --wh-ink: #1c0d00;
+  /* Stage backdrop + hardware follow theme materials (stage / stageLight / metal); the fallbacks
+   * are the wheel's own amber × pink game-show look. Derived shades are only defined for themes
+   * (block below) so Delta Neon renders the literals. */
   background:
-    radial-gradient(900px 520px at 50% -8%, rgba(255, 176, 32, 0.2), transparent 62%),
-    radial-gradient(700px 480px at 100% 30%, rgba(255, 79, 129, 0.14), transparent 60%),
-    radial-gradient(600px 420px at 0% 70%, rgba(255, 138, 61, 0.1), transparent 60%),
-    linear-gradient(180deg, #1d0b18 0%, #120616 40%, var(--bg-0) 100%);
+    radial-gradient(900px 520px at 50% -8%, var(--wh-glow-1, rgba(255, 176, 32, 0.2)), transparent 62%),
+    radial-gradient(700px 480px at 100% 30%, var(--wh-glow-2, rgba(255, 79, 129, 0.14)), transparent 60%),
+    radial-gradient(600px 420px at 0% 70%, var(--wh-glow-3, rgba(255, 138, 61, 0.1)), transparent 60%),
+    linear-gradient(180deg, var(--mat-stage, #1d0b18) 0%, var(--wh-stage-2, #120616) 40%, var(--bg-0) 100%);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .wh {
+  --wh-glow-1: color-mix(in srgb, var(--mat-stage-light) 20%, transparent);
+  --wh-glow-2: color-mix(in srgb, var(--mat-led, var(--accent-2)) 14%, transparent);
+  --wh-glow-3: color-mix(in srgb, var(--mat-stage-light) 10%, transparent);
+  --wh-stage-2: color-mix(in srgb, var(--mat-stage) 70%, #000);
+  --wh-grid: color-mix(in srgb, var(--mat-stage-light) 5%, transparent);
+  --wh-beam-1: color-mix(in srgb, var(--mat-stage-light) 26%, transparent);
+  --wh-beam-2: color-mix(in srgb, var(--mat-stage-light) 7%, transparent);
+  --wh-hub-1: color-mix(in srgb, var(--mat-metal) 45%, #000);
+  --wh-hub-2: color-mix(in srgb, var(--mat-metal) 16%, #000);
+  --wh-hub-3: color-mix(in srgb, var(--mat-metal) 5%, #000);
+  --wh-hub-ring: var(--mat-metal);
+  --wh-hub-ring-2: color-mix(in srgb, var(--mat-metal) 40%, #000);
+  --wh-hub-icon: var(--mat-metal-highlight);
+  --wh-hub-glow: color-mix(in srgb, var(--mat-metal-highlight) 70%, transparent);
+  --wh-pin-1: var(--mat-metal-highlight);
+  --wh-pin-2: var(--mat-metal);
+  --wh-pin-3: color-mix(in srgb, var(--mat-metal) 45%, #000);
+}
+/* Themed chrome: the rail and floating readouts use the theme's panel tokens. */
+:root[data-theme]:not([data-theme='delta-neon']) .wh-rail {
+  background: var(--panel-bg-solid);
+  border-left-color: var(--panel-border);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .wh-rail__tabs {
+  background: var(--surface-sunken);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .wh-tip,
+:root[data-theme]:not([data-theme='delta-neon']) .wh-readout,
+:root[data-theme]:not([data-theme='delta-neon']) .wh-deciding,
+:root[data-theme]:not([data-theme='delta-neon']) .wh-waiting {
+  background: var(--hud-bg-strong);
+  color: var(--hud-fg);
 }
 
 /* ---------- Play layout ---------- */
@@ -43,8 +80,8 @@
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 200, 120, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 200, 120, 0.035) 1px, transparent 1px);
+    linear-gradient(var(--wh-grid, rgba(255, 200, 120, 0.035)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--wh-grid, rgba(255, 200, 120, 0.035)) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: radial-gradient(ellipse at 50% 55%, #000 30%, transparent 75%);
 }
@@ -55,7 +92,7 @@
   height: 120%;
   opacity: 0.55;
   transform-origin: 50% 0;
-  background: linear-gradient(180deg, rgba(255, 214, 140, 0.26), rgba(255, 176, 32, 0.07) 55%, transparent 80%);
+  background: linear-gradient(180deg, var(--wh-beam-1, rgba(255, 214, 140, 0.26)), var(--wh-beam-2, rgba(255, 176, 32, 0.07)) 55%, transparent 80%);
   clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
   filter: blur(6px);
   transition: opacity var(--dur-3);
@@ -276,10 +313,10 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 28%, #6a4012 0%, #251003 48%, #0b0400 100%);
+  background: radial-gradient(circle at 35% 28%, var(--wh-hub-1, #6a4012) 0%, var(--wh-hub-2, #251003) 48%, var(--wh-hub-3, #0b0400) 100%);
   box-shadow:
-    0 0 0 calc(var(--wh-rh) * 0.1) #ffc451,
-    0 0 0 calc(var(--wh-rh) * 0.19) #6b3400,
+    0 0 0 calc(var(--wh-rh) * 0.1) var(--wh-hub-ring, #ffc451),
+    0 0 0 calc(var(--wh-rh) * 0.19) var(--wh-hub-ring-2, #6b3400),
     0 calc(var(--wh-rh) * 0.12) calc(var(--wh-rh) * 0.5) rgba(0, 0, 0, 0.65),
     inset 0 calc(var(--wh-rh) * 0.06) 0 rgba(255, 236, 200, 0.28),
     inset 0 calc(var(--wh-rh) * -0.1) calc(var(--wh-rh) * 0.2) rgba(0, 0, 0, 0.6);
@@ -290,8 +327,8 @@
 .wh-hub__icon {
   width: 46%;
   height: 46%;
-  color: var(--wh-amber);
-  filter: drop-shadow(0 0 calc(var(--wh-rh) * 0.12) rgba(255, 176, 32, 0.9));
+  color: var(--wh-hub-icon, var(--wh-amber));
+  filter: drop-shadow(0 0 calc(var(--wh-rh) * 0.12) var(--wh-hub-glow, rgba(255, 176, 32, 0.9)));
 }
 .wh-hub--active {
   cursor: pointer;

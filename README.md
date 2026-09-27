@@ -1,6 +1,6 @@
 # DASCADE — Delta Alpha Sierra Arcade
 
-A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **24 games**, plus a **Tournament Center** for brackets and Swiss events. No account needed: create a room and share its 5-letter code.
+A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **24 games**, plus a **Tournament Center** for brackets and Swiss events, **eleven themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
 
 > All casino-style games use meaningless **virtual chips**. There is no real-money wagering, purchasing, deposits or cash-out of any kind.
 
@@ -45,6 +45,33 @@ A cabinet is navigation, not a game. `packages/shared/src/cabinets.ts` lists the
 
 Other routes: `/room/:code` and `/r/:code` join a room, and `/tournaments` opens the Tournament Center.
 
+## Themes
+
+DASCADE ships **eleven themes**. Pick one from the palette button on the floor or in a room's top bar, or from **Settings → Display**. A theme restyles the whole arcade: floor, cabinets, pickers, title screens, lobbies, dialogs, the Tournament Center, results, the jukebox and every game's playfield. It never changes rules, timing, networking or scores. The choice is local to each player (people in one room can use different themes) and is remembered per browser (and on the Supabase profile when signed in).
+
+| Theme | id | The idea |
+|---|---|---|
+| **Delta Neon** (default) | `delta-neon` | The house style: violet-black glass, neon marquees, pixel bevels, restrained CRT texture |
+| **Shareware Casino '97** | `shareware-97` | "DASCADE FUN PACK v3.7 — Registered Version": a bargain-bin casino CD-ROM on a late-90s desktop |
+| **Corporate Desktop '98** | `corporate-98` | An unauthorized arcade suite on every office PC: grey bevels, navy title bars, taskbars (the only light theme) |
+| **Cyber Café 2001** | `cyber-cafe-01` | Y2K broadband optimism: translucent blue plastic, chrome, gel buttons, a live LAN diagram |
+| **Mall Arcade '92** | `mall-arcade-92` | The physical arcade row: geometric carpet, fluorescent ceiling, wood-grain cabinets, LED high-score boards |
+| **VHS After Dark** | `vhs-after-dark` | A late-night video store: rental shelves, tape labels, VCR on-screen display, tracking noise only on transitions |
+| **Space Casino 2088** | `space-casino-2088` | 2088 as imagined in 1996: chrome, starfields, an orbital porthole, holographic consoles |
+| **Basement LAN Party** | `lan-party` | Beige PCs, CRTs, folding tables and cables; the switch lights a port for every player in the room |
+| **Saturday Morning** | `saturday-morning` | A loud 90s game-show set: sunbursts, bulbs, buzzers, confetti (competitive boards stay calm) |
+| **Executive Edition** | `executive` | Mahogany, brass and banker lamps; "Match Performance Review" and the "Strategic Putting Division" |
+| **Neon Noir** | `neon-noir` | The serious one: a rainy pixel city, wet reflections, glass HUDs |
+
+Switching plays a short transition in the new theme's style (a quick fade with reduced motion) without reloading, so rooms, games, tournaments and music carry on untouched. **Visual effects: Full / Reduced / Minimal** and **Reduce motion** scale every theme's particles, backgrounds, blur and animation.
+
+**How it works.** Each theme has two halves:
+
+- **Data** (`packages/ui/src/theme/themes/<id>.ts`, a `ThemeDefinition`): ~170 CSS tokens (colours, fonts, panel/button/HUD chrome, glow, motion), about 50 **materials** for playfields (felt, board squares, water, grass, asphalt, card stock, screens, etc., emitted as `--mat-*`), optional per-game material tweaks, effect hints (visualizer and transition style) and a few themed headings. The definitions are small and always loaded.
+- **Skin** (`apps/web/src/themes/<id>/`): scoped structural CSS plus optional background, floor and jukebox decoration components. Skins and their fonts are lazy chunks, and only the active theme's skin loads.
+
+Games read materials with an exact fallback (`var(--mat-board-light, <original colour>)`, or `tokens.materials.boardLight ?? ORIGINAL` in canvas/Phaser code). Delta Neon defines no materials, so every game keeps its hand-tuned look there. See [`docs/THEMING.md`](docs/THEMING.md) for the full architecture.
+
 ## Tournament Center
 
 `/tournaments` (also reachable from the floor's kiosk, from the **Tournament** buttons in the cabinet picker and on title screens, and from "Run a tournament" in a lobby) runs events for the head-to-head games:
@@ -86,6 +113,8 @@ Then open http://localhost:5173. `pnpm dev` runs the Colyseus game server on :25
 | `pnpm test` | Vitest: engine unit tests, kit and platform tests, server integration tests |
 | `pnpm test:e2e` | Playwright projects `chromium`, `firefox`, `webkit`, `mobile` (Pixel 7) and `mobile-safari` (iPhone 14). Builds and boots the production server automatically. |
 | `pnpm load` | Protocol-level load simulation against a running server (see below) |
+| `pnpm test:e2e` themes/audio | `e2e/theme.spec.ts` (all 11 themes, switching, persistence), `e2e/theme-state.spec.ts` (switching themes mid-game never changes room state), `e2e/theme-a11y.spec.ts` (reduced motion, phone layout, focus), `e2e/jukebox.spec.ts` (playback, route persistence, reload restore, two-client Room DJ) |
+| `pnpm music:index` | Report what the jukebox sees in `apps/web/public/audio/jukebox/` (tracks, durations, duplicates, rejects, total size). Read-only; `--json` prints the manifest. |
 
 Focused work:
 
@@ -126,17 +155,19 @@ LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=trivia,deception,masterpiece,words
 | `masterpiece` | Writing and voting bursts with duplicate submissions and votes that must not double-count; authors stay anonymous until scoring |
 | `words`, `words-chain` | Letter Grid word bursts (invalid and duplicate words included, no double scoring, no early reveal); one Word Chain link answered by everyone at once |
 | `survey` | Answer and prediction bursts including duplicates; nobody ever receives another player's answer |
+| `dj` | Room DJ with 30 clients in one room: host scrubs/pauses while everyone queues, a skip vote at the exact strict majority (with duplicate votes), 8 leave and 8 join, then the host leaves; every client must end on the identical DJ state |
 
 `pnpm load` exits non-zero when any scenario fails its thresholds. Racing has a separate scripted-input bot runner, which prints a `RESULT:` health line: `LOAD_URL=http://localhost:2567 pnpm exec tsx scripts/load-circuit.ts --bots 20` (see its header for `--laps`, `--track`, `--spectators` and more).
 
 ## Architecture
 
 ```
-apps/web          React 19 + Vite client: arcade floor, cabinet pickers, shell & lobby, Tournament Center, game UIs
+apps/web          React 19 + Vite client: arcade floor, cabinet pickers, shell & lobby, Tournament Center, game UIs,
+                  theme skins (src/themes), audio engine (src/audio), jukebox UI (src/jukebox), music indexer (vite/)
 apps/game-server  Colyseus 0.18 authoritative rooms + Express (/api/*, static client) + platform services
 packages/shared   Protocol, catalog, cabinets, tournament contract, Zod schemas, sanitation, RNG, rate limits
 packages/game-core Pure deterministic engines (every game), party/classics helpers, tournament engine, Elo
-packages/ui       Design system: theme tokens + theme API, components, pixel icons, playing cards and chips
+packages/ui       Design system: theme tokens, materials + theme API (11 theme definitions), components, pixel icons, playing cards and chips
 e2e/              Playwright specs     scripts/  load simulation, dictionary build     supabase/  optional schema + RLS
 ```
 
@@ -144,6 +175,7 @@ e2e/              Playwright specs     scripts/  load simulation, dictionary bui
 - **Hidden info stays hidden.** Hole cards, the dealer's hole card, secret words, bingo cards, fleets, roles, answers, votes before reveal and authors before reveal are never in synchronized state. They're sent privately and re-sent on reconnect. Spectators get nothing private.
 - **Resilient sessions.** Stable player IDs, auto-reconnect with a per-game grace period (45s by default, 90–120s for long games, 300s for tournament kiosks), seat-token rejoin after a refresh, host migration, spectators, room lock and kick.
 - **Shared lifecycle.** Every game extends `BaseGameRoom` (`LOBBY → COUNTDOWN → PLAYING ↔ INTERMISSION → RESULTS`). Finished games call `reportOutcome()`, which feeds ratings, stats and tournament brackets.
+- **Presentation is separate from play.** Themes (tokens, materials, lazy skins) and the jukebox are purely client-side. Themes are never sent to the server, and Room DJ is an isolated, fault-tolerant add-on that can't affect game state.
 - **Kits.** Game families share tested toolkits: the **party kit** (DAStravaganza), the **boardroom kit** (two-player board games) and the **classics kit** (arcade quick-plays).
 
 For details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The game contract and kit reference are in [`docs/GAME_GUIDE.md`](docs/GAME_GUIDE.md), and theming is in [`docs/THEMING.md`](docs/THEMING.md).
@@ -199,6 +231,59 @@ To enable it:
 
 Players can upgrade their anonymous account to a permanent one from **Settings → Account**.
 
+## Jukebox and audio
+
+The **jukebox** is a global feature that lives in its own corner of the arcade, not a cabinet. Collapsed, it is a small button (in a room it sits in the top bar; in full-screen games it moves into the menu; on the floor it finds a free corner). Expanded, it is a player with transport controls, seek, volume and mute, shuffle, repeat off/all/one, a searchable and sortable library, a reorderable queue ("play next" / "add to queue"), a visualizer and the Room DJ tab. Music keeps playing through every route change (floor, cabinet, lobby, match, results, tournament) and through theme switches. After a reload it restores the track and position, and resumes on your next click. Every theme dresses the same player differently (a CD utility, a mixtape deck, a brass executive stereo…).
+
+- **One engine** (`apps/web/src/audio/`): a single `AudioContext` created on the first user gesture, and a mixer with separate buses for **sound effects**, **game music** (the procedural soundtrack) and the **jukebox** (one `<audio>` element → one shared analyser). Settings → Sound has master, effects, game-music and jukebox volumes.
+- **Mixing policy** (`mixPolicy.ts`): the jukebox never turns effects down. Audible effects briefly dip the music, and sustained sounds (the DASh Circuit engine) hold it lower. While the jukebox plays, game music is muted by default (Settings: *duck*, *mute* or *keep*). All gain changes are smooth ramps.
+- **Autoplay:** nothing plays before a click or keypress. If the browser still blocks playback, the jukebox shows a gentle "Click to enable audio" prompt instead of an error.
+- **Personal by default:** each player controls their own music. Room DJ (below) is opt-in, and local mute, volume and opt-out always win.
+- State is stored in `localStorage['dascade:v1:jukebox']`. QA hook: `window.__DASCADE_AUDIO__`.
+
+## Jukebox music
+
+The jukebox plays the MP3s in **`apps/web/public/audio/jukebox/`**. That folder is the whole library, and it takes no code or manifest edits:
+
+1. Drop an `.mp3` into the folder. Only the top level is scanned; sub-folders are ignored, apart from sidecar covers.
+2. Run `pnpm dev` (a running dev server re-indexes within a second and tells open pages to refresh the library) or `pnpm build`.
+3. It appears in the jukebox. Run `pnpm music:index` to see exactly what was picked up and why anything wasn't.
+
+The Vite plugin (`apps/web/vite/jukebox-plugin.ts`, indexer in `apps/web/vite/jukebox/`) reads each file's ID3v2.2/2.3/2.4 and ID3v1 tags: title, artist, album, track number and embedded cover art. It also works out the duration from the Xing/Info/VBRI header, or estimates it from the bitrate. In dev it serves the generated `/audio/jukebox/manifest.json` and `/audio/jukebox/art/<id>.<ext>` from memory. A build writes them into `apps/web/dist/`. Generated files never go into `public/` or the source tree, and MP3s are never bundled into JavaScript.
+
+- **Missing tags** are fine. The title comes from the file name: `this_is_my_song_v4_final.mp3` becomes "This Is My Song". Underscores, copy suffixes like `(1)` and version words like `v4` and `final` are stripped, and punctuation is kept.
+- **Bad files never break the build.** A file that isn't really an MP3 (the audio frames are checked, not just the extension) is listed as *rejected*, with the reason. Non-MP3 files are ignored.
+- **Duplicates:** byte-identical files are detected by content hash and only one is published. The copy without a `(1)`/`copy` suffix wins, otherwise the first by name. The rest are reported and left out of `dist/`. The indexer never deletes your files. (Right now `Hope's Turnaround (1).mp3` is a duplicate of `Hope's Turnaround.mp3`.)
+- **Track ids** are slugs of the file name (`Neon Cruising.mp3` → `neon-cruising`). They stay the same when you re-tag a file, and renaming a file changes its id. If two names give the same slug, the first by name keeps it and the others get a short hash suffix.
+- **Order:** sidecar `order`, then ID3 track number, then title.
+- A build prints one line, e.g. `jukebox: 7 tracks indexed, 1 duplicate skipped, 0 rejected (17.1 MB, 12:42 of music)`, and copies only the files the manifest references into `dist/audio/jukebox/`.
+
+**Optional sidecar** `apps/web/public/audio/jukebox/jukebox.json` (every field optional; keys are file names). If it is invalid, you get a warning and it is ignored; it never stops the build.
+
+```json
+{
+  "defaults": { "artist": "beanalicious", "album": "Cyber Nightpulse" },
+  "tracks": {
+    "Neon Cruising.mp3": { "title": "Neon Cruising", "order": 1, "cover": "covers/neon.jpg" },
+    "Cyberbro.mp3": { "artist": "Someone Else" },
+    "Work In Progress.mp3": { "hidden": true }
+  }
+}
+```
+
+Sidecar values beat tags, and tags beat `defaults`. `cover` is a JPEG, PNG, GIF or WebP inside the folder, and it replaces the embedded art. `hidden` keeps a file out of the manifest and out of `dist/`.
+
+**Deploy size:** the repo carries the audio itself, about 19 MB today (8 files, of which 17.1 MB is published after dedupe), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB to every clone and deploy.
+
+### Room DJ
+
+The host can turn on **Room DJ** from the jukebox. Everyone in the room then hears the same song at the same moment. The server synchronizes only playback *state*: track id, playing or paused, a position anchored to the server clock, and a shared queue (`packages/shared/src/jukebox.ts`, `apps/game-server/src/platform/dj.ts`). Each client streams the MP3 itself. Local mute, volume and "opt out of room music" always win on each device.
+
+- The host controls everything and DJ authority follows host migration without interrupting the music. Optionally, the host can let everyone add songs (up to 5 each, with a queue of 50) and vote to skip. A skip needs a strict majority of connected, seated players, and a host skip is immediate.
+- Late joiners and reconnecting players get the current track and position straight away. The server advances the queue when a track ends.
+- Opting out is per room: it survives a reconnect or reload, and resets when you join a different room.
+- It is purely cosmetic and fully isolated in `BaseGameRoom`. Messages are validated and rate limited, it never touches game state, timers, outcomes or tournaments, and any DJ error is logged and swallowed. It is off in Tournament Center matches, and no DJ traffic flows until a host turns it on.
+
 ## Extending the arcade
 
 The full per-game contract is [`docs/GAME_GUIDE.md`](docs/GAME_GUIDE.md). In short:
@@ -234,7 +319,11 @@ To make a head-to-head game **rated**, also set `rated: true` in the catalog. To
 
 ### Adding a visual theme
 
-Colours, surfaces, typography and effects are CSS custom-property tokens in layers (`packages/ui/src/styles/tokens.css`), and a theme is a `ThemeDefinition` of token values plus a small palette for canvas renderers. **Delta Neon** is the only built-in theme. To add one, create `packages/ui/src/theme/themes/<id>.ts`, register it in `BUILT_IN_THEMES`, and run `pnpm vitest run packages/ui/src/theme`. The step-by-step guide, token reference and rules for game art are in [`docs/THEMING.md`](docs/THEMING.md).
+1. Create `packages/ui/src/theme/themes/<id>.ts` exporting a `ThemeDefinition` (start from an existing theme: every token, `meta`, all materials, `effects`, optional `copy`), and add it to `BUILT_IN_THEMES` in `registry.ts`.
+2. Create `apps/web/src/themes/<id>/` with `index.ts` (default-export a `ThemeSkin`, import `./skin.css`) and register its loader in `apps/web/src/themes/registry.ts`. Scope every selector under `:root[data-theme='<id>']`; a test enforces it.
+3. Run `pnpm vitest run packages/ui/src/theme apps/web/src/themes` and `pnpm exec playwright test e2e/theme.spec.ts e2e/theme-a11y.spec.ts`, then look at it on the floor, pickers, lobbies, the jukebox and a range of games at desktop and phone sizes.
+
+The step-by-step guide, token and material reference and rules for game art are in [`docs/THEMING.md`](docs/THEMING.md).
 
 ### Adding a DASQuest adventure
 

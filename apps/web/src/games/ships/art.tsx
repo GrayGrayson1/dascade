@@ -17,11 +17,10 @@ export const VESSEL_HUES: Record<VesselId, string> = {
   wisp: '#e2f3ff',
 };
 
+/** Vessel / marker art palette (water + grid lines follow theme materials in ships.css). */
 export const SEA = {
   deep: '#031425',
   mid: '#062a45',
-  line: 'rgba(125, 211, 252, 0.16)',
-  lineStrong: 'rgba(125, 211, 252, 0.3)',
   hull: '#123049',
   hullDark: '#0a1c2d',
   deck: '#1a4260',

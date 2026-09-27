@@ -1,5 +1,7 @@
 /*
  * DAStravaganza Trivia — game-specific styles (.tv-). Kit chrome lives in ../_party/party.css.
+ * Order tiles and the big answer reveal are cards: they follow --mat-card-face / the kit's
+ * --pk-card-ink helper under themes (fallbacks = the Delta Neon look).
  */
 
 .tv-answer {
@@ -74,8 +76,8 @@
   padding: 8px var(--sp-3);
   border-radius: var(--radius);
   border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg-solid));
-  color: var(--text-0);
+  background: color-mix(in srgb, var(--accent) 12%, var(--mat-card-face, var(--panel-bg-solid)));
+  color: var(--pk-card-ink, var(--text-0));
   font: inherit;
   font-weight: 650;
   text-align: left;
@@ -100,7 +102,7 @@
 .tv-order__yours {
   font-size: var(--fs-xs);
   font-weight: 500;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .tv-order__pool {
   display: flex;
@@ -114,8 +116,8 @@
   padding: 8px 18px;
   border-radius: 999px;
   border: 2px solid color-mix(in srgb, var(--slot) 70%, transparent);
-  background: color-mix(in srgb, var(--slot) 16%, var(--panel-bg-solid));
-  color: var(--text-0);
+  background: color-mix(in srgb, var(--slot) 16%, var(--mat-card-face, var(--panel-bg-solid)));
+  color: var(--pk-card-ink, var(--text-0));
   font: inherit;
   font-weight: 650;
   cursor: pointer;
@@ -155,7 +157,7 @@
   gap: 6px;
   padding: var(--sp-5) var(--sp-4);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--green) 10%, var(--panel-bg));
+  background: color-mix(in srgb, var(--green) 10%, var(--mat-card-face, var(--panel-bg)));
   border: 2px solid color-mix(in srgb, var(--green) 60%, transparent);
   box-shadow: 0 0 30px color-mix(in srgb, var(--green) 22%, transparent);
   text-align: center;
@@ -166,21 +168,22 @@
   font-size: var(--fs-2xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--green);
+  --tv-label-ink: color-mix(in srgb, var(--green) 50%, var(--mat-card-ink));
+  color: var(--tv-label-ink, var(--green));
 }
 .tv-bigreveal__value {
   font-size: clamp(1.6rem, 3vw + 0.8rem, 2.8rem);
   line-height: 1.1;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   overflow-wrap: anywhere;
 }
 .tv-bigreveal__also,
 .tv-bigreveal__yours {
-  color: var(--text-1);
+  color: var(--pk-card-ink-muted, var(--text-1));
   font-size: var(--fs-sm);
 }
 .tv-bigreveal__yours strong {
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
 }
 
 .tv-reveal-foot {

@@ -264,7 +264,7 @@ export function Controls({ deckRef }: { deckRef: (el: HTMLElement | null) => voi
 
   if (!info.hasTank || !info.alive) {
     return (
-      <section className="tk-deck tk-deck--watch tk-glass" aria-label="Spectating" ref={deckRef}>
+      <section className="tk-deck tk-deck--watch tk-glass" data-part="controls" aria-label="Spectating" ref={deckRef}>
         <PixelIcon name={info.hasTank ? 'warning' : 'eye'} size={18} />
         <span>
           {info.hasTank ? (info.gone ? 'You left the battle.' : 'Your tank was destroyed — watching the rest of the battle.') : 'Spectating'}
@@ -282,7 +282,7 @@ export function Controls({ deckRef }: { deckRef: (el: HTMLElement | null) => voi
   const fireLabel = a.firing ? 'FIRING' : a.canAct ? 'FIRE' : 'WAIT';
   const fuelK = a.maxFuel > 0 ? Math.max(0, Math.min(1, a.fuel / a.maxFuel)) : 0;
   return (
-    <section className="tk-deck tk-glass" data-turn={a.canAct ? 'mine' : 'wait'} aria-label="Gunner controls" ref={deckRef}>
+    <section className="tk-deck tk-glass" data-part="controls" data-turn={a.canAct ? 'mine' : 'wait'} aria-label="Gunner controls" ref={deckRef}>
       <div className="tk-drive" role="group" aria-label="Drive">
         <HoldButton icon="arrow-left" label="Drive left" disabled={!a.canAct || a.fuel <= 0} onDown={() => aim.startMove(-1)} onUp={() => aim.stopMove()} className="tk-drive__btn" />
         <div className="tk-fuel" role="meter" aria-label="Fuel" aria-valuemin={0} aria-valuemax={Math.max(1, a.maxFuel)} aria-valuenow={Math.round(a.fuel)}>
@@ -318,7 +318,7 @@ export function Controls({ deckRef }: { deckRef: (el: HTMLElement | null) => voi
         }}
         onSet={(v) => aim.setPower(v)}
       />
-      <button type="button" className="tk-fire" aria-label="Fire" disabled={!a.canAct} onMouseDown={(e) => e.preventDefault()} data-state={a.firing ? 'firing' : a.canAct ? 'ready' : 'wait'} onClick={() => aim.fire()}>
+      <button type="button" className="tk-fire" data-part="fire" aria-label="Fire" disabled={!a.canAct} onMouseDown={(e) => e.preventDefault()} data-state={a.firing ? 'firing' : a.canAct ? 'ready' : 'wait'} onClick={() => aim.fire()}>
         <span className="tk-fire__label">{fireLabel}</span>
         <span className="tk-fire__hint">
           {a.canAct ? (

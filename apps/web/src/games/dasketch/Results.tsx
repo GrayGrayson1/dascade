@@ -52,7 +52,7 @@ export function SketchResults() {
 
   return (
     <GameStage gameId="dasketch" className="sk-stage sk-results">
-      <div className="sk-results__inner">
+      <div className="sk-results__inner" data-part="results">
         <header className="sk-results__head">
           <span className="dc-label">DASketch · Final standings</span>
           <h1 className="sk-results__title">
@@ -70,7 +70,7 @@ export function SketchResults() {
           </p>
         </header>
 
-        <section className="sk-podium" aria-label="Podium">
+        <section className="sk-podium" data-part="podium" aria-label="Podium">
           {confetti ? (
             <div className="sk-confetti" aria-hidden="true">
               {Array.from({ length: Math.round(fx.particles * 1.4) }, (_, i) => (
@@ -103,7 +103,7 @@ export function SketchResults() {
 
         <div className="sk-results__grid">
           {rest.length > 0 ? (
-            <section className="sk-panel" aria-label="Full standings">
+            <section className="sk-panel" data-part="standings" aria-label="Full standings">
               <h2 className="sk-panel__title">Standings</h2>
               <ol className="sk-standings">
                 {rest.map(({ p, place }) => (
@@ -119,7 +119,7 @@ export function SketchResults() {
           ) : null}
 
           {awards.length > 0 ? (
-            <section className="sk-panel" aria-label="Awards">
+            <section className="sk-panel" data-part="awards" aria-label="Awards">
               <h2 className="sk-panel__title">Awards</h2>
               <ul className="sk-awards">
                 {awards.map((a) => {
@@ -147,7 +147,7 @@ export function SketchResults() {
         </div>
 
         {history.length > 0 ? (
-          <section className="sk-gallery" aria-label="Tonight’s drawings">
+          <section className="sk-gallery" data-part="gallery" aria-label="Tonight’s drawings">
             <h2 className="sk-panel__title">
               <PixelArt rows={SKETCH_ICONS.easel} className="sk-gallery__icon" /> Tonight’s gallery
             </h2>
@@ -155,7 +155,7 @@ export function SketchResults() {
               {history.map((h) => {
                 const shot = gallery.find((g) => g.turn === h.turn);
                 return (
-                  <li key={h.turn} className="sk-frame">
+                  <li key={h.turn} className="sk-frame" data-part="picture-frame">
                     {shot ? (
                       <img src={shot.src} alt={`${h.artistName}’s drawing of ${h.word}`} className="sk-frame__img" loading="lazy" />
                     ) : (
@@ -176,7 +176,7 @@ export function SketchResults() {
           </section>
         ) : null}
 
-        <div className="sk-results__actions">
+        <div className="sk-results__actions" data-part="results-actions">
           {history.length > 0 ? <span className="sk-results__more">Scroll for awards &amp; tonight’s gallery</span> : null}
           <ResultsActions />
         </div>

@@ -7,6 +7,8 @@
   --sv-maj: var(--accent);
   --sv-rank: var(--yellow);
   --sv-pct: var(--accent-2);
+  /* Bar tracks on themed card stock (invalid → today's --control-track without materials). */
+  --sv-mat-track: color-mix(in srgb, var(--mat-card-ink) 14%, transparent);
 }
 
 .sv-main {
@@ -48,15 +50,20 @@
   gap: 6px;
 }
 .sv-anon {
+  /* On themed card stock the pill takes the card's ink (light text on a grey pill over a paper card
+     was ~3.8:1); without materials these are invalid and today's tokens apply. */
+  --sv-anon-ink: var(--mat-card-ink);
+  --sv-anon-bg: color-mix(in srgb, var(--mat-card-ink) 9%, transparent);
+  --sv-anon-line: color-mix(in srgb, var(--mat-card-ink) 22%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: var(--fs-xs);
-  color: var(--text-1);
-  background: var(--surface-sunken-soft);
-  border: 1px solid var(--line);
+  color: var(--sv-anon-ink, var(--text-1));
+  background: var(--sv-anon-bg, var(--surface-sunken-soft));
+  border: 1px solid var(--sv-anon-line, var(--line));
 }
 .sv-anon svg {
   color: var(--green);
@@ -307,8 +314,8 @@
   padding: 8px 14px 8px 8px;
   border-radius: var(--radius-lg);
   border: 2px solid color-mix(in srgb, var(--slot) 55%, transparent);
-  background: var(--panel-bg-solid);
-  color: var(--text-0);
+  background: var(--mat-card-face, var(--panel-bg-solid));
+  color: var(--pk-card-ink, var(--text-0));
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -343,7 +350,7 @@
 }
 .sv-rankpick__opt[data-placed='true'] {
   border-color: var(--slot);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 26%, transparent), transparent 70%), var(--panel-bg-solid);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slot) 26%, transparent), transparent 70%), var(--mat-card-face, var(--panel-bg-solid));
 }
 .sv-rankpick__opt[data-auto='true'] {
   cursor: default;
@@ -380,7 +387,7 @@
   font-size: var(--fs-2xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .sv-rankpick__actions {
   display: flex;
@@ -532,6 +539,10 @@
   border: 1px solid var(--line-strong);
   white-space: nowrap;
 }
+.sv-bar .sv-tag:not(.sv-tag--lead),
+.sv-rankrow .sv-tag {
+  color: var(--pk-card-ink, var(--text-0));
+}
 .sv-tag--lead {
   color: var(--text-inverse);
   background: var(--yellow);
@@ -590,7 +601,9 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--radius-lg);
-  background: var(--panel-bg);
+  background: var(--mat-card-face, var(--panel-bg));
+  /* Card ink under themed materials; unset (= inherited, today's look) without them. */
+  color: var(--pk-card-ink);
   border: 1px solid color-mix(in srgb, var(--slot) 35%, var(--panel-border));
   animation: pk-rise var(--dur-3) var(--ease-out) backwards;
   animation-delay: var(--delay, 0ms);
@@ -645,7 +658,7 @@
 .sv-bar__pct {
   font-size: clamp(1.2rem, 1vw + 0.9rem, 1.6rem);
   font-weight: 700;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   flex: none;
 }
 .sv-bar__track {
@@ -653,7 +666,7 @@
   height: 14px;
   border-radius: 999px;
   overflow: hidden;
-  background: var(--control-track);
+  background: var(--sv-mat-track, var(--control-track));
   border: 1px solid var(--line);
 }
 .sv-bar__fill {
@@ -672,7 +685,7 @@
   flex-wrap: wrap;
   gap: 6px 12px;
   font-size: var(--fs-xs);
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .sv-bar__called {
   display: inline-flex;
@@ -708,7 +721,8 @@
   gap: var(--sp-3);
   padding: 8px 14px 8px 8px;
   border-radius: var(--radius-lg);
-  background: var(--panel-bg-solid);
+  background: var(--mat-card-face, var(--panel-bg-solid));
+  color: var(--pk-card-ink);
   border: 1px solid color-mix(in srgb, var(--slot) 40%, var(--panel-border));
   transform: translateY(calc(var(--pos) * (var(--row-h) + var(--row-gap))));
   transition:
@@ -771,7 +785,7 @@
   display: block;
   height: 6px;
   border-radius: 999px;
-  background: var(--control-track);
+  background: var(--sv-mat-track, var(--control-track));
   overflow: hidden;
 }
 .sv-rankrow__bar > span {
@@ -795,7 +809,7 @@
 .sv-rankrow__votes {
   font-size: var(--fs-lg);
   font-weight: 700;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   line-height: 1;
 }
 @media (max-width: 560px) {

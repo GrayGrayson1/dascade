@@ -52,6 +52,12 @@ export class Effects {
   private readonly wrecks = new Map<string, { x: number; y: number; next: number }>();
   private celebrate: { x: number; y: number; until: number; next: number; tint: number } | null = null;
 
+  /** Theme change: soil-coloured debris and dust follow the new terrain palette (live particles keep theirs). */
+  setPalette(theme: ThemePalette): void {
+    this.debris.setParticleTint([theme.topsoil, theme.soil, theme.rock, theme.rim].map(hexToInt));
+    this.dust.setParticleTint([hexToInt(theme.topsoil), hexToInt(theme.soil)]);
+  }
+
   constructor(scene: Phaser.Scene, layer: Phaser.GameObjects.Layer, theme: ThemePalette, H: number, q: FxQuality, depth: number) {
     this.scene = scene;
     this.layer = layer;

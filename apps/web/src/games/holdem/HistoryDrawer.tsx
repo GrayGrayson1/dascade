@@ -64,7 +64,7 @@ export function HistoryDrawer({ open, onClose, log, currentHand }: { open: boole
         <IconButton icon="close" label="Close drawer" size="sm" onClick={onClose} />
       </header>
       {tab === 'hands' ? (
-        <div className="hd-log" role="log" aria-label="Hand history">
+        <div className="hd-log" data-part="history" role="log" aria-label="Hand history">
           {groups.length === 0 ? <p className="hd-log__empty">Hands will be logged here as they’re played.</p> : null}
           {groups.map(([hand, entries]) => (
             <section key={hand} className="hd-log__hand" data-current={hand === currentHand ? 'true' : undefined}>

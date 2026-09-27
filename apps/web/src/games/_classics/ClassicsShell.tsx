@@ -131,7 +131,7 @@ export const ClassicsShell = forwardRef<HTMLDivElement, ClassicsShellProps>(func
         data-game={info.gameId}
         data-overlay={overlay ? 'true' : undefined}
       >
-        <header className="cl-top">
+        <header className="cl-top" data-part="header">
           <div className="cl-top__nav">
             <BackToClassicsButton compact confirm={leaveConfirm} />
             <div className="cl-top__title">
@@ -139,7 +139,7 @@ export const ClassicsShell = forwardRef<HTMLDivElement, ClassicsShellProps>(func
               <h1 className="cl-top__name">{game.title}</h1>
             </div>
           </div>
-          <div className="cl-top__hud" role="group" aria-label="Game status">
+          <div className="cl-top__hud" data-part="hud" role="group" aria-label="Game status">
             {hud}
           </div>
           <div className="cl-top__tools">
@@ -161,7 +161,7 @@ export const ClassicsShell = forwardRef<HTMLDivElement, ClassicsShellProps>(func
             <IconButton icon="help" label="How to play" size="sm" className="cl-top__help" onClick={() => openModal('help', info.gameId)} />
           </div>
         </header>
-        {ticker ? <div className="cl-ticker">{ticker}</div> : null}
+        {ticker ? <div className="cl-ticker" data-part="ticker">{ticker}</div> : null}
         <div className="cl-body">
           <div
             className="cl-main"
@@ -169,18 +169,18 @@ export const ClassicsShell = forwardRef<HTMLDivElement, ClassicsShellProps>(func
             style={{ '--rails': String((left ? 1 : 0) + (right ? 1 : 0)) } as CSSProperties}
           >
             <div className="cl-grid">
-              {left ? <aside className="cl-rail cl-rail--left">{left}</aside> : null}
-              <div className="cl-screen" ref={screenRef}>
-                <span className="cl-screen__bezel" aria-hidden />
+              {left ? <aside className="cl-rail cl-rail--left" data-part="rail">{left}</aside> : null}
+              <div className="cl-screen" data-part="screen" ref={screenRef}>
+                <span className="cl-screen__bezel" data-part="bezel" aria-hidden />
                 {children}
-                <span className="cl-screen__glass" aria-hidden />
+                <span className="cl-screen__glass" data-part="glass" aria-hidden />
               </div>
-              {right ? <aside className="cl-rail cl-rail--right">{right}</aside> : null}
+              {right ? <aside className="cl-rail cl-rail--right" data-part="rail">{right}</aside> : null}
             </div>
-            {overlay ? <div className="cl-overlay">{overlay}</div> : null}
+            {overlay ? <div className="cl-overlay" data-part="overlay">{overlay}</div> : null}
           </div>
         </div>
-        {touch ? <div className="cl-touch">{touch}</div> : null}
+        {touch ? <div className="cl-touch" data-part="touch-controls">{touch}</div> : null}
       </div>
     </GameStage>
   );
@@ -189,7 +189,7 @@ export const ClassicsShell = forwardRef<HTMLDivElement, ClassicsShellProps>(func
 /** Small labelled panel for rails (Hold, Next, Power-ups…). */
 export function RailPanel({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className={cx('cl-panel', className)} aria-label={title}>
+    <section className={cx('cl-panel', className)} data-part="panel" aria-label={title}>
       <h2 className="cl-panel__title">{title}</h2>
       <div className="cl-panel__body">{children}</div>
     </section>

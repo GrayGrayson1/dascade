@@ -1,8 +1,8 @@
 /** Flat mini-map of a hole (settings picker, hole summaries). */
 import { PHYS, compileHole, type HoleDef, type Pt } from '@dascade/game-core/putt';
-import { ART } from './palette.ts';
+import { PUTT_DEFAULT_ART, type PuttArt } from './themeAdapter.ts';
 
-export function drawHoleThumb(canvas: HTMLCanvasElement, hole: HoleDef, cssW: number, cssH: number): void {
+export function drawHoleThumb(canvas: HTMLCanvasElement, hole: HoleDef, cssW: number, cssH: number, ART: PuttArt = PUTT_DEFAULT_ART): void {
   const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);

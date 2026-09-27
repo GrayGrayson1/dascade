@@ -28,6 +28,7 @@ export function AdventureLog({ entries, className }: { entries: QuestLogEntryVie
     <ol
       ref={ref}
       className={cx('qs-log', className)}
+      data-part="log"
       aria-label="Adventure log"
       onScroll={(e) => {
         const el = e.currentTarget;

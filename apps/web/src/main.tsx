@@ -12,6 +12,8 @@ import { App } from './app/App.tsx';
 import { applyDocumentSettings, useApp } from './app/store.ts';
 import { initPersistence } from './persistence/index.ts';
 import { installAudio } from './audio/audio.ts';
+import { loadThemeSkinWithin, loadedSkin } from './themes/registry.ts';
+import { switchTheme } from './themes/controller.ts';
 
 // Theme + fx + reduced motion on <html> before the first render (the stored theme id is read
 // synchronously, so a non-default theme never flashes Delta Neon first).
@@ -27,6 +29,10 @@ declare global {
       listThemes: () => ThemeDefinition[];
       activeThemeId: () => string;
       setTheme: (id: string) => void;
+      /** Switch with the themed transition (what the picker does). */
+      switchTheme: (id: string) => Promise<void>;
+      /** true once the theme's structural skin (CSS + environment) has loaded. */
+      skinLoaded: (id: string) => boolean;
       readThemeTokens: (el?: Element | null) => ThemeTokens;
     };
   }
@@ -36,6 +42,8 @@ window.__DASCADE_THEME__ = {
   listThemes,
   activeThemeId,
   setTheme: (id) => useApp.getState().updateSettings({ theme: id }),
+  switchTheme: (id) => switchTheme(id),
+  skinLoaded: (id) => loadedSkin(id) !== null,
   readThemeTokens,
 };
 
@@ -65,9 +73,13 @@ if (missing.length) {
     </main>,
   );
 } else {
-  root.render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
+  // Boot preload: the stored theme's structural skin (lazy chunk: CSS + environment) loads before the
+  // first render so the shell never flashes unskinned — but never holds the first paint > 800 ms.
+  void loadThemeSkinWithin(useApp.getState().settings.theme, 800).then(() => {
+    root.render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+  });
 }

@@ -10,21 +10,31 @@
  */
 
 export type FxLevel = 'high' | 'low' | 'off';
+export type VisualizerPref = 'auto' | 'on' | 'off';
+export type GameMusicWithJukebox = 'duck' | 'mute' | 'keep';
 
 export interface AppSettings {
   masterVolume: number;
   sfxVolume: number;
+  /** "Game music" (the procedural per-game soundtrack) volume. */
   musicVolume: number;
   muted: boolean;
+  /** "Game music" on/off. */
   musicEnabled: boolean;
+  /** Jukebox (MP3 player) volume. */
+  jukeboxVolume: number;
+  /** Jukebox visualizer: 'auto' = off under reduced motion or effects off. */
+  visualizer: VisualizerPref;
+  /** What the game music does while the jukebox is audibly playing. */
+  gameMusicWithJukebox: GameMusicWithJukebox;
   reducedMotion: boolean;
   fx: FxLevel;
   /** Theme preference (a ThemeDefinition id). Unknown ids render as Delta Neon but are kept. */
   theme: string;
 }
 
-/** v1 = the original shape (no version stamp); v2 adds `theme`. */
-export const SETTINGS_VERSION = 2;
+/** v1 = the original shape (no version stamp); v2 adds `theme`; v3 adds the jukebox audio fields. */
+export const SETTINGS_VERSION = 3;
 export const DEFAULT_THEME_PREF = 'delta-neon';
 
 export type StoredSettings = AppSettings & { settingsVersion: number } & Record<string, unknown>;
@@ -52,6 +62,13 @@ export function migrateSettings(stored: unknown, defaults: AppSettings): StoredS
     musicEnabled: bool(raw.musicEnabled, defaults.musicEnabled),
     reducedMotion: bool(raw.reducedMotion, defaults.reducedMotion),
     fx: raw.fx === 'high' || raw.fx === 'low' || raw.fx === 'off' ? raw.fx : defaults.fx,
+    // v2 → v3: jukebox fields (absent → defaults; invalid → defaults).
+    jukeboxVolume: unit(raw.jukeboxVolume, defaults.jukeboxVolume),
+    visualizer: raw.visualizer === 'auto' || raw.visualizer === 'on' || raw.visualizer === 'off' ? raw.visualizer : defaults.visualizer,
+    gameMusicWithJukebox:
+      raw.gameMusicWithJukebox === 'duck' || raw.gameMusicWithJukebox === 'mute' || raw.gameMusicWithJukebox === 'keep'
+        ? raw.gameMusicWithJukebox
+        : defaults.gameMusicWithJukebox,
     theme: typeof raw.theme === 'string' && THEME_ID_RE.test(raw.theme) ? raw.theme : defaults.theme,
     // A settings blob written by a newer build keeps its (higher) version.
     settingsVersion: Math.max(version, SETTINGS_VERSION),

@@ -24,8 +24,8 @@ export function Hud({ ctrl }: { ctrl: RaceController }) {
     }
   });
   return (
-    <div className="ci-hud" ref={b.ref('root')} data-touch={ui.touch ? 'true' : undefined} data-spectating={ui.spectating ? 'true' : undefined}>
-      <section className="ci-hud__tl ci-glass" aria-label="Position and lap times">
+    <div className="ci-hud" data-part="hud" ref={b.ref('root')} data-touch={ui.touch ? 'true' : undefined} data-spectating={ui.spectating ? 'true' : undefined}>
+      <section className="ci-hud__tl ci-glass" data-part="scoreboard" aria-label="Position and lap times">
         <div className="ci-pos">
           <span className="ci-pos__label">POS</span>
           <span className="ci-pos__num" ref={b.ref('pos')}>
@@ -62,7 +62,7 @@ export function Hud({ ctrl }: { ctrl: RaceController }) {
       </section>
 
       <div className="ci-hud__tc">
-        <div className="ci-clock ci-glass" aria-label="Race time">
+        <div className="ci-clock ci-glass" data-part="timer" aria-label="Race time">
           <PixelIcon name="clock" />
           <span ref={b.ref('clock')}>0:00.000</span>
         </div>
@@ -79,7 +79,7 @@ export function Hud({ ctrl }: { ctrl: RaceController }) {
       <Standings />
 
       <div className="ci-hud__bl">
-        <canvas className="ci-minimap" ref={b.ref('minimap')} width={200} height={200} role="img" aria-label="Track map with racer positions" />
+        <canvas className="ci-minimap" data-part="minimap" ref={b.ref('minimap')} width={200} height={200} role="img" aria-label="Track map with racer positions" />
       </div>
 
       <Speedo bridge={b} boost={boostOn !== false} />
@@ -125,7 +125,7 @@ function StartLights({ bridge }: { bridge: HudBridge }) {
     return def ? `${def.name} · ${s.race.laps} ${s.race.laps === 1 ? 'lap' : 'laps'}${s.race.solo ? ' · time trial' : ''}` : '';
   });
   return (
-    <div className="ci-lights" ref={bridge.ref('lights')} data-phase="hidden" aria-hidden>
+    <div className="ci-lights" data-part="start-lights" ref={bridge.ref('lights')} data-phase="hidden" aria-hidden>
       <div className="ci-lights__title">{title}</div>
       <div className="ci-lights__rig">
         {Array.from({ length: CIRCUIT_SIM.lights }, (_, i) => (
@@ -152,7 +152,7 @@ function Speedo({ bridge, boost }: { bridge: HudBridge; boost: boolean }) {
   );
   return (
     <div className="ci-hud__br">
-      <div className="ci-speedo ci-glass" ref={bridge.ref('speedo')} aria-label="Speedometer">
+      <div className="ci-speedo ci-glass" data-part="speedometer" ref={bridge.ref('speedo')} aria-label="Speedometer">
         <svg viewBox="0 0 120 110" className="ci-speedo__dial" aria-hidden>
           <path d="M 18.43 86 A 48 48 0 1 1 101.57 86" className="ci-speedo__track" pathLength={100} />
           <path d="M 18.43 86 A 48 48 0 1 1 101.57 86" className="ci-speedo__fill" pathLength={100} ref={bridge.ref('speedArc') as unknown as (el: SVGPathElement | null) => void} />
@@ -206,7 +206,7 @@ function Standings() {
   const mine = rows.find((row) => row.id === me);
   if (mine && !top.includes(mine)) top.push(mine);
   return (
-    <ol className="ci-tower ci-glass" aria-label="Standings">
+    <ol className="ci-tower ci-glass" data-part="standings" aria-label="Standings">
       {top.map(({ id, r, look }) => (
         <li key={id} className={cx('ci-tower__row', id === me && 'is-me', !r.active && 'is-out')}>
           <span className="ci-tower__pos">{r.position}</span>

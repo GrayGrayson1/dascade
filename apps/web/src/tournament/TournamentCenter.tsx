@@ -24,6 +24,8 @@ import { PixelBracket, PixelTrophy } from './art.tsx';
 import { CreateWizard, isTournamentGame } from './CreateWizard.tsx';
 import './bracket/bracket.css';
 import './center.css';
+import { ThemedText } from '../themes/ThemedText.tsx';
+import { useThemeCopy } from '../themes/copy.ts';
 
 // Dev-only visual QA gallery (`/tournaments?gallery=se16`). `import.meta.env.DEV` is false in
 // production builds, so the import below is dead code there and never bundled.
@@ -100,15 +102,25 @@ function Center({ params, setParams }: { params: URLSearchParams; setParams: Ret
   };
 
   return (
-    <GameTheme accent={GAME_CATALOG.tournament.accent} as="main" className="tc-center dc-game-backdrop" id="main">
-      <header className="tc-top">
+    <GameTheme
+      accent={GAME_CATALOG.tournament.accent}
+      as="main"
+      className="tc-center dc-game-backdrop"
+      id="main"
+      data-part="tournament-center"
+    >
+      <header className="tc-top" data-part="tournament-header">
         <Button variant="ghost" icon="arrow-left" onClick={() => (creating ? setParam('create', null) : navigate('/'))}>
           {creating ? 'Tournament Center' : 'Arcade floor'}
         </Button>
         <span className="tc-top__crumb" aria-hidden>
           <PixelIcon name="trophy" /> Tournament Center
         </span>
-        <IconButton icon="help" label="How tournaments work" onClick={() => openModal('help', 'tournament')} />
+        <span className="tc-top__end">
+          {/* The jukebox docks here instead of floating over the board on phones. */}
+          <span className="tc-top__jukebox" data-jukebox-slot />
+          <IconButton icon="help" label="How tournaments work" onClick={() => openModal('help', 'tournament')} />
+        </span>
       </header>
 
       {creating ? (
@@ -129,6 +141,7 @@ function Center({ params, setParams }: { params: URLSearchParams; setParams: Ret
 // ---------------------------------------------------------------------------
 function Hero({ onCreate, game }: { onCreate: () => void; game: string | null }) {
   const navigate = useNavigate();
+  const t = useThemeCopy();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const join = (e: FormEvent) => {
@@ -143,21 +156,23 @@ function Hero({ onCreate, game }: { onCreate: () => void; game: string | null })
   };
   const gameTitle = game && isTournamentGame(game) ? GAME_CATALOG[game].title : null;
   return (
-    <section className="tc-hero" aria-labelledby="tc-hero-title">
-      <div className="tc-marquee">
+    <section className="tc-hero" data-part="tournament-hero" aria-labelledby="tc-hero-title">
+      <div className="tc-marquee" data-part="tournament-marquee">
         <PixelTrophy className="tc-marquee__trophy" />
         <div className="tc-marquee__text">
           <span className="tc-marquee__kicker">Delta Alpha Sierra Arcade</span>
           <h1 id="tc-hero-title" className="tc-marquee__title">
-            Tournament Center
+            <ThemedText k="tournament.title" plain="Tournament Center" />
           </h1>
           <p className="tc-marquee__sub">
-            Brackets, Swiss and round robins for head-to-head games. Register, check in, play from the bracket — results advance on their
-            own.
+            {t(
+              'tournament.subtitle',
+              'Brackets, Swiss and round robins for head-to-head games. Register, check in, play from the bracket — results advance on their own.',
+            )}
           </p>
         </div>
       </div>
-      <div className="tc-hero__actions">
+      <div className="tc-hero__actions" data-part="tournament-actions">
         <Button variant="gold" size="xl" icon="trophy" onClick={onCreate} className="tc-hero__create">
           {gameTitle ? `Create a ${gameTitle} tournament` : 'Create tournament'}
         </Button>
@@ -234,7 +249,7 @@ function Board({
   }, [list]);
   const liveCount = list.filter((t) => t.status === 'IN_PROGRESS').length;
   return (
-    <section className="tc-board" aria-labelledby="tc-board-title">
+    <section className="tc-board" data-part="tournament-board" aria-labelledby="tc-board-title">
       <header className="tc-board__head">
         <h2 id="tc-board-title" className="tc-board__title">
           <span className="tc-lamp" data-tone={liveCount > 0 ? 'live' : 'idle'} aria-hidden />
@@ -253,7 +268,7 @@ function Board({
         </h2>
         <IconButton icon="refresh" label="Refresh the board" size="sm" onClick={onRefresh} />
       </header>
-      <div className="tc-filters" role="group" aria-label="Filter by game">
+      <div className="tc-filters" data-part="tournament-filters" role="group" aria-label="Filter by game">
         <button type="button" className={cx('tc-chip', !game && 'tc-chip--on')} aria-pressed={!game} onClick={() => onGame(null)}>
           All games
         </button>
@@ -298,7 +313,7 @@ function Board({
           </Button>
         </div>
       ) : (
-        <ul className="tc-rows">
+        <ul className="tc-rows" data-part="tournament-list">
           {shown.map((t) => (
             <BoardRow key={t.code} t={t} />
           ))}
@@ -318,7 +333,12 @@ function BoardRow({ t }: { t: TournamentListing }) {
     navigate(`/room/${t.code}`);
   };
   return (
-    <li className="tc-row" data-tone={tone} style={{ '--g': g.accent.primary, '--g2': g.accent.secondary } as CSSProperties}>
+    <li
+      className="tc-row"
+      data-part="tournament-card"
+      data-tone={tone}
+      style={{ '--g': g.accent.primary, '--g2': g.accent.secondary } as CSSProperties}
+    >
       <span className="tc-row__game" aria-hidden>
         {g.marquee}
       </span>
@@ -384,7 +404,7 @@ function BoardRow({ t }: { t: TournamentListing }) {
 // ---------------------------------------------------------------------------
 function HowItWorks() {
   return (
-    <section className="tc-how" aria-labelledby="tc-how-title">
+    <section className="tc-how" data-part="tournament-how" aria-labelledby="tc-how-title">
       <h2 id="tc-how-title" className="tc-how__title">
         How it works
       </h2>

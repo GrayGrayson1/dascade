@@ -93,7 +93,7 @@ export function BoardActionBar<S extends BoardRoomView>({
     );
 
   return (
-    <div className={cx('br-actions', compact && 'br-actions--compact', className)}>
+    <div className={cx('br-actions', compact && 'br-actions--compact', className)} data-part="actions">
       {canClaim ? (
         <div className="br-prompt" role="alert">
           <PixelIcon name="clock" />

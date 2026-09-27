@@ -20,6 +20,7 @@ export const TournamentKiosk = memo(function TournamentKiosk({ variant, classNam
       aria-label="Tournament Center — brackets, Swiss and round robins"
       onClick={() => sfx('click')}
       data-kiosk
+      data-part="tournament-kiosk"
     >
       <span className="af-kiosk__trophy" aria-hidden>
         <PixelIcon name="trophy" size={variant === 'board' ? 22 : 20} />
@@ -29,7 +30,7 @@ export const TournamentKiosk = memo(function TournamentKiosk({ variant, classNam
           <span className="af-kiosk__long">Tournament Center</span>
           <span className="af-kiosk__short">Tournaments</span>
         </span>
-        <span className="af-kiosk__ticker">
+        <span className="af-kiosk__ticker" data-part="tournament-kiosk-ticker">
           <span className="af-kiosk__track">
             {[...TICKER, ...TICKER].map((t, i) => (
               <span key={i}>{t}</span>

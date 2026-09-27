@@ -87,7 +87,7 @@ export function RackPlay({ rack, disabled, onSubmit, flash }: RackProps) {
   }, [disabled, send, order, letters]);
 
   return (
-    <div className="wd-rack" data-flash={flash ?? undefined}>
+    <div className="wd-rack" data-part="rack" data-flash={flash ?? undefined}>
       <div className="wd-rack__build" aria-live="polite">
         <div className="wd-rack__slots" role="group" aria-label={word ? `Your word: ${word.toUpperCase()}` : 'Your word is empty'}>
           {letters.map((_, slot) => {
@@ -97,7 +97,7 @@ export function RackPlay({ rack, disabled, onSubmit, flash }: RackProps) {
               <span key={slot} className="wd-slot" aria-hidden="true" />
             ) : (
               <button key={slot} type="button" className="wd-slot is-filled" aria-label={`Remove ${ch.toUpperCase()}`} disabled={disabled} onClick={() => setBuilt((b) => b.filter((x) => x !== idx))}>
-                <span className="wd-tile wd-tile--md">
+                <span className="wd-tile wd-tile--md" data-part="tile">
                   <span className="wd-tile__face">{ch.toUpperCase()}</span>
                 </span>
               </button>
@@ -112,7 +112,7 @@ export function RackPlay({ rack, disabled, onSubmit, flash }: RackProps) {
           const used = usedSet.has(i);
           return (
             <button key={i} type="button" className={cx('wd-racktile', used && 'is-used')} disabled={disabled || used} aria-label={`Letter ${ch.toUpperCase()}`} onClick={() => add(i)}>
-              <span className="wd-tile wd-tile--lg">
+              <span className="wd-tile wd-tile--lg" data-part="tile">
                 <span className="wd-tile__face">{ch.toUpperCase()}</span>
               </span>
             </button>

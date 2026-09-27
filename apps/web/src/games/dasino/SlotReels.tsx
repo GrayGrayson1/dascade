@@ -7,6 +7,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { SLOT_REELS, SLOT_STRIP_LENGTH, type SlotStops } from '@dascade/game-core/dasino';
 import { SLOT_SPRITES, spriteCanvas } from './sprites.ts';
+import { readThemeTokens, subscribeThemeTokens } from '@dascade/ui';
+import { reelPalette } from './palette.ts';
 
 const STRIP = SLOT_STRIP_LENGTH;
 /** Cruise speed in symbols per ms. */
@@ -147,6 +149,15 @@ export const SlotReels = forwardRef<SlotReelsHandle, { initial: SlotStops; label
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     resize();
+    // Theme materials (live): only colours change; reel positions/plans are untouched.
+    let pal = reelPalette(readThemeTokens(canvas).materials);
+    let themeRaf = 0;
+    const offTheme = subscribeThemeTokens(() => {
+      cancelAnimationFrame(themeRaf);
+      themeRaf = requestAnimationFrame(() => {
+        pal = reelPalette(readThemeTokens(canvas).materials);
+      });
+    });
 
     const draw = (t: number) => {
       raf = requestAnimationFrame(draw);
@@ -178,11 +189,11 @@ export const SlotReels = forwardRef<SlotReelsHandle, { initial: SlotStops; label
         lastPos[r] = p;
         // Reel body.
         const g = ctx.createLinearGradient(0, 0, 0, H);
-        g.addColorStop(0, '#07040f');
-        g.addColorStop(0.3, '#1c1036');
-        g.addColorStop(0.5, '#27164a');
-        g.addColorStop(0.7, '#1c1036');
-        g.addColorStop(1, '#07040f');
+        g.addColorStop(0, pal.body[0]);
+        g.addColorStop(0.3, pal.body[1]);
+        g.addColorStop(0.5, pal.body[2]);
+        g.addColorStop(0.7, pal.body[1]);
+        g.addColorStop(1, pal.body[0]);
         ctx.fillStyle = g;
         ctx.fillRect(x0, 0, reelW, H);
         ctx.save();
@@ -213,13 +224,15 @@ export const SlotReels = forwardRef<SlotReelsHandle, { initial: SlotStops; label
         ctx.restore();
       }
       // Row separators (subtle).
-      ctx.fillStyle = 'rgba(192,132,252,0.10)';
+      ctx.fillStyle = pal.separator;
       ctx.fillRect(0, Math.round(cell) - 1, W, 2);
       ctx.fillRect(0, Math.round(cell * 2) - 1, W, 2);
     };
     raf = requestAnimationFrame(draw);
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(themeRaf);
+      offTheme();
       ro.disconnect();
     };
   }, []);

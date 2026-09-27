@@ -1,0 +1,1842 @@
+/* =====================================================================
+ * VHS AFTER DARK — structural skin. Every rule is scoped under
+ * :root[data-theme='vhs-after-dark'].
+ * Black clamshell plastic, cream tape labels written in marker, the VCR's
+ * on-screen display, CRT glow in a dim video store. Analog effects only on
+ * transitions and decorative screens — never over boards or text.
+ * ===================================================================== */
+
+:root[data-theme='vhs-after-dark'] {
+  --vh-cream: #f1e8d0;
+  --vh-cream-2: #e6dbbd;
+  --vh-ink: #1b1c28;
+  --vh-rec: #ff3b3b;
+  --vh-pink: #ff3d6e;
+  --vh-cyan: #4fe3e0;
+  --vh-marker: 'Kalam', 'Comic Sans MS', 'Chalkboard SE', cursive;
+  --vh-osd: 'Silkscreen', 'Tiny5', ui-monospace, monospace;
+  --vh-label-stripes: linear-gradient(
+    180deg,
+    var(--vh-cream) 0 72%,
+    var(--vh-pink) 72% 80%,
+    var(--vh-cream) 80% 86%,
+    var(--vh-cyan) 86% 94%,
+    var(--vh-cream) 94%
+  );
+  --vh-clamshell:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 18%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 5px), linear-gradient(180deg, #13151e, #0d0f16);
+  --game-backdrop:
+    radial-gradient(900px 480px at 50% -10%, rgba(120, 150, 255, 0.07), transparent 65%),
+    radial-gradient(700px 420px at 0% 110%, rgba(79, 227, 224, 0.05), transparent 60%), linear-gradient(180deg, #0c0e16, #07080e 70%);
+  --entry-backdrop: linear-gradient(180deg, rgba(7, 8, 14, 0.6), rgba(7, 8, 14, 0.88));
+}
+
+/* =====================================================================
+ * ENVIRONMENT — the store after close
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .vh-env {
+  --vh-horizon: 60%;
+  --vh-ceil: 9%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #06070b;
+  contain: strict;
+  transition:
+    opacity 500ms ease,
+    filter 500ms ease;
+}
+:root[data-theme='vhs-after-dark'] .vh-env > * {
+  position: absolute;
+  pointer-events: none;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__ceiling {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--vh-ceil);
+  background: repeating-linear-gradient(90deg, transparent 0 158px, #16181f 158px 160px), linear-gradient(180deg, #0d0e13, #121319);
+  border-bottom: 2px solid #1b1d25;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__wall {
+  left: 0;
+  right: 0;
+  top: var(--vh-ceil);
+  height: calc(var(--vh-horizon) - var(--vh-ceil));
+  overflow: hidden;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__shelves {
+  position: absolute;
+  inset: 0;
+  background: var(--vh-shelves) 50% 100% / auto min(100%, 420px) repeat;
+  filter: saturate(0.7) brightness(0.5);
+}
+/* Fluorescent falloff over the shelves: brightest under the tube, dark at the ends. */
+:root[data-theme='vhs-after-dark'] .vh-env__wall::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(70% 90% at 50% 0%, rgba(210, 232, 255, 0.12), transparent 70%),
+    linear-gradient(90deg, rgba(6, 7, 11, 0.85), rgba(6, 7, 11, 0.2) 25%, rgba(6, 7, 11, 0.2) 75%, rgba(6, 7, 11, 0.85)),
+    linear-gradient(180deg, rgba(6, 7, 11, 0.35), transparent 30%, rgba(6, 7, 11, 0.55));
+}
+/* A rare, faint tracking band that rolls over the WALL only (fx high). */
+:root[data-theme='vhs-after-dark'] .vh-env__track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12%;
+  height: 10%;
+  z-index: 1;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, transparent, rgba(200, 220, 255, 0.08) 45%, rgba(255, 60, 120, 0.05) 55%, transparent);
+  mix-blend-mode: screen;
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-animate='true'] .vh-env__track {
+  animation: vh-roll 17s linear infinite;
+}
+@keyframes vh-roll {
+  0%,
+  84% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1250%);
+    opacity: 0.9;
+  }
+}
+:root[data-theme='vhs-after-dark'] .vh-env__floor {
+  left: 0;
+  right: 0;
+  top: var(--vh-horizon);
+  bottom: 0;
+  overflow: hidden;
+  perspective: 600px;
+  perspective-origin: 50% 0%;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__floor-plane {
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  top: 0;
+  height: 200%;
+  transform-origin: 50% 0;
+  transform: rotateX(66deg);
+  background: var(--vh-lino) 50% 0 / 120px 120px repeat;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__floor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(22% 60% at 50% 0%, rgba(210, 232, 255, 0.14), transparent 80%),
+    linear-gradient(180deg, rgba(6, 7, 11, 0.8), rgba(6, 7, 11, 0.35) 35%, rgba(6, 7, 11, 0.55));
+}
+/* The fluorescent tube itself. */
+:root[data-theme='vhs-after-dark'] .vh-env__tube {
+  left: 30%;
+  right: 30%;
+  top: calc(var(--vh-ceil) - 6px);
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #ffffff, #d6e8ff);
+  box-shadow:
+    0 0 12px rgba(214, 232, 255, 0.8),
+    0 0 60px 10px rgba(214, 232, 255, 0.18);
+  opacity: 0.85;
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-animate='true'] .vh-env__tube {
+  animation: vh-flicker 11s steps(1, end) infinite;
+}
+@keyframes vh-flicker {
+  0%,
+  47%,
+  49%,
+  51%,
+  100% {
+    opacity: 0.85;
+  }
+  48%,
+  50% {
+    opacity: 0.35;
+  }
+}
+/* Hanging aisle cards, written in marker. */
+:root[data-theme='vhs-after-dark'] .vh-env__signs {
+  left: 0;
+  right: 0;
+  top: var(--vh-ceil);
+  height: 0;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__sign {
+  position: absolute;
+  left: var(--x);
+  top: 18px;
+  transform: translateX(-50%) rotate(var(--r));
+  padding: 4px 16px 6px;
+  background: var(--vh-cream);
+  color: #2a2d6a;
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: clamp(14px, 1.2vw, 20px);
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  opacity: 0.55;
+  filter: brightness(0.8);
+}
+:root[data-theme='vhs-after-dark'] .vh-env__sign::before {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 100%;
+  height: 18px;
+  border-left: 1px solid #3a3d48;
+  border-right: 1px solid #3a3d48;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__sign--pink {
+  color: #b01843;
+}
+/* The TV left on in the corner: blue light washing the floor. */
+:root[data-theme='vhs-after-dark'] .vh-env__tv {
+  inset: 0;
+  background:
+    radial-gradient(40% 40% at 6% 88%, rgba(70, 110, 255, 0.2), transparent 70%),
+    radial-gradient(30% 30% at 96% 78%, rgba(255, 61, 110, 0.08), transparent 70%);
+  mix-blend-mode: screen;
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-animate='true'] .vh-env__tv {
+  animation: vh-tv 4.6s ease-in-out infinite alternate;
+}
+@keyframes vh-tv {
+  0% {
+    opacity: 0.75;
+  }
+  40% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.95;
+  }
+}
+:root[data-theme='vhs-after-dark'] .vh-env__vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 85% 80% at 50% 45%, transparent 50%, rgba(2, 2, 5, 0.78) 100%);
+}
+/* VCR on-screen display: decoration in the backdrop, readable but quiet. */
+:root[data-theme='vhs-after-dark'] .vh-env__osd {
+  top: calc(var(--vh-ceil) + 64px);
+  font-family: var(--vh-osd);
+  font-size: clamp(12px, 1vw, 16px);
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.8),
+    -1px 0 0 rgba(255, 45, 110, 0.35),
+    1px 0 0 rgba(60, 225, 235, 0.35);
+  white-space: nowrap;
+}
+:root[data-theme='vhs-after-dark'] .vh-env__osd--play {
+  left: max(24px, 3vw);
+}
+:root[data-theme='vhs-after-dark'] .vh-env__osd--play b {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+}
+:root[data-theme='vhs-after-dark'] .vh-env__osd--clock {
+  right: max(24px, 3vw);
+}
+/* Places */
+:root[data-theme='vhs-after-dark'] .vh-env[data-place='lobby'],
+:root[data-theme='vhs-after-dark'] .vh-env[data-place='tournament'],
+:root[data-theme='vhs-after-dark'] .vh-env[data-place='other'] {
+  filter: brightness(0.75);
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-place='game'] {
+  opacity: 0.3;
+  filter: saturate(0.5);
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-fx='low'] .vh-env__tv {
+  opacity: 0.7;
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-fx='off'] .vh-env__tv,
+:root[data-theme='vhs-after-dark'] .vh-env[data-fx='off'] .vh-env__track {
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .vh-env[data-fx='off'] .vh-env__tube {
+  box-shadow: none;
+}
+@media (max-width: 700px) {
+  :root[data-theme='vhs-after-dark'] .vh-env {
+    --vh-horizon: 50%;
+    --vh-ceil: 7%;
+  }
+  :root[data-theme='vhs-after-dark'] .vh-env__sign:not(.vh-env__sign--pink),
+  :root[data-theme='vhs-after-dark'] .vh-env__osd {
+    display: none;
+  }
+}
+@media (max-height: 500px) {
+  :root[data-theme='vhs-after-dark'] .vh-env__signs,
+  :root[data-theme='vhs-after-dark'] .vh-env__osd {
+    display: none;
+  }
+}
+
+/* =====================================================================
+ * FLOOR PROPS
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .vh-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+:root[data-theme='vhs-after-dark'] .vh-prop {
+  position: absolute;
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .vh-prop__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+:root[data-theme='vhs-after-dark'] .vh-prop__screen {
+  filter: drop-shadow(0 0 8px rgba(58, 98, 255, 0.8));
+}
+:root[data-theme='vhs-after-dark'] .vh-decor[data-animate='true'] .vh-prop__track {
+  animation: vh-screen-track 6s linear infinite;
+}
+:root[data-theme='vhs-after-dark'] .vh-decor[data-animate='true'] .vh-prop__blink {
+  animation: dc-blink 1.2s steps(2) infinite;
+}
+@keyframes vh-screen-track {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  72% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0.2;
+    transform: translateY(34px);
+  }
+}
+@media (min-width: 1280px) and (min-height: 700px) {
+  :root[data-theme='vhs-after-dark'] .vh-prop {
+    display: block;
+    bottom: calc(var(--plaque-h, 150px) + 70px);
+  }
+  :root[data-theme='vhs-after-dark'] .vh-prop--tv {
+    left: 0.8vw;
+    width: clamp(120px, 9.4vw, 180px);
+  }
+  :root[data-theme='vhs-after-dark'] .vh-prop--returns {
+    right: 0.8vw;
+    width: clamp(110px, 8.6vw, 170px);
+  }
+}
+
+/* =====================================================================
+ * ARCADE FLOOR — the two cabinets in the corner of the video store
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .af-floor {
+  --af-ink-0: #eef0f6;
+  --af-ink-1: #cfd4e2;
+  --af-ink-2: #a2a9bd;
+  --af-ink-3: #959cb2;
+}
+:root[data-theme='vhs-after-dark'] .af-hud {
+  background: linear-gradient(180deg, rgba(6, 7, 11, 0.94), rgba(6, 7, 11, 0.6) 70%, rgba(6, 7, 11, 0));
+}
+:root[data-theme='vhs-after-dark'] .af-hud__word {
+  filter: drop-shadow(-1.5px 0 0 rgba(255, 45, 110, 0.7)) drop-shadow(1.5px 0 0 rgba(60, 225, 235, 0.7))
+    drop-shadow(0 0 10px rgba(79, 227, 224, 0.3));
+}
+:root[data-theme='vhs-after-dark'] .af-hud__sub {
+  color: var(--vh-cream);
+  text-shadow: none;
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='vhs-after-dark'] .af-hud__profile {
+  border-radius: 2px;
+  background: var(--vh-clamshell);
+}
+:root[data-theme='vhs-after-dark'] .af-hud__profile:hover {
+  border-color: var(--vh-cream);
+  background: var(--vh-clamshell);
+}
+:root[data-theme='vhs-after-dark'] .af-hud__profile-name[data-empty='true'] {
+  color: var(--vh-cream);
+}
+:root[data-theme='vhs-after-dark'] .af-lineup::before {
+  background:
+    radial-gradient(34% 22% at 50% 94%, color-mix(in srgb, var(--sel, #4fe3e0) 22%, transparent), transparent 72%),
+    radial-gradient(30% 70% at 50% 0%, rgba(210, 232, 255, 0.08), transparent 80%);
+}
+/* Linoleum gives a dull, smeared reflection (no neon ring). */
+:root[data-theme='vhs-after-dark'] .af-cab__reflect::before {
+  background: radial-gradient(50% 42% at 50% 0%, color-mix(in srgb, var(--p) 40%, transparent), transparent 100%);
+  opacity: 0.12;
+  filter: blur(2px);
+}
+:root[data-theme='vhs-after-dark'] .af-slot[data-active='true'] .af-cab__reflect::before {
+  opacity: 0.35;
+}
+:root[data-theme='vhs-after-dark'] .af-slot[data-active='true'] .af-cab__reflect::after {
+  display: none;
+}
+/* Attract screens are decorative: a CRT sheen and soft scanlines (the art only). */
+:root[data-theme='vhs-after-dark'] .af-cab__glass {
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.12), transparent 55%);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .af-cab__glass {
+  background: radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.08), transparent 55%);
+}
+:root[data-theme='vhs-after-dark'] .af-cab__mold {
+  fill: #2a2d38;
+}
+/* Name plate: a strip of masking tape with the title in marker. */
+:root[data-theme='vhs-after-dark'] .af-cab__name {
+  padding: 1px 10px 2px;
+  background: var(--vh-cream);
+  color: var(--vh-ink);
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: clamp(12px, calc(var(--cab-w) * 0.07), 18px);
+  transform: rotate(-1.5deg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='vhs-after-dark'] .af-slot[data-active='true'] .af-cab__name {
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] .af-slot[data-active='true'] .af-cab__family {
+  color: var(--vh-cream);
+}
+:root[data-theme='vhs-after-dark'] .af-lineup__pager i[data-on='true'] {
+  background: var(--vh-rec);
+  box-shadow: 0 0 8px var(--vh-rec);
+}
+/* Prev/next: rewind / fast-forward keys. */
+:root[data-theme='vhs-after-dark'] .af-lineup__arrow {
+  --btn-bg: #2a2f3e;
+  --btn-bg-2: #171a24;
+  --btn-edge: #05060a;
+}
+
+/* ---------- Plaque: a rental case — black clamshell with a cream spine label ---------- */
+:root[data-theme='vhs-after-dark'] .af-plaque {
+  background: linear-gradient(90deg, var(--vh-cream) 0 10px, #0b0c12 10px 12px, transparent 12px), var(--vh-clamshell);
+  border: 1px solid #2c3244;
+  border-radius: 4px;
+  padding-left: calc(clamp(16px, 2vw, 28px) + 12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px #000,
+    0 22px 50px rgba(0, 0, 0, 0.65);
+}
+:root[data-theme='vhs-after-dark'] .af-plaque::before {
+  /* the rental sticker */
+  top: 10px;
+  left: auto;
+  right: 12px;
+  width: auto;
+  height: auto;
+  padding: 3px 8px;
+  border: 0;
+  filter: none;
+  content: 'BE KIND · REWIND';
+  content: 'BE KIND · REWIND' / '';
+  font-family: var(--vh-osd);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #fff;
+  background: var(--vh-pink);
+  transform: rotate(2deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='vhs-after-dark'] .af-plaque::after {
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .af-plaque__kicker {
+  color: var(--vh-cream);
+}
+@media (max-width: 900px) {
+  :root[data-theme='vhs-after-dark'] .af-plaque::before {
+    display: none;
+  }
+}
+
+/* ---------- Tournament kiosk: the backlit "Top rentals" board behind the counter ---------- */
+:root[data-theme='vhs-after-dark'] .af-kiosk {
+  --k-led: var(--vh-ink);
+  --k-led-2: #b01843;
+  border-radius: 2px;
+  border: 2px solid #2a2d38;
+  background: linear-gradient(180deg, #fbf6e6, #ece2c6);
+  color: var(--vh-ink);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 24px rgba(241, 232, 208, 0.18),
+    0 10px 24px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='vhs-after-dark'] .af-kiosk:hover {
+  border-color: var(--vh-pink);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 30px rgba(241, 232, 208, 0.3),
+    0 10px 24px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='vhs-after-dark'] .af-kiosk__trophy {
+  color: #b01843;
+}
+:root[data-theme='vhs-after-dark'] .af-kiosk__title {
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] .af-kiosk__ticker {
+  color: #3a3d6a;
+}
+:root[data-theme='vhs-after-dark'] .af-kiosk__go {
+  color: #b01843;
+}
+
+/* =====================================================================
+ * CORE CHROME
+ * ===================================================================== */
+/* Panel header = cream tape label with the two coloured stripes. */
+:root[data-theme='vhs-after-dark'] .dc-panel__header {
+  /* ink tokens flip dark on the cream label, so anything a component puts in its header stays legible */
+  --text-0: #1b1c28;
+  --text-1: #262838;
+  --text-2: #464a5e;
+  --text-3: #50546a;
+  color: var(--vh-ink);
+  background: var(--vh-label-stripes);
+  border-bottom: 1px solid #000;
+  padding-bottom: calc(var(--sp-3) + 5px);
+}
+:root[data-theme='vhs-after-dark'] .dc-panel__title::before {
+  border-radius: 50%;
+  box-shadow: none;
+}
+:root[data-theme='vhs-after-dark'] .dc-panel__header .dc-btn--ghost,
+:root[data-theme='vhs-after-dark'] .dc-panel__header .dc-badge {
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] .dc-panel__header .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+}
+:root[data-theme='vhs-after-dark'] .dc-panel {
+  background: var(--vh-clamshell);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .dc-panel {
+  background: var(--panel-bg-solid);
+}
+/* Dialogs: the title is written on the label in marker. */
+:root[data-theme='vhs-after-dark'] [data-part='dialog-frame'] > .dc-panel__header .dc-panel__title {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  line-height: 1.1;
+}
+:root[data-theme='vhs-after-dark'] .dc-modal::backdrop {
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px), rgba(2, 3, 6, 0.8);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .dc-modal::backdrop {
+  background: rgba(2, 3, 6, 0.82);
+}
+/* VCR piano keys. */
+:root[data-theme='vhs-after-dark'] .dc-btn {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 40%), linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+}
+:root[data-theme='vhs-after-dark'] .dc-btn--primary {
+  /* a label-cream key with the red REC stripe along its bottom edge */
+  box-shadow:
+    0 0 0 1px #05060a,
+    inset 0 -3px 0 var(--vh-pink),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 3px 0 #05060a,
+    0 0 16px 0 var(--btn-glow);
+}
+:root[data-theme='vhs-after-dark'] .dc-btn--ghost {
+  background: transparent;
+}
+:root[data-theme='vhs-after-dark'] .dc-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+/* Codes and counters read like the VCR's fluorescent display. */
+:root[data-theme='vhs-after-dark'] .dc-input--code {
+  background: #030806;
+  color: #6dffb0;
+  border-color: #1d3a2c;
+  text-shadow: 0 0 8px rgba(109, 255, 176, 0.45);
+}
+:root[data-theme='vhs-after-dark'] .dc-tab[aria-selected='true']::after {
+  box-shadow: none;
+}
+:root[data-theme='vhs-after-dark'] .dc-segmented__item[aria-checked='true'],
+:root[data-theme='vhs-after-dark'] .dc-segmented__item[aria-selected='true'] {
+  box-shadow: none;
+}
+:root[data-theme='vhs-after-dark'] .dc-toggle input:checked + .dc-toggle__track .dc-toggle__thumb {
+  box-shadow: none;
+}
+:root[data-theme='vhs-after-dark'] .dc-progress::after {
+  background: repeating-linear-gradient(90deg, var(--vh-cyan) 0 4px, #2a8f8d 4px 6px);
+  box-shadow: none;
+}
+/* Toasts: an on-screen-display message box. */
+:root[data-theme='vhs-after-dark'] .dc-toast {
+  background: rgba(8, 9, 14, 0.96);
+  border: 1px solid #2c3244;
+  border-left: 4px solid var(--tone);
+  border-radius: 2px;
+}
+:root[data-theme='vhs-after-dark'] .dc-badge {
+  border-radius: 1px;
+}
+
+/* ---------- Top bar: the VCR's front panel ---------- */
+:root[data-theme='vhs-after-dark'] .topbar {
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px), var(--shell-bar-bg);
+  border-bottom: 1px solid #000;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='vhs-after-dark'] .code-chip,
+:root[data-theme='vhs-after-dark'] [data-part='room-code-chip'] {
+  background: #030806;
+  border-color: #1d3a2c;
+  border-radius: 2px;
+}
+:root[data-theme='vhs-after-dark'] .code-chip__code {
+  color: #6dffb0;
+  text-shadow: 0 0 6px rgba(109, 255, 176, 0.45);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .code-chip__code {
+  text-shadow: none;
+}
+
+/* =====================================================================
+ * LOBBY / ROOM — "Now playing"
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'][data-place='lobby'] .dc-game-backdrop {
+  background: linear-gradient(180deg, rgba(7, 8, 14, 0.8), rgba(7, 8, 14, 0.92));
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'][data-place='lobby'] .dc-game-backdrop {
+  background: var(--bg-0);
+}
+/* Room code: the VCR's fluorescent counter. */
+:root[data-theme='vhs-after-dark'] .lobby-code__value span {
+  border-radius: 2px;
+  border: 1px solid #1d3a2c;
+  background: linear-gradient(180deg, #051009, #020604);
+  color: #6dffb0;
+  text-shadow: 0 0 10px rgba(109, 255, 176, 0.55);
+  box-shadow:
+    0 0 0 2px #000,
+    inset 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .lobby-code__value span {
+  text-shadow: none;
+}
+:root[data-theme='vhs-after-dark'] .player-list__item,
+:root[data-theme='vhs-after-dark'] [data-part='player-row'] {
+  border-radius: 2px;
+}
+:root[data-theme='vhs-after-dark'] .ready-pill--on {
+  font-family: var(--vh-osd);
+}
+:root[data-theme='vhs-after-dark'] .lobby__actions,
+:root[data-theme='vhs-after-dark'] [data-part='lobby-actions'] {
+  border-top: 1px solid #000;
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 -10px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* =====================================================================
+ * TITLE SCREEN: the tape is in, the TV is on
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .af-entry {
+  --af-ink-0: #eef0f6;
+  --af-ink-1: #cfd4e2;
+  --af-ink-2: #a2a9bd;
+  --af-ink-3: #959cb2;
+}
+/* The screen is a CRT: fat rounded corners in a dark plastic surround. */
+:root[data-theme='vhs-after-dark'] .af-entry__screen {
+  inset: clamp(4px, 1.6vw, 28px);
+  border-radius: clamp(10px, 3vw, 48px) / clamp(10px, 2.6vw, 42px);
+  box-shadow:
+    0 0 0 clamp(4px, 0.8vw, 12px) #121319,
+    0 0 0 clamp(5px, 0.9vw, 14px) #000,
+    0 0 80px rgba(80, 120, 255, 0.18);
+}
+/* An on-screen display in the corner of the tube (decorative screen). */
+:root[data-theme='vhs-after-dark'] .af-entry__glass::after {
+  content: 'PLAY \25B6\FE0E';
+  content: 'PLAY \25B6\FE0E' / '';
+  position: absolute;
+  right: clamp(24px, 4vw, 64px);
+  bottom: clamp(18px, 3vw, 40px);
+  font-family: var(--vh-osd);
+  font-size: clamp(12px, 1.2vw, 18px);
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.8),
+    -1px 0 0 rgba(255, 45, 110, 0.4),
+    1px 0 0 rgba(60, 225, 235, 0.4);
+}
+:root[data-theme='vhs-after-dark'][data-fx='off'] .af-entry__glass::after {
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+}
+@media (max-width: 900px) {
+  :root[data-theme='vhs-after-dark'] .af-entry__glass::after {
+    display: none;
+  }
+}
+:root[data-theme='vhs-after-dark'] .af-entry__marquee {
+  border-radius: 3px;
+  background: linear-gradient(180deg, #1a1c24, #0b0c11);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 30px color-mix(in srgb, var(--accent) 30%, transparent),
+    0 10px 30px rgba(0, 0, 0, 0.6);
+}
+/* The card: a rental sleeve with the tape label across the top. */
+:root[data-theme='vhs-after-dark'] .af-entry__card {
+  border: 1px solid #2c3244;
+  border-radius: 3px;
+  background: var(--vh-clamshell);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 30px 70px rgba(0, 0, 0, 0.7);
+}
+:root[data-theme='vhs-after-dark'] .af-entry__card::before,
+:root[data-theme='vhs-after-dark'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .af-entry__card-head {
+  background: var(--vh-label-stripes);
+  border-bottom: 1px solid #000;
+  padding-bottom: 20px;
+}
+:root[data-theme='vhs-after-dark'] .af-entry__card-head h2 {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] .af-entry__credit {
+  color: #b01843;
+}
+:root[data-theme='vhs-after-dark'] .af-entry__slot {
+  /* REC lamp */
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--vh-rec);
+  box-shadow: 0 0 8px var(--vh-rec);
+}
+:root[data-theme='vhs-after-dark'] .af-entry__head::before,
+:root[data-theme='vhs-after-dark'] .af-entry__details::before {
+  background: rgba(6, 7, 11, 0.78);
+  box-shadow: 0 0 44px 26px rgba(6, 7, 11, 0.78);
+}
+:root[data-theme='vhs-after-dark'] .af-entry__top .dc-btn.af-entry__back,
+:root[data-theme='vhs-after-dark'] .af-entry__top .dc-btn.af-entry__help {
+  --btn-bg: rgba(8, 9, 14, 0.9);
+  --btn-bg-2: rgba(8, 9, 14, 0.9);
+}
+
+/* =====================================================================
+ * CABINET PICKER — "Pick a tape"
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .cp {
+  --af-ink-0: #eef0f6;
+  --af-ink-1: #cfd4e2;
+  --af-ink-2: #a2a9bd;
+  --af-ink-3: #959cb2;
+}
+/* Each game is a rental case on the shelf: black clamshell, cream spine label with its colour band. */
+:root[data-theme='vhs-after-dark'] .cp .cp-item {
+  border: 1px solid #262b3a;
+  border-left: 0;
+  border-radius: 3px;
+  padding-left: 22px;
+  background:
+    linear-gradient(90deg, var(--vh-cream) 0 8px, color-mix(in srgb, var(--ip) 80%, #000) 8px 12px, #07080c 12px 14px, transparent 14px),
+    var(--vh-clamshell);
+  box-shadow:
+    0 0 0 1px #000,
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='vhs-after-dark'] .cp .cp-item:hover,
+:root[data-theme='vhs-after-dark'] .cp .cp-item.is-selected {
+  border-color: color-mix(in srgb, var(--ip) 60%, #262b3a);
+  background:
+    linear-gradient(90deg, var(--vh-cream) 0 8px, color-mix(in srgb, var(--ip) 80%, #000) 8px 12px, #07080c 12px 14px, transparent 14px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ip) 12%, transparent), transparent 60%), var(--vh-clamshell);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 20px color-mix(in srgb, var(--ip) 16%, transparent),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='vhs-after-dark'] .cp .cp-item__title {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='vhs-after-dark'] .cp .cp-item__screen {
+  border-radius: 8px / 7px;
+  box-shadow:
+    0 0 0 3px #121319,
+    0 0 0 4px #000;
+}
+:root[data-theme='vhs-after-dark'] .cp .cp__preview {
+  border: 1px solid #262b3a;
+  border-radius: 4px;
+  background: var(--vh-clamshell);
+  box-shadow:
+    0 0 0 1px #000,
+    0 30px 70px rgba(0, 0, 0, 0.7);
+}
+/* The preview is a TV: rounded tube, plastic surround, OSD in the corner. */
+:root[data-theme='vhs-after-dark'] .cp .cp-screen {
+  border-radius: 28px / 24px;
+  box-shadow:
+    0 0 0 10px #121319,
+    0 0 0 11px #000,
+    0 0 40px rgba(80, 120, 255, 0.16);
+  margin: 10px 10px 4px;
+  width: calc(100% - 20px);
+}
+:root[data-theme='vhs-after-dark'] .cp .cp-screen__glass::after {
+  content: 'PLAY \25B6\FE0E';
+  content: 'PLAY \25B6\FE0E' / '';
+  position: absolute;
+  right: 26px;
+  bottom: 14px;
+  font-family: var(--vh-osd);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+}
+:root[data-theme='vhs-after-dark'] .cp .cp__marquee {
+  border-radius: 3px;
+}
+
+/* =====================================================================
+ * TOURNAMENT CENTER — "Top rentals": the backlit board behind the counter
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .tc-center {
+  background: linear-gradient(180deg, rgba(7, 8, 14, 0.5), rgba(7, 8, 14, 0.88) 40%);
+}
+:root[data-theme='vhs-after-dark'] .tc-hero {
+  border: 2px solid #2a2d38;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px) 0 0 / 100% 100%,
+    linear-gradient(180deg, #fbf6e6, #efe5c8);
+  color: var(--vh-ink);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 50px rgba(241, 232, 208, 0.14),
+    var(--shadow-2);
+}
+:root[data-theme='vhs-after-dark'] .tc-hero::before {
+  /* the red and cyan label stripes along the bottom */
+  inset: auto 0 14px;
+  height: 14px;
+  mask-image: none;
+  opacity: 1;
+  background: linear-gradient(180deg, var(--vh-pink) 0 45%, transparent 45% 60%, var(--vh-cyan) 60%);
+}
+:root[data-theme='vhs-after-dark'] .tc-marquee__title {
+  color: var(--vh-ink);
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: none;
+  transform: rotate(-1.5deg);
+}
+:root[data-theme='vhs-after-dark'] .tc-marquee__kicker {
+  color: #b01843;
+}
+:root[data-theme='vhs-after-dark'] .tc-marquee__sub {
+  color: #3a3d52;
+}
+:root[data-theme='vhs-after-dark'] .tc-marquee__trophy {
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.25));
+}
+:root[data-theme='vhs-after-dark'] .tc-hero__actions .dc-panel,
+:root[data-theme='vhs-after-dark'] .tc-hero__actions > div {
+  color: var(--text-1);
+}
+:root[data-theme='vhs-after-dark'] [data-part='tournament-card'] {
+  border-radius: 2px;
+}
+
+/* =====================================================================
+ * RESULTS, LOADING, EMPTY, ERROR
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .results-shell__title,
+:root[data-theme='vhs-after-dark'] [data-part='results-title'] {
+  text-shadow: var(--title-shadow);
+}
+:root[data-theme='vhs-after-dark'] .dc-spinner i {
+  background: var(--vh-cream);
+}
+:root[data-theme='vhs-after-dark'] .dc-spinner i:nth-child(2) {
+  background: var(--vh-pink);
+}
+:root[data-theme='vhs-after-dark'] .dc-spinner i:nth-child(3) {
+  background: var(--vh-cyan);
+}
+/* Error screens get the "blue screen" of a VCR with no signal. */
+:root[data-theme='vhs-after-dark'] [data-part='error-screen'],
+:root[data-theme='vhs-after-dark'] [data-part='not-found-screen'],
+:root[data-theme='vhs-after-dark'] [data-part='crash-screen'] {
+  background: radial-gradient(ellipse at 50% 40%, #1a2cb8, #0a1250 75%);
+}
+:root[data-theme='vhs-after-dark'] .notice-card,
+:root[data-theme='vhs-after-dark'] .reconnect-card {
+  border-radius: 3px;
+}
+
+/* =====================================================================
+ * GAME CHROME + KITS (boards and text stay clean: no noise, no wobble)
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .br-clock {
+  border-radius: 2px;
+  background: #030806;
+  border: 1px solid #1d3a2c;
+  color: #6dffb0;
+}
+:root[data-theme='vhs-after-dark'] [data-part='board-frame'] {
+  border-radius: 3px;
+}
+/* Classics: the screen is a TV set in a plastic surround. */
+:root[data-theme='vhs-after-dark'] .cl-screen {
+  border-radius: 22px / 18px;
+  box-shadow:
+    0 0 0 1px var(--cl-edge, #000),
+    0 0 0 9px #121319,
+    0 0 0 10px #000,
+    0 0 40px rgba(80, 120, 255, 0.15),
+    var(--shadow-3);
+}
+/* Party kit prompt card: a title card. */
+:root[data-theme='vhs-after-dark'] [data-part='prompt-card'] {
+  border-radius: 3px;
+}
+:root[data-theme='vhs-after-dark'] [data-part='answer-card'] {
+  border-radius: 2px;
+}
+
+/* ---------- DASterpiece: answers written on VHS labels ---------- */
+:root[data-theme='vhs-after-dark'] .mp-stage,
+:root[data-theme='vhs-after-dark'] .mp-awards,
+:root[data-theme='vhs-after-dark'] .mp-hall,
+:root[data-theme='vhs-after-dark'] .mp-settings {
+  --mp-canvas: #f6eed8;
+  --mp-canvas-2: #ece1c3;
+  --mp-ink: #1b1c28;
+  --mp-ink-soft: #4a4d62;
+  --mp-rank-0: #ffd452;
+  --mp-rank-1: #cfd6e4;
+  --mp-rank-2: #d08b4f;
+}
+/* The exhibit frame becomes a black cassette case… */
+:root[data-theme='vhs-after-dark'] .mp-exhibit__frame {
+  padding: 10px 10px 16px;
+  clip-path: none;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 26% calc(100% - 7px), #000 0 3px, transparent 3.5px),
+    radial-gradient(circle at 74% calc(100% - 7px), #000 0 3px, transparent 3.5px), linear-gradient(180deg, #1c1e27, #0f1016);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+/* …with a marker-written label: two coloured stripes along the top. */
+:root[data-theme='vhs-after-dark'] .mp-exhibit__hit {
+  padding-top: 26px;
+  background:
+    linear-gradient(180deg, transparent 0 6px, var(--vh-pink) 6px 11px, transparent 11px 13px, var(--vh-cyan) 13px 18px, transparent 18px),
+    repeating-linear-gradient(180deg, transparent 0 25px, rgba(27, 28, 40, 0.1) 25px 26px),
+    linear-gradient(180deg, var(--mp-canvas), var(--mp-canvas-2));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+}
+:root[data-theme='vhs-after-dark'] .mp-exhibit__text,
+:root[data-theme='vhs-after-dark'] .mp-best__text,
+:root[data-theme='vhs-after-dark'] .mp-hall__text {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+/* The prompt placard is the title card at the head of the tape (paper material from the adapter). */
+:root[data-theme='vhs-after-dark'] .mp-placard {
+  border-radius: 3px;
+}
+
+/* ---------- DASception: a mysterious late-night tape ---------- */
+:root[data-theme='vhs-after-dark'] .dx-stage {
+  --vh-dx-glow: rgba(255, 61, 110, 0.08);
+}
+:root[data-theme='vhs-after-dark'] .dx-hero__title,
+:root[data-theme='vhs-after-dark'] .dx-results__title,
+:root[data-theme='vhs-after-dark'] .dx-reveal__headline {
+  text-shadow: var(--title-shadow);
+}
+:root[data-theme='vhs-after-dark'] .dx-rolecard {
+  border-radius: 3px;
+}
+:root[data-theme='vhs-after-dark'] .dx-rolecard__head,
+:root[data-theme='vhs-after-dark'] .dx-case__title {
+  font-family: var(--vh-marker);
+  letter-spacing: 0.01em;
+}
+:root[data-theme='vhs-after-dark'] .dx-terminal__bar {
+  background: var(--vh-label-stripes);
+  color: var(--vh-ink);
+}
+
+/* ---------- DASQuest: a late-night adventure tape, lit by the TV ---------- */
+:root[data-theme='vhs-after-dark'] [data-part='game-stage'][data-game='quest'] {
+  background:
+    radial-gradient(1000px 600px at 50% -10%, rgba(79, 227, 224, 0.08), transparent 60%),
+    radial-gradient(800px 500px at 0% 110%, rgba(70, 110, 255, 0.1), transparent 60%), linear-gradient(180deg, #0a0c14, #05060a 70%);
+}
+:root[data-theme='vhs-after-dark'] [data-part='narrative'] {
+  border-radius: 3px;
+}
+
+/* =====================================================================
+ * JUKEBOX — a cassette / mixtape deck
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] [data-jukebox] {
+  --jb-accent: #4fe3e0;
+  --jb-accent-2: #ff3d6e;
+  --jb-radius: 4px;
+  --jb-blur: none;
+  --jb-font-title: var(--vh-marker);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='panel'] {
+  border: 1px solid #2c3244;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 3px), linear-gradient(180deg, #1c1f29, #0e1018);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--shadow-3);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='header'] {
+  background: var(--vh-label-stripes);
+  color: var(--vh-ink);
+  border-bottom: 1px solid #000;
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='header'] * {
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='title-bar'] {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+/* The tape window. */
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='display'] {
+  position: relative;
+  border-radius: 4px;
+  background: #06070b;
+  box-shadow:
+    inset 0 0 0 1px #2c3244,
+    inset 0 0 22px rgba(0, 0, 0, 0.8);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='time'] {
+  color: #6dffb0;
+}
+/* Handwritten track labels. */
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track'] {
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent 0 calc(100% - 6px), var(--vh-pink) calc(100% - 6px)), var(--vh-cream);
+  color: var(--vh-ink);
+  margin-bottom: 3px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track'] * {
+  color: inherit;
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track'] [data-part='track-title'],
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track'] :first-child {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='track'][data-current] {
+  background: linear-gradient(90deg, transparent 0 calc(100% - 6px), var(--vh-rec) calc(100% - 6px)), #fff7d6;
+  box-shadow:
+    0 0 0 1px var(--vh-rec),
+    0 1px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='mini'] {
+  border-radius: 3px;
+  border: 1px solid #2c3244;
+  background: linear-gradient(180deg, #1c1f29, #0e1018);
+  box-shadow:
+    0 0 0 1px #000,
+    var(--shadow-2);
+}
+/* Decor: the display is the cassette (edges only — never under text). */
+:root[data-theme='vhs-after-dark'] .vh-jb {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__stripes {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 3px;
+  height: 6px;
+  background: linear-gradient(180deg, var(--vh-pink) 0 45%, transparent 45% 60%, var(--vh-cyan) 60%);
+  opacity: 0.8;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__screw {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #8a90a0, #3a3f4c 60%, #15171e);
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__screw--tl {
+  left: 5px;
+  top: 5px;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__screw--tr {
+  right: 5px;
+  top: 5px;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__screw--bl {
+  left: 5px;
+  bottom: 5px;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__screw--br {
+  right: 5px;
+  bottom: 5px;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__head {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 46%;
+  height: 10px;
+  padding: 0 12%;
+  transform: translateX(-50%);
+  clip-path: polygon(6% 0, 94% 0, 100% 100%, 0 100%);
+  background: #1c1e27;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__capstan {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: conic-gradient(#9aa0b0 0 25%, #3a3f4c 0 50%, #9aa0b0 0 75%, #3a3f4c 0);
+}
+:root[data-theme='vhs-after-dark'] .vh-jb[data-animate='true'] .vh-jb__capstan {
+  animation: vh-reel 0.8s linear infinite;
+}
+@keyframes vh-reel {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+:root[data-theme='vhs-after-dark'] .vh-jb__lamp {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3a1518;
+}
+:root[data-theme='vhs-after-dark'] .vh-jb[data-playing='true'] .vh-jb__lamp {
+  background: #5fe39a;
+  box-shadow: 0 0 calc(3px + var(--vh-jb-level, 0) * 9px) #5fe39a;
+}
+
+/* DASception role card: recorded late at night — a REC tag in the free corner. */
+:root[data-theme='vhs-after-dark'] .dx-rolecard::before {
+  content: 'REC ●';
+  content: 'REC ●' / '';
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  right: 16px;
+  font-family: var(--vh-osd);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--vh-rec);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+:root[data-theme='vhs-after-dark'][data-fx='high']:not([data-reduced-motion='true']) .dx-rolecard::before {
+  animation: vh-rec 2s steps(2) infinite;
+}
+@keyframes vh-rec {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A panel title used outside a panel header (no cream label behind it) keeps a light ink. */
+:root[data-theme='vhs-after-dark'] :not(.dc-panel__header) > .dc-panel__title {
+  color: var(--text-1);
+}
+
+/* DASQuest scene art is a decorative screen: a TV tube with an OSD tag in its free corner. */
+:root[data-theme='vhs-after-dark'] .qs-scene {
+  border-radius: 18px / 15px;
+}
+:root[data-theme='vhs-after-dark'] .qs-scene::after {
+  content: 'PLAY \25B6\FE0E';
+  content: 'PLAY \25B6\FE0E' / '';
+  position: absolute;
+  z-index: 5;
+  left: 16px;
+  top: 12px;
+  font-family: var(--vh-osd);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+:root[data-theme='vhs-after-dark'] .qs-narrative,
+:root[data-theme='vhs-after-dark'] [data-part='narrative'] {
+  box-shadow:
+    inset 0 0 60px rgba(70, 110, 255, 0.06),
+    var(--panel-shadow);
+}
+
+/* Carousel arrows become the deck's rewind / fast-forward keys (accessible names unchanged). */
+:root[data-theme='vhs-after-dark'] .af-lineup__arrow .dc-icon {
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .af-lineup__arrow::after {
+  content: '';
+  width: 22px;
+  height: 14px;
+  background: currentColor;
+  clip-path: polygon(0 50%, 50% 0, 50% 50%, 100% 0, 100% 100%, 50% 50%, 50% 100%);
+}
+:root[data-theme='vhs-after-dark'] .af-lineup__arrow--next::after {
+  transform: scaleX(-1);
+}
+
+/* DASterpiece exhibit letters: a small cream sticker on the case. */
+:root[data-theme='vhs-after-dark'] .mp-exhibit__letter {
+  background: var(--vh-cream);
+  border-color: #000;
+  color: var(--vh-ink);
+}
+
+/* 404 / crash: the VCR stopped — OSD in the corner of the blue screen. */
+:root[data-theme='vhs-after-dark'] [data-part='not-found-screen']::before,
+:root[data-theme='vhs-after-dark'] [data-part='error-screen']::before,
+:root[data-theme='vhs-after-dark'] [data-part='crash-screen']::before {
+  content: 'STOP \25A0';
+  content: 'STOP \25A0' / '';
+  position: fixed;
+  top: calc(20px + var(--safe-top));
+  left: calc(24px + var(--safe-left));
+  font-family: var(--vh-osd);
+  font-size: clamp(14px, 1.4vw, 20px);
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* Focus rings on this theme's pale title bars / plates: the default light ring measured < 3:1 there, so
+   controls inside them get a dark ring instead (a11y review). */
+:root[data-theme='vhs-after-dark'] [data-jukebox] [data-part='header'],
+:root[data-theme='vhs-after-dark'] [data-part='tournament-hero'] .tc-hero__create {
+  --focus-ring: #1b1c28;
+}
+
+/* The tournament join box is dark tape-grey (#464541): the label needs a lighter ink. */
+:root[data-theme='vhs-after-dark'] .tc-join__label {
+  color: #c3c8d6;
+}
+
+/* =====================================================================
+ * SPORTS GAMES ON TAPE — the HUD is a VCR's on-screen display: black clamshell panels, OSD digits
+ * with a hint of chroma bleed, transport-key buttons, a red REC-style FIRE key, handwritten tape
+ * labels on the control decks and rounded CRT corners on the playfield. No noise over play.
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-glass,
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] .ci-glass,
+:root[data-theme='vhs-after-dark'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='vhs-after-dark'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 1px solid #2a2f3e;
+  border-radius: 3px;
+  background: var(--vh-clamshell);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px #05060a,
+    0 12px 28px rgba(0, 0, 0, 0.6);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='vhs-after-dark'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='vhs-after-dark'] [data-game='ships'] .sh-panel--active {
+  border-color: var(--vh-cyan);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px #05060a,
+    0 0 18px rgba(79, 227, 224, 0.28),
+    0 12px 28px rgba(0, 0, 0, 0.6);
+}
+/* OSD digits: white with a whisper of red/cyan misregistration. */
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] :is(.tk-dial__value b, .tk-wind__value b),
+:root[data-theme='vhs-after-dark'] [data-game='putt'] :is(.pt-dock__deg, .pt-dock__power-label b, .pt-strokes b, .pt-plate__hole b),
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] :is(.ci-clock, .ci-pos__num),
+:root[data-theme='vhs-after-dark'] [data-game='ships'] .sh-turn__title {
+  text-shadow:
+    1.5px 0 rgba(255, 61, 110, 0.55),
+    -1.5px 0 rgba(79, 227, 224, 0.55);
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-dial__value b {
+  color: #f4f7ff;
+}
+/* VCR transport keys. */
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-hold {
+  border: 1px solid #05060a;
+  border-radius: 4px;
+  color: #e6e9f2;
+  background: linear-gradient(180deg, #3a3f50, #1c1f2a 55%, #14161e);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 3px 0 #05060a;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-hold:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 0 #05060a;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-weapon__current {
+  border-radius: 3px;
+  border: 1px solid #2a2f3e;
+  background: #07080c;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i {
+  border-radius: 0;
+}
+/* FIRE: the red REC key. */
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='fire'] {
+  border-radius: 6px;
+  color: #fff;
+  background: linear-gradient(180deg, #ff5a68, #d21f35 55%, #8e0f20);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 0 0 2px #05060a,
+    0 5px 0 2px #05060a,
+    0 0 22px rgba(255, 59, 59, 0.35);
+  text-shadow: 0 2px 0 rgba(60, 0, 10, 0.6);
+  animation: none;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='fire'][data-state='ready']::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px #fff;
+  animation: vhs-rec-dot 1.1s steps(2, jump-none) infinite;
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='fire']:active:not(:disabled) {
+  transform: translateY(3px);
+}
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #b9bfd0;
+  text-shadow: none;
+  background: linear-gradient(180deg, #3a3f50, #1c1f2a);
+}
+:root[data-theme='vhs-after-dark'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready']::before {
+  animation: none;
+}
+@keyframes vhs-rec-dot {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+/* The playfield is a CRT: rounded glass corners and a soft tube vignette. */
+:root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 26px / 22px;
+  box-shadow:
+    0 0 0 80px #050608,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 0 110px rgba(0, 0, 0, 0.42);
+}
+/* Ships: each sea wears a handwritten tape label. */
+:root[data-theme='vhs-after-dark'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  margin: -8px -12px 6px -8px;
+  padding: 4px 8px 6px 12px;
+  min-height: 34px;
+  background: var(--vh-label-stripes);
+  border-bottom: 1px solid #05060a;
+}
+:root[data-theme='vhs-after-dark'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  font-family: var(--vh-marker);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--vh-ink);
+}
+:root[data-theme='vhs-after-dark'] [data-game='ships'] [data-part='panel'] .sh-panel__meta {
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: #0d0f16;
+}
+:root[data-theme='vhs-after-dark'] [data-game='ships'] [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 1px #05060a,
+    0 0 0 6px #121319,
+    0 0 0 7px #000,
+    inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='vhs-after-dark'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 1px #05060a,
+    0 0 0 6px #121319,
+    0 0 0 7px var(--vh-cyan),
+    0 0 20px rgba(79, 227, 224, 0.3),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+/* Circuit start lights: a black VCR front panel. */
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 1px solid #2a2f3e;
+  border-radius: 4px;
+  background: var(--vh-clamshell);
+}
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__title {
+  border-radius: 2px;
+  font-family: var(--vh-osd);
+  background: rgba(5, 6, 10, 0.85);
+}
+:root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='minimap'] {
+  border-radius: 14px / 12px;
+  box-shadow:
+    0 0 0 1px #05060a,
+    0 0 0 5px #121319,
+    0 0 0 6px #000,
+    0 12px 28px rgba(0, 0, 0, 0.6);
+}
+/* Desktop: tape labels on the control decks and an OSD tag in the corner. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch),
+  :root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='controls'] {
+    padding-top: 34px;
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='controls']::before {
+    content: 'DAS Tanks \2014  the big showdown (SP)' / '';
+    position: absolute;
+    top: 5px;
+    left: 18%;
+    right: 18%;
+    height: 24px;
+    padding: 0 14px 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    white-space: nowrap;
+    font: 700 16px/1 var(--vh-marker);
+    color: var(--vh-ink);
+    background: var(--vh-label-stripes);
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+    transform: rotate(-0.6deg);
+    pointer-events: none;
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='controls']::before {
+    content: 'Mini golf nite \2014  do not tape over!' / '';
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='battlefield']::before,
+  :root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='course']::before,
+  :root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='race']::before {
+    content: 'PLAY \25B6' / '';
+    position: absolute;
+    z-index: 2;
+    left: 28px;
+    bottom: 26px;
+    font: 400 18px/1 var(--vh-osd);
+    letter-spacing: 0.08em;
+    color: #f4f7ff;
+    text-shadow:
+      1.5px 0 rgba(255, 61, 110, 0.6),
+      -1.5px 0 rgba(79, 227, 224, 0.6),
+      0 2px 6px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='battlefield']::before {
+    bottom: auto;
+    top: 128px;
+  }
+  :root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='race']::before {
+    content: '\25CF  REC' / '';
+    left: auto;
+    bottom: auto;
+    right: 70px;
+    top: 24px;
+    color: #ff5a5a;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  :root[data-theme='vhs-after-dark'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='vhs-after-dark'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='vhs-after-dark'] [data-game='circuit'] [data-part='race']::after {
+    border-radius: 16px / 14px;
+    box-shadow: 0 0 0 60px #050608;
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza: a late-night TV quiz taped off channel 3 (party kit — trivia, survey,
+ * DASterpiece, DASwords, DASception). The question plays on a CRT with VCR on-screen-display
+ * captions; answers are cassette spines with handwritten labels (the answer colour is the dot
+ * sticker + the label stripe). Analog touches stay on the frame, never over the words.
+ * ===================================================================== */
+:root[data-theme='vhs-after-dark'] .pk-stage {
+  --vhp-osd: #a6ffb8;
+  --pk-stage-set: inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2) rgba(106, 168, 255, 0.08);
+  background:
+    radial-gradient(55% 40% at 50% 34%, rgba(90, 140, 255, 0.14), transparent 72%),
+    radial-gradient(30% 20% at 88% 100%, rgba(255, 61, 110, 0.1), transparent 70%),
+    linear-gradient(180deg, #0b0d16, #07080e 70%, #0a0b12);
+}
+/* The CRT: dark glass with scanlines + vignette inside a moulded bezel; OSD captions in the corners. */
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt {
+  --mat-card-ink: #f6f2e6;
+  --pk-card-ink: #f6f2e6;
+  --pk-card-ink-muted: rgba(246, 242, 230, 0.74);
+  margin: 10px;
+  padding-top: clamp(34px, 4.5vw, 46px);
+  border: 0;
+  border-radius: 26px / 34px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 100% at 50% 45%, #1a2544 0%, #0c1224 58%, #04060c 100%);
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.9),
+    0 0 0 8px #1a1c26,
+    0 0 0 9px #2a2d3a,
+    0 0 0 12px #0e0f15,
+    0 0 50px 10px rgba(90, 140, 255, 0.16),
+    0 20px 40px 10px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::before,
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::after {
+  position: absolute;
+  top: clamp(10px, 1.6vw, 16px);
+  font-family: var(--vh-osd);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--vhp-osd);
+  text-shadow: 1px 1px 0 #000, -1px 0 0 #000;
+  pointer-events: none;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::before {
+  content: '\25B6  PLAY' / '';
+  left: clamp(16px, 2.4vw, 28px);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::after {
+  content: 'CH 03' / '';
+  right: clamp(16px, 2.4vw, 28px);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt__kicker {
+  font-family: var(--vh-osd);
+  color: var(--vhp-osd);
+  text-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt__text {
+  text-shadow:
+    -1px 0 0 rgba(255, 61, 110, 0.45),
+    1px 0 0 rgba(79, 227, 224, 0.45),
+    0 0 18px rgba(160, 190, 255, 0.35);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt .pk-chip {
+  font-family: var(--vh-osd);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  border-radius: 2px;
+  color: #f6f2e6;
+  background: rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt[data-tone='final'] {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 100% at 50% 45%, #3a1a2c 0%, #1a0c16 58%, #06030a 100%);
+}
+/* Cassette spines: black shell, cream label with a handwritten answer; colour = dot sticker + stripe. */
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer {
+  --mat-card-ink: var(--vh-ink);
+  --pk-card-ink: var(--vh-ink);
+  border: 0;
+  border-radius: 4px;
+  padding: 10px 56px 10px 14px;
+  background:
+    linear-gradient(90deg, transparent calc(100% - 44px), var(--slot) calc(100% - 44px) calc(100% - 34px), transparent calc(100% - 34px) calc(100% - 28px), color-mix(in srgb, var(--slot) 55%, var(--vh-cream)) calc(100% - 28px) calc(100% - 22px), transparent calc(100% - 22px)),
+    repeating-linear-gradient(180deg, transparent 0 21px, rgba(27, 28, 40, 0.08) 21px 22px),
+    linear-gradient(180deg, #f6eed8, var(--vh-cream-2));
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 0 0 7px #15171f,
+    0 0 0 8px #2b2e3b,
+    0 8px 0 8px #06070b,
+    0 14px 24px 8px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answers {
+  gap: clamp(22px, 2.4vw, 28px);
+  padding: 8px;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__badge {
+  grid-template-columns: auto;
+  justify-items: center;
+  gap: 0;
+  min-width: 0;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--vh-ink);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.5), transparent 50%),
+    var(--slot);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2),
+    1px 2px 0 rgba(0, 0, 0, 0.3);
+  transform: rotate(-6deg);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__badge .pk-shape {
+  width: 11px;
+  height: 11px;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__letter {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__label {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+  font-size: clamp(1.15rem, 0.7vw + 0.95rem, 1.45rem);
+  line-height: 1.15;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 0 0 7px #15171f,
+    0 0 0 8px #3a3e50,
+    0 10px 0 8px #06070b,
+    0 0 30px 10px color-mix(in srgb, var(--slot) 22%, transparent);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer:active:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 0 0 7px #15171f,
+    0 0 0 8px #2b2e3b,
+    0 3px 0 8px #06070b;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 0 0 7px color-mix(in srgb, var(--slot) 55%, #15171f),
+    0 0 0 10px var(--slot),
+    0 0 34px 10px color-mix(in srgb, var(--slot) 35%, transparent);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer[data-state='correct'] {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 21px, rgba(27, 28, 40, 0.08) 21px 22px),
+    linear-gradient(180deg, #e8f8e2, #cdeecb);
+  box-shadow:
+    0 0 0 7px #0f3a26,
+    0 0 0 10px #3dd68c,
+    0 0 36px 10px rgba(61, 214, 140, 0.4);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer[data-state='wrong'] {
+  box-shadow:
+    0 0 0 7px #3a1016,
+    0 0 0 10px var(--vh-rec),
+    0 0 26px 8px rgba(255, 59, 59, 0.3);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer[data-state='correct'] .pk-answer__mark {
+  color: #0f6a3a;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer[data-state='wrong'] .pk-answer__mark {
+  color: #b31212;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__bar {
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--slot) 34%, transparent) 0 6px, color-mix(in srgb, var(--slot) 18%, transparent) 6px 12px);
+}
+/* Vote cards: tape labels too. */
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-vote {
+  --mat-card-ink: var(--vh-ink);
+  --pk-card-ink: var(--vh-ink);
+  --pk-card-ink-muted: rgba(27, 28, 40, 0.72);
+  color: var(--vh-ink);
+  border: 0;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, var(--slot) 0 6px, var(--vh-cream) 6px 9px, color-mix(in srgb, var(--slot) 50%, var(--vh-cream)) 9px 12px, transparent 12px),
+    repeating-linear-gradient(180deg, transparent 0 25px, rgba(27, 28, 40, 0.08) 25px 26px),
+    linear-gradient(180deg, #f6eed8, var(--vh-cream-2));
+  box-shadow:
+    0 0 0 6px #15171f,
+    0 0 0 7px #2b2e3b,
+    0 12px 22px 6px rgba(0, 0, 0, 0.45);
+  padding-top: calc(var(--sp-4) + 10px);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-vote__content {
+  font-family: var(--vh-marker);
+  font-weight: 700;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-votes {
+  gap: 26px;
+  padding: 8px;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-vote[data-picked='true'] {
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--slot) 55%, #15171f),
+    0 0 0 9px var(--slot),
+    0 0 30px 8px color-mix(in srgb, var(--slot) 30%, transparent);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-vote[data-winner='true'] {
+  box-shadow:
+    0 0 0 6px #3a2e08,
+    0 0 0 9px #ffd23f,
+    0 0 30px 8px rgba(255, 210, 63, 0.3);
+}
+/* Tape counter timer bar and OSD readouts. */
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-timerbar {
+  height: 10px;
+  border-radius: 1px;
+  background: repeating-linear-gradient(90deg, #0a0b12 0 3px, #1a1d2a 3px 6px);
+  border: 1px solid #2b2e3b;
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-timerbar__fill {
+  background: linear-gradient(90deg, var(--vh-cyan), #6aa8ff);
+  box-shadow: 0 0 10px rgba(79, 227, 224, 0.45);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background: var(--vh-rec);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage :is(.pk-strip__verb, .pk-board__title) {
+  font-family: var(--vh-osd);
+  color: var(--vhp-osd);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-interstitial__icon {
+  border-radius: 18px / 22px;
+  border: 0;
+  background: radial-gradient(120% 100% at 50% 45%, #1a2544, #04060c);
+  color: var(--vhp-osd);
+  box-shadow: 0 0 0 6px #1a1c26, 0 0 0 7px #2a2d3a, 0 0 30px rgba(90, 140, 255, 0.25);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-interstitial__kicker {
+  font-family: var(--vh-osd);
+  color: var(--vhp-osd);
+}
+@media (max-width: 560px) {
+  :root[data-theme='vhs-after-dark'] .pk-stage .pk-answers {
+    gap: 20px;
+  }
+  :root[data-theme='vhs-after-dark'] .pk-stage .pk-answer__badge {
+    width: 42px;
+    height: 42px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  :root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt {
+    padding-top: 12px;
+  }
+  :root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::before,
+  :root[data-theme='vhs-after-dark'] .pk-stage .pk-prompt::after {
+    display: none;
+  }
+}
+/* Results: podiums are stacked cassettes — black shells with a cream label for the place. */
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-podium__block {
+  border: 0;
+  border-radius: 3px 3px 0 0;
+  background:
+    linear-gradient(180deg, transparent 0 calc(50% - 20px), var(--player) calc(50% - 20px) calc(50% - 16px), var(--vh-cream) calc(50% - 16px) calc(50% + 20px), transparent calc(50% + 20px)) 10px 0 / calc(100% - 20px) 100% no-repeat,
+    repeating-linear-gradient(180deg, #15171f 0 22px, #0b0c12 22px 24px);
+  box-shadow:
+    0 0 0 1px #2b2e3b,
+    0 0 26px color-mix(in srgb, var(--player) 25%, transparent);
+}
+:root[data-theme='vhs-after-dark'] .pk-stage .pk-podium__place {
+  color: var(--vh-ink);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}

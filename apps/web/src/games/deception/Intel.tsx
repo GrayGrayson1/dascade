@@ -125,7 +125,7 @@ const EMPTY_INTEL: Record<string, string> = {
 export function IntelPanel({ me, nodes }: { me: DeceptionPrivate; nodes: Record<string, NodeEntry> }) {
   const entries = [...me.intel].reverse();
   return (
-    <section className="dx-panel dx-intel" aria-label="Your intel" style={{ '--role': ROLE_COLOR[me.role!] } as CSSProperties}>
+    <section className="dx-panel dx-intel" data-part="intel" aria-label="Your intel" style={{ '--role': ROLE_COLOR[me.role!] } as CSSProperties}>
       <h3 className="dx-panel__title">
         <Icon name="lock" size={12} /> Your intel <span className="dc-muted">· private</span>
       </h3>
@@ -145,7 +145,7 @@ export function IntelPanel({ me, nodes }: { me: DeceptionPrivate; nodes: Record<
 export function Timeline({ log, nodes }: { log: DeceptionLogEntry[]; nodes: Record<string, NodeEntry> }) {
   if (!log.length) return <p className="dc-muted dx-timeline__empty">Nothing has happened yet. The first night is coming…</p>;
   return (
-    <ol className="dx-timeline" aria-label="Match timeline">
+    <ol className="dx-timeline" data-part="timeline" aria-label="Match timeline">
       {[...log].reverse().map((e, i) => {
         const who = 'playerId' in e && e.playerId ? nameOf(nodes, e.playerId) : '';
         const role = 'role' in e && e.role ? ` (${DECEPTION_ROLE_INFO[e.role].name})` : '';
@@ -195,7 +195,7 @@ export function TeamChannel({ lines, canSend, meId }: { lines: DeceptionTeamLine
     setText('');
   };
   return (
-    <section className="dx-panel dx-teamchan" aria-label="Glitch channel">
+    <section className="dx-panel dx-teamchan" data-part="team-channel" aria-label="Glitch channel">
       <h3 className="dx-panel__title">
         <Icon name="skull" size={12} /> Glitch channel <span className="dc-muted">· only Glitches see this</span>
       </h3>
@@ -243,7 +243,7 @@ function renderChat(m: ChatMessage) {
         </span>
       ) : null}
       {m.playerId && m.kind !== 'system' && m.kind !== 'correct' ? (
-        <span className="chat__name" style={{ color: m.color }}>
+        <span className="chat__name" style={{ '--chat-name': m.color } as CSSProperties}>
           {m.name}
         </span>
       ) : null}

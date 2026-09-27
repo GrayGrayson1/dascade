@@ -65,7 +65,7 @@ export function TopHud({ ctrl, onScorecard }: { ctrl: PuttController; onScorecar
   const showClock = deadline > 0 && hud.holeStatus === 'play' && !hud.solo;
   const limit = hole ? hole.par + hud.maxOverPar : 0;
   return (
-    <header className="pt-top" aria-label="Hole status">
+    <header className="pt-top" data-part="hud" aria-label="Hole status">
       <div className="pt-plate">
         <span className="pt-plate__hole">
           <span className="pt-plate__label">{playoff ? 'Playoff' : 'Hole'}</span>
@@ -113,7 +113,7 @@ export function Leaderboard() {
   if (list.length < 2) return null;
   const playoff = state.playoffIds ?? [];
   return (
-    <aside className="pt-board" aria-label="Leaderboard">
+    <aside className="pt-board" data-part="scoreboard" aria-label="Leaderboard">
       <ol>
         {list.map(({ id, g, toPar, thru }, i) => {
           const turn = state.mode === 'turns' && state.turnId === id;
@@ -158,7 +158,7 @@ export function AimDock({ ctrl, touch }: { ctrl: PuttController; touch: boolean 
       ? 'Drag back from anywhere on the course, release to putt'
       : 'Drag back to aim & set power · or ← → aim, ↑ ↓ power, Space to putt';
   return (
-    <div className={cx('pt-dock', disabled && 'is-idle')} aria-label="Putt controls" role="group">
+    <div className={cx('pt-dock', disabled && 'is-idle')} data-part="controls" aria-label="Putt controls" role="group">
       <p className="pt-dock__hint">{ui.canAim ? hint : ' '}</p>
       <div className="pt-dock__row">
         <div className="pt-dock__aim">

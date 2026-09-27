@@ -4,6 +4,8 @@
  */
 import { synth } from '../../../audio/audio.ts';
 
+const HOLD_KEY = 'circuit-engine';
+
 export class EngineSound {
   private ctx: AudioContext | null = null;
   private osc1: OscillatorNode | null = null;
@@ -59,6 +61,7 @@ export class EngineSound {
   /** speed01: 0..1.3, throttle 0..1, slip 0..1. */
   update(speed01: number, throttle: number, boosting: boolean, slip: number, offroad: boolean, active: boolean): void {
     if (!active) {
+      synth.hold(HOLD_KEY, false);
       if (this.started && this.gain && this.ctx) {
         this.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);
         this.skidGain?.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
@@ -66,6 +69,8 @@ export class EngineSound {
       return;
     }
     if (!this.ensure() || !this.ctx || !this.osc1 || !this.osc2 || !this.filter || !this.gain || !this.skidGain) return;
+    // The hum is continuous: it holds a gentle jukebox dip instead of pumping transient ducks.
+    synth.hold(HOLD_KEY, true);
     const t = this.ctx.currentTime;
     const gears = 5;
     const g = Math.min(gears - 1, Math.floor(Math.min(0.999, speed01 / 1.05) * gears));
@@ -82,6 +87,7 @@ export class EngineSound {
   }
 
   stop(): void {
+    synth.hold(HOLD_KEY, false);
     if (!this.started) return;
     try {
       this.osc1?.stop();

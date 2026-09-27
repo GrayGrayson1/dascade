@@ -1,4 +1,6 @@
 import type { OptionalThemeToken, ThemeToken } from './tokens.ts';
+import type { MaterialKey, ThemeEffects, ThemeMaterials } from './materials.ts';
+import type { ThemeCopy } from './copy.ts';
 
 /** Colours and intensities for Canvas 2D / Phaser renderers (which can't read CSS directly). */
 export interface RendererPalette {
@@ -25,11 +27,35 @@ export interface RendererPalette {
   glowSoft: number;
 }
 
+/** Picker/marketing metadata. */
+export interface ThemeMeta {
+  /** Short era/setting line shown in the picker ("1997 · Bargain-bin CD-ROM"). */
+  era: string;
+  /** One punchy line (picker card subtitle). */
+  tagline: string;
+  /** Four representative colours for picker swatches / previews (background, surface, accent, accent2). */
+  swatches: readonly [string, string, string, string];
+  /** Picker grouping. */
+  family: 'house' | 'retro-desktop' | 'physical' | 'analog' | 'comedy' | 'premium';
+}
+
 export interface ThemeDefinition {
   /** kebab-case, stable forever (stored in user settings). */
   id: string;
   name: string;
   description: string;
+  meta: Readonly<ThemeMeta>;
+  /**
+   * Playfield materials (see materials.ts). Delta Neon omits them (games keep their own palette);
+   * every other built-in theme defines all of them.
+   */
+  materials?: Readonly<ThemeMaterials>;
+  /** Per-game material nudges, keyed by GameId (emitted on <GameStage data-game="id">). */
+  gameMaterials?: Readonly<Record<string, Readonly<Partial<ThemeMaterials>>>>;
+  /** Renderer/visualizer/transition hints. Defaults: DEFAULT_EFFECTS. */
+  effects?: Readonly<Partial<ThemeEffects>>;
+  /** Themed headings/flavour text (see copy.ts). */
+  copy?: Readonly<ThemeCopy>;
   colorScheme: 'dark' | 'light';
   /** Browser UI colour (<meta name="theme-color">). */
   metaThemeColor: string;
@@ -65,6 +91,10 @@ export interface ThemeTokens {
   /** Already scaled by the visual-effects setting (0 when effects are off). */
   glow: number;
   fonts: { display: string; pixel: string; ui: string; num: string };
+  /** Resolved materials in scope of the element read (per-game nudges applied). Missing = use your own palette. */
+  materials: Partial<Record<MaterialKey, string>>;
+  /** Effects profile of the active theme, merged over DEFAULT_EFFECTS. */
+  effects: ThemeEffects;
   /** 0xRRGGBB integers for Phaser (`scene.cameras.main.setBackgroundColor`, `graphics.fillStyle`). */
   int: {
     background: number;

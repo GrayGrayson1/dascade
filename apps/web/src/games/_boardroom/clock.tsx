@@ -68,7 +68,7 @@ export function BoardClock({ clock, side, owner, className, size = 'md' }: Board
 
   if (!clock.enabled) {
     return (
-      <div className={cx('br-clock br-clock--untimed', size === 'lg' && 'br-clock--lg', className)} aria-label={`${owner}: untimed`}>
+      <div className={cx('br-clock br-clock--untimed', size === 'lg' && 'br-clock--lg', className)} data-part="clock" aria-label={`${owner}: untimed`}>
         <PixelIcon name="clock" />
         <span className="br-clock__time">∞</span>
       </div>
@@ -78,6 +78,7 @@ export function BoardClock({ clock, side, owner, className, size = 'md' }: Board
     <div
       ref={rootRef}
       className={cx('br-clock', size === 'lg' && 'br-clock--lg', className)}
+      data-part="clock"
       data-running={running || undefined}
       data-flagged={flagged || undefined}
       role="timer"

@@ -7,6 +7,8 @@
 import { PADDLE, type Side } from '@dascade/game-core/paddle';
 import { Particles, Popups, Shake, alpha, beginFrame, canvasFonts, drawBlock, fxSettings, type Surface } from '../_classics/index.ts';
 import type { PaddleFrame } from './net.ts';
+import { COURT_ART, courtArt, type CourtArt } from './palette.ts';
+import { tint, type Materials } from '../_classics/palette.ts';
 
 /** Court palette (game art; declared once so a theme could override it). */
 export const PADDLE_ART = {
@@ -53,6 +55,15 @@ export class PaddleRenderer {
   private bg: { key: string; canvas: HTMLCanvasElement } | null = null;
   private fonts = canvasFonts();
   private t = 0;
+  private court: CourtArt = COURT_ART;
+
+  /** Theme materials changed: re-colour the court on the next frame (render-only). */
+  setMaterials(m: Materials): void {
+    const next = courtArt(m);
+    if (next === this.court) return;
+    this.court = next;
+    this.bg = null;
+  }
 
   hit(side: Side, x: number, y: number, speed: number, color: string, rally: number): void {
     const fx = fxSettings();
@@ -101,8 +112,9 @@ export class PaddleRenderer {
     const g = c.getContext('2d')!;
     g.scale(s.scale, s.scale);
     const grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, PADDLE_ART.courtTop);
-    grad.addColorStop(1, PADDLE_ART.courtBottom);
+    const art = this.court;
+    grad.addColorStop(0, art.courtTop);
+    grad.addColorStop(1, art.courtBottom);
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
     // Goal zones in each side's colour.
@@ -118,33 +130,33 @@ export class PaddleRenderer {
     }
     // Centre pool of light.
     const pool = g.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, W * 0.46);
-    pool.addColorStop(0, 'rgba(124, 245, 255, 0.10)');
-    pool.addColorStop(1, 'rgba(124, 245, 255, 0)');
+    pool.addColorStop(0, tint(art.glow, 0.1));
+    pool.addColorStop(1, tint(art.glow, 0));
     g.fillStyle = pool;
     g.fillRect(0, 0, W, H);
     // Floor grid.
-    g.fillStyle = PADDLE_ART.grid;
+    g.fillStyle = art.grid;
     for (let x = 50; x < W; x += 50) g.fillRect(x, 0, 1.5, H);
     for (let y = 50; y < H; y += 50) g.fillRect(0, y, W, 1.5);
     // Pixel centre line (with a soft glow) + centre diamond.
     g.save();
-    g.shadowColor = 'rgba(124, 245, 255, 0.8)';
+    g.shadowColor = tint(art.glow, 0.8);
     g.shadowBlur = 14;
-    g.fillStyle = PADDLE_ART.centre;
+    g.fillStyle = art.centre;
     for (let y = 14; y < H; y += 44) g.fillRect(W / 2 - 5, y, 10, 24);
     g.restore();
     g.save();
     g.translate(W / 2, H / 2);
     g.rotate(Math.PI / 4);
-    g.strokeStyle = 'rgba(214, 246, 255, 0.16)';
+    g.strokeStyle = tint(art.line, 0.16);
     g.lineWidth = 4;
     g.strokeRect(-70, -70, 140, 140);
     g.restore();
     // Top/bottom rails.
     g.save();
-    g.shadowColor = 'rgba(124, 245, 255, 0.9)';
+    g.shadowColor = tint(art.glow, 0.9);
     g.shadowBlur = 16;
-    g.fillStyle = 'rgba(214, 246, 255, 0.5)';
+    g.fillStyle = tint(art.line, 0.5);
     g.fillRect(0, 0, W, 4);
     g.fillRect(0, H - 4, W, 4);
     g.restore();
@@ -281,7 +293,7 @@ export class PaddleRenderer {
     if (view.serveHint && f.status === 'serve') {
       const pulse = fx.reducedMotion ? 0.8 : 0.55 + 0.45 * Math.sin(this.t * 6);
       ctx.font = `28px ${this.fonts.pixel}`;
-      ctx.fillStyle = alpha('#f8f6ff', pulse);
+      ctx.fillStyle = alpha(this.court.ink, pulse);
       if (portrait) {
         const at = this.toScreen(b.x + (f.server === 0 ? 60 : -60), b.y);
         ctx.textAlign = 'center';

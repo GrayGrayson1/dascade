@@ -138,14 +138,14 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #05040b;
+  background: var(--mat-screen, #05040b);
   border-radius: 6px;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--tint) 40%, transparent),
-    0 0 0 4px rgba(0, 0, 0, 0.55),
-    0 0 0 5px color-mix(in srgb, var(--tint) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--qs-mat-tint, var(--tint)) 40%, transparent),
+    0 0 0 4px var(--mat-bezel, rgba(0, 0, 0, 0.55)),
+    0 0 0 5px color-mix(in srgb, var(--qs-mat-tint, var(--tint)) 18%, transparent),
     0 18px 50px rgba(0, 0, 0, 0.55),
-    0 0 60px color-mix(in srgb, var(--tint) 14%, transparent);
+    0 0 60px color-mix(in srgb, var(--qs-mat-tint, var(--tint)) 14%, transparent);
   isolation: isolate;
 }
 .qs-main__scene {
@@ -187,6 +187,34 @@
 :root[data-fx='off'] .qs-scene__vignette {
   background: radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
 }
+/* Theme adapter: decorative CRT/grain for themed scenes only (never under Delta Neon, never with
+   visual effects off — SceneCanvas sets --qs-crt / --qs-grain from the theme's effects). */
+.qs-scene__fx {
+  display: none;
+}
+.qs-scene[data-quest-mat] > .qs-scene__fx {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 1;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, calc(var(--qs-crt, 0) * 0.28)) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(0, 0, 0, calc(var(--qs-crt, 0) * 0.5)) 100%);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--mat-bezel, #000) 80%, transparent);
+}
+.qs-scene[data-quest-mat] > .qs-scene__fx::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: calc(var(--qs-grain, 0) * 0.35);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.2 0'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+:root[data-fx='off'] .qs-scene__fx {
+  display: none !important;
+}
+
 @keyframes qs-scene-in {
   0% {
     filter: brightness(2.2) saturate(0);
@@ -364,8 +392,8 @@
   padding: 22px 26px 20px;
   background:
     linear-gradient(180deg, rgba(163, 230, 53, 0.035), transparent 40%),
-    var(--qs-panel);
-  border: 1px solid var(--line);
+    var(--mat-paper, var(--qs-panel));
+  border: 1px solid var(--mat-paper-edge, var(--line));
   border-radius: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -377,7 +405,7 @@
   font-family: var(--font-ui);
   font-size: clamp(1.02rem, 0.96rem + 0.25vw, 1.14rem);
   line-height: 1.72;
-  color: var(--text-1);
+  color: var(--mat-paper-ink, var(--text-1));
   letter-spacing: 0.005em;
   cursor: default;
 }
@@ -403,7 +431,7 @@
 }
 .qs-narrative em {
   font-style: italic;
-  color: #e7ffc6;
+  color: var(--mat-paper-ink, #e7ffc6);
 }
 .qs-narrative__ghost {
   color: transparent;
@@ -432,6 +460,90 @@
   border-top: 1px dashed var(--line);
   font-size: var(--fs-xs);
   color: var(--qs-cyan);
+}
+
+/* ---------- Theme adapter (themes with materials only; Delta Neon never matches) ----------
+   The stage carries [data-quest-mat] when the active theme defines playfield materials: the
+   narrative becomes the theme's paper (ink, edge), in-scene HUD pills and the bag use the
+   theme's HUD / surface tokens. Meaning colours (votes, hero colours, good/bad) are untouched. */
+.qs-root[data-quest-mat] {
+  background:
+    radial-gradient(900px 480px at 20% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+    radial-gradient(700px 420px at 100% 0%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--mat-screen) 55%, var(--bg-0)), var(--bg-0) 60%);
+}
+.qs-root[data-quest-mat] .qs-story {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--mat-paper-edge) 22%, transparent), transparent 18%),
+    var(--mat-paper);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--mat-paper) 70%, white),
+    0 2px 0 var(--mat-paper-edge),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.qs-root[data-quest-mat] .qs-narrative em {
+  font-weight: 600;
+}
+.qs-root[data-quest-mat] .qs-narrative__p:first-child::first-letter {
+  color: color-mix(in srgb, var(--accent) 38%, var(--mat-paper-ink));
+  text-shadow: none;
+}
+.qs-root[data-quest-mat] .qs-caret {
+  background: var(--mat-paper-ink);
+}
+.qs-root[data-quest-mat] .qs-story__note {
+  color: color-mix(in srgb, var(--mat-paper-ink) 80%, var(--info));
+  border-top-color: var(--mat-paper-edge);
+}
+/* Vote bar + choice cards: the default look hard-codes near-black glass with --text-* ink. Under a theme,
+   paint them from the theme's panel surfaces so the ink always matches (light themes stay legible). */
+.qs-root[data-quest-mat] .qs-votebar {
+  background: var(--panel-bg-opaque);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--panel-border));
+}
+.qs-root[data-quest-mat] .qs-choice {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--text-0) 4%, transparent), transparent 60%),
+    var(--panel-bg-opaque);
+}
+.qs-root[data-quest-mat] .qs-choice.is-mine {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    var(--panel-bg-opaque);
+}
+.qs-root[data-quest-mat] .qs-choice.is-locked {
+  background: var(--surface-sunken);
+}
+/* Log tones: pastel ink is tuned for the default dark panel; themes mix from their own status tokens. */
+.qs-root[data-quest-mat] .qs-log__item[data-tone='good'] .qs-log__text {
+  color: color-mix(in srgb, var(--success) 60%, var(--text-0));
+}
+.qs-root[data-quest-mat] .qs-log__item[data-tone='bad'] .qs-log__text {
+  color: color-mix(in srgb, var(--danger) 60%, var(--text-0));
+}
+.qs-root[data-quest-mat] .qs-log__item[data-kind='tie'] .qs-log__text {
+  color: color-mix(in srgb, var(--warning) 70%, var(--text-0));
+}
+.qs-root[data-quest-mat] .qs-caption {
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--mat-screen) 84%, transparent) 70%);
+}
+.qs-root[data-quest-mat] .qs-hud__pill {
+  background: var(--hud-bg);
+  border-color: var(--hud-border);
+  color: var(--hud-fg);
+}
+.qs-root[data-quest-mat] .qs-hud__pill--save {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--hud-border));
+}
+.qs-root[data-quest-mat] .qs-item {
+  background: var(--surface-sunken-soft);
+  border-color: var(--panel-border);
+}
+.qs-root[data-quest-mat] .qs-item:hover,
+.qs-root[data-quest-mat] .qs-item.is-open {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-sunken-soft));
 }
 
 /* ---------- Vote bar ---------- */

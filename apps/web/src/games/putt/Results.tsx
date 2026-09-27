@@ -67,7 +67,7 @@ export function Results() {
         : 'Round complete';
   return (
     <div className="pt-overlay pt-overlay--results" role="dialog" aria-labelledby="pt-results-title">
-      <section className="pt-results dc-panel dc-panel--brackets dc-panel--glow">
+      <section className="pt-results dc-panel dc-panel--brackets dc-panel--glow" data-part="results">
         <header className="pt-results__head">
           <span className="pt-summary__kicker">
             {COURSE_NAME} · {state.regulation === 9 ? 'Full course' : `${state.regulation} ${state.regulation === 1 ? 'hole' : 'holes'}`} · Par <span className="pt-num">{par}</span>

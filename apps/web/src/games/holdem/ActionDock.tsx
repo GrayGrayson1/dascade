@@ -51,7 +51,7 @@ export function ActionDock({ state, settings, mySeat, heroCards, myTurn, compact
   const showCardsInDock = compact && heroCards.length === 2 && Boolean(seat?.inHand);
 
   return (
-    <div className="hd-dock" data-compact={compact ? 'true' : undefined} data-turn={myTurn ? 'true' : undefined}>
+    <div className="hd-dock" data-part="action-dock" data-compact={compact ? 'true' : undefined} data-turn={myTurn ? 'true' : undefined}>
       <div className="hd-dock__inner">
         <div className="hd-hero">
           {showCardsInDock ? (

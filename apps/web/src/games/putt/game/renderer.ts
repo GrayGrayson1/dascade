@@ -11,7 +11,8 @@
 import { PUTT_POWER_MAX } from '@dascade/shared/games/putt';
 import { PHYS, compileHole, moverBars, moverPose, pointInPoly, type HoleDef, type Pt } from '@dascade/game-core/putt';
 import { Camera, type Insets } from './camera.ts';
-import { ART, DISPLAY_FONT, NUM_FONT, artRng, rgba, shade } from './palette.ts';
+import { DISPLAY_FONT, NUM_FONT, artRng, rgba, shade } from './palette.ts';
+import { PUTT_DEFAULT_ART, type PuttArt } from './themeAdapter.ts';
 import { Particles, type FxLevel } from './particles.ts';
 import type { AimDraw, BallDraw, Frame, FxEvent, PuttController } from './controller.ts';
 
@@ -46,6 +47,9 @@ export class PuttRenderer {
   private running = false;
   private hole: HoleDef | null = null;
   private turfPath: Path2D | null = null;
+  /** Course colours for the local DASCADE theme (Delta Neon = the game's own palette). */
+  private art: PuttArt = PUTT_DEFAULT_ART;
+  private artVersion = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -57,6 +61,14 @@ export class PuttRenderer {
     this.g = g;
     this.particles = new Particles(opts.fx, opts.reducedMotion);
     ctrl.toWorldDir = (dx, dy) => this.cam.dirToWorld(dx, dy);
+  }
+
+  /** Theme change: repaint the static course layer with new art on the next frame (state untouched). */
+  setArt(art: PuttArt): void {
+    if (art === this.art) return;
+    this.art = art;
+    this.artVersion++;
+    this.staticKey = '';
   }
 
   get glow(): number {
@@ -138,7 +150,7 @@ export class PuttRenderer {
       this.cam.fit(bounds, this.cssW, this.cssH, best);
     }
     const ins = this.insetsList.map((i) => `${i.top},${i.bottom},${i.left},${i.right}`).join('|');
-    const key = `${hole?.id ?? 'none'}:${this.cssW}x${this.cssH}@${this.dpr}:${ins}`;
+    const key = `${hole?.id ?? 'none'}:${this.cssW}x${this.cssH}@${this.dpr}:${ins}:${this.artVersion}`;
     if (key !== this.staticKey || !this.staticLayer) {
       this.staticKey = key;
       this.buildStatic(hole);
@@ -252,19 +264,19 @@ export class PuttRenderer {
     const W = this.cssW;
     const H = this.cssH;
     const bg = g.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, ART.voidTop);
-    bg.addColorStop(1, ART.voidBottom);
+    bg.addColorStop(0, this.art.voidTop);
+    bg.addColorStop(1, this.art.voidBottom);
     g.fillStyle = bg;
     g.fillRect(0, 0, W, H);
     // Neon horizon glow behind the course.
     const halo = g.createRadialGradient(W / 2, H * 0.55, 10, W / 2, H * 0.55, Math.max(W, H) * 0.7);
-    halo.addColorStop(0, 'rgba(163, 230, 53, 0.10)');
-    halo.addColorStop(0.45, 'rgba(34, 211, 238, 0.04)');
+    halo.addColorStop(0, this.art.halo);
+    halo.addColorStop(0.45, this.art.halo2);
     halo.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = halo;
     g.fillRect(0, 0, W, H);
     // Perspective grid floor.
-    g.strokeStyle = ART.gridLine;
+    g.strokeStyle = this.art.gridLine;
     g.lineWidth = 1;
     const horizon = H * 0.18;
     g.beginPath();
@@ -281,7 +293,7 @@ export class PuttRenderer {
     // Pixel dust.
     const rnd = artRng(31);
     for (let i = 0; i < 90; i++) {
-      g.fillStyle = rgba(ART.star, 0.08 + rnd() * 0.25);
+      g.fillStyle = rgba(this.art.star, 0.08 + rnd() * 0.25);
       const s = rnd() < 0.15 ? 2 : 1;
       g.fillRect(Math.floor(rnd() * W), Math.floor(rnd() * H), s, s);
     }
@@ -314,7 +326,7 @@ export class PuttRenderer {
     for (let i = 3; i >= 1; i--) {
       g.save();
       g.translate(0, (plinth * i) / 3);
-      g.fillStyle = shade(ART.waterDeep, -0.25 * i);
+      g.fillStyle = shade(this.art.waterDeep, -0.25 * i);
       for (const w of waterPaths) g.fill(w);
       g.restore();
     }
@@ -323,8 +335,8 @@ export class PuttRenderer {
       const cx = poly.reduce((s, p) => s + this.cam.sx(p[0], p[1]), 0) / poly.length;
       const cy = poly.reduce((s, p) => s + this.cam.sy(p[0], p[1]), 0) / poly.length;
       const grad = g.createRadialGradient(cx, cy, 4, cx, cy, px(360));
-      grad.addColorStop(0, ART.waterMid);
-      grad.addColorStop(1, ART.waterDeep);
+      grad.addColorStop(0, this.art.waterMid);
+      grad.addColorStop(1, this.art.waterDeep);
       g.fillStyle = grad;
       g.fill(w);
       g.save();
@@ -335,7 +347,7 @@ export class PuttRenderer {
         sg.stroke(w);
       }, px(20), 0, px(4), 'rgba(0,0,0,0.7)');
       g.restore();
-      g.strokeStyle = rgba(ART.waterLight, 0.45);
+      g.strokeStyle = rgba(this.art.waterLight, 0.45);
       g.lineWidth = Math.max(1, px(2));
       g.stroke(w);
     }
@@ -344,7 +356,7 @@ export class PuttRenderer {
     for (let i = 4; i >= 1; i--) {
       g.save();
       g.translate(0, (plinth * i) / 4);
-      g.fillStyle = i === 1 ? ART.plinthEdge : i === 4 ? shade(ART.plinth, -0.4) : shade(ART.plinth, -0.08 * i);
+      g.fillStyle = i === 1 ? this.art.plinthEdge : i === 4 ? shade(this.art.plinth, -0.4) : shade(this.art.plinth, -0.08 * i);
       g.fill(turf);
       g.restore();
     }
@@ -354,15 +366,15 @@ export class PuttRenderer {
     const lx = this.cam.sx(b.minX, b.minY);
     const ly = this.cam.sy(b.minX, b.minY);
     const light = g.createLinearGradient(lx, ly, this.cam.sx(b.maxX, b.maxY), this.cam.sy(b.maxX, b.maxY));
-    light.addColorStop(0, ART.turfLight);
-    light.addColorStop(0.55, ART.turfMid);
-    light.addColorStop(1, ART.turfDark);
+    light.addColorStop(0, this.art.turfLight);
+    light.addColorStop(0.55, this.art.turfMid);
+    light.addColorStop(1, this.art.turfDark);
     g.fillStyle = light;
     g.fill(turf);
     g.save();
     g.clip(turf);
     // Mowing stripes (world-space bands, so they rotate with the hole).
-    g.fillStyle = ART.stripe;
+    g.fillStyle = this.art.stripe;
     const band = 44;
     for (let x = Math.floor(b.minX / band) * band, i = 0; x < b.maxX + band; x += band, i++) {
       if (i % 2) continue;
@@ -393,8 +405,8 @@ export class PuttRenderer {
     // Inner edge shade along the true outline of the decks (overlapping decks leave no seams).
     const outside = this.outsideMask(turf);
     if (outside) {
-      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), this.px(34), 0, 0, 'rgba(0, 18, 6, 0.85)');
-      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), this.px(6), 0, 0, 'rgba(0, 18, 6, 0.55)');
+      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), this.px(34), 0, 0, this.art.turfShade);
+      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), this.px(6), 0, 0, this.art.turfShadeTight);
     }
     // Ambient occlusion along the cushions.
     this.softShadow(
@@ -416,7 +428,7 @@ export class PuttRenderer {
     if (outside) {
       g.save();
       g.clip(turf);
-      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), 1.5, 0, Math.max(1, px(2)), 'rgba(214, 255, 170, 0.55)');
+      this.softShadow((sg) => sg.drawImage(outside, 0, 0, this.cssW, this.cssH), 1.5, 0, Math.max(1, px(2)), this.art.turfLip);
       g.restore();
     }
 
@@ -485,8 +497,8 @@ export class PuttRenderer {
       const y0 = Math.min(...ys);
       const y1 = Math.max(...ys);
       const grad = g.createLinearGradient(x0, y0, x1, y1);
-      grad.addColorStop(0, ART.sandLight);
-      grad.addColorStop(1, ART.sandDark);
+      grad.addColorStop(0, this.art.sandLight);
+      grad.addColorStop(1, this.art.sandDark);
       g.fillStyle = grad;
       g.fill(p);
       g.save();
@@ -513,7 +525,7 @@ export class PuttRenderer {
       g.stroke(p);
       g.restore();
       g.lineWidth = Math.max(1, this.px(1.5));
-      g.strokeStyle = rgba(ART.sandRim, 0.9);
+      g.strokeStyle = rgba(this.art.sandRim, 0.9);
       g.stroke(p);
     }
   }
@@ -577,16 +589,16 @@ export class PuttRenderer {
       [tx + r, ty + r],
       [tx - r, ty + r],
     ]);
-    g.fillStyle = rgba(ART.tee, 0.85);
+    g.fillStyle = rgba(this.art.tee, 0.85);
     g.fill(mat);
     g.setLineDash([Math.max(2, this.px(5)), Math.max(2, this.px(4))]);
-    g.strokeStyle = rgba(ART.teeEdge, 0.55);
+    g.strokeStyle = rgba(this.art.teeEdge, 0.55);
     g.lineWidth = Math.max(1, this.px(2));
     g.stroke(mat);
     g.setLineDash([]);
     const x = this.cam.sx(tx, ty);
     const y = this.cam.sy(tx, ty);
-    g.fillStyle = rgba(ART.teeEdge, 0.5);
+    g.fillStyle = rgba(this.art.teeEdge, 0.5);
     g.beginPath();
     g.arc(x, y, Math.max(2, this.px(4)), 0, Math.PI * 2);
     g.fill();
@@ -599,8 +611,8 @@ export class PuttRenderer {
     const r = this.px(PHYS.cupR);
     // Green collar around the cup.
     const collar = g.createRadialGradient(x, y, r, x, y, r * 3.2);
-    collar.addColorStop(0, 'rgba(190, 255, 120, 0.22)');
-    collar.addColorStop(1, 'rgba(190, 255, 120, 0)');
+    collar.addColorStop(0, this.art.collar);
+    collar.addColorStop(1, this.art.collarOut);
     g.fillStyle = collar;
     g.beginPath();
     g.arc(x, y, r * 3.2, 0, Math.PI * 2);
@@ -608,13 +620,13 @@ export class PuttRenderer {
     // The hole, with depth.
     const hole2 = g.createRadialGradient(x, y + r * 0.35, r * 0.1, x, y, r);
     hole2.addColorStop(0, '#000');
-    hole2.addColorStop(0.7, ART.cupHole);
-    hole2.addColorStop(1, '#1b2a1e');
+    hole2.addColorStop(0.7, this.art.cupHole);
+    hole2.addColorStop(1, this.art.cupWall);
     g.fillStyle = hole2;
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = rgba(ART.cupRim, 0.9);
+    g.strokeStyle = rgba(this.art.cupRim, 0.9);
     g.lineWidth = Math.max(1.2, this.px(2.4));
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
@@ -630,7 +642,7 @@ export class PuttRenderer {
   private drawPortalWells(hole: HoleDef): void {
     const g = this.g;
     for (const p of hole.portals ?? []) {
-      const color = ART.portal[p.color] ?? '#22d3ee';
+      const color = this.art.portal[p.color] ?? '#22d3ee';
       for (const [wx, wy, entry] of [
         [p.from[0], p.from[1], true],
         [p.to[0], p.to[1], false],
@@ -663,7 +675,7 @@ export class PuttRenderer {
         sg.fill();
       }, this.px(10), this.px(4), h + this.px(4), 'rgba(0,0,0,0.6)');
       // Cylinder side.
-      g.fillStyle = shade(ART.post, -0.5);
+      g.fillStyle = shade(this.art.post, -0.5);
       g.beginPath();
       g.arc(x, y + h, r, 0, Math.PI);
       g.lineTo(x - r, y);
@@ -671,8 +683,8 @@ export class PuttRenderer {
       g.closePath();
       g.fill();
       const top = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
-      top.addColorStop(0, ART.postTop);
-      top.addColorStop(1, ART.post);
+      top.addColorStop(0, this.art.postTop);
+      top.addColorStop(1, this.art.post);
       g.fillStyle = top;
       g.beginPath();
       g.arc(x, y, r, 0, Math.PI * 2);
@@ -730,8 +742,8 @@ export class PuttRenderer {
       g.translate(0, (h * i) / steps);
       g.lineWidth = width;
       for (const p of paths) {
-        const base = p.w.kind === 'kicker' ? '#3a0f36' : p.w.kind === 'bank' ? '#3a3210' : ART.wallFace;
-        g.strokeStyle = i === steps ? ART.wallFaceDark : shade(base, -0.12 * (i - 1));
+        const base = p.w.kind === 'kicker' ? '#3a0f36' : p.w.kind === 'bank' ? '#3a3210' : this.art.wallFace;
+        g.strokeStyle = i === steps ? this.art.wallFaceDark : shade(base, -0.12 * (i - 1));
         g.stroke(p.top);
       }
       g.restore();
@@ -739,7 +751,7 @@ export class PuttRenderer {
     // Tops: dark rails…
     g.lineWidth = width;
     for (const p of paths) {
-      g.strokeStyle = p.w.kind === 'kicker' ? '#3d1638' : p.w.kind === 'bank' ? '#3b3514' : ART.wallTop;
+      g.strokeStyle = p.w.kind === 'kicker' ? '#3d1638' : p.w.kind === 'bank' ? '#3b3514' : this.art.wallTop;
       g.stroke(p.top);
     }
     // …with a lit bevel on the upper edge…
@@ -752,7 +764,7 @@ export class PuttRenderer {
     // …and a glowing neon tube inlaid along the top.
     const glow = this.glow;
     for (const p of paths) {
-      const neon = p.w.kind === 'kicker' ? ART.kickerGlow : p.w.kind === 'bank' ? ART.bankGlow : ART.wallGlow;
+      const neon = p.w.kind === 'kicker' ? this.art.kickerGlow : p.w.kind === 'bank' ? this.art.bankGlow : this.art.wallGlow;
       g.save();
       if (glow > 0) {
         g.shadowColor = rgba(neon, 0.8);
@@ -786,7 +798,7 @@ export class PuttRenderer {
         g.arc(x, y - lift, r * 7, 0, Math.PI * 2);
         g.fill();
       }
-      g.strokeStyle = '#1b1b2e';
+      g.strokeStyle = this.art.lampPost;
       g.lineWidth = Math.max(2, this.px(4));
       g.beginPath();
       g.moveTo(x, y);
@@ -823,7 +835,7 @@ export class PuttRenderer {
         const x1 = Math.max(...xs);
         const y0 = Math.min(...ys);
         const y1 = Math.max(...ys);
-        g.strokeStyle = rgba(ART.waterLight, 0.22);
+        g.strokeStyle = rgba(this.art.waterLight, 0.22);
         g.lineWidth = Math.max(1, this.px(2));
         const step = Math.max(8, this.px(22));
         for (let y = y0 + ((time * 14) % step); y < y1; y += step) {
@@ -878,7 +890,7 @@ export class PuttRenderer {
     // Portals.
     const now = performance.now();
     (hole.portals ?? []).forEach((p, i) => {
-      const color = ART.portal[p.color] ?? '#22d3ee';
+      const color = this.art.portal[p.color] ?? '#22d3ee';
       const flash = Math.max(0, 1 - (now - (frame.portalHits.get(i) ?? -1e9)) / 600);
       this.drawPortal(p.from[0], p.from[1], color, p.label, true, time, flash, 0, 0);
       this.drawPortal(p.to[0], p.to[1], color, p.label, false, time, flash, p.exit[0], p.exit[1]);
@@ -892,13 +904,13 @@ export class PuttRenderer {
       const pulse = still ? 0.5 : 0.5 + 0.5 * Math.sin(time * 3 + i);
       g.save();
       if (this.glow > 0) {
-        g.shadowColor = ART.bumper;
+        g.shadowColor = this.art.bumper;
         g.shadowBlur = (10 + 14 * flash) * this.glow * this.dpr;
       }
       const grad = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
-      grad.addColorStop(0, flash > 0 ? '#ffffff' : ART.bumperCore);
-      grad.addColorStop(0.55, ART.bumper);
-      grad.addColorStop(1, shade(ART.bumper, -0.45));
+      grad.addColorStop(0, flash > 0 ? '#ffffff' : this.art.bumperCore);
+      grad.addColorStop(0.55, this.art.bumper);
+      grad.addColorStop(1, shade(this.art.bumper, -0.45));
       g.fillStyle = grad;
       g.beginPath();
       g.arc(x, y, r * (1 + flash * 0.08), 0, Math.PI * 2);
@@ -1036,7 +1048,7 @@ export class PuttRenderer {
       const y0 = this.cam.sy(ax, ay);
       const x1 = this.cam.sx(bx, by);
       const y1 = this.cam.sy(bx, by);
-      g.strokeStyle = shade(ART.blade, -0.5);
+      g.strokeStyle = shade(this.art.blade, -0.5);
       g.lineWidth = width;
       g.beginPath();
       g.moveTo(x0, y0 + lift * 0.5);
@@ -1044,16 +1056,16 @@ export class PuttRenderer {
       g.stroke();
       g.save();
       if (this.glow > 0) {
-        g.shadowColor = ART.blade;
+        g.shadowColor = this.art.blade;
         g.shadowBlur = 8 * this.glow * this.dpr;
       }
-      g.strokeStyle = ART.blade;
+      g.strokeStyle = this.art.blade;
       g.beginPath();
       g.moveTo(x0, y0);
       g.lineTo(x1, y1);
       g.stroke();
       g.restore();
-      g.strokeStyle = ART.bladeTop;
+      g.strokeStyle = this.art.bladeTop;
       g.lineWidth = Math.max(1, width * 0.3);
       g.beginPath();
       g.moveTo(x0, y0);
@@ -1069,7 +1081,7 @@ export class PuttRenderer {
       const y = this.cam.sy(m.at[0], m.at[1]);
       const r = this.px(m.hubR);
       const pose = moverPose(m, tMs);
-      g.fillStyle = ART.hub;
+      g.fillStyle = this.art.hub;
       g.beginPath();
       g.arc(x, y + lift * 0.6, r, 0, Math.PI * 2);
       g.fill();
@@ -1104,7 +1116,7 @@ export class PuttRenderer {
     g.moveTo(x, y);
     g.lineTo(x + h * 0.45, y + h * 0.2);
     g.stroke();
-    g.strokeStyle = ART.flagPole;
+    g.strokeStyle = this.art.flagPole;
     g.lineWidth = Math.max(1.5, this.px(3));
     g.beginPath();
     g.moveTo(x, y);
@@ -1113,9 +1125,9 @@ export class PuttRenderer {
     const fw = h * 0.62;
     const fh = h * 0.38;
     const wave = (k: number) => Math.sin(time * 5 + k * 3) * fh * 0.12;
-    g.fillStyle = ART.flag;
+    g.fillStyle = this.art.flag;
     if (this.glow > 0) {
-      g.shadowColor = ART.flag;
+      g.shadowColor = this.art.flag;
       g.shadowBlur = 8 * this.glow * this.dpr;
     }
     g.beginPath();
@@ -1300,8 +1312,8 @@ export class PuttRenderer {
     // Body.
     const body = g.createRadialGradient(x - R * 0.35, y - R * 0.4, R * 0.1, x, y, R);
     body.addColorStop(0, '#ffffff');
-    body.addColorStop(0.65, ART.ball);
-    body.addColorStop(1, ART.ballShade);
+    body.addColorStop(0.65, this.art.ball);
+    body.addColorStop(1, this.art.ballShade);
     g.fillStyle = body;
     g.beginPath();
     g.arc(x, y, R, 0, Math.PI * 2);
@@ -1341,11 +1353,11 @@ export class PuttRenderer {
       const y = this.cam.sy(e.x, e.y);
       switch (e.kind) {
         case 'impact':
-          if (e.what === 'sand') this.particles.puff(x, y, ART.sandLight, Math.max(0.7, s));
+          if (e.what === 'sand') this.particles.puff(x, y, this.art.sandLight, Math.max(0.7, s));
           else if (e.what === 'bumper') {
-            this.particles.sparks(x, y, 0, -1, 500, ART.bumper);
-            this.particles.ring(x, y, this.px(26), ART.bumper, 0.4);
-          } else this.particles.sparks(x, y, 0, -1, e.v, e.what === 'blade' ? ART.blade : '#e9ffd0');
+            this.particles.sparks(x, y, 0, -1, 500, this.art.bumper);
+            this.particles.ring(x, y, this.px(26), this.art.bumper, 0.4);
+          } else this.particles.sparks(x, y, 0, -1, e.v, e.what === 'blade' ? this.art.blade : '#e9ffd0');
           break;
         case 'cup':
           this.particles.confetti(x, y, [e.color, '#fde047', '#a3e635', '#22d3ee', '#ff4fd8'], Math.max(0.7, s), e.big);

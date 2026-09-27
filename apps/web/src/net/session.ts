@@ -37,6 +37,7 @@ import { friendly, toFriendlyError, type FriendlyError } from './errors.ts';
 import { useApp } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { sfx } from '../audio/audio.ts';
+import { registerDjSession } from '../audio/jukebox/roomDj.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 
@@ -601,3 +602,23 @@ declare global {
 if (typeof window !== 'undefined') {
   window.__DASCADE__ = { session, getState: () => getStateSnapshot(), store: useSessionStore };
 }
+
+// Room DJ: hand the jukebox a port into this session (see audio/jukebox/roomDj.ts).
+registerDjSession({
+  currentRoom: () => useSessionStore.getState().room,
+  subscribeRoom: (cb) =>
+    useSessionStore.subscribe((s, prev) => {
+      if (s.room !== prev.room) cb();
+    }),
+  subscribeMessage: (type, cb) => subscribeMessage(type, cb),
+  getLastMessage: (type) => getLastMessage<unknown>(type),
+  send: (type, payload) => session.send(type, payload),
+  playerId: () => useSessionStore.getState().playerId,
+  hostId: () => getStateSnapshot()?.hostId ?? null,
+  roomKey: () => useSessionStore.getState().room?.roomId ?? null,
+  isSpectator: () => {
+    const me = useSessionStore.getState().playerId;
+    return Boolean(me && getStateSnapshot()?.players?.[me]?.spectator);
+  },
+  serverNow: () => serverNow(),
+});

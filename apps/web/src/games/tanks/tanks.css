@@ -7,14 +7,14 @@
 .tk-stage {
   position: relative;
   overflow: hidden;
-  background: #05040b;
+  background: var(--bg-0, #05040b);
 }
 
 .tk-battle {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: #05040b;
+  background: var(--mat-sky, #05040b);
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -45,6 +45,15 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   background: rgba(10, 8, 20, 0.92);
+}
+/* Other DASCADE themes: the HUD glass follows the theme's HUD tokens (Delta Neon keeps the tuned glass). */
+:root:not([data-theme='delta-neon']) .tk-glass {
+  background: var(--hud-bg);
+  border-radius: var(--hud-radius);
+  color: var(--hud-fg);
+}
+:root:not([data-theme='delta-neon'])[data-fx='off'] .tk-glass {
+  background: var(--hud-bg-strong);
 }
 
 .tk-num,

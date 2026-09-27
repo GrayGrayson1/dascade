@@ -172,6 +172,8 @@
 .dc-btn--icon {
   padding: 0;
   width: 44px;
+  /* never squeezed below its target size by a crowded flex row (e.g. a long themed title) */
+  flex-shrink: 0;
 }
 .dc-btn--icon.dc-btn--sm {
   width: 34px;

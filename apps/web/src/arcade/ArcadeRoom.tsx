@@ -38,7 +38,7 @@ export const ArcadeRoom = memo(function ArcadeRoom({ size }: { size: RoomSize | 
 
   const s = geo?.scale ?? 1;
   return (
-    <div className="af-room" aria-hidden data-ready={geo ? 'true' : undefined}>
+    <div className="af-room" data-part="arcade-room" aria-hidden data-ready={geo ? 'true' : undefined}>
       <canvas ref={canvasRef} className="af-room__canvas" />
       {geo ? (
         <div className="af-room__light">

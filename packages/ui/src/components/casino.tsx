@@ -49,8 +49,32 @@ const RANK_WORD: Record<string, string> = {
 };
 
 function Suit({ suit, x, y, size, color }: { suit: string; x: number; y: number; size: number; color: string }) {
-  return <path d={SUIT_PATHS[suit]} transform={`translate(${x} ${y}) scale(${size / 9})`} fill={color} shapeRendering="crispEdges" />;
+  return <path d={SUIT_PATHS[suit]} transform={`translate(${x} ${y}) scale(${size / 9})`} style={{ fill: color }} shapeRendering="crispEdges" />;
 }
+
+/*
+ * Theme materials (see @dascade/ui theme/materials.ts): the card stock follows the active theme's
+ * `--mat-card-*` colours; every var() falls back to the original DASCADE art, so Delta Neon (which
+ * defines no materials) is unchanged. Red suits keep their fixed red — themes restyle card stock,
+ * never suit meaning — and black suits use the theme's card ink, which themes pick to read on
+ * their own card face.
+ */
+const CARD_RED = '#e11d48';
+const CARD_BLACK = 'var(--mat-card-ink, #1b1830)';
+const CARD_FACE_TOP = 'var(--mat-card-face, #ffffff)';
+const CARD_FACE_BOTTOM = 'var(--mat-card-face, #ece8f7)';
+const BACK = (fallback: string) => `var(--mat-card-back, ${fallback})`;
+const BACK_INK = (fallback: string) => `var(--mat-card-back-ink, ${fallback})`;
+/*
+ * Translucent back-ink strokes: `--dc-cb-*` are only valid when the theme defines
+ * `--mat-card-back-ink` (a var() without fallback in a custom property is invalid otherwise),
+ * so Delta Neon keeps the exact original rgba() values.
+ */
+const BACK_VARS = {
+  '--dc-cb-a': 'color-mix(in srgb, var(--mat-card-back-ink) 35%, transparent)',
+  '--dc-cb-b': 'color-mix(in srgb, var(--mat-card-back-ink) 30%, transparent)',
+  '--dc-cb-c': 'color-mix(in srgb, var(--mat-card-back-ink) 70%, transparent)',
+} as CSSProperties;
 
 export interface PlayingCardProps {
   /** 2-char code like "As", "Td". Omit (or pass faceDown) for a card back. */
@@ -70,13 +94,14 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
   const rank = code?.[0] ?? '';
   const suit = code?.[1] ?? 's';
   const red = suit === 'h' || suit === 'd';
-  const ink = red ? '#e11d48' : '#1b1830';
+  const ink = red ? CARD_RED : CARD_BLACK;
   const label = RANK_LABEL[rank] ?? rank;
   const accessible = showFace ? `${RANK_WORD[rank] ?? rank} of ${SUIT_WORD[suit]}` : 'Face-down card';
   const isFace = rank === 'J' || rank === 'Q' || rank === 'K';
   return (
     <div
       className={cx('dc-card', className)}
+      data-part="card"
       data-face={showFace ? 'up' : 'down'}
       data-highlight={highlight ? 'true' : undefined}
       data-dim={dim ? 'true' : undefined}
@@ -91,8 +116,8 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
             <svg viewBox="0 0 100 140" aria-hidden>
               <defs>
                 <linearGradient id={`cf-${code}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#ffffff" />
-                  <stop offset="1" stopColor="#ece8f7" />
+                  <stop offset="0" style={{ stopColor: CARD_FACE_TOP }} />
+                  <stop offset="1" style={{ stopColor: CARD_FACE_BOTTOM }} />
                 </linearGradient>
               </defs>
               <rect x="0" y="0" width="100" height="140" rx="8" fill={`url(#cf-${code})`} />
@@ -100,7 +125,7 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
               <text
                 x="10"
                 y="30"
-                fill={ink}
+                style={{ fill: ink }}
                 fontFamily={NUM_PIXEL_FONT}
                 fontWeight="700"
                 fontSize={label.length > 1 ? 24 : 28}
@@ -112,7 +137,7 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
                 <text
                   x="10"
                   y="30"
-                  fill={ink}
+                  style={{ fill: ink }}
                   fontFamily={NUM_PIXEL_FONT}
                   fontWeight="700"
                   fontSize={label.length > 1 ? 24 : 28}
@@ -123,12 +148,12 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
               </g>
               {isFace ? (
                 <g>
-                  <rect x="30" y="38" width="40" height="64" rx="4" fill={red ? '#ffe4e9' : '#e9e6f7'} stroke={ink} strokeWidth="2" />
+                  <rect x="30" y="38" width="40" height="64" rx="4" fill={red ? '#ffe4e9' : '#e9e6f7'} style={{ stroke: ink }} strokeWidth="2" />
                   <text
                     x="50"
                     y="80"
                     textAnchor="middle"
-                    fill={ink}
+                    style={{ fill: ink }}
                     fontFamily={NUM_PIXEL_FONT}
                     fontWeight="700"
                     fontSize="34"
@@ -153,24 +178,24 @@ export function PlayingCard({ code, faceDown, width = 64, highlight, dim, deal, 
 
 export function CardBack() {
   return (
-    <svg viewBox="0 0 100 140" aria-hidden>
+    <svg viewBox="0 0 100 140" aria-hidden style={BACK_VARS}>
       <defs>
         <linearGradient id="cb-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2a1d5c" />
-          <stop offset="1" stopColor="#12093a" />
+          <stop offset="0" style={{ stopColor: BACK('#2a1d5c') }} />
+          <stop offset="1" style={{ stopColor: BACK('#12093a') }} />
         </linearGradient>
         <pattern id="cb-lattice" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="12" height="12" fill="none" />
-          <rect x="0" y="0" width="2" height="12" fill="rgba(255,79,216,0.35)" />
-          <rect x="0" y="0" width="12" height="2" fill="rgba(34,211,238,0.3)" />
+          <rect x="0" y="0" width="2" height="12" style={{ fill: 'var(--dc-cb-a, rgba(255,79,216,0.35))' }} />
+          <rect x="0" y="0" width="12" height="2" style={{ fill: 'var(--dc-cb-b, rgba(34,211,238,0.3))' }} />
         </pattern>
       </defs>
-      <rect width="100" height="140" rx="8" fill="#f4f1ff" />
+      <rect width="100" height="140" rx="8" style={{ fill: 'var(--mat-card-face, #f4f1ff)' }} />
       <rect x="5" y="5" width="90" height="130" rx="5" fill="url(#cb-grad)" />
       <rect x="5" y="5" width="90" height="130" rx="5" fill="url(#cb-lattice)" />
-      <rect x="9" y="9" width="82" height="122" rx="3" fill="none" stroke="rgba(255,210,63,0.7)" strokeWidth="2" strokeDasharray="4 3" />
-      <rect x="28" y="54" width="44" height="32" fill="#12093a" stroke="#ffd23f" strokeWidth="2" />
-      <text x="50" y="76" textAnchor="middle" fill="#ffd23f" fontFamily="'Silkscreen', monospace" fontSize="14" fontWeight="700">
+      <rect x="9" y="9" width="82" height="122" rx="3" fill="none" style={{ stroke: 'var(--dc-cb-c, rgba(255,210,63,0.7))' }} strokeWidth="2" strokeDasharray="4 3" />
+      <rect x="28" y="54" width="44" height="32" style={{ fill: BACK('#12093a'), stroke: BACK_INK('#ffd23f') }} strokeWidth="2" />
+      <text x="50" y="76" textAnchor="middle" style={{ fill: BACK_INK('#ffd23f') }} fontFamily="'Silkscreen', monospace" fontSize="14" fontWeight="700">
         DAS
       </text>
     </svg>
@@ -221,6 +246,7 @@ export function CasinoChip({
   return (
     <svg
       className={cx('dc-chip', className)}
+      data-part="chip"
       width={size}
       height={size}
       viewBox="0 0 100 100"

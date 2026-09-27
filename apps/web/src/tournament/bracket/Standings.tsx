@@ -25,9 +25,9 @@ export function StandingsTable({
 }) {
   if (rows.length === 0) return <p className="dc-muted tc-empty">Standings appear once the first round is played.</p>;
   return (
-    <div className="tc-standings">
+    <div className="tc-standings" data-part="standings">
       <div className="tc-table-wrap" role="region" aria-label={caption} tabIndex={0}>
-        <table className="tc-table">
+        <table className="tc-table" data-part="standings-table">
           <caption className="visually-hidden">{caption}</caption>
           <thead>
             <tr>
@@ -144,7 +144,7 @@ export function Crosstable({
 }) {
   if (ids.length === 0) return <p className="dc-muted tc-empty">The crosstable fills in as matches finish.</p>;
   return (
-    <div className="tc-table-wrap tc-table-wrap--fit" role="region" aria-label="Crosstable" tabIndex={0}>
+    <div className="tc-table-wrap tc-table-wrap--fit" data-part="crosstable" role="region" aria-label="Crosstable" tabIndex={0}>
       <table className="tc-cross">
         <caption className="visually-hidden">Crosstable: each row shows that player’s result against the player in each column.</caption>
         <thead>

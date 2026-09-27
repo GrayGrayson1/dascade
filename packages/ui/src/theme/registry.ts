@@ -1,16 +1,40 @@
 /**
- * Theme registry. DASCADE ships exactly one theme (Delta Neon). Future aesthetic packs are
- * added to BUILT_IN_THEMES (or registered at runtime with registerTheme()); unknown or removed
- * ids always fall back to Delta Neon, so a stored preference can never break the app.
+ * Theme registry. DASCADE ships eleven themes (Delta Neon is the default). More can be added to
+ * BUILT_IN_THEMES (or registered at runtime with registerTheme()); unknown or removed ids always
+ * fall back to Delta Neon, so a stored preference can never break the app.
  */
 import { DERIVED_TOKENS, FOUNDATION_TOKENS, OPTIONAL_THEME_TOKENS, RENDERER_TOKENS, THEME_TOKENS } from './tokens.ts';
 import type { ThemeDefinition } from './types.ts';
+import { MATERIAL_KEYS } from './materials.ts';
+import { THEME_COPY_KEYS } from './copy.ts';
 import { DELTA_NEON } from './themes/delta-neon.ts';
+import { SHAREWARE_97 } from './themes/shareware-97.ts';
+import { CORPORATE_98 } from './themes/corporate-98.ts';
+import { CYBER_CAFE_01 } from './themes/cyber-cafe-01.ts';
+import { MALL_ARCADE_92 } from './themes/mall-arcade-92.ts';
+import { VHS_AFTER_DARK } from './themes/vhs-after-dark.ts';
+import { SPACE_CASINO_2088 } from './themes/space-casino-2088.ts';
+import { LAN_PARTY } from './themes/lan-party.ts';
+import { SATURDAY_MORNING } from './themes/saturday-morning.ts';
+import { EXECUTIVE } from './themes/executive.ts';
+import { NEON_NOIR } from './themes/neon-noir.ts';
 
 export const DEFAULT_THEME_ID = 'delta-neon';
 
-/** Themes that ship with DASCADE. Keep Delta Neon first (it is the CSS default in tokens.css). */
-export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [DELTA_NEON];
+/** Themes that ship with DASCADE, in picker order. Keep Delta Neon first (it is the CSS default in tokens.css). */
+export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
+  DELTA_NEON,
+  SHAREWARE_97,
+  CORPORATE_98,
+  CYBER_CAFE_01,
+  MALL_ARCADE_92,
+  VHS_AFTER_DARK,
+  SPACE_CASINO_2088,
+  LAN_PARTY,
+  SATURDAY_MORNING,
+  EXECUTIVE,
+  NEON_NOIR,
+];
 
 const registry = new Map<string, ThemeDefinition>(BUILT_IN_THEMES.map((t) => [t.id, t]));
 
@@ -30,6 +54,30 @@ export function validateTheme(theme: ThemeDefinition): string[] {
   if (typeof theme.description !== 'string') problems.push('description is required');
   if (theme.colorScheme !== 'dark' && theme.colorScheme !== 'light') problems.push('colorScheme must be "dark" or "light"');
   if (!isSafeTokenValue(theme.metaThemeColor)) problems.push('metaThemeColor must be a CSS colour');
+  const meta = theme.meta as unknown as Record<string, unknown> | undefined;
+  if (!meta) problems.push('meta is required');
+  else {
+    if (typeof meta.era !== 'string' || !meta.era.trim()) problems.push('meta.era is required');
+    if (typeof meta.tagline !== 'string' || !meta.tagline.trim()) problems.push('meta.tagline is required');
+    if (!Array.isArray(meta.swatches) || meta.swatches.length !== 4 || !meta.swatches.every(isSafeTokenValue)) problems.push('meta.swatches must be 4 CSS colours');
+  }
+
+  // Materials: optional only for the default theme (games fall back to their own palette there).
+  const mats = (theme.materials ?? null) as Record<string, unknown> | null;
+  if (mats) {
+    for (const key of MATERIAL_KEYS) if (!isSafeTokenValue(mats[key])) problems.push(`material ${key} is missing or unsafe`);
+    for (const key of Object.keys(mats)) if (!(MATERIAL_KEYS as readonly string[]).includes(key)) problems.push(`unknown material ${key}`);
+  } else if (theme.id !== DEFAULT_THEME_ID) problems.push('materials are required (every material key)');
+  for (const [gameId, nudges] of Object.entries(theme.gameMaterials ?? {})) {
+    for (const [key, value] of Object.entries(nudges)) {
+      if (!(MATERIAL_KEYS as readonly string[]).includes(key)) problems.push(`gameMaterials.${gameId}: unknown material ${key}`);
+      else if (!isSafeTokenValue(value)) problems.push(`gameMaterials.${gameId}.${key} is unsafe`);
+    }
+  }
+  for (const [key, value] of Object.entries(theme.copy ?? {})) {
+    if (!(THEME_COPY_KEYS as readonly string[]).includes(key)) problems.push(`unknown copy key ${key}`);
+    else if (typeof value !== 'string' || !value.trim() || value.length > 160) problems.push(`copy ${key} must be 1–160 chars`);
+  }
 
   const tokens = (theme.tokens ?? {}) as Record<string, unknown>;
   for (const name of THEME_TOKENS) {

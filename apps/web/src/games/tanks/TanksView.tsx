@@ -170,9 +170,10 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
 
   return (
     <TanksContext.Provider value={controllers}>
-      <div className="tk-battle" data-dimmed={dimmed ? 'true' : undefined}>
+      <div className="tk-battle" data-part="battlefield" data-dimmed={dimmed ? 'true' : undefined}>
         <div
           className="tk-canvas"
+          data-part="terrain"
           ref={containerRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -182,7 +183,7 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
         />
         {!dimmed ? (
           <>
-            <div className="tk-hud-top" ref={topRef}>
+            <div className="tk-hud-top" data-part="hud-top" ref={topRef}>
               <Hud />
             </div>
             <div className="tk-hud-bottom">

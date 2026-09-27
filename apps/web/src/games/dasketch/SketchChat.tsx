@@ -103,7 +103,7 @@ export function SketchChat({ mode, meId, inputFirst, disabled }: { mode: ChatMod
   );
 
   return (
-    <section className={cx('sk-chat', inputFirst && 'sk-chat--input-first')} aria-label="Guesses and chat" data-mode={mode}>
+    <section className={cx('sk-chat', inputFirst && 'sk-chat--input-first')} aria-label="Guesses and chat" data-part="guess-feed" data-mode={mode}>
       {inputFirst ? null : (
         <header className="sk-chat__head" title={CHANNEL[mode].hint}>
           <span className="dc-label">Guesses &amp; chat</span>

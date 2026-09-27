@@ -74,7 +74,7 @@ export function MoveList({
   };
 
   return (
-    <div className={cx('br-moves', `br-moves--${layout}`, className)}>
+    <div className={cx('br-moves', `br-moves--${layout}`, className)} data-part="move-list">
       {moves.length === 0 ? (
         <p className="br-moves__empty">{emptyText}</p>
       ) : (

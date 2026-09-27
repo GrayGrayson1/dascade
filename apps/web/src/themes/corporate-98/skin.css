@@ -1,0 +1,2543 @@
+/* =====================================================================
+ * Corporate Desktop '98 — structural skin.
+ * "Someone installed an unauthorised arcade suite on every computer in the office in 1998."
+ * Every rule is scoped under :root[data-theme='corporate-98'].
+ *
+ * Language: grey 2px bevels (light top-left, dark bottom-right), navy gradient title bars,
+ * white sunken list/fields, navy selection, tooltip-yellow notices, a teal company wallpaper.
+ * Screens are "application windows" on the desktop; the arcade floor IS the desktop.
+ * Tiny-desktop look, modern-size targets: nothing meaningful under 11px, touch targets >= 40px.
+ * ===================================================================== */
+
+:root[data-theme='corporate-98'] {
+  --c98-face: #c4c4bf;
+  --c98-face-2: #d0d0cb;
+  --c98-hi: #ffffff;
+  --c98-light: #e4e4df;
+  --c98-lo: #86868a;
+  --c98-dk: #1a1a1d;
+  --c98-navy: #0b2c7a;
+  --c98-navy-2: #2a6fd0;
+  --c98-sel: #0b2c7a;
+  --c98-tip: #ffffe1;
+  --c98-desk: #3f7f82;
+  --c98-out: inset -1px -1px 0 var(--c98-dk), inset 1px 1px 0 var(--c98-hi), inset -2px -2px 0 var(--c98-lo), inset 2px 2px 0 var(--c98-light);
+  --c98-in: inset 1px 1px 0 var(--c98-lo), inset -1px -1px 0 var(--c98-hi), inset 2px 2px 0 var(--c98-dk), inset -2px -2px 0 var(--c98-light);
+  --c98-thin-out: inset -1px -1px 0 var(--c98-lo), inset 1px 1px 0 var(--c98-hi);
+  --c98-thin-in: inset 1px 1px 0 var(--c98-lo), inset -1px -1px 0 var(--c98-hi);
+  --c98-title: linear-gradient(90deg, var(--c98-navy), var(--c98-navy-2));
+  --c98-dither: repeating-conic-gradient(var(--c98-face) 0 25%, var(--c98-hi) 0 50%) 0 0 / 2px 2px;
+  --c98-icon-window: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><rect x='1.5' y='2.5' width='13' height='11' fill='%23ffffff' stroke='%23000'/><rect x='2' y='3' width='12' height='3' fill='%230b2c7a'/><rect x='3' y='8' width='6' height='1' fill='%2386868a'/><rect x='3' y='10' width='8' height='1' fill='%2386868a'/></svg>");
+  --c98-icon-logo: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'><rect width='20' height='20' fill='%230b2c7a'/><rect x='1' y='1' width='18' height='1' fill='%232a6fd0'/><path d='M10 3L18 17H2Z' fill='%23ffd23f'/><path d='M10 9L13.5 15H6.5Z' fill='%230b2c7a'/></svg>");
+  --c98-icon-check: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' shape-rendering='crispEdges'><path d='M3 6h1v1h1v1h1V7h1V6h1V5h1V4h1V3h1v2h-1v1H9v1H8v1H7v1H6v1H5V9H4V8H3z' fill='%23000'/></svg>");
+  --c98-icon-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='20' shape-rendering='crispEdges'><rect width='18' height='20' fill='%23c4c4bf'/><rect width='17' height='1' fill='%23ffffff'/><rect width='1' height='19' fill='%23ffffff'/><rect x='17' width='1' height='20' fill='%231a1a1d'/><rect y='19' width='18' height='1' fill='%231a1a1d'/><rect x='16' y='1' width='1' height='18' fill='%2386868a'/><rect x='1' y='18' width='16' height='1' fill='%2386868a'/><path d='M5 8h7v1h-1v1h-1v1H9v1H8v-1H7v-1H6V9H5z' fill='%23000'/></svg>");
+  --c98-icon-trophy: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><path d='M4 2h8v1h2v3h-1v1h-1v1h-1v1H9v2h2v1h1v2H4v-2h1v-1h2V9H5V8H4V7H3V6H2V3h2z' fill='%23ffd23f' stroke='%23000' stroke-width='.6'/></svg>");
+  --af-ink-0: #ffffff;
+  --af-ink-1: #ffffff;
+  --af-ink-2: #e8f2f2;
+  --af-ink-3: #dbe9e9;
+  --entry-backdrop: var(--c98-desk);
+  --picker-backdrop: var(--c98-desk);
+  --arcade-floor-bg: transparent;
+}
+
+/* ---------- Base: page, selection, focus, scrollbars ---------- */
+:root[data-theme='corporate-98'] body {
+  background: var(--c98-desk);
+  -webkit-font-smoothing: auto;
+}
+:root[data-theme='corporate-98'] ::selection {
+  background: var(--c98-sel);
+  color: #fff;
+}
+:root[data-theme='corporate-98'] :focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: 2px;
+}
+:root[data-theme='corporate-98'] * {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+:root[data-theme='corporate-98'] *::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+:root[data-theme='corporate-98'] *::-webkit-scrollbar-track {
+  background: var(--c98-dither);
+}
+:root[data-theme='corporate-98'] *::-webkit-scrollbar-thumb {
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] *::-webkit-scrollbar-corner {
+  background: var(--c98-face);
+}
+@supports (-moz-appearance: none) {
+  :root[data-theme='corporate-98'] * {
+    scrollbar-color: var(--c98-face) #e4e4df;
+  }
+}
+
+/* ---------- Typography ---------- */
+:where(:root[data-theme='corporate-98']) .dc-title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--c98-navy);
+  text-shadow: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-label,
+:where(:root[data-theme='corporate-98']) .dc-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-1);
+}
+:where(:root[data-theme='corporate-98']) .dc-neon {
+  color: var(--c98-navy);
+  text-shadow: none;
+}
+/* Pixel-font words become real system-font text (the accessible text is already in the DOM). */
+:where(:root[data-theme='corporate-98']) :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) > .af-pw {
+  display: none;
+}
+:where(:root[data-theme='corporate-98']) :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) > .visually-hidden {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+:where(:root[data-theme='corporate-98']) :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--c98-navy);
+  text-shadow: none;
+}
+
+/* ---------- Buttons ---------- */
+:where(:root[data-theme='corporate-98']) .dc-btn {
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  background: var(--btn-bg-2);
+  box-shadow: var(--c98-out);
+  transition: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn:hover:not(:disabled) {
+  filter: none;
+  background: var(--btn-bg);
+}
+:where(:root[data-theme='corporate-98']) .dc-btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  filter: none;
+  box-shadow: var(--c98-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-btn:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: -6px;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn:disabled {
+  opacity: 1;
+  filter: none;
+  color: #86868a;
+  text-shadow: 1px 1px 0 #fff;
+}
+/* The default (primary) button: navy, bold, framed in black — impossible to miss. */
+:where(:root[data-theme='corporate-98']) .dc-btn--primary {
+  font-weight: 700;
+  background: linear-gradient(180deg, #2a62c8, var(--c98-navy));
+  box-shadow:
+    0 0 0 1px #000,
+    inset -1px -1px 0 #020b24,
+    inset 1px 1px 0 #7fa6ec,
+    inset -2px -2px 0 #07205c,
+    inset 2px 2px 0 #3f78dc;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3a72d8, #133a94);
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--primary:active:not(:disabled) {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 1px 1px 0 #020b24,
+    inset 2px 2px 0 #07205c;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--primary:disabled {
+  background: #9aa6c2;
+  color: #e8ecf5;
+  text-shadow: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--danger,
+:where(:root[data-theme='corporate-98']) .dc-btn--success,
+:where(:root[data-theme='corporate-98']) .dc-btn--gold {
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.2),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2);
+}
+:where(:root[data-theme='corporate-98']) :is(.dc-btn--danger, .dc-btn--success, .dc-btn--gold):active:not(:disabled) {
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+/* Ghost = flat toolbar button: raises on hover, sinks on press. */
+:where(:root[data-theme='corporate-98']) .dc-btn--ghost {
+  background: transparent;
+  box-shadow: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--ghost:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: var(--c98-thin-out);
+}
+:where(:root[data-theme='corporate-98']) .dc-btn--ghost:active:not(:disabled) {
+  box-shadow: var(--c98-thin-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-modal__footer .dc-btn {
+  min-width: 96px;
+}
+
+/* ---------- Windows (panels + dialogs) ---------- */
+:where(:root[data-theme='corporate-98']) .dc-panel {
+  color: var(--text-0);
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    2px 2px 0 rgba(0, 0, 0, 0.22);
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__header {
+  min-height: 30px;
+  margin: 2px 2px 0;
+  padding: 3px 3px 3px 6px;
+  border-bottom: 0;
+  background: var(--c98-title);
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__title {
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: #fff;
+  min-width: 0;
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__title::before {
+  width: 16px;
+  height: 16px;
+  background: var(--c98-icon-window) center / 16px 16px no-repeat;
+  box-shadow: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__header .dc-btn {
+  color: #000;
+  font-weight: 700;
+  margin: 0;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__header .dc-btn--icon {
+  width: 26px;
+  min-height: 22px;
+  height: 22px;
+}
+:where(:root[data-theme='corporate-98']) .dc-panel__header .dc-btn--icon .dc-icon {
+  width: 12px;
+  height: 12px;
+}
+@media (pointer: coarse) {
+  :where(:root[data-theme='corporate-98']) .dc-panel__header .dc-btn--icon {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+}
+:where(:root[data-theme='corporate-98']) .dc-panel--glow,
+:where(:root[data-theme='corporate-98']) .dc-panel--solid {
+  background: var(--c98-face);
+}
+:where(:root[data-theme='corporate-98']) .dc-modal {
+  color: var(--text-0);
+}
+:where(:root[data-theme='corporate-98']) .dc-modal[open] {
+  animation: c98-window-open 140ms steps(3, end);
+}
+:where(:root[data-theme='corporate-98']) .dc-modal__footer {
+  border-top: 0;
+  padding-top: var(--sp-2);
+}
+:where(:root[data-theme='corporate-98']) .dc-divider {
+  height: 2px;
+  background: none;
+  border-top: 1px solid var(--c98-lo);
+  border-bottom: 1px solid var(--c98-hi);
+}
+@keyframes c98-window-open {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* ---------- Form controls ---------- */
+:where(:root[data-theme='corporate-98']) :is(.dc-input, .dc-select, .dc-textarea) {
+  border: 0;
+  background-color: #fff;
+  box-shadow: var(--c98-in);
+  font-family: var(--font-ui);
+}
+:where(:root[data-theme='corporate-98']) :is(.dc-input, .dc-select, .dc-textarea):focus {
+  box-shadow:
+    var(--c98-in),
+    0 0 0 1px var(--c98-navy);
+}
+:where(:root[data-theme='corporate-98']) .dc-input[aria-invalid='true'] {
+  box-shadow:
+    var(--c98-in),
+    0 0 0 2px var(--danger);
+}
+:where(:root[data-theme='corporate-98']) .dc-select {
+  padding-right: 34px;
+  background-image: var(--c98-icon-arrow);
+  background-position: calc(100% - 3px) 50%;
+  background-size: 18px 20px;
+}
+:where(:root[data-theme='corporate-98']) .dc-select option {
+  background: #fff;
+  color: #000;
+}
+:where(:root[data-theme='corporate-98']) .dc-input--code {
+  font-family: var(--font-tech);
+  font-weight: 700;
+}
+/* Switch → checkbox. */
+:where(:root[data-theme='corporate-98']) .dc-toggle__track {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-toggle__thumb {
+  display: none;
+}
+:where(:root[data-theme='corporate-98']) .dc-toggle input:checked + .dc-toggle__track {
+  background: #fff var(--c98-icon-check) center / 14px 14px no-repeat;
+  border: 0;
+}
+:where(:root[data-theme='corporate-98']) .dc-toggle input:focus-visible + .dc-toggle__track {
+  outline: 1px dotted #000;
+  outline-offset: 3px;
+}
+:where(:root[data-theme='corporate-98']) .dc-toggle__label {
+  color: var(--text-0);
+}
+/* Trackbar. */
+:where(:root[data-theme='corporate-98']) .dc-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  background: linear-gradient(90deg, var(--c98-navy) var(--fill), #fff var(--fill));
+  box-shadow: var(--c98-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 24px;
+  margin-top: -9px;
+  border: 0;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+:where(:root[data-theme='corporate-98']) .dc-slider::-moz-range-track {
+  height: 6px;
+  border: 0;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-slider::-moz-range-progress {
+  height: 6px;
+  background: var(--c98-navy);
+}
+:where(:root[data-theme='corporate-98']) .dc-slider::-moz-range-thumb {
+  width: 12px;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+/* Segmented = a row of toggle buttons; the pressed one sinks and turns navy. */
+:where(:root[data-theme='corporate-98']) .dc-segmented {
+  gap: 0;
+  padding: 2px;
+  border: 0;
+  background: var(--c98-face);
+  box-shadow: var(--c98-thin-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-segmented__item {
+  font-family: var(--font-ui);
+  color: var(--text-0);
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:where(:root[data-theme='corporate-98']) .dc-segmented__item:hover {
+  background: var(--c98-face-2);
+  color: #000;
+}
+:where(:root[data-theme='corporate-98']) .dc-segmented__item[aria-checked='true'],
+:where(:root[data-theme='corporate-98']) .dc-segmented__item[aria-selected='true'] {
+  font-weight: 700;
+  background: var(--c98-navy);
+  color: #fff;
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset 2px 2px 0 #06184a;
+}
+/* Property-sheet tabs. */
+:where(:root[data-theme='corporate-98']) .dc-tabs {
+  gap: 0;
+  padding: 2px 2px 0;
+  border-bottom: 1px solid var(--c98-hi);
+  box-shadow: 0 1px 0 var(--c98-light);
+}
+:where(:root[data-theme='corporate-98']) .dc-tab {
+  margin-top: 3px;
+  padding: 0 var(--sp-4);
+  min-height: 38px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+  background: var(--c98-face);
+  border-radius: 3px 3px 0 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px 0 0 var(--c98-dk),
+    inset -2px 0 0 var(--c98-lo),
+    inset 2px 2px 0 var(--c98-light);
+}
+:where(:root[data-theme='corporate-98']) .dc-tab[aria-selected='true'] {
+  z-index: 1;
+  margin-top: 0;
+  margin-bottom: -1px;
+  padding-bottom: 1px;
+  font-weight: 700;
+  color: #000;
+}
+:where(:root[data-theme='corporate-98']) .dc-tab[aria-selected='true']::after {
+  display: none;
+}
+/* Badges = little sunken status fields. */
+:where(:root[data-theme='corporate-98']) .dc-badge {
+  height: 22px;
+  padding: 0 7px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--badge, var(--c98-navy)) 62%, #000);
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-thin-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-badge--solid {
+  color: #fff;
+  background: color-mix(in srgb, var(--badge, var(--c98-navy)) 70%, #000);
+}
+:where(:root[data-theme='corporate-98']) .dc-kbd {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:where(:root[data-theme='corporate-98']) .dc-avatar {
+  background: color-mix(in srgb, var(--player, var(--c98-navy)) 22%, #fff);
+  box-shadow: var(--c98-thin-in), 0 0 0 2px var(--player, var(--c98-navy));
+}
+/* Progress: navy blocks in a sunken well. */
+:where(:root[data-theme='corporate-98']) .dc-progress {
+  height: 14px;
+  padding: 2px;
+  border: 0;
+  background: #fff;
+  box-shadow: var(--c98-thin-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-progress::after {
+  inset: 2px;
+  width: calc(var(--value) - 4px);
+  max-width: calc(100% - 4px);
+  background: repeating-linear-gradient(90deg, var(--c98-navy) 0 8px, transparent 8px 10px);
+  box-shadow: none;
+  transition: width var(--dur-2) steps(6, end);
+}
+:where(:root[data-theme='corporate-98']) .dc-timer {
+  --tone: var(--c98-navy);
+  box-shadow: 0 0 0 1px var(--c98-lo);
+  background: conic-gradient(var(--tone) calc(var(--p) * 360deg), #fff 0);
+}
+:where(:root[data-theme='corporate-98']) .dc-timer::before {
+  background: var(--c98-face);
+  box-shadow: var(--c98-thin-in);
+}
+:where(:root[data-theme='corporate-98']) .dc-timer[data-urgent='true'] {
+  --tone: var(--danger);
+  animation: none;
+}
+/* Hourglass-ish spinner: three navy blocks stepping. */
+:where(:root[data-theme='corporate-98']) .dc-spinner i {
+  background: var(--c98-navy);
+  animation-timing-function: steps(2, end);
+}
+:where(:root[data-theme='corporate-98']) .dc-empty {
+  color: var(--text-1);
+}
+:where(:root[data-theme='corporate-98']) .dc-empty__icon {
+  color: var(--c98-navy);
+}
+
+/* ---------- Toasts = tooltip balloons ---------- */
+:where(:root[data-theme='corporate-98']) .dc-toast {
+  color: #000;
+  background: var(--c98-tip);
+  border: 1px solid #000;
+  border-left: 1px solid #000;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  animation: c98-tip-in 120ms steps(2, end);
+}
+:where(:root[data-theme='corporate-98']) .dc-toast__icon {
+  color: var(--tone);
+}
+:where(:root[data-theme='corporate-98']) .dc-toast[data-kind='info'] .dc-toast__icon,
+:where(:root[data-theme='corporate-98']) .dc-toast:not([data-kind]) .dc-toast__icon {
+  color: var(--c98-navy);
+}
+:where(:root[data-theme='corporate-98']) .dc-toast__close {
+  color: #000;
+}
+:where(:root[data-theme='corporate-98']) .dc-toast__close:hover {
+  background: transparent;
+  box-shadow: var(--c98-thin-out);
+}
+@keyframes c98-tip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* =====================================================================
+ * Shell: top bar = taskbar
+ * ===================================================================== */
+:root[data-theme='corporate-98'] .topbar {
+  background: var(--c98-face);
+  border-bottom: 1px solid var(--c98-dk);
+  box-shadow:
+    inset 0 -1px 0 var(--c98-lo),
+    inset 0 1px 0 var(--c98-hi);
+}
+:root[data-theme='corporate-98'] .topbar::after {
+  display: none;
+}
+/* The running application = the pressed taskbar button. */
+:root[data-theme='corporate-98'] .topbar__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px 0 6px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000;
+  text-shadow: none;
+  background: var(--c98-dither);
+  box-shadow: var(--c98-in);
+  max-width: 34vw;
+}
+:root[data-theme='corporate-98'] .topbar__title::before {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--c98-icon-window) center / 16px no-repeat;
+}
+:root[data-theme='corporate-98'] .topbar__title > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-theme='corporate-98'] .topbar__cabinet,
+:root[data-theme='corporate-98'] .topbar__sep {
+  color: #3a3a40;
+  font-weight: 400;
+}
+:root[data-theme='corporate-98'] .code-chip {
+  font-family: var(--font-ui);
+  color: #000;
+  background: #fff;
+  border: 0;
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .code-chip:hover {
+  background: #fff;
+  box-shadow:
+    var(--c98-thin-in),
+    0 0 0 1px var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .code-chip__label {
+  color: #3a3a40;
+}
+:root[data-theme='corporate-98'] .code-chip__code {
+  font-family: var(--font-tech);
+  font-weight: 700;
+  color: var(--c98-navy);
+}
+/* The right side reads as the system tray. */
+:root[data-theme='corporate-98'] .topbar__right {
+  gap: 2px;
+}
+:root[data-theme='corporate-98'] .topbar__count {
+  height: 30px;
+  padding: 0 8px;
+  font-family: var(--font-ui);
+  color: #000;
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .topbar .dc-btn--icon,
+:root[data-theme='corporate-98'] .shell-menu > .dc-btn {
+  background: transparent;
+  box-shadow: none;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .topbar .dc-btn--icon:hover:not(:disabled) {
+  box-shadow: var(--c98-thin-out);
+}
+:root[data-theme='corporate-98'] .topbar .dc-btn--icon:active:not(:disabled) {
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .topbar__lock {
+  color: #6a4a00;
+  background: var(--c98-tip);
+  border: 1px solid #000;
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .shell-menu > .dc-btn {
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .shell-menu__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #fff;
+  background: var(--c98-title);
+  margin: -2px -2px 8px;
+  padding: 6px 8px;
+}
+
+/* =====================================================================
+ * Arcade floor = the desktop
+ * ===================================================================== */
+:root[data-theme='corporate-98'] .af-floor {
+  background: transparent;
+}
+:root[data-theme='corporate-98'] .af-floor .dc-btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] .af-floor .dc-btn--xl {
+  font-size: 19px;
+}
+/* Header strip = a taskbar docked at the top of the screen. */
+:root[data-theme='corporate-98'] .af-hud {
+  min-height: calc(56px + var(--safe-top));
+  padding-top: calc(6px + var(--safe-top));
+  padding-bottom: 6px;
+  color: #000;
+  background: var(--c98-face);
+  border-bottom: 1px solid var(--c98-dk);
+  box-shadow:
+    inset 0 -1px 0 var(--c98-lo),
+    inset 0 1px 0 var(--c98-hi),
+    0 2px 0 rgba(0, 0, 0, 0.18);
+}
+:root[data-theme='corporate-98'] .af-hud__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+:root[data-theme='corporate-98'] .af-hud__logo {
+  display: grid;
+  grid-template-columns: 26px auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 1px;
+  align-items: center;
+}
+:root[data-theme='corporate-98'] .af-hud__logo::before {
+  content: '';
+  grid-row: 1 / span 2;
+  width: 26px;
+  height: 26px;
+  background: var(--c98-icon-logo) center / 26px 26px no-repeat;
+  box-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='corporate-98'] .af-hud__logo::after {
+  content: 'DASCADE';
+  content: 'DASCADE' / '';
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--font-ui);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .af-hud__word {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-hud__sub {
+  grid-column: 2;
+  grid-row: 2;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #2f2f35;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-hud__badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--c98-navy);
+  background: #fff;
+  box-shadow: var(--c98-thin-in);
+  white-space: nowrap;
+}
+:root[data-theme='corporate-98'] .af-srv {
+  height: 32px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .af-srv i {
+  box-shadow: inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='corporate-98'] .af-srv[data-state='offline'] {
+  color: #7a0b0b;
+}
+:root[data-theme='corporate-98'] .af-hud__profile {
+  min-height: 40px;
+  color: #000;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .af-hud__profile:hover {
+  background: var(--c98-face-2);
+  border: 0;
+}
+:root[data-theme='corporate-98'] .af-hud__profile:active {
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .af-hud__profile-name[data-empty='true'] {
+  color: var(--c98-navy);
+  text-decoration: underline;
+}
+:root[data-theme='corporate-98'] .af-hud__icons .dc-btn {
+  color: #000;
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-hud__icons .dc-btn:hover:not(:disabled) {
+  box-shadow: var(--c98-thin-out);
+}
+:root[data-theme='corporate-98'] .af-hud__icons .dc-btn:active:not(:disabled) {
+  box-shadow: var(--c98-thin-in);
+}
+
+/* Tournament kiosk = a quick-launch button for the enterprise bracket suite. */
+:root[data-theme='corporate-98'] .af-kiosk {
+  --k-led: var(--c98-navy);
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+  transition: none;
+}
+:root[data-theme='corporate-98'] .af-kiosk::before {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-kiosk:hover {
+  background: var(--c98-face-2);
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .af-kiosk:active {
+  transform: translate(1px, 1px);
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .af-kiosk:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -5px;
+}
+:root[data-theme='corporate-98'] .af-kiosk__trophy {
+  color: #b88a00;
+  background: none;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+:root[data-theme='corporate-98'] .af-kiosk__title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-kiosk__title .af-kiosk__long::after {
+  content: ' 98';
+  content: ' 98' / '';
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .af-kiosk__ticker {
+  mask: none;
+  background: #fff;
+  box-shadow: var(--c98-thin-in);
+  padding: 1px 3px;
+}
+:root[data-theme='corporate-98'] .af-kiosk__track {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--c98-navy);
+  text-shadow: none;
+  animation-duration: 40s;
+}
+:root[data-theme='corporate-98'] .af-kiosk__track span::after {
+  content: '|';
+  content: '|' / '';
+  color: #86868a;
+  font-size: 11px;
+}
+:root[data-theme='corporate-98'] .af-kiosk__go {
+  color: #000;
+}
+
+/* Lineup: cabinets are shortcuts on the desktop. */
+:root[data-theme='corporate-98'] .af-lineup::before {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-cab__halo,
+:root[data-theme='corporate-98'] .af-cab__sparks {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-cab__reflect {
+  opacity: 0.35;
+}
+:root[data-theme='corporate-98'] .af-cab__name {
+  padding: 1px 5px;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='corporate-98'] .af-cab__family {
+  font-family: var(--font-ui);
+  font-size: clamp(10px, calc(var(--cab-w) * 0.046), 12px);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='corporate-98'] .af-cab__family b {
+  color: #fff;
+}
+:root[data-theme='corporate-98'] .af-slot[data-active='true'] .af-cab__name {
+  color: #fff;
+  background: var(--c98-sel);
+  outline: 1px dotted #ffd23f;
+  outline-offset: 0;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-cab__hint {
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='corporate-98'] .af-lineup__pager i {
+  width: 8px;
+  height: 8px;
+  background: var(--c98-face);
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .af-lineup__pager i[data-on='true'] {
+  width: 8px;
+  background: var(--c98-sel);
+  box-shadow: 0 0 0 1px #fff;
+}
+
+/* Plaque = the application's Properties window. */
+:root[data-theme='corporate-98'] .af-plaque {
+  --af-ink-0: #0e0e12;
+  --af-ink-1: #23232a;
+  --af-ink-2: #36363d;
+  --af-ink-3: #44444b;
+  height: calc(var(--plaque-h, 150px) + 28px);
+  padding-top: 40px;
+  color: #000;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    3px 3px 0 rgba(0, 0, 0, 0.3);
+  transition: none;
+}
+:root[data-theme='corporate-98'] .af-plaque::before {
+  content: attr(data-cabinet) '.exe — Properties';
+  content: attr(data-cabinet) '.exe — Properties' / '';
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  width: auto;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 28px;
+  border: 0;
+  filter: none;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background:
+    var(--c98-icon-window) 7px 50% / 16px 16px no-repeat,
+    var(--c98-title);
+}
+:root[data-theme='corporate-98'] .af-plaque::after {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-plaque__kicker {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .af-plaque__count,
+:root[data-theme='corporate-98'] .af-plaque__players {
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .af-plaque__title {
+  font-size: clamp(20px, 1.9vw, 28px);
+}
+:root[data-theme='corporate-98'] .af-plaque__tagline {
+  color: #23232a;
+}
+:root[data-theme='corporate-98'] .af-plaque__desc {
+  color: #23232a;
+}
+:root[data-theme='corporate-98'] .af-plaque__info {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 10px;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .af-plaque__games li {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  color: #000;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding-left: 22px;
+  background: var(--c98-icon-window) 2px 50% / 16px 16px no-repeat;
+}
+:root[data-theme='corporate-98'] .af-plaque__id,
+:root[data-theme='corporate-98'] .af-plaque__info {
+  animation-duration: 1ms;
+}
+:root[data-theme='corporate-98'] .af-floor__extras .af-floor__join-mobile {
+  color: #000;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+
+/* Footer = the bottom taskbar with a system tray. */
+:root[data-theme='corporate-98'] .af-foot {
+  padding-top: 5px;
+  padding-bottom: calc(5px + var(--safe-bottom));
+  color: #000;
+  font-family: var(--font-ui);
+  background: var(--c98-face);
+  border-top: 1px solid var(--c98-light);
+  box-shadow: inset 0 1px 0 var(--c98-hi);
+}
+:root[data-theme='corporate-98'] .af-foot__legal {
+  color: #2f2f35;
+}
+:root[data-theme='corporate-98'] .af-ticker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #000;
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .af-ticker__item {
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+:root[data-theme='corporate-98'] .af-ticker__item + .af-ticker__item {
+  border-left: 1px solid var(--c98-lo);
+  box-shadow: inset 1px 0 0 var(--c98-hi);
+}
+:root[data-theme='corporate-98'] .af-foot__keys {
+  color: #2f2f35;
+}
+
+/* =====================================================================
+ * Screens as maximised application windows
+ * ===================================================================== */
+:root[data-theme='corporate-98'] .af-entry,
+:root[data-theme='corporate-98'] .cp {
+  --af-ink-0: #0e0e12;
+  --af-ink-1: #23232a;
+  --af-ink-2: #36363d;
+  --af-ink-3: #44444b;
+  color: #0e0e12;
+}
+:root[data-theme='corporate-98'] :is(.af-entry__frame, .cp__frame) {
+  position: relative;
+  width: min(1240px, calc(100% - 24px));
+  margin: 12px auto;
+  min-height: calc(100dvh - 24px);
+  padding-top: calc(42px + var(--safe-top));
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    4px 4px 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-theme='corporate-98'] :is(.af-entry__frame, .cp__frame)::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 30px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background:
+    var(--c98-icon-window) 8px 50% / 16px 16px no-repeat,
+    var(--c98-title);
+  pointer-events: none;
+}
+:root[data-theme='corporate-98'] .af-entry__frame::before {
+  content: 'Setup Wizard';
+  content: 'Setup Wizard' / '';
+}
+:root[data-theme='corporate-98'] .cp__frame::before {
+  content: 'Application Launcher';
+  content: 'Application Launcher' / '';
+}
+/* Title screen = a setup wizard: grey dialog face, the coin card is the wizard's dialog. */
+:root[data-theme='corporate-98'] .af-entry__bg {
+  background: var(--c98-desk);
+}
+:root[data-theme='corporate-98'] .af-entry__screen {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-entry .dc-btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] .af-entry__top .dc-btn.af-entry__back,
+:root[data-theme='corporate-98'] .af-entry__top .dc-btn.af-entry__help {
+  --btn-bg: var(--c98-face-2);
+  --btn-bg-2: var(--c98-face);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .af-entry__top .dc-btn.af-entry__back:hover:not(:disabled),
+:root[data-theme='corporate-98'] .af-entry__top .dc-btn.af-entry__help:hover:not(:disabled) {
+  background: var(--c98-face-2);
+}
+:root[data-theme='corporate-98'] :is(.af-entry__head, .af-entry__details)::before {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-entry__marquee {
+  background: #000;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+  padding: 4px;
+}
+:root[data-theme='corporate-98'] .af-entry__crumbs {
+  font-family: var(--font-ui);
+}
+:root[data-theme='corporate-98'] .af-entry__crumbs :is(ol, a, li, [aria-current='page']) {
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .af-entry__kicker {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #36363d;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-entry__tagline {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 38%, #000);
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-entry__desc {
+  color: #23232a;
+}
+:root[data-theme='corporate-98'] .af-entry__controls {
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .af-entry__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .af-entry__controls .dc-icon {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .af-entry__card {
+  padding: 2px;
+  color: #000;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    3px 3px 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-theme='corporate-98'] .af-entry__card::before,
+:root[data-theme='corporate-98'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-entry__card-head {
+  min-height: 30px;
+  padding: 3px 8px 3px 30px;
+  border-bottom: 0;
+  background:
+    var(--c98-icon-window) 8px 50% / 16px 16px no-repeat,
+    var(--c98-title);
+}
+:root[data-theme='corporate-98'] .af-entry__card-head h2 {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #fff;
+}
+:root[data-theme='corporate-98'] .af-entry__slot {
+  display: none;
+}
+:root[data-theme='corporate-98'] .af-entry__credit {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #fff;
+}
+:root[data-theme='corporate-98'] .af-entry__hint {
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .af-entry__hint .dc-icon {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .af-entry__error {
+  color: #000;
+  background: var(--c98-tip);
+  border: 1px solid #000;
+}
+:root[data-theme='corporate-98'] .af-entry__card .dc-field__hint {
+  color: #3a3a40;
+}
+
+/* Picker = "Program Manager": a list view with navy selection, a preview window beside it. */
+:root[data-theme='corporate-98'] .cpb {
+  display: none;
+}
+:root[data-theme='corporate-98'] .cp .dc-btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] .cp .cp__marquee {
+  background: #000;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .cp .cp__tourney {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000;
+  text-shadow: none;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .cp .cp__tourney :is(svg, .dc-icon) {
+  color: #b88a00;
+  filter: none;
+}
+:root[data-theme='corporate-98'] .cp .cp__crumbs ol {
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .cp .cp__crumbs :is(a, [aria-current='page'], li + li::before) {
+  color: #000;
+}
+:root[data-theme='corporate-98'] .cp .cp__crumbs [aria-current='page'] {
+  font-weight: 700;
+}
+:root[data-theme='corporate-98'] .cp .cp__family {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .cp .cp__label {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .cp .cp__label-caret {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .cp .cp__list {
+  gap: 0;
+  padding: 3px;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .cp .cp-item {
+  color: #000;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+:root[data-theme='corporate-98'] .cp .cp-item:hover {
+  background: #e6ecf8;
+  box-shadow: none;
+}
+:root[data-theme='corporate-98'] .cp .cp-item.is-selected {
+  color: #fff;
+  background: var(--c98-sel);
+  box-shadow: none;
+  outline: 1px dotted #ffd23f;
+  outline-offset: -3px;
+}
+:root[data-theme='corporate-98'] .cp .cp-item.is-selected::before {
+  display: none;
+}
+:root[data-theme='corporate-98'] .cp .cp-item__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] .cp .cp-item__meta {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .cp .cp-item__players,
+:root[data-theme='corporate-98'] .cp .cp-item__tag {
+  color: color-mix(in srgb, var(--tag, var(--c98-navy)) 55%, #000);
+}
+:root[data-theme='corporate-98'] .cp .cp-item__blurb {
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .cp .cp-item__go {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .cp .cp-item.is-selected :is(.cp-item__meta, .cp-item__players, .cp-item__tag, .cp-item__blurb, .cp-item__go) {
+  color: #fff;
+}
+:root[data-theme='corporate-98'] .cp .cp-item__screen {
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .cp .cp__preview {
+  padding: 40px 12px 12px;
+  color: #000;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    3px 3px 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-theme='corporate-98'] .cp .cp__preview::before {
+  content: 'Preview';
+  content: 'Preview' / '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 28px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background:
+    var(--c98-icon-window) 7px 50% / 16px 16px no-repeat,
+    var(--c98-title);
+}
+:root[data-theme='corporate-98'] .cp .cp-screen {
+  border-radius: 0;
+  box-shadow:
+    0 0 0 2px #000,
+    0 0 0 4px var(--c98-face),
+    0 0 0 5px var(--c98-lo);
+}
+:root[data-theme='corporate-98'] .cp .cp-detail__kicker {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] .cp .cp-detail__title {
+  font-size: clamp(20px, 2vw, 28px);
+}
+:root[data-theme='corporate-98'] .cp .cp-detail__desc {
+  color: #23232a;
+}
+:root[data-theme='corporate-98'] .cp .cp__foot,
+:root[data-theme='corporate-98'] .cp .cp__note {
+  color: #2f2f35;
+}
+
+/* Lobby / room: the game's application window. */
+:root[data-theme='corporate-98'] .lobby-hero__title,
+:root[data-theme='corporate-98'] .lobby-hero__name {
+  color: var(--c98-navy);
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .player-list {
+  background: #fff;
+  box-shadow: var(--c98-in);
+  padding: 2px;
+}
+:root[data-theme='corporate-98'] .player-list__item {
+  color: #000;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .player-list__item:hover {
+  background: #e6ecf8;
+}
+:root[data-theme='corporate-98'] .ready-pill {
+  font-family: var(--font-ui);
+  border-radius: 0;
+  box-shadow: var(--c98-thin-in);
+}
+:root[data-theme='corporate-98'] .lobby-code,
+:root[data-theme='corporate-98'] .lobby-code__value {
+  font-family: var(--font-tech);
+}
+:root[data-theme='corporate-98'] .lobby-code__value span {
+  font-family: var(--font-tech);
+  color: var(--c98-navy);
+  text-shadow: none;
+  background: #fff;
+  border: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .lobby-code__value:hover span {
+  background: #eef2fb;
+}
+:root[data-theme='corporate-98'] .lobby__actions {
+  background: var(--c98-face);
+  border-top: 1px solid var(--c98-hi);
+  box-shadow: 0 -1px 0 var(--c98-lo);
+}
+:root[data-theme='corporate-98'] .chat__list {
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+/* Player colours are tuned for dark themes; on white chat paper keep each hue but deepen it to text-safe ink
+   (worst case, cyan #22d3ee → ≈ #0e5561, ≥ 7:1 on white). */
+:root[data-theme='corporate-98'] .chat__name {
+  color: color-mix(in srgb, var(--chat-name, var(--c98-navy)) 42%, #000);
+}
+
+/* A light theme needs text-safe accents: every game keeps its hue, deepened so it reads on grey.
+   The stage's own (inline) accent is captured, then children get the deepened version. */
+:root[data-theme='corporate-98'] :is([data-part='game-stage'], .tc-center, .af-entry, .cp, .topbar, .af-plaque) {
+  --c98-acc: var(--accent);
+  --c98-acc2: var(--accent-2);
+}
+:root[data-theme='corporate-98'] :is([data-part='game-stage'], .tc-center, .af-entry, .cp, .af-plaque) > * {
+  /* 36%: even the brightest game hues (mint #3dff9a, yellow #ffd23f) reach ≥ 4.5:1 on the #c4c4bf face */
+  --accent: color-mix(in srgb, var(--c98-acc) 36%, #000);
+  --accent-2: color-mix(in srgb, var(--c98-acc2) 36%, #000);
+  --accent-deep: color-mix(in srgb, var(--c98-acc) 14%, #e4e4df);
+  --accent-ink: #ffffff;
+}
+:root[data-theme='corporate-98'] .shell-crumb__cabinet,
+:root[data-theme='corporate-98'] .shell-crumb__game {
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+:root[data-theme='corporate-98'] .shell-crumb {
+  font-family: var(--font-ui);
+}
+/* The lobby hero sits straight on the grey desktop (#9d9d98): cabinet-hue and muted inks fall under
+   4.5:1 there, so the crumb and the tagline use dark ink (the title keeps navy, 6:1+). */
+:root[data-theme='corporate-98'] [data-part='lobby-hero'] :is(.shell-crumb, .shell-crumb *, .dc-muted) {
+  color: #1d1d22;
+}
+/* Classics scoreboard on the light window face: gold/green hues deepened to text-safe ink. */
+:root[data-theme='corporate-98'] .cl-board__row.is-top1 .cl-board__rank {
+  color: #5c3f0a;
+}
+:root[data-theme='corporate-98'] .cl-board__row.is-top3 .cl-board__rank {
+  color: #7a3300;
+}
+:root[data-theme='corporate-98'] .cl-board__tag {
+  color: #0a4f20;
+  border-color: #0a4f20;
+}
+/* Section labels in dialogs (accent blue, some set inline via var(--accent)) on the #c4c4bf face. */
+:root[data-theme='corporate-98'] [data-part='dialog-body'] .dc-label {
+  --accent: #163a8a;
+  color: #163a8a;
+}
+
+/* Game stage: the application workspace. Games paint their own playfield on top. */
+:root[data-theme='corporate-98'][data-place='game'] body {
+  background: #9d9d98;
+}
+:root[data-theme='corporate-98'] .results-shell__title {
+  color: var(--c98-navy);
+  text-shadow: none;
+  font-weight: 700;
+}
+:root[data-theme='corporate-98'] .countdown-overlay__num {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 3px 3px 0 #000;
+}
+:root[data-theme='corporate-98'] :is(.notice-card, .reconnect-card, .loading-card, .join-prompt) {
+  color: #000;
+}
+
+/* =====================================================================
+ * Tournament Center = "Tournament Manager 98", enterprise edition.
+ * ===================================================================== */
+:root[data-theme='corporate-98'] .tc-center {
+  background: var(--c98-desk);
+}
+:root[data-theme='corporate-98'] .tc-shell {
+  position: relative;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding-top: 40px;
+  padding-bottom: 34px;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    4px 4px 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-theme='corporate-98'] .tc-shell::before {
+  content: 'Tournament Manager 98 — Enterprise Bracket Administration Console';
+  content: 'Tournament Manager 98 — Enterprise Bracket Administration Console' / '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 30px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background:
+    var(--c98-icon-trophy) 8px 50% / 16px 16px no-repeat,
+    var(--c98-title);
+  pointer-events: none;
+}
+:root[data-theme='corporate-98'] .tc-shell::after {
+  content: 'Ready        |        License: 30 seats        |        Bracket engine v4.00.1998';
+  content: 'Ready        |        License: 30 seats        |        Bracket engine v4.00.1998' / '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: pre;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #2f2f35;
+  box-shadow: var(--c98-thin-in);
+  pointer-events: none;
+}
+:root[data-theme='corporate-98'] .tc-hero {
+  color: #000;
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .tc-marquee__title,
+:root[data-theme='corporate-98'] .tc-board__title,
+:root[data-theme='corporate-98'] .tc-how__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: var(--c98-navy);
+  text-shadow: none;
+  letter-spacing: -0.01em;
+}
+:root[data-theme='corporate-98'] .tc-marquee__kicker {
+  font-family: var(--font-ui);
+  color: #36363d;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .tc-marquee__sub {
+  color: #23232a;
+}
+:root[data-theme='corporate-98'] .tc-join {
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .tc-chip {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .tc-chip:is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true'], .tc-chip--on) {
+  font-weight: 700;
+  color: #fff;
+  background: var(--c98-navy);
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset 2px 2px 0 #06184a;
+}
+:root[data-theme='corporate-98'] .tc-rows {
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .tc-row {
+  color: #000;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #e0e0db;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-theme='corporate-98'] .tc-row:hover {
+  color: #fff;
+  background: var(--c98-sel);
+}
+:root[data-theme='corporate-98'] .tc-row:hover * {
+  color: #fff;
+}
+:root[data-theme='corporate-98'] :is(.tc-match, .tc-slot, .tc-table-wrap, .tc-cross__cell, .tc-format, .tc-wiz) {
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .tc-match {
+  background: #fff;
+  box-shadow: var(--c98-thin-in), 1px 1px 0 var(--c98-hi);
+}
+:root[data-theme='corporate-98'] .tc-canvas__lines {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .tc-format {
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+  border: 0;
+}
+:root[data-theme='corporate-98'] .tc-format[aria-checked='true'],
+:root[data-theme='corporate-98'] .tc-format[aria-pressed='true'] {
+  background: #fff;
+  box-shadow: var(--c98-in), 0 0 0 1px var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .tc-top {
+  width: 100%;
+  max-width: none;
+  color: #000;
+  background: var(--c98-face);
+  border-bottom: 1px solid var(--c98-dk);
+  box-shadow:
+    inset 0 -1px 0 var(--c98-lo),
+    inset 0 1px 0 var(--c98-hi);
+}
+:root[data-theme='corporate-98'] .tc-top__crumb {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .tc-board__empty {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: #000;
+}
+:root[data-theme='corporate-98'] .tb {
+  color: #000;
+  background: var(--c98-tip);
+  border: 1px solid #000;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* =====================================================================
+ * Kits
+ * ===================================================================== */
+/* DAS Boardroom leans hardest: the board sits in a bevelled document window. */
+:root[data-theme='corporate-98'] [data-part='game-stage'][data-game='chess'] [data-part='board'],
+:root[data-theme='corporate-98'] [data-part='game-stage'][data-game='checkers'] [data-part='board'] {
+  box-shadow:
+    0 0 0 2px var(--c98-face),
+    0 0 0 3px var(--c98-lo),
+    0 0 0 4px var(--c98-dk),
+    4px 4px 0 4px rgba(0, 0, 0, 0.25);
+}
+:root[data-theme='corporate-98'] [data-part='clock'] {
+  font-family: var(--font-num);
+  color: #3aff5a;
+  background: #000;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-part='scoreboard'],
+:root[data-theme='corporate-98'] [data-part='hud'] {
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] [data-part='card'] {
+  border-radius: 2px;
+}
+/* DAStravaganza = corporate training software that unexpectedly became fun. */
+:root[data-theme='corporate-98'] [data-part='stage'],
+:root[data-theme='corporate-98'] [data-part='podium'] {
+  border-radius: 0;
+}
+
+/* =====================================================================
+ * Jukebox = "Media Player (Approved by IT)" — a desktop window, tiny transport buttons.
+ * ===================================================================== */
+:root[data-theme='corporate-98'] [data-jukebox] {
+  --jb-bg: var(--c98-face);
+  --jb-fg: #000;
+  --jb-muted: #36363d;
+  --jb-border: var(--c98-dk);
+  --jb-radius: 0px;
+  --jb-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  --jb-blur: none;
+  --jb-accent: var(--c98-navy);
+  --jb-accent-2: #008080;
+  --jb-font-title: var(--font-ui);
+  --jb-font-label: var(--font-ui);
+  --jb-btn: 40px;
+  --jb-btn-play: 44px;
+  --jb-track-h: 40px;
+  --jb-vis-h: 56px;
+  --accent: #2fdc4a;
+  --accent-2: #b6ff9a;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='panel'] {
+  padding: 2px;
+  color: #000;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='header'], [data-part='title-bar']) {
+  color: #fff;
+  background: var(--c98-title);
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='title-bar'] {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='close'] {
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='display'] {
+  color: #3aff5a;
+  background: #000;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--font-tech);
+  color: #3aff5a;
+}
+/* The time readout sits on the grey window face under the seek bar, not on the black LCD. */
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='time'] {
+  font-family: var(--font-tech);
+  color: #36363d;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='display'] .jb-now__label {
+  color: #9adf9a;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='track-artist'] {
+  font-family: var(--font-tech);
+  color: #9adf9a;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='art'] {
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='prev'], [data-part='play'], [data-part='next'], [data-part='mute'], [data-part='shuffle'], [data-part='repeat'], [data-part='mini-toggle'], [data-part='mini-next'], [data-part='mini-open']) {
+  color: #000;
+  background: var(--c98-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='prev'], [data-part='play'], [data-part='next'], [data-part='mute'], [data-part='shuffle'], [data-part='repeat'], [data-part='mini-toggle'], [data-part='mini-next'], [data-part='mini-open']):active,
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='shuffle'], [data-part='repeat'], [data-part='mute'])[aria-pressed='true'],
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='repeat']:not([data-mode='off']) {
+  background: var(--c98-dither);
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='tabs'] {
+  border-bottom: 1px solid var(--c98-hi);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='track-list'], [data-part='queue']) {
+  color: #000;
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='track'], [data-part='queue-item']) {
+  color: #000;
+  border-radius: 0;
+  font-family: var(--font-ui);
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='track'], [data-part='queue-item']):hover {
+  background: #e6ecf8;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='track'][data-current] {
+  color: #fff;
+  background: var(--c98-sel);
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='track'][data-current] * {
+  color: #fff;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='search'] {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='enable-audio'] {
+  color: #000;
+  background: var(--c98-tip);
+  border: 1px solid #000;
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='mini'] {
+  color: #000;
+  background: var(--c98-face);
+  border: 1px solid;
+  border-color: var(--c98-light) var(--c98-dk) var(--c98-dk) var(--c98-light);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 var(--c98-hi),
+    inset -1px -1px 0 var(--c98-lo),
+    2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-theme='corporate-98'] [data-jukebox][data-dock='topbar'] [data-part='mini'] {
+  box-shadow: var(--c98-thin-in);
+  border: 0;
+}
+:root[data-theme='corporate-98'] [data-jukebox] [data-part='mini-title'] {
+  font-family: var(--font-ui);
+  color: #000;
+}
+:root[data-theme='corporate-98'] [data-jukebox] :is([data-part='dj'], [data-part='dj-status']) {
+  color: #000;
+  border-radius: 0;
+}
+
+/* =====================================================================
+ * Motion + effects levels
+ * ===================================================================== */
+:root[data-theme='corporate-98'][data-reduced-motion='true'] .dc-modal[open],
+:root[data-theme='corporate-98'][data-reduced-motion='true'] .dc-toast {
+  animation: none;
+}
+
+/* =====================================================================
+ * Environment: the company wallpaper
+ * ===================================================================== */
+:root[data-theme='corporate-98'] .c98-env {
+  position: absolute;
+  inset: 0;
+  background-color: var(--c98-desk);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='160'><g fill='%23ffffff' fill-opacity='.055' font-family='Tahoma,Verdana,sans-serif' font-weight='700' font-size='10'><path d='M30 22l12 21H18z'/><text x='50' y='40'>DELTA ALPHA SIERRA INC.</text><path d='M150 102l12 21h-24z'/><text x='170' y='120'>DAS INC.</text></g></svg>"),
+    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 20, 24, 0.22));
+  background-size:
+    240px 160px,
+    100% 100%;
+}
+:root[data-theme='corporate-98'] .c98-env[data-fx='off'] {
+  background-image: none;
+}
+
+/* Floor decor: desktop shortcuts + IT memo (roomy screens only). */
+:root[data-theme='corporate-98'] .c98-desk {
+  display: none;
+}
+@media (min-width: 1280px) and (min-height: 760px) {
+  :root[data-theme='corporate-98'] .c98-desk {
+    display: block;
+    position: absolute;
+    inset: 0;
+  }
+}
+:root[data-theme='corporate-98'] .c98-desk__icons {
+  position: absolute;
+  top: 80px;
+  left: calc(10px + var(--safe-left));
+  display: flex;
+  gap: 6px;
+}
+:root[data-theme='corporate-98'] .c98-icon {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 84px;
+  text-align: center;
+}
+:root[data-theme='corporate-98'] .c98-icon svg {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.35));
+}
+:root[data-theme='corporate-98'] .c98-icon__label {
+  padding: 0 2px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+:root[data-theme='corporate-98'] .c98-note {
+  position: absolute;
+  top: 96px;
+  right: calc(22px + var(--safe-right));
+  display: grid;
+  gap: 4px;
+  width: 150px;
+  padding: 12px 12px 14px;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Chalkboard SE', 'Comic Sans MS', cursive;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #2a2300;
+  background: linear-gradient(180deg, #fff59a, #fbe96a);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.28);
+  transform: rotate(2.5deg);
+}
+:root[data-theme='corporate-98'] .c98-note b {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #9a1010;
+}
+:root[data-theme='corporate-98'] .c98-note i {
+  font-size: 11px;
+}
+@media (min-width: 1600px) {
+  :root[data-theme='corporate-98'] .c98-note {
+    right: calc(40px + var(--safe-right));
+  }
+}
+
+/* Jukebox decor */
+:root[data-theme='corporate-98'] .c98-jbdecor {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-tech);
+  font-size: 11px;
+  color: #3aff5a;
+  opacity: 0.85;
+}
+
+/* Header density: the flavour badge only where there is room for it. */
+@media (max-width: 1599px) {
+  :root[data-theme='corporate-98'] .af-hud__badge {
+    display: none;
+  }
+}
+:root[data-theme='corporate-98'] .af-entry__card .af-entry__tourney,
+:root[data-theme='corporate-98'] .af-entry__card .af-entry__tourney .dc-icon {
+  color: #000;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .af-entry__card .af-entry__tourney .dc-icon {
+  color: #9a7200;
+}
+:root[data-theme='corporate-98'] .tc-center .dc-empty__icon,
+:root[data-theme='corporate-98'] .tc-board .dc-empty__icon {
+  color: var(--c98-navy);
+}
+
+/* =====================================================================
+ * Phones / small screens: the 1998 look, 2026 touch targets and density.
+ * ===================================================================== */
+@media (max-width: 699px), (max-height: 540px) and (orientation: landscape) {
+  :root[data-theme='corporate-98'] .af-hud__sub,
+  :root[data-theme='corporate-98'] .af-ticker {
+    display: none;
+  }
+  :root[data-theme='corporate-98'] .af-hud__logo {
+    grid-template-rows: auto;
+  }
+  :root[data-theme='corporate-98'] .af-hud__logo::before {
+    grid-row: 1;
+    width: 22px;
+    height: 22px;
+    background-size: 22px 22px;
+  }
+  :root[data-theme='corporate-98'] .af-plaque {
+    height: calc(var(--plaque-h, 150px) + 24px);
+    padding-top: 30px;
+  }
+  :root[data-theme='corporate-98'] .af-plaque::before {
+    height: 22px;
+    font-size: 12px;
+  }
+  :root[data-theme='corporate-98'] .af-plaque__info {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  :root[data-theme='corporate-98'] .af-plaque__games li {
+    min-height: 26px;
+    padding: 2px 6px 2px 22px;
+    background-color: #fff;
+    box-shadow: var(--c98-thin-in);
+  }
+  :root[data-theme='corporate-98'] :is(.af-entry__frame, .cp__frame) {
+    width: 100%;
+    margin: 0;
+    min-height: 100dvh;
+    border-width: 0;
+    box-shadow: none;
+    padding-top: calc(36px + var(--safe-top));
+  }
+  :root[data-theme='corporate-98'] :is(.af-entry__frame, .cp__frame)::before {
+    top: var(--safe-top);
+    left: 0;
+    right: 0;
+    height: 26px;
+  }
+  :root[data-theme='corporate-98'] .tc-shell {
+    margin-top: 0;
+    border-width: 0;
+    box-shadow: none;
+  }
+  :root[data-theme='corporate-98'] .tc-shell::before {
+    content: 'Tournament Manager 98';
+    content: 'Tournament Manager 98' / '';
+  }
+  :root[data-theme='corporate-98'] .tc-shell::after {
+    content: 'Ready';
+    content: 'Ready' / '';
+  }
+  :root[data-theme='corporate-98'] .topbar__title {
+    max-width: 36vw;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+  :root[data-theme='corporate-98'] .topbar__title :is(.topbar__cabinet, .topbar__sep) {
+    display: none;
+  }
+  :root[data-theme='corporate-98'] .topbar__title::before {
+    display: none;
+  }
+}
+/* DAStravaganza as corporate training software: prompts are slides with a navy header band. */
+:root[data-theme='corporate-98'] [data-part='game-stage'] [data-part='prompt-card'] {
+  border-radius: 0;
+  border-color: var(--c98-dk);
+  box-shadow:
+    inset 0 8px 0 var(--c98-navy),
+    inset 0 9px 0 var(--c98-navy-2),
+    3px 3px 0 rgba(0, 0, 0, 0.25);
+}
+:root[data-theme='corporate-98'] [data-part='game-stage'] :is([data-part='answer-card'], [data-part='vote-card'], [data-part='scoreboard'], [data-part='leaderboard']) {
+  border-radius: 0;
+}
+/* Tournament wizard: game tiles are white list items; the per-game colour stays as a deepened title. */
+:root[data-theme='corporate-98'] .tc-game {
+  color: #000;
+  background: #fff;
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+  transform: none;
+}
+:root[data-theme='corporate-98'] .tc-game:hover {
+  transform: none;
+  background: #eef2fb;
+}
+:root[data-theme='corporate-98'] .tc-game[aria-checked='true'] {
+  background: #e3e9f7;
+  box-shadow:
+    var(--c98-in),
+    0 0 0 2px var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .tc-game__marquee {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--g) 42%, #000);
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] .tc-game__tag {
+  color: #2f2f35;
+}
+:root[data-theme='corporate-98'] .tc-game__caps span {
+  color: #000;
+  background: var(--c98-face);
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .tc-wiz__step { border-radius: 0; }
+
+/* Phones / touch: the era's small controls still get ≥ 40px targets (tabs, the jukebox transport). Desktop keeps the compact look. */
+@media (pointer: coarse) {
+  :root[data-theme='corporate-98'] [data-jukebox] {
+    --jb-btn: 40px;
+  }
+  :root[data-theme='corporate-98'] :is(.dc-tab, [role='tab']) {
+    min-height: 40px;
+  }
+}
+/* DASh Circuit touch pedals float over the track as dark glass: keep light ink on them (the light
+   theme's black --text-0 made DRIFT / BOOST / BRAKE / Auto-gas vanish). */
+:root[data-theme='corporate-98'] .ci-touch__btn {
+  color: #f4f4f8;
+}
+:root[data-theme='corporate-98'] .ci-touch__auto {
+  color: #dcdce6;
+}
+:root[data-theme='corporate-98'] .ci-touch__auto.is-on {
+  color: #7dff9c;
+}
+/* DAS Tanks keyboard hints float over the (dark) foreground terrain: give them a little grey status
+   strip so the key legend reads on any ground colour (was dark grey on dark green). */
+:root[data-theme='corporate-98'] .tk-hints {
+  padding: 3px 8px;
+  color: #1a1a1f;
+  text-shadow: none;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] .tk-hints kbd {
+  color: #000;
+  background: #fff;
+  border-color: #6b6b70;
+  border-radius: 0;
+}
+/* Phones: the room code + tray icons leave the taskbar button ~20px, which rendered as an empty/one-letter
+   stub ("D."). Drop it like the base top bar does; the room screen names the game in its own header. */
+@media (max-width: 480px) {
+  :root[data-theme='corporate-98'] .topbar__title {
+    display: none;
+  }
+}
+/* DAS Chess on a phone: the status line and move strip were dark-glass wells (black 28%) with grey ink
+   on the grey desktop. Make them white sunken fields like every other corporate text box. */
+:root[data-theme='corporate-98'] .ch-status,
+:root[data-theme='corporate-98'] :is(.ch--stack, .ch--short) .br-moves--strip {
+  border-radius: 0;
+  border-color: transparent;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] .ch-status[data-tone='accent'] {
+  box-shadow: var(--c98-in), inset 4px 0 0 var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .ch-status[data-tone='accent'] .ch-status__text {
+  color: var(--c98-navy);
+}
+:root[data-theme='corporate-98'] .ch-status[data-tone='warn'] {
+  background: #fff0f0;
+}
+:root[data-theme='corporate-98'] .ch-status[data-tone='warn'] .ch-status__text {
+  color: #a0141c;
+}
+/* Phone title screen: the help key collapses to its "?" icon (the themed 15px label spilled out of the
+   44px key as "How to pla"). Its accessible name is unaffected. */
+@media (max-width: 560px) {
+  :root[data-theme='corporate-98'] .af-entry .dc-btn.af-entry__help {
+    font-size: 0;
+  }
+}
+
+/* DAS Survey: the gold "Perfect order!" bonus line was 1.3:1 on the grey points panel. */
+:root[data-theme='corporate-98'] .sv-mine__bonus {
+  color: #5c4300;
+}
+
+/* Tournament kiosk header on the grey desktop: the code tiles, status box and game tag were built for
+   dark glass (dim gold on charcoal ≈ 2:1). Give them sunken white fields with ink. */
+:root[data-theme='corporate-98'] .tk-invite__code span {
+  color: #0b2c7a;
+  text-shadow: none;
+  background: #ffffff;
+  border-color: #808080 #ffffff #ffffff #808080;
+  border-width: 2px;
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .tk-board-status {
+  color: #101014;
+  background: #ffffff;
+  border-color: #808080 #ffffff #ffffff #808080;
+  border-width: 2px;
+  border-radius: 0;
+}
+:root[data-theme='corporate-98'] .tk-board-status[data-tone='live'] .tk-board-status__label,
+:root[data-theme='corporate-98'] .tk-board-status__live {
+  color: #0a6b2c;
+}
+:root[data-theme='corporate-98'] .tk-board-status__round {
+  color: #303036;
+}
+:root[data-theme='corporate-98'] .tk-head__game {
+  color: #ffffff;
+  text-shadow: none;
+  background: #0b2c7a;
+  border-color: #0b2c7a;
+}
+/* Party podium headline: "<name> wins!" in the winner's colour — deepened for the light desktop
+   (pink/cyan player colours were ≈2:1 on grey). */
+:root[data-theme='corporate-98'] .pk-winner-name {
+  color: color-mix(in srgb, var(--winner, var(--c98-navy)) 45%, #000);
+}
+
+/* Tournament cards: the game badge keeps its hue but lifted, so it reads on the grey card (was 3.6:1). */
+:root[data-theme='corporate-98'] .tc-row__game {
+  color: color-mix(in srgb, var(--g) 45%, #ffffff);
+}
+
+/* =====================================================================
+ * SPORTS GAMES AS OFFICE APPLICATIONS — Artillery.exe, Putt.exe, Fleet Manager, Lap Timer.
+ * Grey bevelled windows, navy title bars, sunken white read-outs and a segmented progress-bar
+ * power meter. Playfields untouched; the window edge sits on the viewport border only.
+ * ===================================================================== */
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-glass,
+:root[data-theme='corporate-98'] [data-game='circuit'] .ci-glass,
+:root[data-theme='corporate-98'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='corporate-98'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 0;
+  border-radius: 0;
+  background: var(--c98-face);
+  color: #0e0e12;
+  box-shadow:
+    var(--c98-out),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Active window: the frame gets a navy focus keyline (plus the title bar below goes navy). */
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='corporate-98'] [data-game='ships'] .sh-panel--active {
+  box-shadow:
+    0 0 0 2px var(--c98-navy),
+    var(--c98-out),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+/* Bevelled push buttons. */
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-hold {
+  border: 0;
+  border-radius: 0;
+  background: var(--c98-face);
+  color: #000;
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  background: var(--c98-face-2);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-hold:active:not(:disabled) {
+  background: var(--c98-face);
+  box-shadow: var(--c98-in);
+  transform: translate(1px, 1px);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-weapon__current {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: var(--c98-in);
+  color: #000;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-weapon__ammo {
+  color: var(--c98-navy);
+}
+/* Read-outs are sunken white edit fields. */
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='corporate-98'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='corporate-98'] [data-game='circuit'] .ci-clock {
+  padding: 3px 8px 2px;
+  background: #fff;
+  color: #000;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-game='circuit'] .ci-clock {
+  border: 0;
+  border-radius: 0;
+  outline: 2px solid var(--c98-face);
+  outline-offset: 0;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial__value b {
+  color: #000;
+  text-shadow: none;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial__value small,
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial__label,
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-fuel__label {
+  color: #36363d;
+}
+/* Wind: a little sunken meter; blocks keep the strength colour, outlined so they read on white. */
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+  padding: 3px;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i {
+  border-radius: 0;
+  background: #e4e4df;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i[data-on='true'] {
+  background: var(--wind-c, var(--c98-navy));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='wind'] .tk-wind__value {
+  color: #0e0e12;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-fuel__bar {
+  border-radius: 0;
+  background: #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-fuel__bar i {
+  background: repeating-linear-gradient(90deg, var(--c98-navy) 0 5px, transparent 5px 7px);
+}
+/* Power: the chunky segmented progress bar every installer had. */
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial--power .tk-dial__slider::-webkit-slider-runnable-track,
+:root[data-theme='corporate-98'] [data-game='putt'] .pt-dock__power .dc-slider::-webkit-slider-runnable-track {
+  height: 14px;
+  border: 0;
+  background:
+    linear-gradient(90deg, transparent var(--fill), #fff var(--fill)) 2px 2px / calc(100% - 4px) 10px no-repeat,
+    repeating-linear-gradient(90deg, var(--c98-navy) 0 8px, #fff 8px 10px) 2px 2px / calc(100% - 4px) 10px no-repeat,
+    #fff;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial--power .tk-dial__slider::-webkit-slider-thumb,
+:root[data-theme='corporate-98'] [data-game='putt'] .pt-dock__power .dc-slider::-webkit-slider-thumb {
+  margin-top: -5px;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] .tk-dial--power .tk-dial__slider::-moz-range-progress,
+:root[data-theme='corporate-98'] [data-game='putt'] .pt-dock__power .dc-slider::-moz-range-progress {
+  height: 10px;
+  background: repeating-linear-gradient(90deg, var(--c98-navy) 0 8px, #fff 8px 10px);
+}
+/* FIRE: the default push button (heavy black keyline, navy face, dotted focus rectangle when armed). */
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='fire'] {
+  border-radius: 0;
+  color: #fff;
+  background: linear-gradient(180deg, #2a62c8, var(--c98-navy));
+  box-shadow:
+    0 0 0 2px #000,
+    inset -1px -1px 0 #020b24,
+    inset 1px 1px 0 #7fa6ec,
+    inset -2px -2px 0 #07205c,
+    inset 2px 2px 0 #3f78dc;
+  text-shadow: 1px 1px 0 #000;
+  animation: none;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='fire'][data-state='ready']::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px dotted #fff;
+  pointer-events: none;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='fire']:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow:
+    0 0 0 2px #000,
+    inset 1px 1px 0 #020b24,
+    inset 2px 2px 0 #07205c;
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #86868a;
+  text-shadow: 1px 1px 0 #fff;
+  background: var(--c98-face);
+  box-shadow: var(--c98-out);
+}
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(255, 255, 255, 0.2);
+}
+/* Window edge on the playfield (the game runs maximised). */
+:root[data-theme='corporate-98'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='corporate-98'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='corporate-98'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px var(--c98-light),
+    inset 0 0 0 2px #fff,
+    inset 0 0 0 5px var(--c98-face),
+    inset 0 0 0 6px var(--c98-lo),
+    inset 0 0 0 7px var(--c98-dk);
+}
+/* Ships: each sea is a child window with a title bar (grey when inactive, navy when it's in focus). */
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  margin: -6px -10px 4px -6px;
+  padding: 3px 4px 3px 8px;
+  min-height: 28px;
+  background: linear-gradient(90deg, #62626a, #8e8e96);
+}
+:root[data-theme='corporate-98'] [data-game='ships'] :is(.sh-panel--active, .sh-panel--incoming) .sh-panel__head {
+  background: var(--c98-title);
+}
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='panel'] .sh-panel__meta {
+  padding: 1px 6px;
+  color: #000;
+  background: var(--c98-face);
+  box-shadow: var(--c98-thin-out);
+}
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='panel'] .sh-panel__count,
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='panel'] .sh-panel__count b {
+  color: #000;
+}
+:root[data-theme='corporate-98'] [data-game='ships'] [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 1px var(--c98-lo),
+    0 0 0 2px var(--c98-dk),
+    0 0 0 3px #fff,
+    inset 0 0 30px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='corporate-98'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px var(--c98-navy),
+    0 0 0 3px #fff,
+    inset 0 0 30px rgba(0, 0, 0, 0.4);
+}
+/* Circuit: grey start-light gantry, minimap in a sunken frame. */
+:root[data-theme='corporate-98'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 0;
+  border-radius: 0;
+  background: var(--c98-face);
+  box-shadow:
+    var(--c98-out),
+    4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+:root[data-theme='corporate-98'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__pod {
+  border-radius: 0;
+  box-shadow: var(--c98-in);
+}
+:root[data-theme='corporate-98'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__title {
+  border-radius: 0;
+  color: #fff;
+  background: var(--c98-title);
+  border: 0;
+}
+:root[data-theme='corporate-98'] [data-game='circuit'] [data-part='minimap'] {
+  border: 3px solid var(--c98-face);
+  border-radius: 0;
+  box-shadow:
+    var(--c98-in),
+    0 0 0 1px var(--c98-dk),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+/* Desktop: navy title bars with the three caption studs. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='corporate-98'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='corporate-98'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch),
+  :root[data-theme='corporate-98'] [data-game='putt'] [data-part='controls'],
+  :root[data-theme='corporate-98'] [data-game='circuit'] [data-part='scoreboard'] {
+    padding-top: 30px;
+  }
+  :root[data-theme='corporate-98'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='corporate-98'] [data-game='putt'] [data-part='controls']::before,
+  :root[data-theme='corporate-98'] [data-game='circuit'] [data-part='scoreboard']::before {
+    content: 'Artillery.exe \2014  Ballistics Planning Console' / '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    height: 20px;
+    padding: 0 60px 0 24px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    font: 700 12px/1 var(--font-ui);
+    color: #fff;
+    background:
+      var(--c98-icon-window) 4px 50% / 14px 14px no-repeat,
+      var(--c98-title);
+    pointer-events: none;
+  }
+  :root[data-theme='corporate-98'] [data-game='putt'] [data-part='controls']::before {
+    content: 'Putt.exe \2014  Short Game Planner' / '';
+  }
+  :root[data-theme='corporate-98'] [data-game='circuit'] [data-part='scoreboard']::before {
+    content: 'Lap Timer' / '';
+    padding-right: 8px;
+  }
+  :root[data-theme='corporate-98'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::after,
+  :root[data-theme='corporate-98'] [data-game='putt'] [data-part='controls']::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 7px;
+    width: 50px;
+    height: 14px;
+    pointer-events: none;
+    background:
+      var(--c98-icon-arrow) 0 0 / 16px 14px no-repeat,
+      linear-gradient(var(--c98-face), var(--c98-face)) 18px 0 / 14px 14px no-repeat,
+      linear-gradient(var(--c98-face), var(--c98-face)) 36px 0 / 14px 14px no-repeat;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  /* Keep the top bar's centre column narrow so the turn card keeps its words. */
+  :root[data-theme='corporate-98'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+    padding: 2px;
+  }
+  :root[data-theme='corporate-98'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='corporate-98'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='corporate-98'] [data-game='circuit'] [data-part='race']::after {
+    box-shadow:
+      inset 0 0 0 1px #fff,
+      inset 0 0 0 3px var(--c98-face),
+      inset 0 0 0 4px var(--c98-dk);
+  }
+}

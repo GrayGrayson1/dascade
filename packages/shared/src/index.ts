@@ -9,3 +9,4 @@ export * from './format.ts';
 export * from './cabinets.ts';
 export * from './tournament.ts';
 export * from './outcome.ts';
+export * from './jukebox.ts';

@@ -32,7 +32,7 @@ export function WagerPanel({
     session.send(TRIVIA_MSG.wager, { seq: priv.seq, amount: v });
   };
   return (
-    <section className="tv-wager" aria-labelledby="tv-wager-title">
+    <section className="tv-wager" data-part="wager-card" aria-labelledby="tv-wager-title">
       <p className="tv-wager__kicker">Final question</p>
       <h2 id="tv-wager-title" className="tv-wager__title">
         Place your wager

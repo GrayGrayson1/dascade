@@ -1174,3 +1174,10 @@ td.pt-score--over {
     display: none;
   }
 }
+
+/* Other DASCADE themes: intro card and callouts sit on the theme's HUD surface (Delta Neon keeps its tuned glass). */
+:root:not([data-theme='delta-neon']) .pt-intro,
+:root:not([data-theme='delta-neon']) .pt-callout {
+  background: var(--hud-bg-strong);
+  color: var(--hud-fg);
+}

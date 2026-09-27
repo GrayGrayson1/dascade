@@ -137,7 +137,7 @@ export function SeatPlate({
   else if (!seat.inRound && stage !== 'SETTLING' && stage !== 'SHUFFLING') status = 'Next round';
   else status = '';
   return (
-    <div className={cx('bj-plate', compact && 'bj-plate--compact')} data-me={isMe ? 'true' : undefined} data-offline={offline ? 'true' : undefined}>
+    <div className={cx('bj-plate', compact && 'bj-plate--compact')} data-part="player-card" data-me={isMe ? 'true' : undefined} data-offline={offline ? 'true' : undefined}>
       {isMe ? <span className="bj-plate__you">You</span> : null}
       <Avatar avatar={player?.avatar ?? 'rocket'} color={player?.color ?? '#9d95c4'} size={compact ? 22 : 28} offline={offline} />
       <div className="bj-plate__text">
@@ -200,7 +200,7 @@ export function BetSpot({
     );
   }
   return (
-    <div className="bj-spot" data-me={isMe ? 'true' : undefined} data-empty={seat ? undefined : 'true'} data-locked={seat?.locked ? 'true' : undefined}>
+    <div className="bj-spot" data-part="seat" data-me={isMe ? 'true' : undefined} data-empty={seat ? undefined : 'true'} data-locked={seat?.locked ? 'true' : undefined}>
       <span className="bj-spot__ring" aria-hidden />
       {!seat || wager === 0 ? <span className="bj-spot__num" aria-hidden>{seatNumber}</span> : null}
       {staked > 0 ? <BetStack amount={staked} size={chipSize} max={5} /> : null}
@@ -243,7 +243,7 @@ export function DealerHand({ dealer, round, stage }: { dealer: BlackjackDealerVi
   }, [dealer.revealed, dealer.cards.length]);
   const showValue = dealer.cards.length > 0;
   return (
-    <div className="bj-dealer" data-peek={stage === 'PEEK' ? 'true' : undefined} data-revealed={dealer.revealed ? 'true' : undefined}>
+    <div className="bj-dealer" data-part="dealer" data-peek={stage === 'PEEK' ? 'true' : undefined} data-revealed={dealer.revealed ? 'true' : undefined}>
       <div className="bj-dealer__cards" style={{ '--n': cards.length } as CSSProperties} aria-label="Dealer cards">
         {cards.map((c, i) => (
           <TableCard key={i} animKey={`r${round}:dealer:${i}`} code={c} faceDown={c === null} style={{ '--i': i } as CSSProperties} className={c === null ? 'bj-card--hole' : undefined} />
@@ -269,7 +269,7 @@ export function Shoe({ remaining, size, cutRemaining, cutReached, shuffling }: {
   const fill = size > 0 ? remaining / size : 0;
   const cut = size > 0 ? cutRemaining / size : 0;
   return (
-    <div className="bj-shoe" data-shuffling={shuffling ? 'true' : undefined} data-cut={cutReached ? 'true' : undefined} aria-label={`Shoe: ${remaining} of ${size} cards left${cutReached ? ', cut card is out' : ''}`} role="img">
+    <div className="bj-shoe" data-part="shoe" data-shuffling={shuffling ? 'true' : undefined} data-cut={cutReached ? 'true' : undefined} aria-label={`Shoe: ${remaining} of ${size} cards left${cutReached ? ', cut card is out' : ''}`} role="img">
       <div className="bj-shoe__body" ref={shoeRef}>
         <span className="bj-shoe__card" aria-hidden>
           <CardBack />
@@ -288,7 +288,7 @@ export function Shoe({ remaining, size, cutRemaining, cutReached, shuffling }: {
 export function DiscardTray({ count, size }: { count: number; size: number }) {
   const layers = size > 0 ? Math.min(10, Math.ceil((count / size) * 10)) : 0;
   return (
-    <div className="bj-discard" role="img" aria-label={`Discard tray: ${count} cards`}>
+    <div className="bj-discard" data-part="discard" role="img" aria-label={`Discard tray: ${count} cards`}>
       <div className="bj-discard__tray">
         {Array.from({ length: layers }, (_, i) => (
           <span key={i} className="bj-discard__card" style={{ '--i': i } as CSSProperties}>
@@ -306,7 +306,7 @@ const RACK = [5000, 1000, 500, 100, 25, 5, 1];
 export function ChipRack() {
   const { rackRef } = useTableAnim();
   return (
-    <div className="bj-rack" ref={rackRef} aria-hidden>
+    <div className="bj-rack" data-part="chip-rack" ref={rackRef} aria-hidden>
       {RACK.map((v) => (
         <span key={v} className="bj-rack__col">
           {[0, 1, 2, 3].map((i) => (

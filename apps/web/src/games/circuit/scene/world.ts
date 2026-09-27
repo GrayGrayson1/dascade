@@ -7,10 +7,10 @@
 import Phaser from 'phaser';
 import type { Building, Decor, Track } from '@dascade/game-core/circuit';
 import { artRng, hexToInt, NEON, shade } from '../art/palette.ts';
+import { circuitWorldPalette, type CircuitWorldPalette } from '../themeAdapter.ts';
 import {
   TILE,
   TRACKSIDE_BAND,
-  WALL_TONES,
   billboardCanvas,
   cityTileCanvas,
   drawTrackTile,
@@ -21,6 +21,7 @@ import {
   signCanvas,
   standCanvas,
   trackTiles,
+  wallTones,
 } from '../art/worldArt.ts';
 
 export interface WorldQuality {
@@ -95,6 +96,17 @@ export class World {
   private beams: Phaser.GameObjects.Image[] = [];
   private rain: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private ripples: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  /** World palette (theme materials → colours). Unthemed = the game's own constants. */
+  private pal: CircuitWorldPalette;
+  private walls: string[];
+  private city: Phaser.GameObjects.TileSprite | null = null;
+  private parks: Phaser.GameObjects.Image[] = [];
+  private lots: Phaser.GameObjects.Image[] = [];
+  private readonly tileImages = new Map<string, { img: Phaser.GameObjects.Image; quality: 'high' | 'low' }>();
+  /** Theme repaint jobs (swap a layer's texture in place; the old one is destroyed once unused). */
+  private repaint: Array<() => void> = [];
+  /** Theme-driven drizzle (effects.ambient === 'rain'); independent of the Neon Loop weather. */
+  private themeRain = false;
   private gateFlash = new Map<number, number>();
   private standFrame = 0;
   private lastStandSwap = 0;
@@ -102,13 +114,25 @@ export class World {
   progress = 0;
   private totalTiles = 0;
 
-  constructor(scene: Phaser.Scene, track: Track, decor: Decor, quality: WorldQuality) {
+  constructor(scene: Phaser.Scene, track: Track, decor: Decor, quality: WorldQuality, palette?: CircuitWorldPalette) {
     this.scene = scene;
     this.track = track;
     this.decor = decor;
     this.q = quality;
+    this.pal = palette ?? circuitWorldPalette(track.def.theme);
+    this.walls = wallTones(this.pal);
     this.key = `${track.def.id}-${quality.tileScale}`;
     this.build();
+  }
+
+  /** Texture key suffix: '' for the game's own look (keys unchanged), '~sig' when themed. */
+  private get tk(): string {
+    return this.pal.sig ? `~${this.pal.sig}` : '';
+  }
+
+  /** Camera clear colour for the current palette. */
+  get background(): string {
+    return this.pal.background;
   }
 
   private build(): void {
@@ -116,21 +140,16 @@ export class World {
     const d = this.decor;
     const b = d.bounds;
     // City ground (repeating street grid).
-    const cityKey = `ci-city-${this.q.tileScale}`;
-    if (!scene.textures.exists(cityKey)) scene.textures.addCanvas(cityKey, cityTileCanvas(d, this.q.tileScale));
-    const city = scene.add.tileSprite(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY, cityKey).setOrigin(0, 0).setDepth(DEPTH.ground);
+    const city = scene.add.tileSprite(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY, this.cityTexture()).setOrigin(0, 0).setDepth(DEPTH.ground);
     city.setTileScale(1 / this.q.tileScale, 1 / this.q.tileScale);
+    this.city = city;
 
     // Parks and parking lots.
     d.parks.forEach((p, i) => {
-      const key = `ci-park-${this.track.def.id}-${i}`;
-      if (!scene.textures.exists(key)) scene.textures.addCanvas(key, parkCanvas(p.w, p.h, p.trees, p.x, p.y, i + 7));
-      scene.add.image(p.x, p.y, key).setOrigin(0, 0).setDepth(DEPTH.lots);
+      this.parks.push(scene.add.image(p.x, p.y, this.parkTexture(i)).setOrigin(0, 0).setDepth(DEPTH.lots));
     });
     d.lots.forEach((l) => {
-      const key = `ci-lot-${Math.round(l.w)}x${Math.round(l.h)}-${l.seed % 4}`;
-      if (!scene.textures.exists(key)) scene.textures.addCanvas(key, lotCanvas(l.w, l.h, l.seed % 4));
-      scene.add.image(l.x, l.y, key).setOrigin(0, 0).setDepth(DEPTH.lots);
+      this.lots.push(scene.add.image(l.x, l.y, this.lotTexture(l)).setOrigin(0, 0).setDepth(DEPTH.lots));
     });
 
     // Track tiles: nearest to the grid first, generated progressively.
@@ -142,14 +161,8 @@ export class World {
     this.totalTiles = this.pendingTiles.length;
 
     // Flyover deck.
-    this.track.bridges.forEach((br, i) => {
-      const key = `ci-deck-${this.key}-${i}`;
-      if (!scene.textures.exists(key)) {
-        const deck = renderDeck(this.track, br, this.q.tileScale);
-        scene.textures.addCanvas(key, deck.canvas);
-        scene.registry.set(`${key}-pos`, { x: deck.x, y: deck.y });
-      }
-      const pos = scene.registry.get(`${key}-pos`) as { x: number; y: number };
+    this.track.bridges.forEach((_, i) => {
+      const { key, pos } = this.deckTexture(i);
       this.deck = scene.add.image(pos.x, pos.y, key).setOrigin(0, 0).setScale(1 / this.q.tileScale).setDepth(DEPTH.deck);
     });
 
@@ -191,13 +204,10 @@ export class World {
       this.boards.push(img);
     });
     // Grandstands (two frames for a bobbing crowd).
-    for (let f = 0; f < 2; f++) {
-      const key = `ci-stand-${this.track.def.id}-${f}`;
-      if (!scene.textures.exists(key)) scene.textures.addCanvas(key, standCanvas(150, 58, f, this.track.def.theme.neonA, 2));
-    }
+    this.standTextures();
     for (const s of d.stands) {
       const img = scene.add
-        .image(s.x, s.y, `ci-stand-${this.track.def.id}-0`)
+        .image(s.x, s.y, this.standKey(0))
         .setScale(0.5)
         .setRotation(s.angle + (s.side > 0 ? 0 : Math.PI))
         .setDepth(DEPTH.stands);
@@ -227,26 +237,29 @@ export class World {
     }
 
     // Weather: drizzle on the Neon Loop.
-    if (this.track.def.id === 'neon-loop' && this.q.detail !== 'off') {
-      this.rain = scene.add.particles(0, 0, 'ci-rain', {
-        lifespan: 380,
-        speedX: { min: -90, max: -60 },
-        speedY: { min: 700, max: 900 },
-        alpha: { start: this.q.detail === 'high' ? 0.28 : 0.18, end: 0 },
-        scaleY: { min: 0.5, max: 1.1 },
-        rotate: 6,
-        emitting: false,
-      });
-      this.rain.setDepth(DEPTH.sky + 1);
-      this.ripples = scene.add.particles(0, 0, 'ci-dot', {
-        lifespan: 420,
-        scale: { start: 0.2, end: 1.5 },
-        alpha: { start: 0.35, end: 0 },
-        tint: 0x9fd8ff,
-        emitting: false,
-      });
-      this.ripples.setDepth(DEPTH.skid + 0.5);
-    }
+    if (this.track.def.id === 'neon-loop' && this.q.detail !== 'off') this.startRain();
+  }
+
+  private startRain(soft = false): void {
+    const scene = this.scene;
+    this.rain = scene.add.particles(0, 0, 'ci-rain', {
+      lifespan: 380,
+      speedX: { min: -90, max: -60 },
+      speedY: { min: 700, max: 900 },
+      alpha: { start: (this.q.detail === 'high' ? 0.28 : 0.18) * (soft ? 0.6 : 1), end: 0 },
+      scaleY: { min: 0.5, max: 1.1 },
+      rotate: 6,
+      emitting: false,
+    });
+    this.rain.setDepth(DEPTH.sky + 1);
+    this.ripples = scene.add.particles(0, 0, 'ci-dot', {
+      lifespan: 420,
+      scale: { start: 0.2, end: 1.5 },
+      alpha: { start: soft ? 0.2 : 0.35, end: 0 },
+      tint: 0x9fd8ff,
+      emitting: false,
+    });
+    this.ripples.setDepth(DEPTH.skid + 0.5);
   }
 
   /** Weak hardware: stop drawing lit windows, rain and searchlights. */
@@ -272,23 +285,176 @@ export class World {
     const quality = this.q.detail === 'high' ? 'high' : 'low';
     while (this.pendingTiles.length && performance.now() - t0 < budgetMs) {
       const tile = this.pendingTiles.shift()!;
-      const key = `ci-tile-${this.key}-${tile.x}-${tile.y}`;
-      if (!this.scene.textures.exists(key)) {
-        const c = document.createElement('canvas');
-        c.width = Math.round(TILE * scale);
-        c.height = Math.round(TILE * scale);
-        drawTrackTile(c.getContext('2d')!, tile.x, tile.y, scale, this.track, this.decor, quality);
-        this.scene.textures.addCanvas(key, c);
-      }
-      this.scene.add
+      const key = this.tileTexture(tile, quality);
+      const img = this.scene.add
         .image(tile.x, tile.y, key)
         .setOrigin(0, 0)
         .setScale(1 / scale)
         .setDepth(DEPTH.track);
+      this.tileImages.set(`${tile.x},${tile.y}`, { img, quality });
     }
     this.progress = 1 - this.pendingTiles.length / Math.max(1, this.totalTiles);
     this.ready = this.pendingTiles.length === 0;
     return this.ready;
+  }
+
+  // --- Textures (keyed by palette so a theme change can swap them in place) ------------------
+
+  private addCanvas(key: string, make: () => HTMLCanvasElement): string {
+    if (!this.scene.textures.exists(key)) this.scene.textures.addCanvas(key, make());
+    return key;
+  }
+
+  private cityTexture(): string {
+    return this.addCanvas(`ci-city-${this.q.tileScale}${this.tk}`, () => cityTileCanvas(this.decor, this.q.tileScale, this.pal));
+  }
+
+  private parkTexture(i: number): string {
+    const p = this.decor.parks[i]!;
+    return this.addCanvas(`ci-park-${this.track.def.id}-${i}${this.tk}`, () => parkCanvas(p.w, p.h, p.trees, p.x, p.y, i + 7, this.pal));
+  }
+
+  private lotTexture(l: Decor['lots'][number]): string {
+    return this.addCanvas(`ci-lot-${Math.round(l.w)}x${Math.round(l.h)}-${l.seed % 4}${this.tk}`, () => lotCanvas(l.w, l.h, l.seed % 4, this.pal));
+  }
+
+  private deckTexture(i: number): { key: string; pos: { x: number; y: number } } {
+    const key = `ci-deck-${this.key}-${i}${this.tk}`;
+    if (!this.scene.textures.exists(key)) {
+      const deck = renderDeck(this.track, this.track.bridges[i]!, this.q.tileScale, this.pal);
+      this.scene.textures.addCanvas(key, deck.canvas);
+      this.scene.registry.set(`${key}-pos`, { x: deck.x, y: deck.y });
+    }
+    return { key, pos: this.scene.registry.get(`${key}-pos`) as { x: number; y: number } };
+  }
+
+  private standKey(frame: number): string {
+    return `ci-stand-${this.track.def.id}-${frame}${this.tk}`;
+  }
+
+  private standTextures(): void {
+    for (let f = 0; f < 2; f++) this.addCanvas(this.standKey(f), () => standCanvas(150, 58, f, this.track.def.theme.neonA, 2, this.pal));
+  }
+
+  private roofKey(b: Building): string {
+    return `ci-roof-${b.kind}-${Math.round(b.w)}x${Math.round(b.h)}-${b.tone}-${b.seed % 3}-${b.neon}${this.tk}`;
+  }
+
+  private roofTexture(b: Building): string {
+    return this.addCanvas(this.roofKey(b), () => roofCanvas({ ...b, seed: b.seed % 3 === 0 ? 11 : b.seed % 3 === 1 ? 23 : 37 }, 1, this.pal));
+  }
+
+  private tileTexture(tile: { x: number; y: number }, quality: 'high' | 'low'): string {
+    const scale = this.q.tileScale;
+    return this.addCanvas(`ci-tile-${this.key}-${tile.x}-${tile.y}${this.tk}`, () => {
+      const c = document.createElement('canvas');
+      c.width = Math.round(TILE * scale);
+      c.height = Math.round(TILE * scale);
+      drawTrackTile(c.getContext('2d')!, tile.x, tile.y, scale, this.track, this.decor, quality, this.pal);
+      return c;
+    });
+  }
+
+  /**
+   * Re-presents the world for a new palette IN PLACE: every themed layer (city, deck, stands,
+   * parks, lots, roofs, then track tiles nearest the camera first) is queued and repainted
+   * within a small per-frame budget (see pumpRepaint), swapping each display object's texture
+   * and destroying the old one once nothing uses it. Never touches gameplay, cars, camera or
+   * timing, and never restarts the scene.
+   */
+  setPalette(next: CircuitWorldPalette, ambientRain: boolean): void {
+    this.setAmbientRain(ambientRain);
+    if (next.sig === this.pal.sig) return;
+    this.pal = next;
+    this.walls = wallTones(next);
+    const jobs: Array<{ x: number; y: number; run: () => void }> = [];
+    const at = (x: number, y: number, run: () => void) => jobs.push({ x, y, run });
+    if (this.city) {
+      const city = this.city;
+      at(-Infinity, -Infinity, () => this.swap(city, this.cityTexture()));
+    }
+    if (this.deck) {
+      const deck = this.deck;
+      at(-Infinity, -Infinity, () => {
+        const { key, pos } = this.deckTexture(0);
+        this.swap(deck, key);
+        deck.setPosition(pos.x, pos.y);
+      });
+    }
+    if (this.stands.length) {
+      at(-Infinity, -Infinity, () => {
+        const prev = [0, 1].map((f) => this.stands[0]!.texture.key.replace(/-[01](~[a-z0-9]+)?$/, `-${f}$1`));
+        this.standTextures();
+        for (const st of this.stands) st.setTexture(this.standKey(this.standFrame));
+        prev.forEach((k) => this.old.add(k));
+      });
+    }
+    this.parks.forEach((img, i) => at(img.x, img.y, () => this.swap(img, this.parkTexture(i))));
+    this.lots.forEach((img, i) => at(img.x, img.y, () => this.swap(img, this.lotTexture(this.decor.lots[i]!))));
+    for (const bv of this.buildings) {
+      const roof = bv.roof;
+      if (roof) at(bv.b.x, bv.b.y, () => this.swap(roof, this.roofTexture(bv.b)));
+    }
+    // Tiles keep the detail they were built with (a round trip back to a theme is pixel-identical).
+    for (const [k, { img, quality }] of this.tileImages) {
+      const [x, y] = k.split(',').map(Number) as [number, number];
+      at(x + TILE / 2, y + TILE / 2, () => this.swap(img, this.tileTexture({ x, y }, quality)));
+    }
+    // Nearest the camera first (global layers carry -Infinity so they go first).
+    const c = this.cam;
+    const d = (j: { x: number; y: number }) => (j.x === -Infinity ? -1 : Math.hypot(j.x - c.x, j.y - c.y));
+    jobs.sort((a, b2) => d(a) - d(b2));
+    this.repaint = jobs.map((j) => j.run);
+  }
+
+  /** Last camera centre (repaint nearest layers first). */
+  private cam = { x: 0, y: 0 };
+  /** Textures replaced by a repaint, destroyed once unused. */
+  private readonly old = new Set<string>();
+
+  private swap(obj: { texture: Phaser.Textures.Texture; setTexture(key: string): unknown }, key: string): void {
+    const prev = obj.texture.key;
+    if (prev === key) return;
+    this.old.add(prev);
+    obj.setTexture(key);
+  }
+
+  /** Destroys replaced textures no display object references any more. */
+  private release(): void {
+    if (!this.old.size) return;
+    const scene = this.scene;
+    const inUse = new Set<string>();
+    for (const obj of scene.children.list) {
+      const t = (obj as { texture?: Phaser.Textures.Texture }).texture;
+      if (t) inUse.add(t.key);
+    }
+    for (const k of this.old) {
+      if (inUse.has(k)) continue;
+      if (scene.textures.exists(k)) scene.textures.remove(k);
+      scene.registry.remove(`${k}-pos`);
+      this.old.delete(k);
+    }
+  }
+
+  /** Runs queued theme repaints within a time budget (after the initial build). */
+  pumpRepaint(budgetMs: number): void {
+    if (!this.repaint.length || this.pendingTiles.length) return;
+    const t0 = performance.now();
+    while (this.repaint.length && performance.now() - t0 < budgetMs) this.repaint.shift()!();
+    this.release();
+  }
+
+  private setAmbientRain(on: boolean): void {
+    const want = on && this.q.detail !== 'off' && this.track.def.id !== 'neon-loop';
+    if (want === this.themeRain) return;
+    this.themeRain = want;
+    if (want) this.startRain(true);
+    else {
+      this.rain?.destroy();
+      this.ripples?.destroy();
+      this.rain = null;
+      this.ripples = null;
+    }
   }
 
   flashGate(gate: number, now: number): void {
@@ -300,6 +466,8 @@ export class World {
     const view = cam.worldView;
     const cx = view.centerX;
     const cy = view.centerY;
+    this.cam.x = cx;
+    this.cam.y = cy;
     const margin = 260;
     const vx0 = view.x - margin;
     const vy0 = view.y - margin;
@@ -343,9 +511,9 @@ export class World {
       if (!vis) return;
       const hx = cx + (lamp.x - cx) * (1 + lampH);
       const hy = cy + (lamp.y - cy) * (1 + lampH);
-      p.lineStyle(3, 0x0b0914, 0.9);
+      p.lineStyle(3, this.pal.steelDark, 0.9);
       p.lineBetween(lamp.x, lamp.y, hx, hy);
-      p.lineStyle(1.5, 0x3a4262, 1);
+      p.lineStyle(1.5, this.pal.steel, 1);
       p.lineBetween(lamp.x, lamp.y, hx, hy);
       p.fillStyle(0xf8f6ff, 1);
       p.fillCircle(hx, hy, 3.2);
@@ -361,7 +529,7 @@ export class World {
       const hy = cy + (bb.y - cy) * (1 + boardH);
       const ax = Math.cos(bb.angle) * 50;
       const ay = Math.sin(bb.angle) * 50;
-      p.lineStyle(3, 0x0b0914, 1);
+      p.lineStyle(3, this.pal.steelDark, 1);
       p.lineBetween(bb.x - ax, bb.y - ay, hx - ax, hy - ay);
       p.lineBetween(bb.x + ax, bb.y + ay, hx + ax, hy + ay);
       p.fillStyle(0x000000, 0.35);
@@ -373,7 +541,7 @@ export class World {
     if (now - this.lastStandSwap > 320 && this.q.detail !== 'off') {
       this.lastStandSwap = now;
       this.standFrame = 1 - this.standFrame;
-      const key = `ci-stand-${this.track.def.id}-${this.standFrame}`;
+      const key = this.standKey(this.standFrame);
       for (const s of this.stands) s.setTexture(key);
     }
 
@@ -424,10 +592,8 @@ export class World {
     if (bv.g) return;
     const scene = this.scene;
     const b = bv.b;
-    const key = `ci-roof-${b.kind}-${Math.round(b.w)}x${Math.round(b.h)}-${b.tone}-${b.seed % 3}-${b.neon}`;
-    if (!scene.textures.exists(key)) scene.textures.addCanvas(key, roofCanvas({ ...b, seed: b.seed % 3 === 0 ? 11 : b.seed % 3 === 1 ? 23 : 37 }, 1));
     bv.g = scene.add.graphics();
-    bv.roof = scene.add.image(b.x, b.y, key).setOrigin(0, 0);
+    bv.roof = scene.add.image(b.x, b.y, this.roofTexture(b)).setOrigin(0, 0);
     if (b.height > 0.7 && this.q.detail !== 'off') {
       bv.beacon = scene.add.image(b.x, b.y, 'ci-glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0xff2a4a).setScale(0.32).setAlpha(0.12);
     }
@@ -477,7 +643,7 @@ export class World {
     // Soft shadow to the south-east.
     g.fillStyle(0x000000, 0.32);
     g.fillRect(x0 + 10 + b.height * 22, y0 + 12 + b.height * 30, b.w, b.h);
-    const wall = WALL_TONES[b.tone % WALL_TONES.length]!;
+    const wall = this.walls[b.tone % this.walls.length]!;
     const lit = hexToInt(shade(wall, 0.18));
     const mid = hexToInt(wall);
     const dark = hexToInt(shade(wall, -0.25));
@@ -547,13 +713,13 @@ export class World {
       [baseA, topA],
       [baseB, topB],
     ] as const) {
-      g.fillStyle(0x0b0914, 1);
+      g.fillStyle(this.pal.steelDark, 1);
       g.fillRect(base[0] - 9, base[1] - 9, 18, 18);
-      g.fillStyle(0x2a3350, 1);
+      g.fillStyle(this.pal.steelLight, 1);
       g.fillRect(base[0] - 6, base[1] - 6, 12, 12);
-      g.lineStyle(11, 0x0b0914, 1);
+      g.lineStyle(11, this.pal.steelDark, 1);
       g.lineBetween(base[0], base[1], top[0], top[1]);
-      g.lineStyle(6, 0x3a4262, 1);
+      g.lineStyle(6, this.pal.steel, 1);
       g.lineBetween(base[0], base[1], top[0], top[1]);
     }
     // Beam (truss): dark body, lit edges, cross bracing.
@@ -561,14 +727,14 @@ export class World {
     const a2 = q(topA[0], topA[1], w);
     const b1 = q(topB[0], topB[1], -w);
     const b2 = q(topB[0], topB[1], w);
-    g.fillStyle(0x151a2c, 1);
+    g.fillStyle(this.pal.steelBody, 1);
     g.fillTriangle(a1[0], a1[1], a2[0], a2[1], b2[0], b2[1]);
     g.fillTriangle(a1[0], a1[1], b2[0], b2[1], b1[0], b1[1]);
-    g.lineStyle(1.5, 0x3a4262, 1);
+    g.lineStyle(1.5, this.pal.steel, 1);
     g.lineBetween(a1[0], a1[1], b1[0], b1[1]);
     g.lineBetween(a2[0], a2[1], b2[0], b2[1]);
     const braces = Math.max(4, Math.round(half / 26));
-    g.lineStyle(1, 0x2a3350, 1);
+    g.lineStyle(1, this.pal.steelLight, 1);
     for (let i = 0; i < braces; i++) {
       const t0 = i / braces;
       const t1 = (i + 1) / braces;

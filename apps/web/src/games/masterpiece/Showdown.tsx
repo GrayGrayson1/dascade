@@ -98,7 +98,11 @@ function Showdown({ state, priv, players, meId, allowChange }: { state: Masterpi
         </div>
       ) : null}
 
-      <ol className={cx('mp-wall', answers.length === 2 && 'mp-wall--duel', answers.length === 3 && 'mp-wall--trio', answers.length > 4 && 'mp-wall--many')} aria-label="Exhibits">
+      <ol
+        className={cx('mp-wall', answers.length === 2 && 'mp-wall--duel', answers.length === 3 && 'mp-wall--trio', answers.length > 4 && 'mp-wall--many')}
+        data-part="vote-grid"
+        aria-label="Exhibits"
+      >
         {answers.map((a, i) => (
           <Exhibit
             key={a.id}
@@ -182,7 +186,7 @@ function Exhibit({
       style={{ '--delay': `${index * 90}ms`, '--share': share } as CSSProperties}
       data-slot={index % 6}
     >
-      <div className="mp-exhibit__frame">
+      <div className="mp-exhibit__frame" data-part="answer-card">
         <span className="mp-exhibit__letter" aria-hidden="true">
           {letter}
         </span>
@@ -278,7 +282,7 @@ function VoteActions({
 }) {
   if (mine?.voteBlock === 'author') {
     return (
-      <div className="mp-voteline mp-voteline--author" role="status">
+      <div className="mp-voteline mp-voteline--author" data-part="vote-bar" role="status">
         <PixelIcon name="star" />
         <span>
           <strong>Your answer is on stage!</strong> Everyone else is voting — act natural.
@@ -294,7 +298,7 @@ function VoteActions({
   const audience = mine?.role === 'audience';
   const castLabel = kind === 'ranked' ? (ready ? 'Submit ranking' : `Pick ${need - pickedLetters.length} more`) : ready ? `Vote for ${pickedLetters[0]}` : 'Tap your favourite';
   return (
-    <div className="mp-voteline" data-audience={audience ? 'true' : undefined}>
+    <div className="mp-voteline" data-part="vote-bar" data-audience={audience ? 'true' : undefined}>
       <p className="mp-voteline__hint">
         {audience ? (
           <>

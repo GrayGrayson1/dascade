@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "load": "tsx scripts/load-test.ts"
+    "load": "tsx scripts/load-test.ts",
+    "music:index": "tsx scripts/music/index.ts"
   },
   "devDependencies": {
     "@colyseus/sdk": "^0.18.4",

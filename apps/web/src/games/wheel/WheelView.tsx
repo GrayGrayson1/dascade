@@ -259,14 +259,14 @@ function PlayView() {
   return (
     <GameStage gameId="wheel" className="wh wh-play" style={{ '--wh-win': reveal?.seg.color ?? 'var(--accent)' } as CSSProperties}>
       <div className="wh-play__grid">
-        <section className="wh-stage" ref={stageRef} data-spinning={inFlight ? 'true' : undefined} data-revealed={reveal ? 'true' : undefined} aria-label="Wheel stage">
+        <section className="wh-stage" data-part="stage" ref={stageRef} data-spinning={inFlight ? 'true' : undefined} data-revealed={reveal ? 'true' : undefined} aria-label="Wheel stage">
           <div className="wh-stage__lights" aria-hidden>
             <i className="wh-beam wh-beam--l" />
             <i className="wh-beam wh-beam--r" />
             <i className="wh-floor" />
           </div>
 
-          <header className="wh-head">
+          <header className="wh-head" data-part="hud">
             <div className="wh-head__title">
               <span className="wh-head__kicker dc-pixel">Wheel of DAStiny</span>
               <h1 className="wh-title">{title}</h1>
@@ -304,7 +304,7 @@ function PlayView() {
             </WheelDisplay>
           </div>
 
-          <div className="wh-controls">
+          <div className="wh-controls" data-part="controls">
             <div className="wh-readout" aria-hidden>
               <PixelIcon name="chevron-up" className="wh-readout__arrow" />
               <span ref={readoutRef} className="wh-readout__text">
@@ -346,7 +346,7 @@ function PlayView() {
           </div>
         </section>
 
-        <aside className="wh-rail" aria-label="Wheel details" ref={railRef}>
+        <aside className="wh-rail" data-part="rail" aria-label="Wheel details" ref={railRef}>
           <Tabs label="Wheel panels" value={tab} onChange={setTab} tabs={tabs} className="wh-rail__tabs" />
           <div className={cx('wh-rail__body', tab === 'chat' && 'wh-rail__body--chat')}>
             {tab === 'history' ? (
@@ -416,7 +416,7 @@ function ResultCard({ reveal, onClose }: { reveal: Reveal; onClose: () => void }
   const long = label.length > 22;
   return (
     <div className="wh-result" style={{ '--c': seg.color } as CSSProperties}>
-      <div className="wh-result__card">
+      <div className="wh-result__card" data-part="result-card">
         <IconButton icon="close" label="Dismiss result" size="sm" className="wh-result__close" onClick={onClose} />
         <span className="wh-result__kicker dc-pixel">The wheel has spoken</span>
         {seg.emoji && seg.label ? (

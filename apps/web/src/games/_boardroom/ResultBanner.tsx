@@ -46,7 +46,7 @@ export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch,
 
   if (collapsed) {
     return (
-      <div className={cx('br-result br-result--bar', className)} data-tone={tone} role="status">
+      <div className={cx('br-result br-result--bar', className)} data-part="result" data-tone={tone} role="status">
         <span className="br-result__bar-title">{title}</span>
         <span className="br-result__bar-text">{result.text}</span>
         <Button size="sm" variant="secondary" icon="chevron-up" onClick={() => setCollapsed(false)}>
@@ -57,7 +57,7 @@ export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch,
   }
 
   return (
-    <section className={cx('br-result', compact && 'br-result--compact', className)} data-tone={tone} aria-labelledby={titleId}>
+    <section className={cx('br-result', compact && 'br-result--compact', className)} data-part="result" data-tone={tone} aria-labelledby={titleId}>
       <header className="br-result__head">
         <span className="br-result__eyebrow">
           {tournament

@@ -194,6 +194,12 @@ export const OPTIONAL_THEME_TOKENS = [
   '--input-focus-ring',
   '--game-backdrop',
   '--shell-bar-rule',
+  /**
+   * Screen backdrops a theme can make translucent (or `transparent`) so its Environment layer shows
+   * through. Unset = today's cabinet-tinted backdrops. (The floor uses the required --arcade-floor-bg.)
+   */
+  '--entry-backdrop',
+  '--picker-backdrop',
 ] as const;
 export type OptionalThemeToken = (typeof OPTIONAL_THEME_TOKENS)[number];
 

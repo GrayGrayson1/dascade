@@ -1063,7 +1063,14 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
   ];
   const DX = FACE_X - 16;
   return (
-    <svg className="af-cab__svg" viewBox={`0 0 ${CAB_W} ${CAB_H}`} preserveAspectRatio="xMidYMid meet" aria-hidden focusable="false">
+    <svg
+      className="af-cab__svg"
+      data-part="cabinet-art"
+      viewBox={`0 0 ${CAB_W} ${CAB_H}`}
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden
+      focusable="false"
+    >
       <defs>
         <MotifPattern cabinet={cabinet} id={id('pat')} />
         <linearGradient id={id('side')} x1="0" y1="0" x2="0" y2="1">
@@ -1137,7 +1144,7 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
       <ellipse cx={CAB_W / 2} cy="598" rx="136" ry="11" fill={url('shadow')} />
 
       {/* side panels (revealed by the lineup) */}
-      <g className="af-cab__side af-cab__side--l">
+      <g className="af-cab__side af-cab__side--l" data-part="cabinet-side">
         <g clipPath={url('clipL')}>
           <polygon points={sideL} fill={url('side')} />
           <g transform="translate(4 0) scale(0.44 1)">
@@ -1148,7 +1155,7 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
         <polygon points={`${L0 + 4},540 10,522 10,574 ${L0 + 4},596`} fill="#07060d" />
         <rect x={L0 - 2} y="0" width="4" height="540" fill={url('mold')} className="af-cab__mold" />
       </g>
-      <g className="af-cab__side af-cab__side--r">
+      <g className="af-cab__side af-cab__side--r" data-part="cabinet-side">
         <g clipPath={url('clipR')}>
           <polygon points={sideR} fill={url('side')} />
           <g transform={`translate(${R0} 0) scale(0.44 1)`}>
@@ -1160,7 +1167,7 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
         <rect x={R0 - 2} y="0" width="4" height="540" fill={url('mold')} className="af-cab__mold" />
       </g>
 
-      <g transform={`translate(${DX} 0)`}>
+      <g transform={`translate(${DX} 0)`} data-part="cabinet-front">
         {/* body */}
         <rect x="16" y="0" width="200" height="540" fill={url('body')} />
         <rect x="16" y="0" width="200" height="84" style={{ fill: m.bezel[0] }} />
@@ -1186,7 +1193,7 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
         <rect x="30" y="280" width="172" height="1" fill={S} opacity=".5" />
         <path d="M34 110L110 110L60 232L34 232Z" fill="#fff" opacity=".035" />
         {/* kick panel */}
-        <g clipPath={url('kickClip')}>
+        <g clipPath={url('kickClip')} data-part="cabinet-kick-panel">
           <rect x="16" y="350" width="200" height="190" fill={url('kick')} />
           <rect x="16" y="350" width="200" height="190" fill={url('pat')} />
           <KickArt cabinet={cabinet} />
@@ -1194,18 +1201,20 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
         </g>
         <rect x="16" y="520" width="200" height="20" fill="#000" opacity=".3" />
         {/* coin door */}
-        <rect x="86" y="398" width="60" height="80" rx="4" fill="#0b0916" />
-        <rect x="88" y="400" width="56" height="76" rx="3" fill={url('metal')} />
-        <rect x="91" y="403" width="50" height="70" rx="2" fill="none" stroke="#6a6690" strokeOpacity=".55" />
-        {[98, 126].map((x) => (
-          <g key={x}>
-            <rect x={x - 2} y="409" width="10" height="24" rx="2" fill="#15121f" />
-            <rect className="af-cab__slot" x={x + 1.5} y="412" width="3" height="18" rx="1" fill="#ff4a5e" />
-            <rect x={x - 1} y="440" width="8" height="6" rx="1" fill="#0b0916" />
-          </g>
-        ))}
-        <circle cx="116" cy="462" r="3" fill="#0b0916" />
-        <rect x="115.2" y="460.5" width="1.6" height="3" fill="#6a6690" />
+        <g data-part="cabinet-coin-door">
+          <rect x="86" y="398" width="60" height="80" rx="4" fill="#0b0916" />
+          <rect x="88" y="400" width="56" height="76" rx="3" fill={url('metal')} />
+          <rect x="91" y="403" width="50" height="70" rx="2" fill="none" stroke="#6a6690" strokeOpacity=".55" />
+          {[98, 126].map((x) => (
+            <g key={x}>
+              <rect x={x - 2} y="409" width="10" height="24" rx="2" fill="#15121f" />
+              <rect className="af-cab__slot" x={x + 1.5} y="412" width="3" height="18" rx="1" fill="#ff4a5e" />
+              <rect x={x - 1} y="440" width="8" height="6" rx="1" fill="#0b0916" />
+            </g>
+          ))}
+          <circle cx="116" cy="462" r="3" fill="#0b0916" />
+          <rect x="115.2" y="460.5" width="1.6" height="3" fill="#6a6690" />
+        </g>
         {/* riser */}
         <rect x="20" y="540" width="192" height="56" fill="#0b0918" />
         <rect className="af-cab__led" x="20" y="540" width="192" height="3" fill={P} />
@@ -1218,33 +1227,35 @@ export const CabinetArt = memo(function CabinetArt({ cabinet, uid }: { cabinet: 
         <rect x="211" y="0" width="5" height="540" fill={url('edge')} transform="rotate(180 213.5 270)" />
         <FrontDeco cabinet={cabinet} />
         {/* control deck */}
-        <polygon points="16,292 216,292 230,334 2,334" fill={url('deck')} />
-        <polygon points="16,292 216,292 230,334 2,334" fill={url('pat')} opacity=".55" />
-        <rect x="16" y="292" width="200" height="1.5" fill="#fff" opacity=".12" />
-        <rect x="2" y="334" width="228" height="17" fill="#0d0b19" />
-        <rect x="2" y="334" width="228" height="2.5" fill={P} className="af-cab__deck-edge" />
-        <rect x="2" y="349" width="228" height="2" fill="#000" opacity=".5" />
-        {/* start buttons */}
-        <ellipse cx="96" cy="302" rx="4.5" ry="2.2" fill="#0b0916" />
-        <ellipse cx="96" cy="301" rx="4" ry="2" fill="#f4f1ff" />
-        <ellipse cx="108" cy="302" rx="4.5" ry="2.2" fill="#0b0916" />
-        <ellipse cx="108" cy="301" rx="4" ry="2" fill={S} />
-        {/* joystick */}
-        <g className="af-cab__stick">
-          <ellipse cx="60" cy="318" rx="15" ry="5.5" fill="#06050c" />
-          <ellipse cx="60" cy="316.5" rx="11" ry="4" fill="#23203a" />
-          <rect x="58" y="296" width="4" height="21" rx="1.5" fill="#b8b6cc" />
-          <rect x="58" y="296" width="1.5" height="21" fill="#fff" opacity=".6" />
-          <circle cx="60" cy="294" r="9.5" fill={url('ball')} />
-        </g>
-        {/* action buttons */}
-        {buttons.map(([x, y, c], i) => (
-          <g key={i} className="af-cab__btn">
-            <ellipse cx={x} cy={y + 2.4} rx="9" ry="4.4" fill="#06050c" />
-            <ellipse cx={x} cy={y} rx="8" ry="4" fill={c} />
-            <ellipse cx={x - 2.2} cy={y - 1.3} rx="3" ry="1.2" fill="#fff" opacity=".55" />
+        <g data-part="cabinet-control-panel">
+          <polygon points="16,292 216,292 230,334 2,334" fill={url('deck')} />
+          <polygon points="16,292 216,292 230,334 2,334" fill={url('pat')} opacity=".55" />
+          <rect x="16" y="292" width="200" height="1.5" fill="#fff" opacity=".12" />
+          <rect x="2" y="334" width="228" height="17" fill="#0d0b19" />
+          <rect x="2" y="334" width="228" height="2.5" fill={P} className="af-cab__deck-edge" />
+          <rect x="2" y="349" width="228" height="2" fill="#000" opacity=".5" />
+          {/* start buttons */}
+          <ellipse cx="96" cy="302" rx="4.5" ry="2.2" fill="#0b0916" />
+          <ellipse cx="96" cy="301" rx="4" ry="2" fill="#f4f1ff" />
+          <ellipse cx="108" cy="302" rx="4.5" ry="2.2" fill="#0b0916" />
+          <ellipse cx="108" cy="301" rx="4" ry="2" fill={S} />
+          {/* joystick */}
+          <g className="af-cab__stick" data-part="cabinet-joystick">
+            <ellipse cx="60" cy="318" rx="15" ry="5.5" fill="#06050c" />
+            <ellipse cx="60" cy="316.5" rx="11" ry="4" fill="#23203a" />
+            <rect x="58" y="296" width="4" height="21" rx="1.5" fill="#b8b6cc" />
+            <rect x="58" y="296" width="1.5" height="21" fill="#fff" opacity=".6" />
+            <circle cx="60" cy="294" r="9.5" fill={url('ball')} />
           </g>
-        ))}
+          {/* action buttons */}
+          {buttons.map(([x, y, c], i) => (
+            <g key={i} className="af-cab__btn">
+              <ellipse cx={x} cy={y + 2.4} rx="9" ry="4.4" fill="#06050c" />
+              <ellipse cx={x} cy={y} rx="8" ry="4" fill={c} />
+              <ellipse cx={x - 2.2} cy={y - 1.3} rx="3" ry="1.2" fill="#fff" opacity=".55" />
+            </g>
+          ))}
+        </g>
       </g>
     </svg>
   );

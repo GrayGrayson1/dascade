@@ -53,7 +53,7 @@ export function RevealView({ question, result, priv, meId, spectator, players, b
   const mine = meId ? result.scores.find((s) => s.playerId === meId) : undefined;
   const prediction = priv?.q === result.q ? priv.prediction : null;
   return (
-    <div className="sv-reveal" data-mode={question.mode} data-voided={result.voided ? 'true' : undefined}>
+    <div className="sv-reveal" data-part="reveal" data-mode={question.mode} data-voided={result.voided ? 'true' : undefined}>
       <PromptCard
         animKey={`r${result.q}`}
         size="md"
@@ -144,7 +144,7 @@ function MajorityReveal({
   const tie = result.leaders.length > 1;
   const predictors = result.predictionCounts.reduce((a, b) => a + b, 0);
   return (
-    <section className="sv-bars" aria-label="Results">
+    <section className="sv-bars" data-part="bar-chart" aria-label="Results">
       {tie ? (
         <p className="sv-tie" role="status">
           <PixelIcon name="users" size={12} /> Tie for the lead — every tied option counts as the majority.
@@ -160,6 +160,7 @@ function MajorityReveal({
             <li
               key={i}
               className="sv-bar"
+              data-part="answer-card"
               data-slot={i % 6}
               data-leader={leader ? 'true' : undefined}
               style={{ '--share': settled ? pct / 100 : 0, '--delay': `${i * 90}ms` } as CSSProperties}
@@ -222,7 +223,7 @@ function RankReveal({
   const n = question.options.length;
   const maxVotes = Math.max(1, ...result.counts);
   return (
-    <section className="sv-rankrev" aria-label="Final ranking">
+    <section className="sv-rankrev" data-part="bar-chart" aria-label="Final ranking">
       <ol className="sv-rankrev__list" style={{ '--rows': n } as CSSProperties} data-settled={settled ? 'true' : undefined}>
         {question.options.map((opt, i) => {
           const at = result.ranking.findIndex((s) => s.option === i);
@@ -234,6 +235,7 @@ function RankReveal({
             <li
               key={i}
               className="sv-rankrow"
+              data-part="answer-card"
               data-slot={i % 6}
               data-top={settled && slot.lo === 1 ? 'true' : undefined}
               style={{ '--pos': settled ? at : i, '--share': settled ? votes / maxVotes : 0 } as CSSProperties}
@@ -301,7 +303,7 @@ function PercentReveal({
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Player';
   const closestScore = result.scores.find((s) => s.playerId === result.closest[0]);
   return (
-    <section className="sv-meter" aria-label="Percentage result">
+    <section className="sv-meter" data-part="meter" aria-label="Percentage result">
       <div className="sv-meter__headline">
         <span className="sv-meter__big dc-num" aria-hidden="true">
           {formatPercent(shown)}
@@ -408,7 +410,7 @@ function MyPoints({ result, mine }: { result: SurveyResult; mine: SurveyPlayerSc
   const points = useCountUp(settled ? (mine?.points ?? 0) : 0, 0, 800, `${result.q}:${settled}`);
   const v = verdict(result, mine);
   return (
-    <section className="sv-mine" data-tone={v.tone} data-shown={settled ? 'true' : undefined} aria-label="Your points">
+    <section className="sv-mine" data-part="score-reveal" data-tone={v.tone} data-shown={settled ? 'true' : undefined} aria-label="Your points">
       <div className="sv-mine__points dc-num" aria-hidden="true">
         +{points.toLocaleString('en-US')}
       </div>

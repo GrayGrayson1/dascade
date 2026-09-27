@@ -1,9 +1,10 @@
 /** Hold / Next piece previews and rival stack mini boards (small canvases, redrawn on change). */
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cx } from '@dascade/ui';
 import type { PieceId } from '@dascade/game-core/blocks';
-import { formatScore } from '../_classics/index.ts';
+import { formatScore, useLiveMaterials, type Materials } from '../_classics/index.ts';
 import { drawMiniBoard, drawPiecePreview } from './art.ts';
+import { wellArt } from './palette.ts';
 
 function useSizedCanvas(draw: (ctx: CanvasRenderingContext2D, w: number, h: number, scale: number) => void, deps: unknown[]) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -36,7 +37,10 @@ export function PiecePreview({ piece, dim, small, label, className }: { piece: P
 }
 
 export function MiniBoard({ board, name, score, out, color, large }: { board: string; name: string; score: number; out?: boolean; color?: string; large?: boolean }) {
-  const ref = useSizedCanvas((ctx, w, h, scale) => drawMiniBoard(ctx, board, w, h, scale), [board]);
+  const [materials, setMaterials] = useState<Materials>({});
+  const art = useMemo(() => wellArt(materials), [materials]);
+  const ref = useSizedCanvas((ctx, w, h, scale) => drawMiniBoard(ctx, board, w, h, scale, art), [board, art]);
+  useLiveMaterials(ref, setMaterials);
   return (
     <figure className={cx('bd-mini', out && 'is-out', large && 'bd-mini--large')} style={color ? ({ '--pc': color } as React.CSSProperties) : undefined}>
       <canvas ref={ref} className="bd-mini__board" role="img" aria-label={`${name}'s stack`} />

@@ -387,8 +387,8 @@ export function SketchCanvas({ canDraw, tool, color, size, label, onReject, onRe
 
   return (
     <div className="sk-canvas-wrap">
-      <div className="sk-canvas-frame" ref={frameRef} data-can-draw={canDraw ? 'true' : undefined} data-tool={tool}>
-        <canvas ref={mainRef} className="sk-canvas" role="img" aria-label={label} />
+      <div className="sk-canvas-frame" data-part="canvas-frame" ref={frameRef} data-can-draw={canDraw ? 'true' : undefined} data-tool={tool}>
+        <canvas ref={mainRef} className="sk-canvas" data-part="canvas" role="img" aria-label={label} />
         <canvas ref={overlayRef} className="sk-canvas-overlay" aria-hidden="true" data-testid="sketch-surface" />
         {children}
       </div>

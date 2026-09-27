@@ -110,7 +110,7 @@ export function SketchToolbar({ value, onChange, compact }: { value: ToolState; 
   );
 
   return (
-    <div className={cx('sk-toolbar', compact && 'sk-toolbar--compact')} role="toolbar" aria-label="Drawing tools">
+    <div className={cx('sk-toolbar', compact && 'sk-toolbar--compact')} role="toolbar" data-part="toolbar" aria-label="Drawing tools">
       <div className="sk-tool-group sk-tool-group--tools" role="radiogroup" aria-label="Tool">
         {TOOLS.map((t) => (
           <button

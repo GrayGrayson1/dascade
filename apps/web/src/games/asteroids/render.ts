@@ -9,6 +9,8 @@ import type { PowerKind, RockKind } from '@dascade/shared/games/asteroids';
 import { ROCK, SHIP, ShipFlag, WORLD, headingVec, type SnapRock, type SnapShip } from '@dascade/game-core/asteroids';
 import { Particles, Popups, Shake, alpha, beginFrame, canvasFonts, fxSettings, shade, type Surface } from '../_classics/index.ts';
 import type { Interp, LocalBullet } from './net.ts';
+import { tint, type Materials } from '../_classics/palette.ts';
+import { SPACE_ART, spaceArt, type SpaceArt } from './palette.ts';
 
 const W = WORLD.width;
 const H = WORLD.height;
@@ -69,6 +71,15 @@ export class BeltRenderer {
   private readonly shake = new Shake();
   private rings: Ring[] = [];
   private bg: { key: string; canvas: HTMLCanvasElement } | null = null;
+  private space: SpaceArt = SPACE_ART;
+
+  /** Theme materials changed: re-colour the backdrop on the next frame (render-only). */
+  setMaterials(m: Materials): void {
+    const next = spaceArt(m);
+    if (next === this.space) return;
+    this.space = next;
+    this.bg = null;
+  }
   private readonly rockSprites = new Map<string, HTMLCanvasElement>();
   private fonts = canvasFonts();
   private t = 0;
@@ -153,26 +164,27 @@ export class BeltRenderer {
   private background(s: Surface): HTMLCanvasElement {
     const key = `${s.scale.toFixed(3)}`;
     if (this.bg?.key === key) return this.bg.canvas;
+    const art = this.space;
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(W * s.scale));
     c.height = Math.max(1, Math.round(H * s.scale));
     const g = c.getContext('2d')!;
     g.scale(s.scale, s.scale);
     const grad = g.createLinearGradient(0, 0, W * 0.3, H);
-    grad.addColorStop(0, BELT_ART.spaceTop);
-    grad.addColorStop(1, BELT_ART.spaceBottom);
+    grad.addColorStop(0, art.spaceTop);
+    grad.addColorStop(1, art.spaceBottom);
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
     const blob = (x: number, y: number, r: number, color: string, a: number) => {
       const rg = g.createRadialGradient(x, y, 0, x, y, r);
-      rg.addColorStop(0, alpha(color, a));
-      rg.addColorStop(1, alpha(color, 0));
+      rg.addColorStop(0, tint(color, a));
+      rg.addColorStop(1, tint(color, 0));
       g.fillStyle = rg;
       g.fillRect(x - r, y - r, r * 2, r * 2);
     };
-    blob(W * 0.22, H * 0.28, 520, BELT_ART.nebulaA, 0.22);
-    blob(W * 0.78, H * 0.7, 560, BELT_ART.nebulaB, 0.2);
-    blob(W * 0.6, H * 0.15, 300, '#be185d', 0.1);
+    blob(W * 0.22, H * 0.28, 520, art.nebulaA, 0.22);
+    blob(W * 0.78, H * 0.7, 560, art.nebulaB, 0.2);
+    blob(W * 0.6, H * 0.15, 300, art.nebulaC, 0.1);
     // Star dust (three depths).
     for (let i = 0; i < 420; i++) {
       const x = hash01(i * 3 + 1) * W;

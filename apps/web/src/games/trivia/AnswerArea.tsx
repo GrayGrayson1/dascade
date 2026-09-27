@@ -153,7 +153,7 @@ function OrderAnswer({
       <p className="tv-order__help">
         Tap the items from <strong>{first}</strong> to <strong>{last}</strong>.
       </p>
-      <ol className="tv-order__slots" aria-label={`Your order, ${first} to ${last}`}>
+      <ol className="tv-order__slots" data-part="order-slots" aria-label={`Your order, ${first} to ${last}`}>
         {items.map((_, pos) => {
           const idx = chosen[pos];
           return (
@@ -163,6 +163,7 @@ function OrderAnswer({
                 <button
                   type="button"
                   className="tv-order__placed"
+                  data-part="answer-card"
                   disabled={Boolean(locked) || disabled}
                   aria-label={`Position ${pos + 1}: ${items[idx]}. Tap to remove.`}
                   onClick={() => setSeqd((s) => s.filter((x) => x !== idx))}
@@ -179,13 +180,14 @@ function OrderAnswer({
       </ol>
       {!locked ? (
         <>
-          <div className="tv-order__pool" role="group" aria-label="Items to place">
+          <div className="tv-order__pool" data-part="answer-grid" role="group" aria-label="Items to place">
             {items.map((item, i) =>
               seqd.includes(i) ? null : (
                 <button
                   key={i}
                   type="button"
                   className="tv-order__item"
+                  data-part="answer-card"
                   data-slot={i % 6}
                   disabled={disabled}
                   onClick={() => setSeqd((s) => [...s, i])}
@@ -247,13 +249,13 @@ export function RevealAnswer({
     const correct = reveal.correctOrder ?? [];
     const myOrder = my?.kind === 'order' ? my.order : null;
     return (
-      <ol className="tv-order__slots tv-order__slots--reveal" aria-label="Correct order">
+      <ol className="tv-order__slots tv-order__slots--reveal" data-part="order-slots" aria-label="Correct order">
         {correct.map((idx, pos) => {
           const hit = myOrder ? myOrder[pos] === idx : null;
           return (
             <li key={pos} className={cx('tv-order__slot', 'is-filled', hit === true && 'is-hit', hit === false && 'is-miss')}>
               <span className="tv-order__pos dc-num">{pos + 1}</span>
-              <span className="tv-order__placed tv-order__placed--static">
+              <span className="tv-order__placed tv-order__placed--static" data-part="answer-card">
                 <span>{items[idx]}</span>
                 {hit === true ? (
                   <PixelIcon name="check" size={14} title="You had this right" />
@@ -270,7 +272,7 @@ export function RevealAnswer({
   // text / number
   const closest = reveal.closest;
   return (
-    <div className="tv-bigreveal" data-correct={mine?.correct ? 'true' : undefined}>
+    <div className="tv-bigreveal" data-part="reveal-card" data-correct={mine?.correct ? 'true' : undefined}>
       <span className="tv-bigreveal__label">{view.type === 'number' ? 'The answer' : 'Correct answer'}</span>
       <strong className="tv-bigreveal__value">{reveal.correctText}</strong>
       {reveal.alsoAccepted?.length ? <span className="tv-bigreveal__also">Also accepted: {reveal.alsoAccepted.join(', ')}</span> : null}
@@ -307,7 +309,7 @@ export function MyResult({ reveal, meId, isFinal }: { reveal: TriviaRevealView; 
   const verdict = !r.answered ? 'No answer' : r.correct ? 'Correct!' : r.partial ? 'Partly right' : 'Not quite';
   const tone = r.correct ? 'good' : r.partial ? 'partial' : 'bad';
   return (
-    <div className="tv-result" data-tone={tone} role="status" style={{ '--delay': '0.2s' } as CSSProperties}>
+    <div className="tv-result" data-part="result" data-tone={tone} role="status" style={{ '--delay': '0.2s' } as CSSProperties}>
       <span className="tv-result__icon" aria-hidden="true">
         <PixelIcon name={r.correct ? 'check' : r.partial ? 'star' : !r.answered ? 'clock' : 'close'} />
       </span>

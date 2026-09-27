@@ -415,7 +415,7 @@ export function Battle({
   return (
     <div className={cx('sh-battle', `sh-battle--${layout.mode}`, short && 'sh-battle--short')}>
       {hurt > 0 && !reducedMotion && glow > 0 ? <div key={hurt} className="sh-hurt" aria-hidden /> : null}
-      <div className="sh-hud" data-turn={myTurn ? 'mine' : live ? 'theirs' : state.stage}>
+      <div className="sh-hud" data-part="hud" data-turn={myTurn ? 'mine' : live ? 'theirs' : state.stage}>
         <CaptainTag
           side={me}
           player={me ? state.players[me.playerId] : undefined}
@@ -525,7 +525,7 @@ export function Battle({
       </div>
 
       {short ? null : (
-        <div className="sh-actions">
+        <div className="sh-actions" data-part="actions">
           <div className="sh-actions__ticker" aria-live="polite">
             {lastLog && !logInline ? <span data-kind={lastLog.kind}>{lastLog.text}</span> : null}
           </div>
@@ -626,7 +626,7 @@ function BoardPanel({
   children: ReactNode;
 }) {
   return (
-    <section className={cx('sh-panel', `sh-panel--${tone}`)} aria-label={title}>
+    <section className={cx('sh-panel', `sh-panel--${tone}`)} data-part="panel" aria-label={title}>
       <header className="sh-panel__head">
         <h2 className="sh-panel__title">{title}</h2>
         <span className="sh-panel__meta">
@@ -661,7 +661,7 @@ function CaptainTag({
   const acc = side.shots ? Math.round((side.hits / side.shots) * 100) : 0;
   const offline = player ? !player.connected : true;
   return (
-    <div className={cx('sh-captain', `sh-captain--${align}`, active && 'is-active')}>
+    <div className={cx('sh-captain', `sh-captain--${align}`, active && 'is-active')} data-part="player-card">
       <span className="sh-captain__avatar">
         <Avatar avatar={player?.avatar ?? 'rocket'} color={player?.color ?? 'var(--accent)'} size={30} offline={offline} />
       </span>
@@ -757,7 +757,7 @@ function FleetStrip({
 }) {
   const sunk = new Set(side?.sunkVessels.map((v) => v.id) ?? []);
   return (
-    <ul className="sh-fleet" aria-label={own ? 'Your vessels' : 'Enemy vessels'}>
+    <ul className="sh-fleet" data-part="fleet" aria-label={own ? 'Your vessels' : 'Enemy vessels'}>
       {fleet.map((id) => {
         const isSunk = sunk.has(id);
         let damage = 0;

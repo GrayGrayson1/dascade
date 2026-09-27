@@ -6,13 +6,15 @@ import { useCountdown, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { formatToPar, holeAt, rows, scoreTone } from './helpers.ts';
 import { drawHoleThumb } from './game/thumb.ts';
+import { usePuttArt } from './game/usePuttArt.ts';
 
 function Thumb({ holeNo }: { holeNo: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const hole = holeAt({ route: [holeNo] }, 0);
+  const art = usePuttArt(ref);
   useEffect(() => {
-    if (ref.current && hole) drawHoleThumb(ref.current, hole, 168, 96);
-  }, [hole]);
+    if (ref.current && hole) drawHoleThumb(ref.current, hole, 168, 96, art);
+  }, [hole, art]);
   return <canvas ref={ref} className="pt-thumb" aria-hidden width={168} height={96} style={{ width: 168, height: 96 }} />;
 }
 
@@ -30,7 +32,7 @@ export function HoleSummary() {
   const total = 5500;
   return (
     <div className="pt-overlay" role="dialog" aria-labelledby="pt-summary-title">
-      <section className="pt-summary dc-panel dc-panel--brackets">
+      <section className="pt-summary dc-panel dc-panel--brackets" data-part="summary">
         <header className="pt-summary__head">
           <span className="pt-summary__kicker">Hole {played.number} complete</span>
           <h2 id="pt-summary-title" className="pt-summary__title">

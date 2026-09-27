@@ -3,36 +3,59 @@
  * Boardroom kit's <SquareBoard> (`br-*`), re-skinned here through its CSS variables and data
  * attributes. Board/piece ART colours are declared once as --ck-* custom properties so a theme can
  * restyle the set; UI chrome uses the shared tokens (--bg-*, --text-*, --accent…).
+ *
+ * Theme materials: each art colour reads the active theme's playfield material (--mat-board-*,
+ * --mat-piece-*) and falls back to the Delta Neon art. Derived shades use `--*-t` helpers that
+ * reference a material with no fallback — invalid (so unused) when the theme defines no materials.
+ * Meaning stays fixed in every theme: must-capture/selection red, gold crowns.
  */
 .ck {
+  /* Theme-only derived values (invalid → unused under Delta Neon). */
+  --ck-sq-dark-2-t: color-mix(in srgb, var(--mat-board-dark) 78%, var(--mat-piece-edge));
+  --ck-sq-num-t: color-mix(in srgb, var(--mat-board-light) 62%, transparent);
+  --ck-hl-last-t: color-mix(in srgb, var(--mat-board-highlight) 20%, transparent);
+  --ck-hl-last-edge-t: color-mix(in srgb, var(--mat-board-highlight) 60%, transparent);
+  --ck-dark-shade-t: color-mix(in srgb, var(--mat-piece-dark) 84%, var(--mat-piece-edge));
+  --ck-dark-ring-t: color-mix(in srgb, var(--mat-piece-dark) 80%, var(--mat-piece-light));
+  --ck-dark-shine-t: color-mix(in srgb, var(--mat-piece-dark) 55%, var(--mat-piece-light));
+  --ck-dark-side-t: color-mix(in srgb, var(--mat-piece-dark) 55%, var(--mat-piece-edge));
+  /* The dark set sits on dark squares: a mid-tone rim keeps it readable on any board material. */
+  --ck-dark-rim-t: color-mix(in srgb, var(--mat-piece-light) 52%, var(--mat-piece-dark));
+  --ck-dark-glow-t: color-mix(in srgb, var(--mat-piece-edge) 45%, transparent);
+  --ck-light-shade-t: color-mix(in srgb, var(--mat-piece-light) 90%, var(--mat-piece-edge));
+  --ck-light-ring-t: color-mix(in srgb, var(--mat-piece-light) 80%, var(--mat-piece-edge));
+  --ck-light-shine-t: color-mix(in srgb, var(--mat-piece-light) 25%, white);
+  --ck-light-side-t: color-mix(in srgb, var(--mat-piece-light) 68%, var(--mat-piece-edge));
+  --ck-light-edge-t: color-mix(in srgb, var(--mat-piece-light) 42%, var(--mat-piece-edge));
+  --ck-light-glow-t: color-mix(in srgb, var(--mat-piece-edge) 40%, transparent);
   /* Board art */
-  --ck-sq-light: #b39a88;
-  --ck-sq-dark: #3b1c2c;
-  --ck-sq-dark-2: #2b1220;
-  --ck-sq-num: rgba(255, 226, 214, 0.5);
-  --ck-hl-last: rgba(255, 210, 63, 0.18);
-  --ck-hl-last-edge: rgba(255, 210, 63, 0.55);
+  --ck-sq-light: var(--mat-board-light, #b39a88);
+  --ck-sq-dark: var(--mat-board-dark, #3b1c2c);
+  --ck-sq-dark-2: var(--ck-sq-dark-2-t, #2b1220);
+  --ck-sq-num: var(--ck-sq-num-t, rgba(255, 226, 214, 0.5));
+  --ck-hl-last: var(--ck-hl-last-t, rgba(255, 210, 63, 0.18));
+  --ck-hl-last-edge: var(--ck-hl-last-edge-t, rgba(255, 210, 63, 0.55));
   --ck-hl-select: rgba(255, 90, 95, 0.28);
-  --ck-hl-target: #ffd23f;
+  --ck-hl-target: var(--mat-board-highlight, #ffd23f);
   --ck-hl-must: #ff5a5f;
-  /* Dark pieces: obsidian with a crimson neon rim */
-  --ck-dark-top: #2b2438;
-  --ck-dark-shade: #221c2e;
-  --ck-dark-ring: #3f3553;
-  --ck-dark-shine: #75689a;
-  --ck-dark-side: #16111f;
-  --ck-dark-edge: #0a080e;
-  --ck-dark-rim: #ff5a5f;
-  --ck-dark-glow: rgba(255, 90, 95, 0.55);
-  /* Light pieces: ivory with a gold rim */
-  --ck-light-top: #f6ecd9;
-  --ck-light-shade: #e6d6b9;
-  --ck-light-ring: #d5bf98;
-  --ck-light-shine: #ffffff;
-  --ck-light-side: #c4a174;
-  --ck-light-edge: #8a6a45;
-  --ck-light-rim: #ffc93a;
-  --ck-light-glow: rgba(255, 201, 58, 0.5);
+  /* Dark pieces: obsidian with a crimson neon rim (themes: the piece-dark material, edge-outlined) */
+  --ck-dark-top: var(--mat-piece-dark, #2b2438);
+  --ck-dark-shade: var(--ck-dark-shade-t, #221c2e);
+  --ck-dark-ring: var(--ck-dark-ring-t, #3f3553);
+  --ck-dark-shine: var(--ck-dark-shine-t, #75689a);
+  --ck-dark-side: var(--ck-dark-side-t, #16111f);
+  --ck-dark-edge: var(--mat-piece-edge, #0a080e);
+  --ck-dark-rim: var(--ck-dark-rim-t, #ff5a5f);
+  --ck-dark-glow: var(--ck-dark-glow-t, rgba(255, 90, 95, 0.55));
+  /* Light pieces: ivory with a gold rim (themes: the piece-light material, edge-outlined) */
+  --ck-light-top: var(--mat-piece-light, #f6ecd9);
+  --ck-light-shade: var(--ck-light-shade-t, #e6d6b9);
+  --ck-light-ring: var(--ck-light-ring-t, #d5bf98);
+  --ck-light-shine: var(--ck-light-shine-t, #ffffff);
+  --ck-light-side: var(--ck-light-side-t, #c4a174);
+  --ck-light-edge: var(--ck-light-edge-t, #8a6a45);
+  --ck-light-rim: var(--mat-piece-edge, #ffc93a);
+  --ck-light-glow: var(--ck-light-glow-t, rgba(255, 201, 58, 0.5));
   /* Crown */
   --ck-crown: #ffd23f;
   --ck-crown-deep: #d68a17;
@@ -318,17 +341,23 @@
 .ck .br-board {
   --br-light: var(--ck-sq-light);
   --br-dark: var(--ck-sq-dark);
-  --br-frame: #140a10;
-  --br-frame-edge: color-mix(in srgb, var(--accent) 60%, #2b1320);
-  --br-last: rgba(255, 210, 63, 0.2);
+  --br-last-t: color-mix(in srgb, var(--mat-board-highlight) 22%, transparent);
+  --br-target-t: color-mix(in srgb, var(--mat-board-highlight) 90%, transparent);
+  --br-target-capture-t: color-mix(in srgb, var(--mat-board-highlight) 85%, transparent);
+  --br-frame: var(--mat-board-frame, #140a10);
+  --br-frame-edge: color-mix(in srgb, var(--accent) 60%, var(--mat-board-frame, #2b1320));
+  --br-last: var(--br-last-t, rgba(255, 210, 63, 0.2));
   --br-select: rgba(255, 90, 95, 0.32);
-  --br-target: rgba(255, 210, 63, 0.9);
-  --br-target-capture: rgba(255, 210, 63, 0.85);
+  --br-target: var(--br-target-t, rgba(255, 210, 63, 0.9));
+  --br-target-capture: var(--br-target-capture-t, rgba(255, 210, 63, 0.85));
+  /* Checkers draws its own (highlight-coloured) markers on every square. */
+  --br-target-dark-t: initial;
+  --br-target-capture-dark-t: initial;
   --br-coord-on-dark: var(--ck-sq-num);
 }
 .ck .br-sq[data-dark] {
   background-image:
-    radial-gradient(120% 120% at 30% 25%, rgba(255, 255, 255, 0.07), transparent 60%),
+    radial-gradient(120% 120% at 30% 25%, color-mix(in srgb, var(--light) 7%, transparent), transparent 60%),
     linear-gradient(160deg, var(--ck-sq-dark), var(--ck-sq-dark-2));
 }
 .ck .br-sq[data-dark][data-last]::before {
@@ -340,7 +369,7 @@
 .ck .br-sq[data-target='move'] .br-sq__target::before {
   width: 28%;
   height: 28%;
-  box-shadow: 0 0 calc(12px * var(--ck-glow)) rgba(255, 210, 63, 0.7);
+  box-shadow: 0 0 calc(12px * var(--ck-glow)) color-mix(in srgb, var(--ck-hl-target) 70%, transparent);
 }
 .ck .br-sq[data-target='capture'] .br-sq__target {
   background: none;
@@ -352,8 +381,8 @@
   border-radius: 50%;
   border: 3px solid var(--br-target-capture);
   box-shadow:
-    0 0 calc(12px * var(--ck-glow)) rgba(255, 210, 63, 0.6),
-    inset 0 0 calc(10px * var(--ck-glow)) rgba(255, 210, 63, 0.35);
+    0 0 calc(12px * var(--ck-glow)) color-mix(in srgb, var(--ck-hl-target) 60%, transparent),
+    inset 0 0 calc(10px * var(--ck-glow)) color-mix(in srgb, var(--ck-hl-target) 35%, transparent);
 }
 .ck .br-sq__label {
   font-weight: 600;
@@ -565,4 +594,13 @@
   gap: 4px;
   font-size: var(--fs-sm);
   color: var(--text-1);
+}
+
+/* Themed chrome: a light theme turns --text-* dark, so the must-capture ink follows the theme there,
+   and accent-as-text is mixed toward the theme's body ink (readable on light and dark themes). */
+:root[data-theme]:not([data-theme='delta-neon']) .ck-status__must {
+  color: var(--text-0);
+}
+:root[data-theme]:not([data-theme='delta-neon']) :is(.ck-status.is-my-turn .ck-status__text, .ck-rules-card__title) {
+  color: color-mix(in srgb, var(--accent) 60%, var(--text-0));
 }

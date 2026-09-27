@@ -24,7 +24,7 @@ export function RoundIntro({ state, isWriter }: { state: MasterpiecePublicState;
       <p className="mp-intro__kicker">
         {final ? 'Final exhibition' : 'Exhibition'} <span className="dc-num">{state.round}</span> of <span className="dc-num">{state.totalRounds}</span>
       </p>
-      <div className="mp-intro__frame">
+      <div className="mp-intro__frame" data-part="interstitial">
         <span className="mp-intro__icon" aria-hidden="true">
           <PixelIcon name={THEME_ICON[theme]} />
         </span>
@@ -63,13 +63,13 @@ export function RoundScores({ state, players, meId }: { state: MasterpiecePublic
     sfx('whoosh');
   }, [state.scoreSeq]);
   return (
-    <div className="mp-scores">
+    <div className="mp-scores" data-part="score-reveal">
       <header className="mp-scores__head">
         <span className="dc-label">{last ? 'Final tally' : `After exhibition ${state.round}`}</span>
         <h2 className="mp-scores__title">{last ? 'And the gallery’s verdict is…' : 'The critics have spoken'}</h2>
       </header>
       {best ? (
-        <figure className="mp-best">
+        <figure className="mp-best" data-part="winner-card">
           <PixelArt rows={MP_ART.ribbon} className="mp-best__ribbon" />
           <figcaption className="mp-best__label">Best in show</figcaption>
           <p className="mp-best__prompt">{best.prompt}</p>
@@ -91,7 +91,7 @@ export function RoundScores({ state, players, meId }: { state: MasterpiecePublic
 export function VoteMeter({ state }: { state: MasterpiecePublicState }) {
   if (state.stage === 'reveal') {
     return (
-      <div className="mp-meter" role="status">
+      <div className="mp-meter" data-part="vote-meter" role="status">
         <PixelIcon name="check" size={12} /> Votes counted
         {state.audienceOpen && state.audienceIn > 0 ? (
           <span className="mp-meter__aud">
@@ -104,7 +104,7 @@ export function VoteMeter({ state }: { state: MasterpiecePublicState }) {
   const expected = Math.max(state.votersExpected, state.votesIn);
   const pct = expected > 0 ? Math.min(1, state.votesIn / expected) : 0;
   return (
-    <div className="mp-meter" role="status" aria-label={`${state.votesIn} of ${expected} votes in`}>
+    <div className="mp-meter" data-part="vote-meter" role="status" aria-label={`${state.votesIn} of ${expected} votes in`}>
       <span className="mp-meter__count dc-num" aria-hidden="true">
         {state.votesIn}
         <span className="mp-meter__of">/{expected}</span>

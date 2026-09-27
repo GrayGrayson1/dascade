@@ -162,7 +162,23 @@ export class Sky {
       this.clouds.push({ img, x: hash2(i, 5, 5), y: 0.12 + hash2(i, 6, 6) * 0.3, speed: 0.4 + hash2(i, 7, 7) * 0.8, scale: 0.8 + hash2(i, 8, 8) * 1.4 });
     }
 
-    if (q.motes > 0) {
+    if (q.motes > 0 && theme.weather === 'rain') {
+      // Theme weather (e.g. Neon Noir): thin rain streaks in the backdrop, behind the battlefield.
+      this.motes = add(
+        scene.add.particles(0, 0, 'tk-px', {
+          lifespan: { min: 900, max: 1500 },
+          speedY: { min: 420, max: 620 },
+          speedX: { min: -10, max: 10 },
+          scaleX: { min: 0.1, max: 0.16 },
+          scaleY: { min: 1.6, max: 2.8 },
+          alpha: { start: 0.42, end: 0.08 },
+          tint: hexToInt(theme.motes),
+          frequency: Math.round(36 / q.motes),
+          maxAliveParticles: Math.round(140 * q.motes),
+          emitting: true,
+        }),
+      );
+    } else if (q.motes > 0) {
       const tint = hexToInt(theme.motes);
       this.motes = add(
         scene.add.particles(0, 0, theme.moteKind === 'snow' ? 'tk-dot' : 'tk-px', {

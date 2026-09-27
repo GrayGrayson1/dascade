@@ -124,13 +124,14 @@ export function Table({ state, geo, mySeat, heroCards, players, reducedMotion, f
 
 
   return (
-    <div className="hd-table" style={{ width: geo.width, height: geo.height } as CSSProperties} data-portrait={geo.portrait ? 'true' : undefined} data-compact={geo.compact ? 'true' : undefined}>
+    <div className="hd-table" data-part="table" style={{ width: geo.width, height: geo.height } as CSSProperties} data-portrait={geo.portrait ? 'true' : undefined} data-compact={geo.compact ? 'true' : undefined}>
       <div
         className="hd-rail"
+        data-part="rail"
         style={{ left: geo.cx - geo.seatRx - 10, top: geo.cy - geo.seatRy - 10, width: (geo.seatRx + 10) * 2, height: (geo.seatRy + 10) * 2 }}
         aria-hidden
       />
-      <div className="hd-felt" style={{ left: geo.cx - geo.feltRx, top: geo.cy - geo.feltRy, width: geo.feltRx * 2, height: geo.feltRy * 2 }} aria-hidden>
+      <div className="hd-felt" data-part="felt" style={{ left: geo.cx - geo.feltRx, top: geo.cy - geo.feltRy, width: geo.feltRx * 2, height: geo.feltRy * 2 }} aria-hidden>
         <div className="hd-felt__line" />
         <div className="hd-felt__glow" />
       </div>
@@ -142,7 +143,7 @@ export function Table({ state, geo, mySeat, heroCards, players, reducedMotion, f
           </div>
         ) : null}
 
-        <div className="hd-pot" aria-live="polite">
+        <div className="hd-pot" data-part="pot" aria-live="polite">
           {pot > 0 ? (
             <>
               <div className="hd-pot__main">
@@ -165,7 +166,7 @@ export function Table({ state, geo, mySeat, heroCards, players, reducedMotion, f
           ) : null}
         </div>
 
-        <div className="hd-board" style={{ '--board-w': `${boardW}px` } as CSSProperties} aria-label={state.board.length ? `Board: ${state.board.join(' ')}` : 'No community cards yet'}>
+        <div className="hd-board" data-part="board" style={{ '--board-w': `${boardW}px` } as CSSProperties} aria-label={state.board.length ? `Board: ${state.board.join(' ')}` : 'No community cards yet'}>
           {[0, 1, 2, 3, 4].map((i) => {
             const code = state.board[i];
             if (!code) return <span key={`slot-${i}`} className="hd-board__slot" style={{ width: boardW }} />;
@@ -209,7 +210,7 @@ export function Table({ state, geo, mySeat, heroCards, players, reducedMotion, f
       )}
 
       {btn ? (
-        <span className="hd-dealer" style={{ left: btn.x, top: btn.y }} aria-label="Dealer button">
+        <span className="hd-dealer" data-part="dealer-button" style={{ left: btn.x, top: btn.y }} aria-label="Dealer button">
           D
         </span>
       ) : null}

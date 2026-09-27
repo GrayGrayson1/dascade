@@ -147,8 +147,8 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
   }, [step]);
 
   return (
-    <section className="tc-wiz" aria-labelledby={headingId} ref={rootRef}>
-      <header className="tc-wiz__head">
+    <section className="tc-wiz" data-part="tournament-wizard" aria-labelledby={headingId} ref={rootRef}>
+      <header className="tc-wiz__head" data-part="tournament-wizard-header">
         <h2 id={headingId} className="tc-wiz__title">
           Create a tournament
         </h2>

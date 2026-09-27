@@ -40,6 +40,7 @@ import { scenesForGame } from '../arcade/attract.ts';
 import { CATEGORY_LABEL, entryPlayers, gameBadges, tournamentGames } from '../arcade/cabinetInfo.ts';
 import { MarqueeLogo } from '../arcade/Marquee.tsx';
 import { PixelWord } from '../arcade/PixelWord.tsx';
+import { ThemedText } from '../themes/ThemedText.tsx';
 import { lastGameKey, rememberCabinet, rememberGame, runViewTransition } from '../arcade/transition.ts';
 import { TournamentButton, tournamentPath } from '../tournament/TournamentButton.tsx';
 import { PickerBackdrop } from './cabinet/PickerBackdrop.tsx';
@@ -231,17 +232,18 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
       className="cp"
       id="main"
       data-cabinet-picker={cabinet.id}
+      data-part="cabinet-picker"
       data-flavour={cabinet.id}
       style={{ '--p': cabinet.accent.primary, '--s': cabinet.accent.secondary, '--d': cabinet.accent.deep } as CSSProperties}
     >
       <PickerBackdrop cabinet={cabinet.id} />
 
-      <div className="cp__frame">
-        <header className="cp__top">
+      <div className="cp__frame" data-part="picker-frame">
+        <header className="cp__top" data-part="picker-header">
           <Button variant="ghost" icon="arrow-left" onClick={back} className="cp__back">
             Arcade floor
           </Button>
-          <div className="cp__marquee" aria-hidden>
+          <div className="cp__marquee" data-part="picker-marquee" aria-hidden>
             <MarqueeLogo subject={cabinet} />
           </div>
           <div className="cp__top-end">
@@ -256,7 +258,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
 
         <div className="cp__body">
           <div className="cp__col">
-            <div className="cp__head">
+            <div className="cp__head" data-part="picker-heading">
               <nav className="cp__crumbs" aria-label="Breadcrumb">
                 <ol>
                   <li>
@@ -267,7 +269,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                   <li aria-current="page">{cabinet.title}</li>
                 </ol>
               </nav>
-              <h1 className="cp__title">
+              <h1 className="cp__title" data-part="picker-title">
                 <span className="visually-hidden">{cabinet.title}</span>
                 <PixelWord text={cabinet.title} variant="title" />
               </h1>
@@ -279,14 +281,14 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                 <span>{cabinetPlayersLabel(cabinet)}</span>
               </p>
             </div>
-            <section className="cp__menu" aria-labelledby="cp-menu-title">
+            <section className="cp__menu" data-part="picker-menu" aria-labelledby="cp-menu-title">
               <h2 id="cp-menu-title" className="cp__label">
                 <span className="cp__label-caret" aria-hidden>
                   ▶
                 </span>
-                {menuTitle}
+                <ThemedText k="cabinet.heading" plain={menuTitle} />
               </h2>
-              <ul className="cp__list" onKeyDown={onMenuKeyDown}>
+              <ul className="cp__list" data-part="picker-list" onKeyDown={onMenuKeyDown}>
                 {games.map((g, i) => {
                   const catalog = GAME_CATALOG[g.gameId];
                   const accent = entryAccent(g);
@@ -295,7 +297,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                     .filter((b) => b.key !== 'spectators')
                     .slice(0, 3);
                   return (
-                    <li key={g.key} className="cp__li">
+                    <li key={g.key} className="cp__li" data-part="picker-card">
                       <Link
                         ref={(el) => {
                           items.current[i] = el;
@@ -303,6 +305,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                         to={playPath(g)}
                         className={cx('cp-item', isSel && 'is-selected', busy === g.key && 'is-busy')}
                         data-game={g.key}
+                        data-part="picker-card-link"
                         aria-label={`${g.title} — ${entryPlayers(g)}. ${g.blurb}`}
                         aria-current={isSel && desktop ? 'true' : undefined}
                         style={{ '--ip': accent.primary, '--is': accent.secondary, '--id': accent.deep } as CSSProperties}
@@ -354,10 +357,11 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
           {desktop ? (
             <aside
               className="cp__preview"
+              data-part="picker-preview"
               aria-label={`Selected: ${entry.title}`}
               style={{ '--ip': entryAccent(entry).primary, '--is': entryAccent(entry).secondary } as CSSProperties}
             >
-              <div className="cp-screen" ref={previewScreen}>
+              <div className="cp-screen" data-part="picker-screen" ref={previewScreen}>
                 <AttractCanvas
                   key={entry.key}
                   scenes={scenesForGame(entry.gameId, entry.variant)}
@@ -370,7 +374,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                 />
                 <span className="cp-screen__glass" aria-hidden />
               </div>
-              <div className="cp-detail" key={`d-${entry.key}`}>
+              <div className="cp-detail" data-part="picker-detail" key={`d-${entry.key}`}>
                 <p className="cp-detail__kicker">
                   {CATEGORY_LABEL[game.category]} · {entryPlayers(entry)}
                 </p>
@@ -386,7 +390,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                     </Badge>
                   ))}
                 </div>
-                <div className="cp-detail__actions">
+                <div className="cp-detail__actions" data-part="picker-actions">
                   <Button
                     variant="primary"
                     size="xl"
@@ -408,7 +412,7 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
           ) : null}
         </div>
 
-        <footer className="cp__foot">
+        <footer className="cp__foot" data-part="picker-footer">
           {FLAVOUR_NOTE[cabinet.id] ? <span className="cp__note">{FLAVOUR_NOTE[cabinet.id]}</span> : null}
           <span className="cp__keys" aria-hidden>
             <kbd className="dc-kbd">↑</kbd>

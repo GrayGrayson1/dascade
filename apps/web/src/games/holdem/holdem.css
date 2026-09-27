@@ -8,10 +8,11 @@
   --hd-gold: #ffd23f;
   --hd-gold-soft: #ffe79a;
   --hd-emerald: #2de38f;
-  --hd-felt-1: #1a9a63;
-  --hd-felt-2: #0e6b44;
-  --hd-felt-3: #094a30;
-  --hd-felt-4: #06311f;
+  /* Playfield materials: theme `--mat-*` when set, else the original emerald room (Delta Neon). */
+  --hd-felt-1: var(--mat-felt, #1a9a63);
+  --hd-felt-2: var(--mat-felt, #0e6b44);
+  --hd-felt-3: var(--mat-felt-deep, #094a30);
+  --hd-felt-4: var(--mat-felt-deep, #06311f);
   --hd-pod: rgba(14, 12, 28, 0.94);
   /* Numerals: crisp tabular sans (pixel faces blur 8/9 at small sizes). */
   --hd-num: var(--font-tech);
@@ -137,7 +138,7 @@
   border-radius: 50%;
   background:
     radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.1), transparent 45%),
-    linear-gradient(180deg, #2b2442 0%, #16122a 45%, #0b0917 100%);
+    linear-gradient(180deg, var(--mat-rail-highlight, #2b2442) 0%, var(--mat-rail, #16122a) 45%, var(--mat-rail, #0b0917) 100%);
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.65),
     0 12px 28px rgba(0, 0, 0, 0.45),
@@ -172,7 +173,7 @@
   position: absolute;
   inset: 9% 8%;
   border-radius: 50%;
-  border: 2px dashed rgba(255, 210, 63, 0.16);
+  border: 2px dashed var(--mat-felt-line, rgba(255, 210, 63, 0.16));
 }
 .hd-felt__glow {
   position: absolute;
@@ -200,7 +201,7 @@
   display: grid;
   justify-items: center;
   gap: 6px;
-  color: rgba(4, 38, 24, 0.55);
+  color: var(--mat-felt-deep, rgba(4, 38, 24, 0.55));
   filter: drop-shadow(0 1px 0 rgba(160, 255, 205, 0.1));
 }
 .hd-logo__mark {
@@ -212,7 +213,7 @@
   font-size: 10px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(1, 26, 15, 0.85);
+  color: var(--mat-felt-deep, rgba(1, 26, 15, 0.85));
   text-shadow: 0 1px 0 rgba(160, 255, 205, 0.12);
   white-space: nowrap;
 }
@@ -1121,8 +1122,8 @@
   font-family: var(--hd-num);
   font-size: 14px;
   line-height: 1.2;
-  color: #1b1830;
-  background: #f4f1ff;
+  color: var(--mat-card-ink, #1b1830);
+  background: var(--mat-card-face, #f4f1ff);
   border-radius: 3px;
 }
 .hd-log__card[data-red='true'] {
@@ -1287,9 +1288,9 @@
   position: absolute;
   inset: 14% 12%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 40%, var(--hd-felt-1, #1a9a63), #0a4a30 80%);
+  background: radial-gradient(ellipse at 50% 40%, var(--hd-felt-1, var(--mat-felt, #1a9a63)), var(--mat-felt-deep, #0a4a30) 80%);
   box-shadow:
-    0 0 0 6px #16122a,
+    0 0 0 6px var(--mat-rail, #16122a),
     0 0 0 8px rgba(45, 227, 143, 0.35),
     0 16px 40px rgba(0, 0, 0, 0.5);
 }
@@ -1540,4 +1541,41 @@
 }
 .hd--side .hd-seat-controls {
   justify-content: flex-start;
+}
+
+/* ---------- Local ink on the card room's dark art (HUD, table, action dock) (non-default themes) ----------
+ * These surfaces are the game's own dark art, but a theme's --text-* may be dark (Corporate
+ * Desktop '98 is a light theme). Keep the theme's ink hue and lift only its lightness (relative
+ * colour; static light inks where unsupported). Light UI controls inside keep the theme's own ink.
+ * Delta Neon never matches these selectors, so it is unchanged. */
+.hd {
+  --hd-theme-t0: var(--text-0);
+  --hd-theme-t1: var(--text-1);
+  --hd-theme-t2: var(--text-2);
+  --hd-theme-t3: var(--text-3);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .hd :is(.hd-hud, .hd-table, .hd-dock) {
+  --text-0: #f8f6ff;
+  --text-1: #d3cdf0;
+  --text-2: #b3acd8;
+  --text-3: #a39cc9;
+  color: var(--text-0);
+}
+@supports (color: oklch(from red l c h)) {
+  :root[data-theme]:not([data-theme='delta-neon']) .hd :is(.hd-hud, .hd-table, .hd-dock) {
+    --text-0: oklch(from var(--hd-theme-t0) max(l, 0.93) min(c, 0.06) h);
+    --text-1: oklch(from var(--hd-theme-t1) max(l, 0.84) min(c, 0.07) h);
+    --text-2: oklch(from var(--hd-theme-t2) max(l, 0.75) min(c, 0.08) h);
+    --text-3: oklch(from var(--hd-theme-t3) max(l, 0.7) min(c, 0.08) h);
+  }
+}
+:root[data-theme]:not([data-theme='delta-neon']) .hd :is(.hd-hud, .hd-table, .hd-dock) :is(input, textarea, select, .dc-input, .dc-segmented, .dc-slider, .dc-toggle, .dc-timer, .dc-modal, dialog) {
+  --text-0: var(--hd-theme-t0);
+  --text-1: var(--hd-theme-t1);
+  --text-2: var(--hd-theme-t2);
+  --text-3: var(--hd-theme-t3);
+  color: var(--text-0);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .hd :is(.hd-hud, .hd-table, .hd-dock) .dc-btn--ghost {
+  --btn-fg: var(--text-1);
 }

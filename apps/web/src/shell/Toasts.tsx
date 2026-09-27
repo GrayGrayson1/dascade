@@ -10,9 +10,9 @@ export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   const dismiss = useApp((s) => s.dismissToast);
   return (
-    <div className="dc-toasts" role="status" aria-live="polite">
+    <div className="dc-toasts" data-part="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className="dc-toast" data-kind={t.kind}>
+        <div key={t.id} className="dc-toast" data-part="toast" data-kind={t.kind}>
           <PixelIcon className="dc-toast__icon" name={TOAST_ICON[t.kind] ?? 'info'} />
           <span className="visually-hidden">{TOAST_LABEL[t.kind] ?? 'Info'}: </span>
           <span className="dc-toast__text">{t.text}</span>

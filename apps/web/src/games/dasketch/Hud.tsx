@@ -13,7 +13,7 @@ export function WordTiles({ pattern, tone = 'hidden', label }: { pattern: string
   const chars = Array.from(pattern);
   const letters = chars.filter((c) => c !== ' ').length;
   return (
-    <div className="sk-tiles" data-tone={tone} role="img" aria-label={label} style={{ '--n': Math.max(letters, 4) } as CSSProperties}>
+    <div className="sk-tiles" data-part="word-card" data-tone={tone} role="img" aria-label={label} style={{ '--n': Math.max(letters, 4) } as CSSProperties}>
       {pattern.split(' ').map((word, wi) => (
         <span key={wi} className="sk-tiles__word">
           {Array.from(word).map((ch, i) => {
@@ -49,9 +49,9 @@ export function SketchTimer({ endsAt, stage }: { endsAt: number; stage: string }
     lastTick.current = seconds;
     sfx('tick');
   }, [seconds, stage]);
-  if (!endsAt) return <div className="sk-timer sk-timer--idle" aria-hidden="true" />;
+  if (!endsAt) return <div className="sk-timer sk-timer--idle" data-part="timer" aria-hidden="true" />;
   return (
-    <div className="sk-timer">
+    <div className="sk-timer" data-part="timer">
       <TimerRing seconds={seconds} progress={remaining / total.current.ms} urgentAt={stage === 'drawing' ? 10 : 3} size={56} label={stage === 'choosing' ? 'Time to choose' : 'Time left to draw'} />
     </div>
   );
@@ -84,7 +84,7 @@ export function SketchHud({ state, priv, artistName, isArtist }: { state: Dasket
 
   const lengths = stage === 'drawing' && !known ? wordLengths(state.hint) : [];
   return (
-    <header className="sk-hud" data-stage={stage}>
+    <header className="sk-hud" data-part="hud" data-stage={stage}>
       <div className="sk-hud__round">
         <span className="dc-label">Round</span>
         <span className="sk-hud__round-num" key={state.round}>

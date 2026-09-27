@@ -46,7 +46,7 @@ export function Results() {
   const canRematch = isHost && game.seated.length + cpuTanks >= 2;
   return (
     <div className="tk-results">
-      <section className="tk-results__card tk-glass" aria-labelledby="tk-results-title">
+      <section className="tk-results__card tk-glass" data-part="results" aria-labelledby="tk-results-title">
         <header className="tk-results__head" style={{ '--win': team >= 0 ? TEAM_TINT[team] : 'var(--accent-2)' } as CSSProperties}>
           <PixelIcon name={b?.reason === 'draw' ? 'flag' : 'trophy'} size={40} className="tk-results__icon" />
           <h1 id="tk-results-title" className="tk-results__title">
@@ -57,7 +57,7 @@ export function Results() {
             {state.round ? ` · ${state.round} round${state.round === 1 ? '' : 's'}` : ''}
           </p>
         </header>
-        <table className="tk-standings">
+        <table className="tk-standings" data-part="standings">
           <caption className="visually-hidden">Final standings</caption>
           <thead>
             <tr>

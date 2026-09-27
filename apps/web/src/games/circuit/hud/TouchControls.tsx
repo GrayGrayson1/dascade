@@ -71,7 +71,7 @@ export function TouchControls({ sampler, boost }: { sampler: InputSampler; boost
   );
 
   return (
-    <div className="ci-touch" aria-label="Touch driving controls">
+    <div className="ci-touch" data-part="controls" aria-label="Touch driving controls">
       <div
         className="ci-touch__pad"
         ref={padRef}

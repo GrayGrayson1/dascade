@@ -683,7 +683,10 @@
   position: absolute !important;
   z-index: 1200;
   top: var(--arrow-top, 46%);
-  transform: translateY(-50%);
+  /* Centred with the individual `translate` property, not `transform`: theme skins give every
+     .dc-btn a pressed `transform` (e.g. translate(1px, 1px)) that would otherwise replace the
+     centring, drop the arrow 22px on mousedown and turn the click into a miss on the track. */
+  translate: 0 -50%;
 }
 .af-lineup__arrow--prev {
   left: calc(var(--arrow-inset, 10px) + var(--safe-left));
@@ -696,7 +699,7 @@
   pointer-events: none;
 }
 .af-lineup__arrow:active:not(:disabled) {
-  transform: translateY(calc(-50% + 2px));
+  transform: translateY(2px);
 }
 .af-lineup__pager {
   position: absolute;
@@ -1610,6 +1613,7 @@
       'id actions'
       'info info';
     gap: 8px 12px;
+    grid-template-rows: auto minmax(0, 1fr);
     padding: 12px 12px 12px;
     --plaque-h: 196px;
   }
@@ -1623,6 +1627,18 @@
   }
   .af-plaque__info {
     grid-area: info;
+    /* The plaque has a fixed height; themes with larger chips/titles run out of room. A wrapping
+       column pushes a row that doesn't fit into a second (clipped) column, so rows drop out whole
+       instead of being sliced in half at the plaque's edge. */
+    display: flex;
+    flex-flow: column wrap;
+    align-content: flex-start;
+    column-gap: 0;
+    align-self: stretch;
+  }
+  .af-plaque__info > * {
+    width: 100%;
+    flex-shrink: 0;
   }
   .af-plaque__actions {
     grid-area: actions;
@@ -1656,7 +1672,7 @@
     gap: 4px;
   }
   .af-plaque__badges {
-    margin-top: 6px;
+    margin-top: 3px;
     gap: 4px;
   }
   .af-plaque__badges .dc-badge:nth-child(n + 4) {

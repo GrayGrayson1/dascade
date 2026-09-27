@@ -4,10 +4,17 @@
  * theme can override it.
  */
 .wd-stage {
-  --wd-tile-1: #2c2556;
-  --wd-tile-2: #1a1535;
-  --wd-tile-edge: #0b0819;
-  --wd-tile-ink: #f8f6ff;
+  /* Theme materials (card stock) with today's palette as the exact fallback. The --wd-mat-* helpers
+     only resolve when the theme defines materials (an undefined var() makes them invalid → fallback). */
+  --wd-mat-tile-2: color-mix(in srgb, var(--mat-card-face) 86%, var(--mat-card-ink));
+  --wd-tile-1: var(--mat-card-face, #2c2556);
+  --wd-tile-2: var(--wd-mat-tile-2, #1a1535);
+  --wd-tile-edge: var(--mat-paper-edge, #0b0819);
+  --wd-tile-ink: var(--mat-card-ink, #f8f6ff);
+  /* Board / rack tray: a podium plinth under a stage light when the theme has materials. */
+  --wd-mat-tray:
+    radial-gradient(90% 90% at 50% 0%, color-mix(in srgb, var(--mat-stage-light) 16%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--mat-podium), color-mix(in srgb, var(--mat-podium) 55%, var(--mat-stage)));
   --wd-tile-hi: color-mix(in srgb, var(--light) 16%, transparent);
   --wd-good: var(--green);
   --wd-bad: var(--red);
@@ -234,9 +241,11 @@
   width: 100%;
   padding: clamp(8px, 2.2cqw, 16px);
   border-radius: var(--radius-lg);
-  background:
+  background: var(
+    --wd-mat-tray,
     radial-gradient(90% 90% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-1)), var(--bg-1));
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-1)), var(--bg-1))
+  );
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line-strong));
   box-shadow: var(--panel-shadow), var(--glow-sm);
   touch-action: none;
@@ -736,9 +745,11 @@
   gap: var(--sp-4);
   padding: clamp(14px, 3vw, 26px);
   border-radius: var(--radius-lg);
-  background:
+  background: var(
+    --wd-mat-tray,
     radial-gradient(90% 90% at 50% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-1)), var(--bg-1));
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-1)), var(--bg-1))
+  );
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line-strong));
   box-shadow: var(--panel-shadow), var(--glow-sm);
 }

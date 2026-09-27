@@ -138,7 +138,7 @@ export function AnagramPlay({ state, priv, spectator }: PlayProps) {
 
 export function ForbiddenCard({ category, hint, letter, compact }: { category: string; hint: string; letter: string; compact?: boolean }) {
   return (
-    <section className={cx('wd-forbid', compact && 'wd-forbid--compact')} aria-label={`Category ${category}, forbidden letter ${letter.toUpperCase()}`}>
+    <section className={cx('wd-forbid', compact && 'wd-forbid--compact')} data-part="prompt-card" aria-label={`Category ${category}, forbidden letter ${letter.toUpperCase()}`}>
       <div className="wd-forbid__text">
         <p className="wd-forbid__kicker">Name things in this category</p>
         <h2 className="wd-forbid__category">{category}</h2>
@@ -238,7 +238,7 @@ export function ChainPlay({ state, priv, meId, players, spectator, settings }: P
   return (
     <div className="wd-play wd-play--chain">
       <div className="wd-play__board">
-        <div className="wd-chain" data-revealing={revealing ? 'true' : undefined}>
+        <div className="wd-chain" data-part="chain" data-revealing={revealing ? 'true' : undefined}>
           <ChainTrail trail={trail} current={current} rule={rule} />
           <div className="wd-chain__current">
             <p className="wd-chain__kicker">
@@ -285,7 +285,7 @@ export function ChainPlay({ state, priv, meId, players, spectator, settings }: P
             <Hearts lives={me.lives} max={maxLives} />
           </div>
         ) : null}
-        <ul className="wd-chainplayers" aria-label="Players">
+        <ul className="wd-chainplayers" data-part="players-strip" aria-label="Players">
           {seated.map((p) => {
             const prog = state.progress[p.id];
             const answered = Boolean(state.seats[p.id]?.answered) && state.stage === 'link';

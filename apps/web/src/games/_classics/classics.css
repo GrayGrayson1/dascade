@@ -128,13 +128,14 @@
   aspect-ratio: var(--cl-aspect);
   max-height: 100cqh;
   border-radius: 12px;
+  /* Theme materials: --mat-screen (CRT/playfield), --mat-screen-glow, --mat-bezel. Fallbacks = Delta Neon. */
   background:
-    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-0)), var(--bg-0));
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--mat-screen-glow, var(--accent)) 10%, transparent), transparent 60%),
+    var(--mat-screen, linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 80%, var(--bg-0)), var(--bg-0)));
   box-shadow:
     0 0 0 1px var(--cl-edge),
-    0 0 0 6px color-mix(in srgb, var(--bg-1) 92%, var(--accent)),
-    0 0 0 7px color-mix(in srgb, var(--accent) 22%, var(--line)),
+    0 0 0 6px var(--mat-bezel, color-mix(in srgb, var(--bg-1) 92%, var(--accent))),
+    0 0 0 7px color-mix(in srgb, var(--mat-screen-glow, var(--accent)) 22%, var(--line)),
     var(--glow-md),
     var(--shadow-3);
   overflow: hidden;
@@ -166,7 +167,7 @@
   z-index: 3;
   pointer-events: none;
   border-radius: inherit;
-  background: linear-gradient(172deg, color-mix(in srgb, var(--light) 7%, transparent) 0%, transparent 22%, transparent 78%, color-mix(in srgb, var(--accent) 5%, transparent) 100%);
+  background: linear-gradient(172deg, color-mix(in srgb, var(--light) 7%, transparent) 0%, transparent 22%, transparent 78%, color-mix(in srgb, var(--mat-screen-glow, var(--accent)) 5%, transparent) 100%);
 }
 :root[data-fx='off'] .cl-screen__glass {
   display: none;
@@ -842,7 +843,8 @@
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--light) 9%, transparent), transparent 60%),
     var(--button-bg, var(--bg-3));
-  color: var(--text-0);
+  /* Keys sit on the theme's --button-bg, so they take its paired ink (light-key themes need dark glyphs). */
+  color: var(--button-fg, var(--text-0));
   box-shadow:
     0 3px 0 color-mix(in srgb, var(--shade) 70%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--light) 12%, transparent);

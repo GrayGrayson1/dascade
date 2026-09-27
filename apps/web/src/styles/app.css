@@ -765,6 +765,7 @@
   color: var(--warning);
 }
 .chat__name {
+  color: var(--chat-name, inherit);
   font-weight: 700;
   margin-right: 6px;
 }

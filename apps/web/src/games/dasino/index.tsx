@@ -61,7 +61,7 @@ function DasinoView() {
       <div className="dn-shell" data-view={view}>
         {phase === 'RESULTS' ? null : (
           <>
-            <header className="dn-hud">
+            <header className="dn-hud" data-part="hud">
               <TableNav state={state} seated={!spectator} />
               <BalanceHud seat={seat} settings={settings} isHost={isHost} spectator={spectator && phase === 'PLAYING'} />
             </header>

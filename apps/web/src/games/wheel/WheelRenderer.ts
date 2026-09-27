@@ -26,6 +26,7 @@ import {
 } from '@dascade/game-core/wheel';
 import { graphemes, type WheelSnapshotSegment, type WheelSliceMode } from '@dascade/shared/games/wheel';
 import { serverNow } from '../../net/hooks.ts';
+import { DEFAULT_WHEEL_PALETTE, paletteKey, type WheelPalette } from './palette.ts';
 
 export interface RenderSpin {
   key: string;
@@ -129,6 +130,9 @@ export class WheelRenderer {
   private readonly el: RendererElements;
   private readonly cb: RendererCallbacks;
   private opts: RendererOptions = { reducedMotion: false, fx: 'high', preview: false };
+  /** Theme-driven hardware colours (rim, sockets, pegs, bulbs); slices keep their own colours. */
+  private pal: WheelPalette = DEFAULT_WHEEL_PALETTE;
+  private palKey = paletteKey(DEFAULT_WHEEL_PALETTE);
 
   private size = 0;
   private dpr = 1;
@@ -195,6 +199,18 @@ export class WheelRenderer {
       this.lightsKey = '';
       this.bulbSprites.clear();
     }
+  }
+
+  /** Recolours the hardware in place (theme change): no reset of spin, layout or flapper state. */
+  setPalette(palette: WheelPalette): void {
+    const key = paletteKey(palette);
+    if (key === this.palKey) return;
+    this.pal = palette;
+    this.palKey = key;
+    this.faceDirty = true;
+    this.rimDirty = true;
+    this.lightsKey = '';
+    this.bulbSprites.clear();
   }
 
   setSize(size: number): void {
@@ -563,14 +579,14 @@ export class WheelRenderer {
 
   private drawEmptyFace(ctx: CanvasRenderingContext2D, R: number): void {
     const g = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R);
-    g.addColorStop(0, '#2a1a3a');
-    g.addColorStop(1, '#120a1c');
+    g.addColorStop(0, this.pal.emptyInner);
+    g.addColorStop(1, this.pal.emptyOuter);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.fill();
     ctx.setLineDash([R * 0.04, R * 0.04]);
-    ctx.strokeStyle = 'rgba(255, 176, 32, 0.35)';
+    ctx.strokeStyle = this.pal.emptyGuide;
     ctx.lineWidth = Math.max(1, R * 0.008);
     ctx.beginPath();
     ctx.arc(0, 0, R * 0.7, 0, Math.PI * 2);
@@ -737,9 +753,9 @@ export class WheelRenderer {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.fill();
       const g = ctx.createRadialGradient(x - pr * 0.35, y - pr * 0.35, pr * 0.1, x, y, pr);
-      g.addColorStop(0, '#fff8de');
-      g.addColorStop(0.45, '#ffc54a');
-      g.addColorStop(1, '#8a4c00');
+      g.addColorStop(0, this.pal.peg[0]);
+      g.addColorStop(0.45, this.pal.peg[1]);
+      g.addColorStop(1, this.pal.peg[2]);
       ctx.beginPath();
       ctx.arc(x, y, pr, 0, Math.PI * 2);
       ctx.fillStyle = g;
@@ -780,49 +796,50 @@ export class WheelRenderer {
       ctx.shadowOffsetY = rw * 0.06;
     }
     circle(rw);
-    ctx.fillStyle = '#1a0c02';
+    ctx.fillStyle = this.pal.base;
     ctx.fill();
     ctx.restore();
 
     // Outer gold lip.
     const lip = ctx.createLinearGradient(cx, cy - rw, cx, cy + rw);
-    lip.addColorStop(0, '#fff0c2');
-    lip.addColorStop(0.2, '#ffc94d');
-    lip.addColorStop(0.5, '#e38b00');
-    lip.addColorStop(0.8, '#8f4a00');
-    lip.addColorStop(1, '#4d2600');
+    const P = this.pal;
+    lip.addColorStop(0, P.lip[0]);
+    lip.addColorStop(0.2, P.lip[1]);
+    lip.addColorStop(0.5, P.lip[2]);
+    lip.addColorStop(0.8, P.lip[3]);
+    lip.addColorStop(1, P.lip[4]);
     circle(rw);
     ctx.fillStyle = lip;
     ctx.fill();
     circle(rw - 1);
-    ctx.strokeStyle = 'rgba(255, 246, 214, 0.6)';
+    ctx.strokeStyle = P.lipEdge;
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
     // Bulb channel.
     const channel = ctx.createLinearGradient(cx, cy - rw, cx, cy + rw);
-    channel.addColorStop(0, '#0b0401');
-    channel.addColorStop(0.5, '#1f0f03');
-    channel.addColorStop(1, '#321805');
+    channel.addColorStop(0, P.channel[0]);
+    channel.addColorStop(0.5, P.channel[1]);
+    channel.addColorStop(1, P.channel[2]);
     circle(rw * 0.962);
     ctx.fillStyle = channel;
     ctx.fill();
     // Hot-pink neon pinstripe.
     circle(rw * 0.962);
-    ctx.strokeStyle = 'rgba(255, 79, 129, 0.55)';
+    ctx.strokeStyle = P.pinstripe;
     ctx.lineWidth = Math.max(1, rw * 0.006);
     ctx.stroke();
 
     // Inner lip (reverse gradient reads as a bevel).
     const inner = ctx.createLinearGradient(cx, cy - rf, cx, cy + rf);
-    inner.addColorStop(0, '#6e3700');
-    inner.addColorStop(0.5, '#d68200');
-    inner.addColorStop(1, '#ffe3a1');
+    inner.addColorStop(0, P.innerLip[0]);
+    inner.addColorStop(0.5, P.innerLip[1]);
+    inner.addColorStop(1, P.innerLip[2]);
     circle(rf + rw * 0.032);
     ctx.fillStyle = inner;
     ctx.fill();
     circle(rf + 0.5);
-    ctx.fillStyle = '#0a0400';
+    ctx.fillStyle = P.faceBack;
     ctx.fill();
 
     // Bulb sockets.
@@ -835,9 +852,9 @@ export class WheelRenderer {
       const y = cy + Math.sin(a) * rb;
       ctx.beginPath();
       ctx.arc(x, y, size * 1.35, 0, Math.PI * 2);
-      ctx.fillStyle = '#070200';
+      ctx.fillStyle = P.socket;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 200, 110, 0.35)';
+      ctx.strokeStyle = P.socketEdge;
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -890,7 +907,7 @@ export class WheelRenderer {
     const n = this.bulbCount;
     const reduced = this.opts.reducedMotion;
     const celebrate = this.highlight;
-    const color = celebrate ? celebrate.color : '#ffc451';
+    const color = celebrate ? celebrate.color : this.pal.bulbOn;
     let pattern: (i: number) => boolean;
     let key: string;
     if (reduced || this.opts.fx === 'off') {
@@ -935,7 +952,7 @@ export class WheelRenderer {
     const rb = rw * g.bulbRing * this.dpr;
     const r = Math.max(2.5, rw * g.bulbSize);
     const onSprite = this.bulbSprite(color, true, r);
-    const offSprite = this.bulbSprite(celebrate ? color : '#ffb020', false, r);
+    const offSprite = this.bulbSprite(celebrate ? color : this.pal.bulbOff, false, r);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
       const x = cx + Math.cos(a) * rb;

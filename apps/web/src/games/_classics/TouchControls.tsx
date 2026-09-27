@@ -177,7 +177,7 @@ export function TouchStick<I extends string>({
 /** Bottom control deck: left cluster + right cluster (hidden on fine pointers unless `always`). */
 export function TouchDeck({ left, right, center, always, className }: { left?: ReactNode; right?: ReactNode; center?: ReactNode; always?: boolean; className?: string }) {
   return (
-    <div className={cx('cl-deck', always && 'cl-deck--always', className)}>
+    <div className={cx('cl-deck', always && 'cl-deck--always', className)} data-part="controls">
       <div className="cl-deck__side">{left}</div>
       {center ? <div className="cl-deck__center">{center}</div> : null}
       <div className="cl-deck__side cl-deck__side--right">{right}</div>

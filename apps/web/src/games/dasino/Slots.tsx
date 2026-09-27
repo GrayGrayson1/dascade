@@ -233,7 +233,7 @@ export function SlotsTable({ state, settings, seat }: { state: DasinoPublicState
   return (
     <div className="dn-slots">
       <div className="dn-slots__stage">
-        <div className={cx('dn-machine', mode === 'presenting' && result && result.totalWin > 0 && 'is-winning')}>
+        <div className={cx('dn-machine', mode === 'presenting' && result && result.totalWin > 0 && 'is-winning')} data-part="machine">
           <div className="dn-machine__marquee" aria-hidden>
             <span className="dn-bulbs" />
             <span className="dn-machine__title">
@@ -241,7 +241,7 @@ export function SlotsTable({ state, settings, seat }: { state: DasinoPublicState
             </span>
             <span className="dn-bulbs" />
           </div>
-          <div className="dn-machine__window">
+          <div className="dn-machine__window" data-part="screen">
             <LineMarkers side="left" lines={lines} focus={focusLine} wins={wins.map((w) => w.line)} />
             <div className="dn-reels" data-spinning={mode === 'spinning' ? 'true' : undefined}>
               <SlotReels ref={reels} initial={initial.current} label={result ? `Reels stopped: ${describeStops(result.stops)}` : 'Slot reels'} />
@@ -325,7 +325,7 @@ export function SlotsTable({ state, settings, seat }: { state: DasinoPublicState
           </p>
           <Celebration info={celebrate} onDone={() => setCelebrate(null)} />
         </div>
-        <button type="button" className={cx('dn-lever', lever && 'is-pulled')} aria-label="Pull the lever to spin" disabled={!canSpin} onClick={pull}>
+        <button type="button" className={cx('dn-lever', lever && 'is-pulled')} data-part="lever" aria-label="Pull the lever to spin" disabled={!canSpin} onClick={pull}>
           <span className="dn-lever__rod" />
           <span className="dn-lever__knob" />
           <span className="dn-lever__base" />

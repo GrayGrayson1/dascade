@@ -50,7 +50,7 @@ export function CallerPanel({
                 ? 'Every ball is out!'
                 : 'Shuffling the balls…';
   return (
-    <section className="bg-caller" aria-label="Caller">
+    <section className="bg-caller" data-part="caller" aria-label="Caller">
       <div className="bg-caller__stage">
         <CallTimer key={state.nextCallAt} remainingMs={remaining} intervalMs={state.callIntervalMs} />
         <Ball key={`${calls.length}:${latest ?? 'none'}`} token={latest} mode={state.mode} items={items} />

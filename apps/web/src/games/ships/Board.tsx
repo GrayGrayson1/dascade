@@ -16,7 +16,7 @@ import {
 } from 'react';
 import { SHIPS_COLUMNS, type ShipsDir, type VesselId } from '@dascade/shared/games/ships';
 import { cx } from '@dascade/ui';
-import { ArtDefs, HitMark, MissMark, SEA, Vessel, type VesselTone } from './art.tsx';
+import { ArtDefs, HitMark, MissMark, Vessel, type VesselTone } from './art.tsx';
 
 export interface VesselDraw {
   id: VesselId;
@@ -153,6 +153,7 @@ export const Board = memo(function Board(props: BoardProps) {
       className={cx('sh-board', `sh-board--${variant}`, active && 'is-active', props.className)}
       style={{ '--sh-n': n, '--sh-sea': `${px}px`, '--sh-gutter': `${gutter}px`, '--sh-cell': `${cellPx}px` } as CSSProperties}
       data-testid={props.testId}
+      data-part="board"
     >
       <div className="sh-board__cols" aria-hidden>
         {Array.from({ length: n }, (_, i) => (
@@ -164,7 +165,7 @@ export const Board = memo(function Board(props: BoardProps) {
           <span key={i}>{i + 1}</span>
         ))}
       </div>
-      <div className="sh-board__sea" ref={props.seaRef} onPointerLeave={props.onCellHover ? () => props.onCellHover!(null) : undefined}>
+      <div className="sh-board__sea" data-part="board-frame" ref={props.seaRef} onPointerLeave={props.onCellHover ? () => props.onCellHover!(null) : undefined}>
         <svg className="sh-board__art" viewBox={`0 0 ${n} ${n}`} aria-hidden focusable="false">
           <ArtDefs glowId={glowId} strength={glow} />
           <Sea n={n} />
@@ -172,7 +173,7 @@ export const Board = memo(function Board(props: BoardProps) {
             <Vessel key={v.id} {...v} glowId={glow > 0 ? glowId : undefined} />
           ))}
         </svg>
-        {sweep && glow > 0 ? <div className="sh-sweep" aria-hidden /> : null}
+        {sweep && glow > 0 ? <div className="sh-sweep" data-part="radar" aria-hidden /> : null}
         <div
           ref={gridRef}
           className="sh-board__cells"
@@ -203,10 +204,10 @@ const Sea = memo(function Sea({ n }: { n: number }) {
   return (
     <g>
       <rect x={0} y={0} width={n} height={n} className="sh-sea" />
-      <g stroke={SEA.line} strokeWidth={0.025}>
+      <g className="sh-grid-lines" strokeWidth={0.025}>
         {lines}
       </g>
-      <rect x={0.0125} y={0.0125} width={n - 0.025} height={n - 0.025} fill="none" stroke={SEA.lineStrong} strokeWidth={0.025} />
+      <rect x={0.0125} y={0.0125} width={n - 0.025} height={n - 0.025} fill="none" className="sh-grid-edge" strokeWidth={0.025} />
     </g>
   );
 });

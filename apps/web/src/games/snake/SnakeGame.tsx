@@ -37,6 +37,7 @@ import {
   formatScore,
   useCanvasSurface,
   useFixedLoop,
+  useLiveMaterials,
   useMyStanding,
   usePersonalBest,
   type ClassicsGameInfo,
@@ -126,6 +127,7 @@ export function SnakeGame() {
   const worldDir = (d: Dir): Dir => (portraitRef.current ? (((d + 1) & 3) as Dir) : d);
   const net = useMemo(() => new SnakeNet(), []);
   const renderer = useMemo(() => new SnakeRenderer(), []);
+  useLiveMaterials(screenRef, (m) => renderer.setMaterials(m));
   const input = useMemo(() => new IntentInput<Intent>(INTENTS), []);
   const looksRef = useRef(new Map<number, SnakeLook>());
   const growingRef = useRef(new Set<number>());

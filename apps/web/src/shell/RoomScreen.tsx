@@ -20,6 +20,8 @@ import { NoticeCard, ProfileEditor } from './common.tsx';
 import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './Reconnect.tsx';
 import { crumbCabinet } from './crumbs.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
+import { reportRoomPlace } from '../themes/place.ts';
+import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
 
 export function RoomScreen() {
   const params = useParams();
@@ -67,7 +69,12 @@ export function RoomScreen() {
   if (removed && noticeHere) {
     return (
       <ErrorScreen
-        error={{ kind: 'kicked', title: removed.reason === 'room_closed' ? 'Room closed' : 'Removed from room', message: removed.message, retryable: false }}
+        error={{
+          kind: 'kicked',
+          title: removed.reason === 'room_closed' ? 'Room closed' : 'Removed from room',
+          message: removed.message,
+          retryable: false,
+        }}
         onBack={() => {
           session.clearNotices();
           navigate('/');
@@ -113,7 +120,7 @@ export function RoomScreen() {
     );
   }
   if (resolving || status === 'connecting') {
-    return <LoadingScreen label={`Connecting to room ${code}…`} />;
+    return <LoadingScreen label={`Connecting to room ${code}…`} kind="connecting" />;
   }
   if (needsProfile) {
     return <JoinPrompt code={code} onCancel={() => navigate('/')} />;
@@ -158,17 +165,23 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
 
   const lobbyPhases = module?.lobbyPhases ?? ['LOBBY'];
   const inLobby = !phase || lobbyPhases.includes(phase);
+  // Theme environments calm down in games (presentation only; see themes/place.ts).
+  useEffect(() => reportRoomPlace(inLobby ? 'lobby' : 'game'), [inLobby]);
+  useEffect(() => () => reportRoomPlace(null), []);
   const immersive = Boolean(module?.immersive) && !inLobby;
   const GameView = module?.GameView;
 
   return (
-    <GameTheme accent={GAME_CATALOG[gameId].accent} className="room" data-immersive={immersive ? 'true' : undefined}>
+    <GameTheme accent={GAME_CATALOG[gameId].accent} className="room" data-part="room" data-immersive={immersive ? 'true' : undefined}>
       {immersive ? <ShellMenu gameId={gameId} code={code} /> : <TopBar gameId={gameId} code={code} />}
       <TournamentBanner compact={immersive} />
       <ReconnectingOverlay gameId={gameId} immersive={immersive} />
       <ReconnectedFlash />
       {loadError ? (
-        <ErrorScreen error={friendly('unknown', 'This cabinet failed to load. Check your connection and try again.')} onRetry={() => location.reload()} />
+        <ErrorScreen
+          error={friendly('unknown', 'This cabinet failed to load. Check your connection and try again.')}
+          onRetry={() => location.reload()}
+        />
       ) : inLobby ? (
         <Lobby gameId={gameId} module={module} />
       ) : GameView ? (
@@ -202,8 +215,14 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
     setBusy(false);
   };
   return (
-    <GameTheme accent={game?.accent ?? GAME_CATALOG.wheel.accent} as="main" className="center-screen dc-game-backdrop" id="main">
-      <Panel brackets glow className="join-prompt" title={game ? `Join ${game.title}` : 'Join room'}>
+    <GameTheme
+      accent={game?.accent ?? GAME_CATALOG.wheel.accent}
+      as="main"
+      className="center-screen dc-game-backdrop"
+      id="main"
+      data-part="join-screen"
+    >
+      <Panel data-part="join-prompt" brackets glow className="join-prompt" title={game ? `Join ${game.title}` : 'Join room'}>
         <div className="dc-col join-prompt__body">
           <div className="join-prompt__head">
             {game ? (
@@ -234,7 +253,14 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
               Arcade
             </Button>
             <span className="dc-spacer" />
-            <Button variant="primary" size="lg" icon="play" loading={busy} disabled={!profileConfirmed || lookup?.exists === false} onClick={join}>
+            <Button
+              variant="primary"
+              size="lg"
+              icon="play"
+              loading={busy}
+              disabled={!profileConfirmed || lookup?.exists === false}
+              onClick={join}
+            >
               Join game
             </Button>
           </div>
@@ -244,10 +270,11 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
   );
 }
 
-export function LoadingScreen({ label }: { label: string }) {
+export function LoadingScreen({ label, kind = 'loading' }: { label: string; kind?: 'loading' | 'connecting' }) {
   return (
-    <main className="center-screen" id="main">
-      <div className="loading-card">
+    <main className="center-screen" id="main" data-part="loading-screen">
+      <div className="loading-card" data-part="loading-card">
+        <LoadingFlavour kind={kind} />
         <Spinner label={label} />
         <p className="dc-display">{label}</p>
       </div>
@@ -268,14 +295,33 @@ const ERROR_ICON: Partial<Record<FriendlyError['kind'], IconName>> = {
   rate_limited: 'clock',
 };
 
-export function ErrorScreen({ error, onBack, onRetry }: { error: FriendlyError; onBack?: () => void; onRetry?: () => void | Promise<void> }) {
+export function ErrorScreen({
+  error,
+  onBack,
+  onRetry,
+}: {
+  error: FriendlyError;
+  onBack?: () => void;
+  onRetry?: () => void | Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const gameId = useSessionStore((s) => s.gameId);
   const game = gameId && isGameId(gameId) ? GAME_CATALOG[gameId] : null;
-  const tone = error.kind === 'kicked' || error.kind === 'unknown' ? 'danger' : error.kind === 'not_found' || error.kind === 'invalid_code' ? 'info' : 'warning';
+  const tone =
+    error.kind === 'kicked' || error.kind === 'unknown'
+      ? 'danger'
+      : error.kind === 'not_found' || error.kind === 'invalid_code'
+        ? 'info'
+        : 'warning';
   return (
-    <GameTheme accent={game?.accent ?? GAME_CATALOG.wheel.accent} as="main" className="center-screen dc-game-backdrop" id="main">
+    <GameTheme
+      accent={game?.accent ?? GAME_CATALOG.wheel.accent}
+      as="main"
+      className="center-screen dc-game-backdrop"
+      id="main"
+      data-part="error-screen"
+    >
       <NoticeCard
         icon={ERROR_ICON[error.kind] ?? 'warning'}
         tone={tone}
@@ -314,7 +360,7 @@ export function ErrorScreen({ error, onBack, onRetry }: { error: FriendlyError; 
 export function NotFoundScreen() {
   const navigate = useNavigate();
   return (
-    <main className="center-screen dc-game-backdrop" id="main">
+    <main className="center-screen dc-game-backdrop" id="main" data-part="not-found-screen">
       <NoticeCard
         icon="help"
         tone="info"

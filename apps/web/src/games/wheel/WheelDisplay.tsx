@@ -3,11 +3,12 @@
  * to the renderer and renders the DOM parts (hub, pointer, gloss).
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { PixelIcon, cx } from '@dascade/ui';
+import { PixelIcon, cx, useThemeTokens } from '@dascade/ui';
 import type { WheelSnapshotSegment } from '@dascade/shared/games/wheel';
 import { useApp } from '../../app/store.ts';
 import { formatPercent } from './model.ts';
 import { WheelRenderer, type RenderLayout, type RenderSpin } from './WheelRenderer.ts';
+import { wheelPalette } from './palette.ts';
 
 export interface WheelDisplayProps {
   layout: RenderLayout;
@@ -63,6 +64,8 @@ export function WheelDisplay({
   const callbacks = useRef({ onTick, onPointer });
   callbacks.current = { onTick, onPointer };
   const gradientId = useId().replace(/:/g, '');
+  // Theme materials (read in scope of the wheel so per-game nudges apply); live on theme change.
+  const materials = useThemeTokens(rootRef).materials;
 
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -98,6 +101,9 @@ export function WheelDisplay({
     };
   }, []);
 
+  useEffect(() => {
+    rendererRef.current?.setPalette(wheelPalette(materials));
+  }, [materials]);
   useEffect(() => {
     rendererRef.current?.setOptions({ reducedMotion, fx, preview: variant === 'preview' });
   }, [reducedMotion, fx, variant]);
@@ -145,6 +151,7 @@ export function WheelDisplay({
         role="img"
         aria-label={label}
         data-variant={variant}
+        data-part="wheel"
         onPointerMove={(e) => e.pointerType === 'mouse' && probe(e)}
         onPointerDown={(e) => e.pointerType !== 'mouse' && probe(e)}
         onPointerLeave={(e) => e.pointerType === 'mouse' && setTip(null)}
@@ -158,13 +165,14 @@ export function WheelDisplay({
         <canvas className="wh-wheel__lights" ref={lightsRef} aria-hidden />
         <div
           className={cx('wh-hub', hubActive && 'wh-hub--active')}
+          data-part="wheel-hub"
           aria-hidden
           onClick={hubActive ? onHubClick : undefined}
           title={hubActive ? 'Spin!' : undefined}
         >
           <PixelIcon name="star" className="wh-hub__icon" />
         </div>
-        <div className="wh-pointer" ref={pointerRef} aria-hidden>
+        <div className="wh-pointer" data-part="wheel-pointer" ref={pointerRef} aria-hidden>
           <svg viewBox="0 0 60 100" className="wh-pointer__svg">
             <defs>
               <linearGradient id={`${gradientId}-body`} x1="0" y1="0" x2="1" y2="0">
@@ -173,9 +181,9 @@ export function WheelDisplay({
                 <stop offset="1" stopColor="#a80f45" />
               </linearGradient>
               <radialGradient id={`${gradientId}-pin`} cx="0.35" cy="0.3" r="0.8">
-                <stop offset="0" stopColor="#fff6d8" />
-                <stop offset="0.5" stopColor="#ffbf3f" />
-                <stop offset="1" stopColor="#8a4a00" />
+                <stop offset="0" style={{ stopColor: 'var(--wh-pin-1, #fff6d8)' }} />
+                <stop offset="0.5" style={{ stopColor: 'var(--wh-pin-2, #ffbf3f)' }} />
+                <stop offset="1" style={{ stopColor: 'var(--wh-pin-3, #8a4a00)' }} />
               </radialGradient>
             </defs>
             <path d="M30 97 L12 42 A19 19 0 1 1 48 42 Z" fill={`url(#${gradientId}-body)`} stroke="#3b0016" strokeWidth="3.5" strokeLinejoin="round" />

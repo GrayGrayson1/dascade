@@ -6,6 +6,7 @@
  *   LOAD_SCENARIOS=join,chat,reconnect,sketch,wheel,bingo,cleanup pnpm load
  *
  *   LOAD_SCENARIOS=trivia,deception,masterpiece,words,survey pnpm load   (party games: scripts/load/<id>.ts)
+ *   LOAD_SCENARIOS=dj pnpm load                                            (Room DJ: scripts/load/dj.ts)
  *
  * Racing has its own scripted-input bot runner: scripts/load-circuit.ts.
  * Exits non-zero when any scenario fails its thresholds.

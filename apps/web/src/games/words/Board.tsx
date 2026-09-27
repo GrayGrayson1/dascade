@@ -174,7 +174,7 @@ export function GridBoard({ tiles, disabled, highlight, flash, onSubmit, minLeng
   const line = path.map((t) => `${(t % size) + 0.5},${Math.floor(t / size) + 0.5}`).join(' ');
 
   return (
-    <div className="wd-board-wrap">
+    <div className="wd-board-wrap" data-part="board">
       <div className="wd-trace">
         <span className="wd-trace__live" aria-live="polite">
           {letters > 0 ? (
@@ -199,6 +199,7 @@ export function GridBoard({ tiles, disabled, highlight, flash, onSubmit, minLeng
       </div>
       <div
         className={cx('wd-board', disabled && 'is-disabled')}
+        data-part="board-grid"
         style={{ '--n': size } as CSSProperties}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -215,6 +216,7 @@ export function GridBoard({ tiles, disabled, highlight, flash, onSubmit, minLeng
                 key={i}
                 type="button"
                 className="wd-cell"
+                data-part="tile"
                 data-state={state}
                 data-long={tile.length > 1 ? 'true' : undefined}
                 disabled={disabled}

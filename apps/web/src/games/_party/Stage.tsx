@@ -37,16 +37,21 @@ export function PartyStage({ gameId, top, children, side, sideOnCompact, bottom,
     <GameStage gameId={gameId} className={cx('pk-stage', className)}>
       <div
         className={cx('pk-layout', Boolean(side) && 'pk-layout--side', Boolean(side && sideOnCompact) && 'pk-layout--side-compact')}
+        data-part="stage"
         data-stage={stage}
       >
         {top ? <div className="pk-top">{top}</div> : null}
         <div className="pk-main">{children}</div>
         {side ? (
-          <aside className="pk-side" aria-label="Scores">
+          <aside className="pk-side" aria-label="Scores" data-part="scoreboard">
             {side}
           </aside>
         ) : null}
-        {bottom ? <div className="pk-bottom">{bottom}</div> : null}
+        {bottom ? (
+          <div className="pk-bottom" data-part="players-strip">
+            {bottom}
+          </div>
+        ) : null}
       </div>
     </GameStage>
   );
@@ -55,9 +60,11 @@ export function PartyStage({ gameId, top, children, side, sideOnCompact, bottom,
 /** The standard top bar: left cluster (counter + chips), timer, right cluster (host + rules). */
 export function PartyTopBar({ left, timer, right }: { left?: ReactNode; timer?: ReactNode; right?: ReactNode }) {
   return (
-    <header className="pk-topbar">
+    <header className="pk-topbar" data-part="hud">
       <div className="pk-topbar__left">{left}</div>
-      <div className="pk-topbar__timer">{timer}</div>
+      <div className="pk-topbar__timer" data-part="timer">
+        {timer}
+      </div>
       <div className="pk-topbar__right">{right}</div>
     </header>
   );
@@ -117,7 +124,7 @@ export interface PromptCardProps {
 
 export function PromptCard({ kicker, children, meta, tone = 'default', animKey, size = 'lg' }: PromptCardProps) {
   return (
-    <section key={animKey} className={cx('pk-prompt', `pk-prompt--${size}`)} data-tone={tone} aria-live="polite">
+    <section key={animKey} className={cx('pk-prompt', `pk-prompt--${size}`)} data-part="prompt-card" data-tone={tone} aria-live="polite">
       <i className="pk-prompt__corner pk-prompt__corner--tl" aria-hidden="true" />
       <i className="pk-prompt__corner pk-prompt__corner--br" aria-hidden="true" />
       {kicker ? <p className="pk-prompt__kicker">{kicker}</p> : null}
@@ -134,11 +141,12 @@ export function PromptCard({ kicker, children, meta, tone = 'default', animKey, 
 /** Horizontal draining bar for the current stage timer (hidden when the stage is untimed). */
 export function TimerBar({ label = 'Time left', className }: { label?: string; className?: string }) {
   const t = useStageTimer(true);
-  if (!t.timed) return <div className={cx('pk-timerbar', 'pk-timerbar--idle', className)} aria-hidden="true" />;
+  if (!t.timed) return <div className={cx('pk-timerbar', 'pk-timerbar--idle', className)} data-part="timer-bar" aria-hidden="true" />;
   const urgent = !t.paused && t.seconds <= 5;
   return (
     <div
       className={cx('pk-timerbar', className)}
+      data-part="timer-bar"
       data-urgent={urgent ? 'true' : undefined}
       data-paused={t.paused ? 'true' : undefined}
       role="timer"
@@ -184,7 +192,7 @@ export function HostBar({ skipLabel, canPause = true, compact }: { skipLabel?: s
   const t = useStageTimer();
   if (!playerId || hostId !== playerId || phase !== 'PLAYING') return null;
   return (
-    <div className="pk-hostbar" role="group" aria-label="Host controls">
+    <div className="pk-hostbar" data-part="host-bar" role="group" aria-label="Host controls">
       {canPause && t.timed ? (
         t.paused ? (
           <Button size="sm" variant="secondary" icon="play" onClick={() => sendHost('resume', stageSeq)}>
@@ -287,7 +295,7 @@ export function Interstitial({
   animKey?: string | number;
 }) {
   return (
-    <div key={animKey} className="pk-interstitial">
+    <div key={animKey} className="pk-interstitial" data-part="interstitial">
       <span className="pk-interstitial__icon" aria-hidden="true">
         <PixelIcon name={icon} />
       </span>

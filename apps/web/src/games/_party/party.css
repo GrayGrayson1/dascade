@@ -2,6 +2,15 @@
  * DAStravaganza party kit — game-show chrome in DASCADE's neon-pixel identity.
  * Classes are prefixed .pk-. Chrome uses theme tokens; the answer-slot art palette is declared
  * once below (--pk-slot-*) so a theme can override it.
+ *
+ * Theme materials (packages/ui/src/theme/materials.ts): the stage set, prompt/answer/vote cards
+ * and the podium follow `--mat-stage / stage-light / podium / card-face / card-ink`. Delta Neon
+ * defines no materials, so every rule falls back to the kit's own look. Helpers declared on the
+ * stage below (`--pk-card-ink`, `--pk-card-ink-muted`, `--pk-stage-set`) only exist when the theme
+ * defines materials — use them as `var(--pk-card-ink, <your current colour>)` in game CSS.
+ * DOM hooks for skins: data-part = stage, hud, timer, timer-bar, host-bar, prompt-card,
+ * answer-grid, answer-card, vote-grid, vote-card, answered-strip, players-strip, scoreboard,
+ * leaderboard, interstitial, results, podium, podium-block, standings.
  */
 .pk-stage {
   --pk-slot-0: #ff4f81;
@@ -12,6 +21,17 @@
   --pk-slot-5: #ff8a3d;
   --pk-row-h: 50px;
   --pk-gutter: clamp(12px, 2.4vw, 28px);
+  /* Material helpers: guaranteed-invalid (so var() fallbacks apply) unless the theme sets materials. */
+  --pk-card-ink: var(--mat-card-ink);
+  --pk-card-ink-muted: color-mix(in srgb, var(--mat-card-ink) 66%, transparent);
+  /* The stage set: a floor of --mat-stage over the theme backdrop with a --mat-stage-light wash
+     from the rig above. Inset shadows paint over the background and under the content, so the
+     stage needs no extra element; without materials it is `none` (the stage's current value). */
+  --pk-stage-set:
+    inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2)
+      color-mix(in srgb, var(--mat-stage-light) 30%, transparent),
+    inset 0 0 0 100vmax color-mix(in srgb, var(--mat-stage) 90%, transparent);
+  box-shadow: var(--pk-stage-set, none);
   overflow-x: clip;
 }
 
@@ -203,7 +223,8 @@
   border-radius: var(--radius-lg);
   background:
     radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
-    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--accent-2) 14%, transparent), transparent 55%), var(--panel-bg);
+    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--accent-2) 14%, transparent), transparent 55%),
+    var(--mat-card-face, var(--panel-bg));
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--panel-border));
   box-shadow: var(--panel-shadow), var(--glow-sm);
   text-align: center;
@@ -235,19 +256,20 @@
   border-top: 0;
 }
 .pk-prompt__kicker {
+  --pk-kicker-ink: color-mix(in srgb, var(--accent) 32%, var(--mat-card-ink));
   margin: 0 0 var(--sp-2);
   font-family: var(--font-pixel);
   font-size: var(--fs-xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--pk-kicker-ink, var(--accent));
 }
 .pk-prompt__text {
   margin: 0;
   font-family: var(--font-ui);
   font-weight: 700;
   line-height: 1.22;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -263,6 +285,9 @@
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin-top: var(--sp-3);
+}
+.pk-prompt .pk-chip {
+  color: var(--pk-card-ink, var(--text-0));
 }
 
 @keyframes pk-rise {
@@ -382,8 +407,8 @@
   border: 2px solid color-mix(in srgb, var(--slot) 70%, transparent);
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--slot) 22%, transparent), color-mix(in srgb, var(--slot) 8%, transparent)),
-    var(--panel-bg-solid);
-  color: var(--text-0);
+    var(--mat-card-face, var(--panel-bg-solid));
+  color: var(--pk-card-ink, var(--text-0));
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -457,14 +482,14 @@
   position: relative;
   z-index: 1;
   font-size: var(--fs-lg);
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   min-width: 2ch;
   text-align: right;
 }
 .pk-answer__mark {
   position: relative;
   z-index: 1;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
 }
 .pk-answer__bar {
   position: absolute;
@@ -496,14 +521,16 @@
   animation: pk-pop var(--dur-3) var(--ease-spring);
 }
 .pk-answer[data-state='correct'] .pk-answer__mark {
-  color: var(--green);
+  --pk-mark-ink: color-mix(in srgb, var(--green) 55%, var(--mat-card-ink));
+  color: var(--pk-mark-ink, var(--green));
 }
 .pk-answer[data-state='wrong'] {
   border-color: var(--red);
   opacity: 0.85;
 }
 .pk-answer[data-state='wrong'] .pk-answer__mark {
-  color: var(--red);
+  --pk-mark-ink: color-mix(in srgb, var(--red) 65%, var(--mat-card-ink));
+  color: var(--pk-mark-ink, var(--red));
 }
 .pk-shape {
   display: block;
@@ -702,7 +729,9 @@
   gap: var(--sp-3);
   padding: var(--sp-4);
   border-radius: var(--radius-lg);
-  background: var(--panel-bg);
+  background: var(--mat-card-face, var(--panel-bg));
+  /* No colour of its own today (inherits): without materials this is invalid → inherits as before. */
+  color: var(--pk-card-ink);
   border: 2px solid color-mix(in srgb, var(--slot) 45%, var(--panel-border));
   box-shadow: var(--shadow-1);
   animation: pk-rise var(--dur-3) var(--ease-out) backwards;
@@ -749,7 +778,7 @@
   font-size: var(--fs-2xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .pk-vote .dc-btn {
   min-height: 48px;
@@ -771,10 +800,10 @@
   transition: transform var(--dur-4) var(--ease-out);
 }
 .pk-vote__votes {
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
 }
 .pk-vote__author {
-  color: var(--text-1);
+  color: var(--pk-card-ink-muted, var(--text-1));
 }
 .pk-vote__crown {
   color: var(--yellow);
@@ -1175,12 +1204,15 @@
 }
 
 .pk-podium {
+  /* A spotlight pool from the stage rig behind the podium (themes with materials only). */
+  --pk-podium-light: radial-gradient(60% 70% at 50% 100%, color-mix(in srgb, var(--mat-stage-light) 20%, transparent), transparent 72%);
   display: flex;
   justify-content: center;
   align-items: flex-end;
   gap: clamp(8px, 2vw, 22px);
   min-height: 250px;
   padding-top: var(--sp-4);
+  background: var(--pk-podium-light, none);
 }
 .pk-podium__slot {
   --player: var(--accent);
@@ -1227,7 +1259,7 @@
   border-radius: var(--radius) var(--radius) 4px 4px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--player) 45%, transparent), color-mix(in srgb, var(--player) 12%, transparent)),
-    var(--panel-bg-solid);
+    var(--mat-podium, var(--panel-bg-solid));
   border: 2px solid color-mix(in srgb, var(--player) 70%, transparent);
   box-shadow: 0 0 24px color-mix(in srgb, var(--player) 30%, transparent);
 }
@@ -1492,4 +1524,9 @@
   .pk-answer__label {
     font-size: clamp(1.15rem, 0.6vw + 1rem, 1.45rem);
   }
+}
+
+/* Podium headline: the winner's name in their player colour (a var so light themes can deepen it). */
+.pk-winner-name {
+  color: var(--winner, inherit);
 }

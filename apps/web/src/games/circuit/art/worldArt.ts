@@ -6,8 +6,12 @@
  */
 import { levelAt, pointAt, type Bridge, type Building, type Decor, type Track, type TrackTheme } from '@dascade/game-core/circuit';
 import { artRng, DISPLAY_FONT, NEON, PIXEL_FONT, rgba, shade } from './palette.ts';
+import { circuitWorldPalette, type CircuitWorldPalette } from '../themeAdapter.ts';
 
 export const TILE = 1024;
+
+/** Only the world-default constants matter for track-less art (city, parks, lots, roofs, stands). */
+const DEFAULT_TRACK_THEME: TrackTheme = { ground: '', road: '#000000', runoff: '#000000', neonA: '#22d3ee', neonB: '#ff4fd8', curb: '#000000', barrier: '#000000' };
 
 // ---------------------------------------------------------------------------
 // Patterns
@@ -34,7 +38,7 @@ interface Patterns {
   plaza: CanvasPattern;
 }
 
-function makePatterns(ctx: CanvasRenderingContext2D, theme: TrackTheme): Patterns {
+function makePatterns(ctx: CanvasRenderingContext2D, theme: TrackTheme, P: CircuitWorldPalette): Patterns {
   const asphalt = noiseCanvas(
     96,
     theme.road,
@@ -60,9 +64,9 @@ function makePatterns(ctx: CanvasRenderingContext2D, theme: TrackTheme): Pattern
   plaza.width = 64;
   plaza.height = 64;
   const pg = plaza.getContext('2d')!;
-  pg.fillStyle = '#121728';
+  pg.fillStyle = P.plazaA;
   pg.fillRect(0, 0, 64, 64);
-  pg.fillStyle = '#161c30';
+  pg.fillStyle = P.plazaB;
   pg.fillRect(0, 0, 31, 31);
   pg.fillRect(32, 32, 31, 31);
   pg.fillStyle = 'rgba(0,0,0,0.35)';
@@ -160,9 +164,18 @@ export const TRACKSIDE_BAND = 118;
 // Track tile
 // ---------------------------------------------------------------------------
 
-export function drawTrackTile(ctx: CanvasRenderingContext2D, ox: number, oy: number, scale: number, track: Track, decor: Decor, quality: 'high' | 'low'): void {
-  const theme = track.def.theme;
-  const pats = makePatterns(ctx, theme);
+export function drawTrackTile(
+  ctx: CanvasRenderingContext2D,
+  ox: number,
+  oy: number,
+  scale: number,
+  track: Track,
+  decor: Decor,
+  quality: 'high' | 'low',
+  P: CircuitWorldPalette = circuitWorldPalette(track.def.theme),
+): void {
+  const theme = P.track;
+  const pats = makePatterns(ctx, theme, P);
   const hw = track.halfWidth;
   const wall = track.wall;
   ctx.save();
@@ -174,7 +187,7 @@ export function drawTrackTile(ctx: CanvasRenderingContext2D, ox: number, oy: num
   // Trackside plaza band + its kerb.
   tracePath(ctx, track);
   ctx.lineWidth = (wall + TRACKSIDE_BAND) * 2 + 6;
-  ctx.strokeStyle = '#232a44';
+  ctx.strokeStyle = P.plazaEdge;
   ctx.stroke();
   tracePath(ctx, track);
   ctx.lineWidth = (wall + TRACKSIDE_BAND) * 2;
@@ -209,12 +222,12 @@ export function drawTrackTile(ctx: CanvasRenderingContext2D, ox: number, oy: num
   ctx.stroke();
 
   // Chevrons on the outside barrier of tight corners.
-  drawChevrons(ctx, track);
+  drawChevrons(ctx, track, P);
 
   // Road edge line then asphalt.
   tracePath(ctx, track);
   ctx.lineWidth = hw * 2 + 5;
-  ctx.strokeStyle = '#e6ebff';
+  ctx.strokeStyle = P.roadEdge;
   ctx.stroke();
   tracePath(ctx, track);
   ctx.lineWidth = hw * 2;
@@ -230,14 +243,14 @@ export function drawTrackTile(ctx: CanvasRenderingContext2D, ox: number, oy: num
     else ctx.moveTo(x, y);
   }
   ctx.lineWidth = 34;
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.strokeStyle = P.racingLine;
   ctx.stroke();
 
   // Wet sheen streaks and puddles.
   if (quality === 'high') drawWetSheen(ctx, track);
 
   // Curbs and edge lines.
-  drawCurbs(ctx, track);
+  drawCurbs(ctx, track, P);
 
   // Light pools spilling onto the road (wet reflections).
   if (quality === 'high') drawLightPools(ctx, track, decor, 0.16);
@@ -250,9 +263,9 @@ export function drawTrackTile(ctx: CanvasRenderingContext2D, ox: number, oy: num
   ctx.restore();
 }
 
-function drawChevrons(ctx: CanvasRenderingContext2D, track: Track): void {
+function drawChevrons(ctx: CanvasRenderingContext2D, track: Track, P: CircuitWorldPalette): void {
   const { curb } = curves(track);
-  const theme = track.def.theme;
+  const theme = P.track;
   for (let i = 0; i < track.n; i += 5) {
     const k = curb[i]!;
     if (Math.abs(k) < 1 / 330) continue;
@@ -262,7 +275,7 @@ function drawChevrons(ctx: CanvasRenderingContext2D, track: Track): void {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
-    ctx.fillStyle = '#0b0914';
+    ctx.fillStyle = P.chevronBg;
     ctx.fillRect(-9, -6, 18, 12);
     ctx.fillStyle = theme.neonB;
     ctx.beginPath();
@@ -278,9 +291,9 @@ function drawChevrons(ctx: CanvasRenderingContext2D, track: Track): void {
   }
 }
 
-function drawCurbs(ctx: CanvasRenderingContext2D, track: Track): void {
+function drawCurbs(ctx: CanvasRenderingContext2D, track: Track, P: CircuitWorldPalette): void {
   const { curb } = curves(track);
-  const theme = track.def.theme;
+  const theme = P.track;
   const hw = track.halfWidth;
   const inner = hw - track.rumble;
   // Thin edge line everywhere, curbs in corners.
@@ -292,7 +305,7 @@ function drawCurbs(ctx: CanvasRenderingContext2D, track: Track): void {
       else ctx.moveTo(x, y);
     }
     ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(230,235,255,0.55)';
+    ctx.strokeStyle = P.edgeLine;
     ctx.stroke();
   }
   for (let i = 0; i < track.n; i++) {
@@ -300,7 +313,7 @@ function drawCurbs(ctx: CanvasRenderingContext2D, track: Track): void {
     if (Math.abs(k) < 1 / 650) continue;
     for (const side of [-1, 1]) {
       const block = Math.floor(i / 2) % 2 === 0;
-      ctx.fillStyle = block ? theme.curb : theme.neonB;
+      ctx.fillStyle = block ? theme.curb : P.curbAlt;
       quad(ctx, edge(track, i, side * inner), edge(track, i + 1, side * inner), edge(track, i + 1, side * hw), edge(track, i, side * hw));
     }
   }
@@ -473,7 +486,12 @@ function drawRoadPaint(ctx: CanvasRenderingContext2D, track: Track): void {
 // Flyover deck (drawn above the lower pass)
 // ---------------------------------------------------------------------------
 
-export function renderDeck(track: Track, bridge: Bridge, scale: number): { canvas: HTMLCanvasElement; x: number; y: number } {
+export function renderDeck(
+  track: Track,
+  bridge: Bridge,
+  scale: number,
+  P: CircuitWorldPalette = circuitWorldPalette(track.def.theme),
+): { canvas: HTMLCanvasElement; x: number; y: number } {
   const span = bridge.to >= bridge.from ? bridge.to - bridge.from : track.length - bridge.from + bridge.to;
   const samples = Math.ceil(span / track.spacing);
   const i0 = Math.floor(bridge.from / track.spacing);
@@ -499,8 +517,8 @@ export function renderDeck(track: Track, bridge: Bridge, scale: number): { canva
   ctx.translate(-minX, -minY);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'butt';
-  const theme = track.def.theme;
-  const pats = makePatterns(ctx, theme);
+  const theme = P.track;
+  const pats = makePatterns(ctx, theme, P);
   const path = (d: number, from = 0, to = samples) => {
     ctx.beginPath();
     for (let k = from; k <= to; k++) {
@@ -524,7 +542,7 @@ export function renderDeck(track: Track, bridge: Bridge, scale: number): { canva
   // Deck structure (girders visible beyond the barrier).
   path(0, fadeK - 4, samples - fadeK + 4);
   ctx.lineWidth = track.wall * 2 + 26;
-  ctx.strokeStyle = '#1a1830';
+  ctx.strokeStyle = P.deckGirder;
   ctx.stroke();
   // Barriers + neon railings.
   path(0);
@@ -545,7 +563,7 @@ export function renderDeck(track: Track, bridge: Bridge, scale: number): { canva
   ctx.stroke();
   path(0);
   ctx.lineWidth = track.halfWidth * 2 + 5;
-  ctx.strokeStyle = '#e6ebff';
+  ctx.strokeStyle = P.roadEdge;
   ctx.stroke();
   path(0);
   ctx.lineWidth = track.halfWidth * 2;
@@ -554,7 +572,7 @@ export function renderDeck(track: Track, bridge: Bridge, scale: number): { canva
   for (const side of [-1, 1]) {
     path(side * (track.halfWidth - track.rumble - 2));
     ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(230,235,255,0.55)';
+    ctx.strokeStyle = P.edgeLine;
     ctx.stroke();
   }
   // Expansion joints.
@@ -601,7 +619,7 @@ export function renderDeck(track: Track, bridge: Bridge, scale: number): { canva
 // City street tile (repeating)
 // ---------------------------------------------------------------------------
 
-export function cityTileCanvas(decor: Decor, scale: number): HTMLCanvasElement {
+export function cityTileCanvas(decor: Decor, scale: number, P: CircuitWorldPalette = circuitWorldPalette(DEFAULT_TRACK_THEME)): HTMLCanvasElement {
   const cell = decor.cell;
   const street = decor.street;
   const c = document.createElement('canvas');
@@ -611,13 +629,13 @@ export function cityTileCanvas(decor: Decor, scale: number): HTMLCanvasElement {
   g.scale(scale, scale);
   g.imageSmoothingEnabled = false;
   // Street asphalt.
-  g.fillStyle = '#0c0f1c';
+  g.fillStyle = P.street;
   g.fillRect(0, 0, cell, cell);
   const rnd = artRng(99);
-  g.fillStyle = '#0f1322';
+  g.fillStyle = P.streetSpeck;
   for (let i = 0; i < 500; i++) g.fillRect(Math.floor(rnd() * cell), Math.floor(rnd() * cell), 2, 2);
   // Lane dashes along the tile edges (streets are centred on tile boundaries).
-  g.fillStyle = 'rgba(255,210,63,0.35)';
+  g.fillStyle = P.laneDash;
   for (let t = 0; t < cell; t += 24) {
     g.fillRect(t, 0, 12, 1);
     g.fillRect(t, cell - 1, 12, 1);
@@ -627,7 +645,7 @@ export function cityTileCanvas(decor: Decor, scale: number): HTMLCanvasElement {
   const b0 = street / 2;
   const bs = cell - street;
   // Crosswalks at the corners.
-  g.fillStyle = 'rgba(230,235,255,0.22)';
+  g.fillStyle = P.crosswalk;
   for (let k = 0; k < 5; k++) {
     g.fillRect(b0 - 20 + k * 0, b0 + 6 + k * 6, 16, 3);
     g.fillRect(b0 + 6 + k * 6, b0 - 20, 3, 16);
@@ -635,14 +653,14 @@ export function cityTileCanvas(decor: Decor, scale: number): HTMLCanvasElement {
     g.fillRect(b0 + bs - 30 + k * 6, b0 + bs + 4, 3, 16);
   }
   // Sidewalk ring + block base.
-  g.fillStyle = '#1a2036';
+  g.fillStyle = P.sidewalk;
   g.fillRect(b0, b0, bs, bs);
-  g.fillStyle = '#232a44';
+  g.fillStyle = P.sidewalkEdge;
   g.fillRect(b0, b0, bs, 2);
   g.fillRect(b0, b0, 2, bs);
-  g.fillStyle = '#0e1120';
+  g.fillStyle = P.block;
   g.fillRect(b0 + 10, b0 + 10, bs - 20, bs - 20);
-  g.fillStyle = '#12162a';
+  g.fillStyle = P.blockSpeck;
   for (let i = 0; i < 160; i++) g.fillRect(b0 + 10 + Math.floor(rnd() * (bs - 22)), b0 + 10 + Math.floor(rnd() * (bs - 22)), 2, 2);
   // Street lamps at block corners.
   g.fillStyle = 'rgba(255,214,140,0.9)';
@@ -661,18 +679,26 @@ export function cityTileCanvas(decor: Decor, scale: number): HTMLCanvasElement {
 // Parks, lots, roofs, signs
 // ---------------------------------------------------------------------------
 
-export function parkCanvas(w: number, h: number, trees: Array<{ x: number; y: number; r: number }>, ox: number, oy: number, seed: number): HTMLCanvasElement {
+export function parkCanvas(
+  w: number,
+  h: number,
+  trees: Array<{ x: number; y: number; r: number }>,
+  ox: number,
+  oy: number,
+  seed: number,
+  P: CircuitWorldPalette = circuitWorldPalette(DEFAULT_TRACK_THEME),
+): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.ceil(w);
   c.height = Math.ceil(h);
   const g = c.getContext('2d')!;
   const rnd = artRng(seed);
-  g.fillStyle = '#0d2219';
+  g.fillStyle = P.parkGrass;
   g.fillRect(0, 0, w, h);
-  g.fillStyle = '#10291e';
+  g.fillStyle = P.parkSpeck;
   for (let i = 0; i < (w * h) / 60; i++) g.fillRect(Math.floor(rnd() * w / 2) * 2, Math.floor(rnd() * h / 2) * 2, 2, 2);
   // Paths.
-  g.strokeStyle = '#2a2d3e';
+  g.strokeStyle = P.parkPath;
   g.lineWidth = 6;
   g.beginPath();
   g.moveTo(0, h * (0.3 + rnd() * 0.4));
@@ -682,7 +708,7 @@ export function parkCanvas(w: number, h: number, trees: Array<{ x: number; y: nu
   if (w > 150 && rnd() < 0.6) {
     const px = w * (0.3 + rnd() * 0.4);
     const py = h * (0.3 + rnd() * 0.4);
-    g.fillStyle = '#0b2a3c';
+    g.fillStyle = P.pond;
     g.beginPath();
     g.ellipse(px, py, 26, 18, 0, 0, Math.PI * 2);
     g.fill();
@@ -699,27 +725,27 @@ export function parkCanvas(w: number, h: number, trees: Array<{ x: number; y: nu
     g.beginPath();
     g.arc(x + 4, y + 5, r, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#174d33';
+    g.fillStyle = P.treeA;
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#1f6b44';
+    g.fillStyle = P.treeB;
     g.beginPath();
     g.arc(x - r * 0.25, y - r * 0.25, r * 0.65, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#2d8a57';
+    g.fillStyle = P.treeC;
     g.fillRect(Math.round(x - r * 0.45), Math.round(y - r * 0.5), 3, 3);
   }
   return c;
 }
 
-export function lotCanvas(w: number, h: number, seed: number): HTMLCanvasElement {
+export function lotCanvas(w: number, h: number, seed: number, P: CircuitWorldPalette = circuitWorldPalette(DEFAULT_TRACK_THEME)): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.ceil(w);
   c.height = Math.ceil(h);
   const g = c.getContext('2d')!;
   const rnd = artRng(seed);
-  g.fillStyle = '#15182a';
+  g.fillStyle = P.lot;
   g.fillRect(0, 0, w, h);
   g.fillStyle = 'rgba(230,235,255,0.25)';
   const rows = Math.max(1, Math.floor((h - 20) / 44));
@@ -745,10 +771,14 @@ export function lotCanvas(w: number, h: number, seed: number): HTMLCanvasElement
   return c;
 }
 
-const TONES = ['#2a2f47', '#342f4c', '#243a46', '#3b2d40', '#2c3a33', '#3e3833'];
-export const WALL_TONES = TONES.map((t) => shade(t, -0.35));
+/** Building wall tones for a palette (roof tones darkened). */
+export function wallTones(P: CircuitWorldPalette): string[] {
+  return P.roofTones.map((t) => shade(t, -0.35));
+}
+export const WALL_TONES = wallTones(circuitWorldPalette(DEFAULT_TRACK_THEME));
 
-export function roofCanvas(b: Building, scale: number): HTMLCanvasElement {
+export function roofCanvas(b: Building, scale: number, P: CircuitWorldPalette = circuitWorldPalette(DEFAULT_TRACK_THEME)): HTMLCanvasElement {
+  const TONES = P.roofTones;
   const w = b.w;
   const h = b.h;
   const c = document.createElement('canvas');
@@ -988,7 +1018,14 @@ export function billboardCanvas(text: string, tone: number, scale: number): HTML
 }
 
 /** Grandstand texture (two frames for a bobbing crowd). */
-export function standCanvas(length: number, depth: number, frame: number, neon: string, scale: number): HTMLCanvasElement {
+export function standCanvas(
+  length: number,
+  depth: number,
+  frame: number,
+  neon: string,
+  scale: number,
+  P: CircuitWorldPalette = circuitWorldPalette(DEFAULT_TRACK_THEME),
+): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.ceil(length * scale);
   c.height = Math.ceil(depth * scale);
@@ -998,12 +1035,12 @@ export function standCanvas(length: number, depth: number, frame: number, neon: 
   const rnd = artRng(4242);
   const rows = 7;
   const rowH = (depth - 10) / rows;
-  g.fillStyle = '#141828';
+  g.fillStyle = P.standBase;
   g.fillRect(0, 0, length, depth);
   const shirts = ['#22d3ee', '#f97316', '#ff4fd8', '#ffd23f', '#2de38f', '#f8f6ff', '#a78bfa', '#ff5a5f'];
   for (let r = 0; r < rows; r++) {
     const y = depth - 8 - (r + 1) * rowH;
-    g.fillStyle = r % 2 ? '#1d2236' : '#20263c';
+    g.fillStyle = r % 2 ? P.standRowA : P.standRowB;
     g.fillRect(0, y, length, rowH);
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(0, y + rowH - 1, length, 1);
@@ -1022,7 +1059,7 @@ export function standCanvas(length: number, depth: number, frame: number, neon: 
     }
   }
   // Front wall with neon trim.
-  g.fillStyle = '#2a3350';
+  g.fillStyle = P.standWall;
   g.fillRect(0, depth - 8, length, 8);
   g.fillStyle = neon;
   g.fillRect(0, depth - 8, length, 2);

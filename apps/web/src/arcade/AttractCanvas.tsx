@@ -65,7 +65,8 @@ export function AttractCanvas({
     if (!ctx) return;
     // A paused (not running) screen keeps its last live frame when it has one; motion-off shows the still.
     const motionOff = reduced || fx === 'off';
-    const time = t ?? (s.lastT || clockNow() + offset);
+    // Motion off: a fixed moment, so a repaint (resize, late fonts) shows the identical still frame.
+    const time = t ?? (s.lastT || (motionOff ? offset : clockNow() + offset));
     if (t !== undefined) s.lastT = t;
     drawAttract({ ctx, W: s.W, H: s.H, t: time, active: s.active, hud, still: motionOff || (!s.live && !s.lastT), scenes, title, accent });
   };

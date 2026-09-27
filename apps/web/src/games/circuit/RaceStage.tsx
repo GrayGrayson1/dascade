@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CircuitPublicState } from '@dascade/shared/games/circuit';
-import { PixelIcon, ProgressBar } from '@dascade/ui';
+import { PixelIcon, ProgressBar, readThemeTokens, subscribeThemeTokens } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
 import { useRoomSelector } from '../../net/hooks.ts';
 import { RaceController } from './race/controller.ts';
@@ -55,11 +55,19 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
     if (!el || !fontsReady) return;
     const mobile = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 560;
     let lastReport = -1;
+    // Theme materials re-present the world; read in scope of the stage (per-game nudges apply).
+    const themeLook = () => {
+      const t = readThemeTokens(el);
+      return { materials: t.materials, ambientRain: t.effects.ambient === 'rain' && fx !== 'off' && !reducedMotion };
+    };
+    const look = themeLook();
     const rg = createRaceGame(el, {
       controller: ctrl,
       fx,
       reducedMotion,
       mobile,
+      materials: look.materials,
+      ambientRain: look.ambientRain,
       onProgress: (progress, ready) => {
         if (ready || progress - lastReport > 0.08) {
           lastReport = progress;
@@ -69,8 +77,13 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
     });
     const ro = new ResizeObserver(() => rg.resize(el.clientWidth, el.clientHeight));
     ro.observe(el);
+    const offTheme = subscribeThemeTokens(() => {
+      const next = themeLook();
+      rg.scene.setTheme(next.materials, next.ambientRain);
+    });
     window.__CIRCUIT__ = { game: rg.game, controller: ctrl };
     return () => {
+      offTheme();
       ro.disconnect();
       rg.destroy();
       if (window.__CIRCUIT__?.controller === ctrl) delete window.__CIRCUIT__;
@@ -78,8 +91,8 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
   }, [ctrl, fx, reducedMotion, fontsReady]);
 
   return (
-    <div className="ci-race" data-dimmed={dimmed ? 'true' : undefined}>
-      <div className="ci-canvas" ref={containerRef} />
+    <div className="ci-race" data-part="race" data-dimmed={dimmed ? 'true' : undefined}>
+      <div className="ci-canvas" data-part="track" ref={containerRef} />
       <Hud ctrl={ctrl} />
       {ui.touch && !ui.spectating && !dimmed ? <TouchControls sampler={ctrl.sampler} boost={boostOn !== false} /> : null}
       {ui.netDebug ? <NetDebug ctrl={ctrl} /> : null}

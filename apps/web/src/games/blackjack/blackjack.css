@@ -8,9 +8,10 @@
   --bj-gold: #ffd23f;
   --bj-gold-soft: rgba(255, 210, 63, 0.55);
   --bj-gold-faint: rgba(255, 210, 63, 0.22);
-  --bj-felt-hi: #9a1b2c;
-  --bj-felt: #6a0f1d;
-  --bj-felt-lo: #33060f;
+  /* Playfield materials: theme `--mat-*` when set, else the original crimson table (Delta Neon). */
+  --bj-felt-hi: var(--mat-felt, #9a1b2c);
+  --bj-felt: var(--mat-felt, #6a0f1d);
+  --bj-felt-lo: var(--mat-felt-deep, #33060f);
   --bj-win: #2de38f;
   --bj-lose: #ff5a5f;
   --bj-push: #c9c2ea;
@@ -19,7 +20,7 @@
     radial-gradient(900px 420px at 50% 8%, rgba(255, 90, 95, 0.16), transparent 70%),
     radial-gradient(700px 500px at 0% 100%, rgba(255, 210, 63, 0.07), transparent 70%),
     radial-gradient(700px 500px at 100% 100%, rgba(255, 90, 95, 0.08), transparent 70%),
-    linear-gradient(180deg, #1a060c 0%, #0b0408 55%, #05030a 100%);
+    linear-gradient(180deg, var(--mat-stage, #1a060c) 0%, var(--mat-stage, #0b0408) 55%, #05030a 100%);
 }
 
 .bj-room {
@@ -65,7 +66,7 @@
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 30%),
-    radial-gradient(ellipse at 50% 100%, #2a1119, #120609 70%);
+    radial-gradient(ellipse at 50% 100%, var(--mat-rail-highlight, #2a1119), var(--mat-rail, #120609) 70%);
   box-shadow:
     0 0 0 2px #05020a,
     0 0 0 4px color-mix(in srgb, var(--accent) 70%, #000),
@@ -80,7 +81,7 @@
   inset: calc(var(--rail) * 0.45);
   top: -2px;
   border-radius: inherit;
-  border: 2px dashed rgba(255, 210, 63, 0.16);
+  border: 2px dashed var(--mat-rail-highlight, rgba(255, 210, 63, 0.16));
   border-top: 0;
   pointer-events: none;
 }
@@ -93,7 +94,7 @@
   right: -4px;
   top: -6px;
   height: 8px;
-  background: linear-gradient(180deg, #ffe89a, #b88a14 60%, #6b4d05);
+  background: linear-gradient(180deg, var(--mat-metal-highlight, #ffe89a), var(--mat-metal, #b88a14) 60%, var(--mat-rail, #6b4d05));
   box-shadow:
     0 2px 0 #000,
     0 0 16px color-mix(in srgb, var(--accent-2) 55%, transparent);
@@ -159,12 +160,12 @@
 }
 .bj-print__line {
   fill: none;
-  stroke: rgba(255, 210, 63, 0.4);
+  stroke: var(--mat-felt-line, rgba(255, 210, 63, 0.4));
   stroke-width: 2;
   stroke-dasharray: 6 5;
 }
 .bj-print__line--thin {
-  stroke: rgba(255, 210, 63, 0.2);
+  stroke: var(--mat-felt-line, rgba(255, 210, 63, 0.2));
   stroke-width: 1.5;
   stroke-dasharray: 3 6;
 }
@@ -221,7 +222,7 @@
   display: flex;
   gap: 2px;
   padding: 3px 6px 6px;
-  background: linear-gradient(180deg, #1b0d13, #2c1820 60%, #140a0e);
+  background: linear-gradient(180deg, var(--mat-rail, #1b0d13), var(--mat-rail-highlight, #2c1820) 60%, var(--mat-rail, #140a0e));
   border: 1px solid rgba(255, 210, 63, 0.35);
   border-top: 0;
   border-radius: 0 0 10px 10px;
@@ -326,7 +327,7 @@
   height: calc(var(--bj-card-base) * 1.05);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 35%),
-    linear-gradient(160deg, #3d2130, #150a10 70%);
+    linear-gradient(160deg, var(--mat-rail-highlight, #3d2130), var(--mat-rail, #150a10) 70%);
   border: 2px solid #050206;
   border-radius: 8px 8px 4px 14px;
   box-shadow:
@@ -1246,7 +1247,7 @@
   letter-spacing: 0.14em;
   text-align: center;
   color: var(--accent-2);
-  background: radial-gradient(ellipse at 50% 0%, rgba(154, 27, 44, 0.55), rgba(51, 6, 15, 0.8));
+  background: radial-gradient(ellipse at 50% 0%, var(--mat-felt, rgba(154, 27, 44, 0.55)), var(--mat-felt-deep, rgba(51, 6, 15, 0.8)));
   border: 1px solid rgba(255, 210, 63, 0.35);
 }
 .bj-settings__presets {
@@ -2158,4 +2159,41 @@
 /* Disabled betting buttons stay legible against the dark bar. */
 .bj-ctl--bet .dc-btn:disabled {
   opacity: 0.62;
+}
+
+/* ---------- Local ink on the half-moon table's dark art (table, compact felt, control bar) (non-default themes) ----------
+ * These surfaces are the game's own dark art, but a theme's --text-* may be dark (Corporate
+ * Desktop '98 is a light theme). Keep the theme's ink hue and lift only its lightness (relative
+ * colour; static light inks where unsupported). Light UI controls inside keep the theme's own ink.
+ * Delta Neon never matches these selectors, so it is unchanged. */
+.bj-stage {
+  --bj-theme-t0: var(--text-0);
+  --bj-theme-t1: var(--text-1);
+  --bj-theme-t2: var(--text-2);
+  --bj-theme-t3: var(--text-3);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .bj-stage :is(.bj-table, .bj-compact, .bj-bar) {
+  --text-0: #f8f6ff;
+  --text-1: #d3cdf0;
+  --text-2: #b3acd8;
+  --text-3: #a39cc9;
+  color: var(--text-0);
+}
+@supports (color: oklch(from red l c h)) {
+  :root[data-theme]:not([data-theme='delta-neon']) .bj-stage :is(.bj-table, .bj-compact, .bj-bar) {
+    --text-0: oklch(from var(--bj-theme-t0) max(l, 0.93) min(c, 0.06) h);
+    --text-1: oklch(from var(--bj-theme-t1) max(l, 0.84) min(c, 0.07) h);
+    --text-2: oklch(from var(--bj-theme-t2) max(l, 0.75) min(c, 0.08) h);
+    --text-3: oklch(from var(--bj-theme-t3) max(l, 0.7) min(c, 0.08) h);
+  }
+}
+:root[data-theme]:not([data-theme='delta-neon']) .bj-stage :is(.bj-table, .bj-compact, .bj-bar) :is(input, textarea, select, .dc-input, .dc-segmented, .dc-slider, .dc-toggle, .dc-timer, .dc-modal, dialog) {
+  --text-0: var(--bj-theme-t0);
+  --text-1: var(--bj-theme-t1);
+  --text-2: var(--bj-theme-t2);
+  --text-3: var(--bj-theme-t3);
+  color: var(--text-0);
+}
+:root[data-theme]:not([data-theme='delta-neon']) .bj-stage :is(.bj-table, .bj-compact, .bj-bar) .dc-btn--ghost {
+  --btn-fg: var(--text-1);
 }

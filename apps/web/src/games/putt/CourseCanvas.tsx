@@ -4,12 +4,14 @@
  * everything down on unmount.
  */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { readThemeTokens, subscribeThemeTokens } from '@dascade/ui';
 import type { PuttPublicState } from '@dascade/shared/games/putt';
 import { useApp } from '../../app/store.ts';
 import { useRoomSelector } from '../../net/hooks.ts';
 import type { PuttController } from './game/controller.ts';
 import { ensureFonts } from './game/palette.ts';
 import { PuttRenderer } from './game/renderer.ts';
+import { puttArt, puttMaterialsSignature } from './game/themeAdapter.ts';
 import type { Insets } from './game/camera.ts';
 import { currentHole } from './helpers.ts';
 
@@ -52,6 +54,23 @@ export function CourseCanvas({ ctrl, insets }: { ctrl: PuttController; insets: I
       return;
     }
     rendererRef.current = renderer;
+    // Local DASCADE theme → course materials; repainted in place when the theme changes.
+    let artSig: string | null = null;
+    const applyTheme = () => {
+      const m = readThemeTokens(wrap).materials;
+      const sig = puttMaterialsSignature(m);
+      if (sig === artSig) return;
+      artSig = sig;
+      renderer.setArt(puttArt(m));
+    };
+    applyTheme();
+    let recheck: ReturnType<typeof setTimeout> | null = null;
+    const offTheme = subscribeThemeTokens(() => {
+      applyTheme();
+      // The theme's CSS may land a beat after the switch (transition layer): look once more.
+      if (recheck) clearTimeout(recheck);
+      recheck = setTimeout(applyTheme, 300);
+    });
     const dprCap = fx === 'high' ? 2 : fx === 'low' ? 1.5 : 1;
     const resize = () => {
       const dpr = Math.max(1, Math.min(dprCap, window.devicePixelRatio || 1));
@@ -64,6 +83,8 @@ export function CourseCanvas({ ctrl, insets }: { ctrl: PuttController; insets: I
     window.addEventListener('keydown', ctrl.onKeyDown);
     window.__PUTT__ = { renderer, controller: ctrl };
     return () => {
+      offTheme();
+      if (recheck) clearTimeout(recheck);
       ro.disconnect();
       window.removeEventListener('keydown', ctrl.onKeyDown);
       renderer.destroy();
@@ -88,7 +109,7 @@ export function CourseCanvas({ ctrl, insets }: { ctrl: PuttController; insets: I
   };
 
   return (
-    <div className="pt-canvas" ref={wrapRef}>
+    <div className="pt-canvas" data-part="course" ref={wrapRef}>
       <canvas
         ref={canvasRef}
         role="img"

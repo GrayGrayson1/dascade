@@ -9,7 +9,9 @@ import type { BattleTheme, TanksPublicState } from '@dascade/shared/games/tanks'
 import { previewArc, type Terrain } from '@dascade/game-core/tanks';
 import { getStateSnapshot } from '../../../net/session.ts';
 import type { BattleFrame, BattlePresenter, FxEvent } from '../model/presenter.ts';
+import { readThemeTokens, subscribeThemeTokens, type ThemeEffects } from '@dascade/ui';
 import { DISPLAY_FONT, THEMES, TEAM_TINT, WEAPON_TINT, hexToInt, type ThemePalette } from '../art/themes.ts';
+import { materialsSignature, themedPalette, voidColor, type Materials } from '../art/themeAdapter.ts';
 import { tankSfx } from '../audio.ts';
 import { Effects } from './fx.ts';
 import { Sky } from './sky.ts';
@@ -41,6 +43,13 @@ export class BattleScene extends Phaser.Scene {
   private terrainRef: Terrain | null = null;
   private fx: Effects | null = null;
   private theme: ThemePalette = THEMES.dusk;
+  /** Local DASCADE theme materials (presentation only; never synchronized). */
+  private mats: Materials = {};
+  private matEffects: Pick<ThemeEffects, 'ambient'> | undefined;
+  private matSig = '';
+  private themeDirty = false;
+  private themeRecheck: ReturnType<typeof setTimeout> | null = null;
+  private unsubTheme: (() => void) | null = null;
   private readonly tanks = new Map<string, TankView>();
   private readonly shells = new Map<number, { core: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image }>();
   private overlay!: Phaser.GameObjects.Graphics;
@@ -80,10 +89,28 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     makeFxTextures(this);
+    this.readMaterials();
+    this.unsubTheme = subscribeThemeTokens(() => {
+      this.themeDirty = true;
+      // The theme's CSS may land a beat after the switch (transition layer): look once more.
+      if (this.themeRecheck) clearTimeout(this.themeRecheck);
+      this.themeRecheck = setTimeout(() => {
+        this.themeRecheck = null;
+        this.themeDirty = true;
+      }, 300);
+    });
+    const disposeTheme = () => {
+      this.unsubTheme?.();
+      this.unsubTheme = null;
+      if (this.themeRecheck) clearTimeout(this.themeRecheck);
+      this.themeRecheck = null;
+    };
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, disposeTheme);
+    this.events.once(Phaser.Scenes.Events.DESTROY, disposeTheme);
     this.bgLayer = this.add.layer();
     this.worldLayer = this.add.layer();
     const bgCam = this.cameras.main;
-    bgCam.setBackgroundColor('#05040b');
+    bgCam.setBackgroundColor(voidColor(this.theme, this.matSig !== ''));
     this.worldCam = this.cameras.add(0, 0, this.scale.width, this.scale.height, false, 'world');
     this.worldCam.transparent = true;
     bgCam.ignore(this.worldLayer);
@@ -91,6 +118,44 @@ export class BattleScene extends Phaser.Scene {
     this.overlay = this.add.graphics().setDepth(DEPTH.overlay);
     this.edges = this.add.graphics().setDepth(DEPTH.terrain + 2);
     this.worldLayer.add([this.overlay, this.edges]);
+  }
+
+  /** Reads the local theme's terrain materials (scoped to the game stage). Returns true when they changed. */
+  private readMaterials(): boolean {
+    const t = readThemeTokens(this.game.canvas?.parentElement ?? null);
+    const sig = materialsSignature(t.materials, t.effects);
+    const themed = Object.values(t.materials).some(Boolean) ? sig : '';
+    if (themed === this.matSig) return false;
+    this.matSig = themed;
+    this.mats = t.materials;
+    this.matEffects = t.effects;
+    return true;
+  }
+
+  /**
+   * Theme switched mid-match: repaint the sky, terrain, field edges and soil debris with the new
+   * palette IN PLACE. Tanks, projectiles, effects, camera and every timer are left untouched.
+   */
+  private restyle(): void {
+    this.themeDirty = false;
+    if (!this.readMaterials() || !this.sky || !this.skyTheme) return;
+    this.theme = themedPalette(THEMES[this.skyTheme] ?? THEMES.dusk, this.mats, this.matEffects);
+    this.cameras.main.setBackgroundColor(voidColor(this.theme, this.matSig !== ''));
+    this.sky.destroy();
+    this.sky = this.makeSky();
+    this.terrainLayer?.restyle(this.theme);
+    this.fx?.setPalette(this.theme);
+    if (this.terrainRef) this.drawEdges(this.terrainRef);
+  }
+
+  private makeSky(): Sky {
+    const fx = this.opts.fx;
+    return new Sky(this, this.bgLayer, this.theme, {
+      stars: fx === 'off' ? 0.5 : 1,
+      clouds: fx === 'off' ? 2 : fx === 'low' ? 4 : 6,
+      motes: fx === 'off' || this.opts.reducedMotion ? 0 : fx === 'low' ? 0.5 : 1,
+      animate: !this.opts.reducedMotion,
+    });
   }
 
   private quality() {
@@ -104,14 +169,8 @@ export class BattleScene extends Phaser.Scene {
   private buildWorld(frame: BattleFrame): void {
     if (this.skyTheme !== frame.theme || !this.sky) {
       this.sky?.destroy();
-      this.theme = THEMES[frame.theme] ?? THEMES.dusk;
-      const fx = this.opts.fx;
-      this.sky = new Sky(this, this.bgLayer, this.theme, {
-        stars: fx === 'off' ? 0.5 : 1,
-        clouds: fx === 'off' ? 2 : fx === 'low' ? 4 : 6,
-        motes: fx === 'off' || this.opts.reducedMotion ? 0 : fx === 'low' ? 0.5 : 1,
-        animate: !this.opts.reducedMotion,
-      });
+      this.theme = themedPalette(THEMES[frame.theme] ?? THEMES.dusk, this.mats, this.matEffects);
+      this.sky = this.makeSky();
       this.skyTheme = frame.theme;
       this.fx?.destroy();
       this.fx = null;
@@ -162,7 +221,7 @@ export class BattleScene extends Phaser.Scene {
       g.fillStyle(glow, 0.9);
       g.fillRect(x - 3, H - h - 6, 6, 6);
     }
-    g.fillStyle(0x05040b, 1);
+    g.fillStyle(hexToInt(voidColor(this.theme, this.matSig !== '')), 1);
     g.fillRect(-2400, H, t.width + 4800, 900);
   }
 
@@ -172,6 +231,7 @@ export class BattleScene extends Phaser.Scene {
     this.lastNow = now;
     const frame = this.opts.presenter.frame(now);
     if (!frame) return;
+    if (this.themeDirty) this.restyle();
     this.buildWorld(frame);
     const terrainLayer = this.terrainLayer!;
     const fx = this.fx!;

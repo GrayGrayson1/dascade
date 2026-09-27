@@ -77,7 +77,7 @@ export function Results() {
   const earned = solo && mine ? medal(mine.r.bestLapMs, def.parLapMs) : null;
 
   return (
-    <div className="ci-results" role="dialog" aria-labelledby="ci-results-title">
+    <div className="ci-results" data-part="results" role="dialog" aria-labelledby="ci-results-title">
       <Panel brackets glow className="ci-results__panel" padded={false}>
         <header className="ci-results__head">
           <span className="dc-label">

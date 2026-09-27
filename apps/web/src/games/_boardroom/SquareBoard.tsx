@@ -373,12 +373,14 @@ export function SquareBoard(props: SquareBoardProps) {
     <div
       className={cx('br-board', dragFrom && 'br-board--dragging', className)}
       style={{ '--br-files': files, '--br-ranks': ranks } as CSSProperties}
+      data-part="board-frame"
       data-flipped={flipped || undefined}
       data-interactive={interactive || undefined}
     >
       <div
         ref={gridRef}
         className="br-board__grid"
+        data-part="board"
         role="group"
         aria-label={label}
         onPointerDown={onPointerDown}

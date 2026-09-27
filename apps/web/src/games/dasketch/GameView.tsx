@@ -132,7 +132,7 @@ function SketchTable() {
   return (
     <GameStage gameId="dasketch" className="sk-stage">
       {compact ? (
-        <div className="sk-table sk-table--compact" data-stage={stage} data-drawing={canDraw ? 'true' : undefined}>
+        <div className="sk-table sk-table--compact" data-part="stage" data-stage={stage} data-drawing={canDraw ? 'true' : undefined}>
           <div className="sk-main">
             {hud}
             {canvas}
@@ -144,17 +144,17 @@ function SketchTable() {
           </div>
         </div>
       ) : (
-        <div className="sk-table" data-stage={stage} data-drawing={canDraw ? 'true' : undefined}>
-          <aside className="sk-left" aria-label="Players">
+        <div className="sk-table" data-part="stage" data-stage={stage} data-drawing={canDraw ? 'true' : undefined}>
+          <aside className="sk-left" data-part="side" aria-label="Players">
             <Scoreboard rows={rows} meId={meId} spectators={spectators} />
             <SideTip isArtist={isArtist} stage={stage} knows={knows} />
           </aside>
-          <section className="sk-center" aria-label="Drawing">
+          <section className="sk-center" data-part="board" aria-label="Drawing">
             {hud}
             {canvas}
             {toolbar}
           </section>
-          <aside className="sk-right" aria-label="Guesses and chat">
+          <aside className="sk-right" data-part="side" aria-label="Guesses and chat">
             <div className="sk-right__board">
               <Scoreboard rows={rows} meId={meId} spectators={spectators} />
             </div>
@@ -180,7 +180,7 @@ function SideTip({ isArtist, stage, knows }: { isArtist: boolean; stage: string;
     icon = 'clock';
   }
   return (
-    <div className="sk-tip">
+    <div className="sk-tip" data-part="tip">
       <PixelIcon name={icon} className="sk-tip__icon" />
       <p>{text}</p>
     </div>

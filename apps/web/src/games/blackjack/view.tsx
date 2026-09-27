@@ -101,8 +101,8 @@ function TableView({ state, settings, playerId, me, isHost, send }: TableProps) 
           data-size={!feltWidth ? 'l' : feltWidth < 760 ? 's' : feltWidth < 1100 ? 'm' : feltWidth < 1500 ? 'l' : 'xl'}
           style={feltWidth ? ({ '--felt-w': `${feltWidth}px` } as CSSProperties) : undefined}
         >
-          <div className="bj-table">
-            <div className="bj-felt">
+          <div className="bj-table" data-part="table">
+            <div className="bj-felt" data-part="felt">
               <FeltPrint rules={rules} />
               {furniture}
               {bySeat.map((seat, i) => (
@@ -222,8 +222,8 @@ function CompactTable({
   const others = bySeat.filter((s): s is BlackjackSeatView => Boolean(s) && s!.playerId !== playerId).reverse();
   const showResult = stage === 'SETTLING';
   return (
-    <div className="bj-compact">
-      <div className="bj-felt bj-felt--compact">
+    <div className="bj-compact" data-part="table">
+      <div className="bj-felt bj-felt--compact" data-part="felt">
         {furniture}
         <div className="bj-compact-print" aria-hidden>
           <div className="bj-compact-print__art">

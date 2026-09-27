@@ -21,7 +21,11 @@ async function drag(page: Page, from: Locator, to: Locator): Promise<void> {
 /** The enemy grid, switching to it first on phones (one grid at a time there). */
 async function enemyBoard(page: Page): Promise<Locator> {
   const board = page.getByTestId('ships-enemy-board');
-  if (!(await board.isVisible())) await page.getByRole('radio', { name: /Enemy waters/ }).click();
+  // Only phones have the switch. On desktop the grid can be briefly absent (e.g. re-rendering after a
+  // reconnect): wait for it below instead of an unbounded click on a radio that never appears, which
+  // would outlive the caller's expect.poll timeout and hang the test.
+  const toggle = page.getByRole('radio', { name: /Enemy waters/ });
+  if (!(await board.isVisible()) && (await toggle.count()) > 0) await toggle.click({ timeout: 5_000 });
   await expect(board).toBeVisible();
   return board;
 }

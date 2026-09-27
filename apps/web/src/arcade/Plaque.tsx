@@ -21,6 +21,7 @@ export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen:
   return (
     <section
       className="af-plaque"
+      data-part="plaque"
       data-cabinet={cabinet.id}
       aria-labelledby="plaque-title"
       style={
@@ -31,19 +32,21 @@ export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen:
         } as CSSProperties
       }
     >
-      <div className="af-plaque__id" key={`id-${cabinet.id}`}>
+      <div className="af-plaque__id" data-part="plaque-id" key={`id-${cabinet.id}`}>
         <span className="af-plaque__kicker">
           {cabinet.family}
           {multi ? <span className="af-plaque__count"> · {cabinet.games.length} games</span> : null}
           <span className="af-plaque__players"> · {cabinetPlayersLabel(cabinet)}</span>
         </span>
-        <h2 id="plaque-title" className="af-plaque__title">
+        <h2 id="plaque-title" className="af-plaque__title" data-part="plaque-title">
           <span className="visually-hidden">{cabinet.title}</span>
           <PixelWord text={cabinet.title} variant="title" />
         </h2>
-        <p className="af-plaque__tagline">{cabinet.tagline}</p>
+        <p className="af-plaque__tagline" data-part="plaque-tagline">
+          {cabinet.tagline}
+        </p>
       </div>
-      <div className="af-plaque__info" key={`info-${cabinet.id}`}>
+      <div className="af-plaque__info" data-part="plaque-info" key={`info-${cabinet.id}`}>
         {multi ? (
           <ul className="af-plaque__games" aria-label={`Games in ${cabinet.title}`}>
             {cabinet.games.map((g) => (
@@ -53,7 +56,7 @@ export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen:
         ) : (
           <p className="af-plaque__desc">{cabinet.description}</p>
         )}
-        <div className="af-plaque__badges">
+        <div className="af-plaque__badges" data-part="plaque-badges">
           <Badge icon="users">{cabinetPlayersLabel(cabinet)}</Badge>
           {badges.map((b) => (
             <Badge key={b.key} icon={b.icon} color={b.color}>
@@ -62,7 +65,7 @@ export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen:
           ))}
         </div>
       </div>
-      <div className="af-plaque__actions">
+      <div className="af-plaque__actions" data-part="plaque-actions">
         <Button
           variant="primary"
           size="xl"

@@ -31,6 +31,8 @@ export interface ThemePalette {
   /** Ambient floating particles (embers, snow, fireflies). */
   motes: string;
   moteKind: 'ember' | 'snow' | 'spark' | 'ash';
+  /** Decorative weather drawn by the background sky only (set by DASCADE themes, e.g. Neon Noir rain). */
+  weather?: 'rain';
   cloud: string;
 }
 

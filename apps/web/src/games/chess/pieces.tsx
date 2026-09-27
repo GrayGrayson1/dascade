@@ -124,7 +124,12 @@ const MASKS: Record<PieceKind, readonly string[]> = {
   ],
 };
 
-/** Piece palette — the art's own colours (declared once here so a theme can swap them). */
+/**
+ * Piece palette — the art's own colours (Delta Neon). Each layer is drawn as
+ * `fill="var(--ch-<w|b>-<layer>, <this colour>)"`; chess.css defines those variables only when the
+ * active theme has playfield materials (--mat-piece-light/-dark/-edge), so other themes re-cast the
+ * set while Delta Neon keeps exactly these colours.
+ */
 export const PIECE_PALETTE: Record<
   PieceColor,
   { outline: string; body: string; hi: string; glint: string; shade: string; detail: string }
@@ -225,7 +230,7 @@ export const ChessPiece = memo(function ChessPiece({
       aria-label={title}
       data-piece={`${color}${kind}`}
     >
-      {LAYERS.map((layer) => (paths[layer] ? <path key={layer} d={paths[layer]} fill={pal[layer]} /> : null))}
+      {LAYERS.map((layer) => (paths[layer] ? <path key={layer} d={paths[layer]} fill={`var(--ch-${color}-${layer}, ${pal[layer]})`} /> : null))}
     </svg>
   );
 });

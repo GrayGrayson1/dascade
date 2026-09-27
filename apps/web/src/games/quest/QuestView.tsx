@@ -4,7 +4,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { PlayerView } from '@dascade/shared';
-import { Badge, Modal, Panel, PixelArt, PixelIcon, Tabs, cx } from '@dascade/ui';
+import { Badge, Modal, Panel, PixelArt, PixelIcon, Tabs, cx, readThemeTokens, subscribeThemeTokens } from '@dascade/ui';
 import {
   QUEST_MSG,
   QUEST_TIEBREAK_MS,
@@ -36,6 +36,7 @@ import { DiceOverlay } from './Dice.tsx';
 import { QuestResults } from './Results.tsx';
 import { PORTRAITS, UNKNOWN_PORTRAIT } from './art.ts';
 import { questSound, sortHeroes, useJson } from './util.ts';
+import { hasMaterials } from './themeAdapter.ts';
 
 /** Checkpoints already stored this session (run id + save time; small keys, not the blobs). */
 const savedCheckpoints = new Set<string>();
@@ -58,6 +59,23 @@ function useCheckpointSaver() {
   }, [latest, toast]);
 }
 
+/**
+ * Theme adapter: flags the stage with [data-quest-mat] while the active theme defines playfield
+ * materials (never under Delta Neon), so quest.css can dress the narrative as the theme's paper.
+ * Imperative attribute toggle — a theme switch never re-renders or resets the play view.
+ */
+function useThemeMaterialsFlag(mounted: boolean) {
+  useEffect(() => {
+    if (!mounted) return;
+    const apply = () => {
+      const stage = document.querySelector<HTMLElement>('.qs-root[data-game="quest"]');
+      if (stage) stage.toggleAttribute('data-quest-mat', hasMaterials(readThemeTokens(stage).materials));
+    };
+    apply();
+    return subscribeThemeTokens(apply);
+  }, [mounted]);
+}
+
 interface TopView {
   phase: string;
   resultJson: string;
@@ -71,6 +89,7 @@ export function QuestView() {
   const playerId = useSessionStore((s) => s.playerId);
   const result = useJson<QuestResultView>(top?.resultJson);
   useCheckpointSaver();
+  useThemeMaterialsFlag(Boolean(top));
   useRoomMessage<QuestEventPayload>(QUEST_MSG.event, (e) => {
     if (e.kind === 'scene') questSound.scene();
     else if (e.kind === 'ko') questSound.ko();
@@ -235,7 +254,7 @@ const SceneStory = memo(function SceneStory({ scene, outcome, onDone }: { scene:
           </span>
           <h2 className="qs-caption__title">{scene.title}</h2>
         </div>
-        <div className="qs-hud">
+        <div className="qs-hud" data-part="hud">
           <span className="qs-hud__pill" title="In-game time">
             <PixelIcon name="clock" /> {scene.clock}
           </span>
@@ -250,7 +269,7 @@ const SceneStory = memo(function SceneStory({ scene, outcome, onDone }: { scene:
       <div className="qs-storycol">
         {outcome ? <OutcomeCard key={`o${scene.rev}`} outcome={outcome} /> : null}
 
-        <article className="qs-story" aria-labelledby="qs-scene-title">
+        <article className="qs-story" data-part="narrative" aria-labelledby="qs-scene-title">
           <h3 id="qs-scene-title" className="visually-hidden">
             {scene.title}
           </h3>
@@ -351,7 +370,7 @@ function QuestPlay() {
   const canUseItems = !isSpectator && (state.stage === 'voting' || state.stage === 'tiebreak');
   const reveal = doneRev === scene.rev || reduced;
   const partyList = (
-    <ul className="qs-party">
+    <ul className="qs-party" data-part="party">
       {heroes.map((h) => (
         <HeroCard
           key={h.playerId}

@@ -5,7 +5,8 @@
 import { existsSync } from 'node:fs';
 import type { AddScenario, ScenarioContext } from './helpers.ts';
 
-const PARTY_SCENARIO_FILES = ['trivia', 'deception', 'masterpiece', 'words', 'survey'] as const;
+// 'dj' = Room DJ (platform feature, any room) — same file convention.
+const PARTY_SCENARIO_FILES = ['trivia', 'deception', 'masterpiece', 'words', 'survey', 'dj'] as const;
 
 export async function register(add: AddScenario, ctx: ScenarioContext): Promise<void> {
   for (const id of PARTY_SCENARIO_FILES) {

@@ -37,6 +37,7 @@ import {
   toLogical,
   useCanvasSurface,
   useFixedLoop,
+  useLiveMaterials,
   useMyStanding,
   usePersonalBest,
   type ClassicsGameInfo,
@@ -126,6 +127,7 @@ export function PaddleGame() {
   const surface = useCanvasSurface(screenRef, canvasRef, portrait ? PADDLE.height : PADDLE.width, portrait ? PADDLE.width : PADDLE.height);
   const net = useMemo(() => new PaddleNet(), []);
   const renderer = useMemo(() => new PaddleRenderer(), []);
+  useLiveMaterials(screenRef, (m) => renderer.setMaterials(m));
   const input = useMemo(() => new IntentInput<Intent>(INTENTS), []);
   const colorsRef = useRef<[string, string]>([PADDLE_ART.ballGlow, PADDLE_ART.house]);
   const viewRef = useRef({ scores: [0, 0] as [number, number], mySide: -1 as Side | -1, winner: -1 as Side | -1, canPlay: false });

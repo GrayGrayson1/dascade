@@ -1,15 +1,26 @@
 /** Global modals: Settings, Help / How to play, Profile, Join-by-code. */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { CABINET_LIST, GAME_CATALOG, GAME_LIST, ROOM_CODE_LENGTH, cabinetForGame, isGameId, normalizeRoomCode, type GameId } from '@dascade/shared';
-import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Slider, Tabs, TextInput, Toggle, getTheme, useThemeId } from '@dascade/ui';
+import {
+  CABINET_LIST,
+  GAME_CATALOG,
+  GAME_LIST,
+  ROOM_CODE_LENGTH,
+  cabinetForGame,
+  isGameId,
+  normalizeRoomCode,
+  type GameId,
+} from '@dascade/shared';
+import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Tabs, TextInput, Toggle } from '@dascade/ui';
 import { useApp, type FxLevel } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { session } from '../net/session.ts';
-import { sfx } from '../audio/audio.ts';
+import { AudioSettings } from '../audio/AudioSettings.tsx';
 import { ProfileEditor } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
 import { ProfileTabs } from './profile/ProfileTabs.tsx';
+import { ThemePicker } from '../themes/ThemePicker.tsx';
+import { ThemedText } from '../themes/ThemedText.tsx';
 
 export function GlobalModals() {
   const modal = useApp((s) => s.modal);
@@ -18,7 +29,16 @@ export function GlobalModals() {
     <>
       <SettingsModal open={modal === 'settings'} onClose={close} />
       <HelpModal open={modal === 'help'} onClose={close} />
-      <Modal open={modal === 'profile'} onClose={close} title="Your profile" footer={<Button variant="primary" onClick={close}>Done</Button>}>
+      <Modal
+        open={modal === 'profile'}
+        onClose={close}
+        title="Your profile"
+        footer={
+          <Button variant="primary" onClick={close}>
+            Done
+          </Button>
+        }
+      >
         <ProfileTabs onSubmit={close} />
       </Modal>
       <JoinModal open={modal === 'join'} onClose={close} />
@@ -38,9 +58,17 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
   const fullscreenSupported = typeof document.documentElement.requestFullscreen === 'function';
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
   return (
-    <Modal open={open} onClose={onClose} title="Settings" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={<ThemedText k="settings.title" plain="Settings" />}
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          Done
+        </Button>
+      }
+    >
       <Tabs
         label="Settings sections"
         value={tab}
@@ -53,44 +81,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
         ]}
       />
       <div className="settings-body">
-        {tab === 'sound' ? (
-          <div className="dc-col" style={{ gap: 18 }}>
-            <Toggle label="Mute everything" checked={settings.muted} onChange={(muted) => update({ muted })} />
-            <Field label="Master volume" aside={pct(settings.masterVolume)}>
-              {({ id }) => (
-                <Slider id={id} min={0} max={1} step={0.05} value={settings.masterVolume} onChange={(masterVolume) => update({ masterVolume })} />
-              )}
-            </Field>
-            <Field label="Sound effects" aside={pct(settings.sfxVolume)}>
-              {({ id }) => (
-                <Slider
-                  id={id}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={settings.sfxVolume}
-                  onChange={(sfxVolume) => update({ sfxVolume })}
-                  onPointerUp={() => sfx('coin')}
-                />
-              )}
-            </Field>
-            <Toggle label="Background music (procedural, subtle)" checked={settings.musicEnabled} onChange={(musicEnabled) => update({ musicEnabled })} />
-            <Field label="Music volume" aside={pct(settings.musicVolume)}>
-              {({ id }) => (
-                <Slider
-                  id={id}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={settings.musicVolume}
-                  disabled={!settings.musicEnabled}
-                  onChange={(musicVolume) => update({ musicVolume })}
-                />
-              )}
-            </Field>
-            <p className="dc-field__hint">Sound starts after your first click or key press, as browsers require.</p>
-          </div>
-        ) : null}
+        {tab === 'sound' ? <AudioSettings /> : null}
         {tab === 'display' ? (
           <div className="dc-col" style={{ gap: 18 }}>
             <Toggle
@@ -105,14 +96,19 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
                 value={settings.fx}
                 onChange={(fx) => update({ fx })}
                 options={[
-                  { value: 'high', label: 'Full glow' },
+                  { value: 'high', label: 'Full' },
                   { value: 'low', label: 'Reduced' },
-                  { value: 'off', label: 'Off' },
+                  { value: 'off', label: 'Minimal' },
                 ]}
               />
-              <span className="dc-field__hint">Lower this on older laptops or if the neon is too much.</span>
+              <span className="dc-field__hint">Scales particles, glow, backgrounds and theme ambience. Lower it on older laptops.</span>
             </div>
-            <ThemeLine />
+            <div className="dc-field" data-part="settings-theme">
+              <span className="dc-field__label" id="settings-theme-label">
+                Theme
+              </span>
+              <ThemePicker variant="settings" label="Theme" />
+            </div>
             {fullscreenSupported ? (
               <Toggle
                 label="Fullscreen"
@@ -131,27 +127,6 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
         {tab === 'account' ? <AccountPanel /> : null}
       </div>
     </Modal>
-  );
-}
-
-/** Read-only for now: DASCADE ships one theme. The line becomes a picker when more themes ship. */
-function ThemeLine() {
-  const theme = getTheme(useThemeId());
-  return (
-    <div className="dc-field">
-      <span className="dc-field__label">Theme</span>
-      <div className="theme-line">
-        <span className="theme-line__swatch" aria-hidden>
-          <i style={{ background: theme.renderer.accent }} />
-          <i style={{ background: theme.renderer.accent2 }} />
-          <i style={{ background: theme.renderer.surface }} />
-        </span>
-        <span className="theme-line__text">
-          <strong className="theme-line__name">Theme: {theme.name}</strong>
-          <span className="dc-field__hint">{theme.description}</span>
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -217,7 +192,17 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const cabinet = game ? cabinetForGame(game.id) : undefined;
   const siblings = cabinet ? [...new Set(cabinet.games.map((g) => g.gameId))] : [];
   return (
-    <Modal open={open} onClose={onClose} wide title="How to play" footer={<Button variant="primary" onClick={onClose}>Got it</Button>}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      wide
+      title="How to play"
+      footer={
+        <Button variant="primary" onClick={onClose}>
+          Got it
+        </Button>
+      }
+    >
       <div className="help-nav">
         <Field label="Help topic" className="help-nav__topic">
           {({ id }) => (
@@ -274,7 +259,8 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
             </ul>
             <p className="dc-field__hint help-body__meta">
-              {game.capacity.minPlayers === 1 ? 'Playable solo' : `${game.capacity.minPlayers}+ players`} · up to {game.capacity.maxPlayersLimit} players
+              {game.capacity.minPlayers === 1 ? 'Playable solo' : `${game.capacity.minPlayers}+ players`} · up to{' '}
+              {game.capacity.maxPlayersLimit} players
               {game.capacity.supportsSpectators ? ' · spectators welcome' : ''}
               {game.virtualChips ? ' · virtual chips only, no real money' : ''}
             </p>
@@ -283,15 +269,17 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <div className="dc-stack">
             <h3 className="dc-display dc-neon help-body__title">Welcome to DASCADE</h3>
             <p>
-              The Delta Alpha Sierra Arcade: {CABINET_LIST.length} cabinets and {GAME_LIST.filter((g) => g.cabinet !== null).length} multiplayer
-              games you can play right in your browser — no account needed.
+              The Delta Alpha Sierra Arcade: {CABINET_LIST.length} cabinets and {GAME_LIST.filter((g) => g.cabinet !== null).length}{' '}
+              multiplayer games you can play right in your browser — no account needed.
             </p>
             <ol className="help-steps">
               <li>
                 Walk up to a cabinet (some hold several games — pick one), then choose <strong>Create game</strong>.
               </li>
               <li>Share the 5-letter room code (or the link) with your team.</li>
-              <li>Everyone joins the lobby, the host tweaks settings, then hits <strong>Start</strong>.</li>
+              <li>
+                Everyone joins the lobby, the host tweaks settings, then hits <strong>Start</strong>.
+              </li>
               <li>
                 Already have a code? Use <strong>Join with code</strong> on the arcade floor.
               </li>

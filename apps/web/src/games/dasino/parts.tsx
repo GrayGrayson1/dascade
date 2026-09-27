@@ -200,7 +200,7 @@ export function Ticker({ ticker }: { ticker: DasinoTickerView[] }) {
   const visible = ticker.filter((t) => t.at <= serverNow()).reverse();
   const items = visible.length ? visible : null;
   return (
-    <div className="dn-ticker" role="log" aria-label="Recent big wins" data-static={reduced || !items ? 'true' : undefined}>
+    <div className="dn-ticker" data-part="ticker" role="log" aria-label="Recent big wins" data-static={reduced || !items ? 'true' : undefined}>
       <span className="dn-ticker__tag">
         <PixelIcon name="trophy" /> Big wins
       </span>
@@ -235,7 +235,7 @@ export function ChipRack({ chips, balance, disabled, className }: { chips: numbe
     if (!chips.includes(chip)) setChip(chips[Math.min(1, chips.length - 1)] ?? chips[0]!);
   }, [chips, chip, setChip]);
   return (
-    <div className={cx('dn-rack', className)} role="radiogroup" aria-label="Chip value">
+    <div className={cx('dn-rack', className)} data-part="chip-rack" role="radiogroup" aria-label="Chip value">
       {chips.map((c) => (
         <button
           key={c}

@@ -43,7 +43,7 @@ function Clock({ deadline, actionMs }: { deadline: number; actionMs: number }) {
   const p = actionMs > 0 ? Math.max(0, Math.min(1, remaining / actionMs)) : 0;
   const urgent = remaining > 0 && remaining <= 5000;
   return (
-    <span className="hd-clock" data-urgent={urgent ? 'true' : undefined} style={{ '--p': p } as CSSProperties} role="timer" aria-label={`${Math.ceil(remaining / 1000)} seconds to act`}>
+    <span className="hd-clock" data-part="clock" data-urgent={urgent ? 'true' : undefined} style={{ '--p': p } as CSSProperties} role="timer" aria-label={`${Math.ceil(remaining / 1000)} seconds to act`}>
       <span className="hd-clock__bar" />
     </span>
   );
@@ -103,6 +103,7 @@ export const Seat = memo(function Seat(props: SeatProps) {
   return (
     <div
       className={cx('hd-seat', isMe && 'hd-seat--me')}
+      data-part="seat"
       style={style}
       data-state={state}
       data-acting={acting ? 'true' : undefined}
@@ -130,7 +131,7 @@ export const Seat = memo(function Seat(props: SeatProps) {
         </div>
       ) : null}
 
-      <div className="hd-pod">
+      <div className="hd-pod" data-part="player-card">
         <span className="hd-pod__avatar">
           <Avatar avatar={player?.avatar ?? 'ghost'} color={player?.color ?? '#8f88b3'} size={geo.compact ? 18 : geo.podH < 60 ? 28 : 34} offline={!connected} />
           {!connected && !seat.left ? <PixelIcon name="wifi-off" className="hd-pod__offline" title="Disconnected" /> : null}

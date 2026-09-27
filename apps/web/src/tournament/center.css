@@ -29,6 +29,14 @@
 .tc-top > :last-child {
   justify-self: end;
 }
+.tc-top__end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.tc-top__jukebox:empty {
+  display: none;
+}
 .tc-top__crumb {
   display: inline-flex;
   align-items: center;
@@ -402,7 +410,8 @@
 .tc-row__code {
   font-size: var(--fs-sm);
   letter-spacing: 0.14em;
-  color: var(--text-3);
+  /* the join code is real information: secondary ink (--text-3 fell under 4.5:1 in several themes) */
+  color: var(--text-2);
   text-align: right;
 }
 

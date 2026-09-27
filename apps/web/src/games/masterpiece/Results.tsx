@@ -54,7 +54,7 @@ export function MpResults({ state, players, meId }: { state: MasterpiecePublicSt
       }}
     >
       {awards.length > 0 ? (
-        <section className="mp-awards" aria-label="Awards">
+        <section className="mp-awards" data-part="awards" aria-label="Awards">
           <h2 className="mp-section-title">
             <PixelArt rows={MP_ART.ribbon} className="mp-section-title__art" /> Awards
           </h2>
@@ -84,7 +84,7 @@ export function MpResults({ state, players, meId }: { state: MasterpiecePublicSt
       ) : null}
 
       {gallery.length > 0 ? (
-        <section className="mp-hall" aria-label="Hall of Fame">
+        <section className="mp-hall" data-part="hall-of-fame" aria-label="Hall of Fame">
           <h2 className="mp-section-title">
             <PixelArt rows={MP_ART.frame} className="mp-section-title__art" /> Hall of Fame
             {extras?.sweeps ? (

@@ -47,7 +47,7 @@ export function PromptPlacard({ type, prompt, kicker, compact, note }: { type: M
   const info = MP_PROMPT_TYPE_INFO[type];
   const def = type === 'definition' ? /^(.*) \(([a-z]+)\)$/u.exec(prompt) : null;
   return (
-    <article className={cx('mp-placard', compact && 'mp-placard--compact')} data-type={type}>
+    <article className={cx('mp-placard', compact && 'mp-placard--compact')} data-part="prompt-card" data-type={type}>
       <p className="mp-placard__kicker">
         <PixelIcon name={THEME_ICON[type]} size={12} />
         <span>{kicker ?? info.lead}</span>
@@ -211,7 +211,7 @@ function Composer({ assignment }: { assignment: MpAssignment }) {
   };
 
   return (
-    <form ref={formRef} className="mp-compose" onSubmit={submit} data-over={over ? 'true' : undefined}>
+    <form ref={formRef} className="mp-compose" data-part="compose" onSubmit={submit} data-over={over ? 'true' : undefined}>
       {info.multiline ? (
         <div className="mp-compose__lines">
           {lines.map((line, i) => (

@@ -8,6 +8,14 @@
   --sk-ink: #16121f;
   --sk-glass: rgba(20, 10, 30, 0.72);
   --sk-glass-2: rgba(33, 14, 44, 0.8);
+  /* Chrome surfaces (Delta Neon's hand-tuned values; other themes remap them to tokens below). */
+  --sk-glass-solid: rgba(16, 8, 24, 0.95);
+  --sk-card-bg: rgba(24, 9, 34, 0.9);
+  --sk-well: rgba(5, 4, 12, 0.5);
+  --sk-fade: rgba(12, 5, 18, 0.9);
+  --sk-fade-strong: rgba(12, 5, 18, 0.97);
+  --sk-good-ink: #b9ffdc;
+  --sk-close-ink: #fff3b0;
   --sk-edge: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.08));
   --sk-edge-strong: color-mix(in srgb, var(--accent) 55%, transparent);
   --sk-radius: 6px;
@@ -94,7 +102,7 @@
 :root[data-fx='off'] :is(.sk-board, .sk-chat, .sk-hud, .sk-toolbar, .sk-tip) {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  background: rgba(16, 8, 24, 0.95);
+  background: var(--sk-glass-solid);
 }
 
 /* ---------- HUD ---------- */
@@ -212,14 +220,14 @@
   font-size: calc(var(--tile) * 0.78);
   line-height: 1;
   text-transform: uppercase;
-  color: var(--text-0);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  color: var(--mat-card-ink, var(--text-0));
+  background: linear-gradient(180deg, var(--mat-card-face, rgba(255, 255, 255, 0.07)), var(--mat-card-face, rgba(255, 255, 255, 0.02)));
   box-shadow:
     inset 0 -3px 0 rgba(0, 0, 0, 0.35),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 .sk-tile--blank {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--mat-card-face, rgba(255, 255, 255, 0.03));
   box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--accent) 75%, white);
 }
 .sk-tile--mark {
@@ -229,7 +237,7 @@
   color: var(--text-2);
 }
 .sk-tiles[data-tone='hidden'] .sk-tile--letter {
-  color: var(--accent-2);
+  color: var(--mat-card-ink, var(--accent-2));
   text-shadow: 0 0 10px color-mix(in srgb, var(--accent-2) 60%, transparent);
   animation: sk-flip var(--dur-3) var(--ease-spring);
 }
@@ -271,7 +279,7 @@
   container-type: size;
 }
 .sk-canvas-frame {
-  --bezel: #1b0b24;
+  --bezel: var(--mat-bezel, #1b0b24);
   position: relative;
   width: min(100cqw, calc(100cqh * 4 / 3));
   aspect-ratio: 4 / 3;
@@ -313,7 +321,7 @@
   pointer-events: none;
   background:
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 4px, transparent 4px 8px),
-    color-mix(in srgb, var(--accent-2) 78%, transparent);
+    var(--mat-paper-edge, color-mix(in srgb, var(--accent-2) 78%, transparent));
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
   opacity: 0.9;
 }
@@ -814,7 +822,7 @@
   font-weight: 600;
 }
 .sk-msg--correct {
-  color: #b9ffdc;
+  color: var(--sk-good-ink);
   background: color-mix(in srgb, var(--green) 16%, transparent);
   border-left: 3px solid var(--green);
 }
@@ -827,7 +835,7 @@
   box-shadow: 0 0 14px color-mix(in srgb, var(--green) 25%, transparent);
 }
 .sk-msg--close {
-  color: #fff3b0;
+  color: var(--sk-close-ink);
   background: color-mix(in srgb, var(--yellow) 14%, transparent);
   border-left: 3px solid var(--yellow);
 }
@@ -890,7 +898,7 @@
     radial-gradient(ellipse 70% 60% at 50% 45%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 20px 20px,
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 20px 20px,
-    linear-gradient(180deg, #1f0a2b, #12061a);
+    linear-gradient(180deg, var(--mat-stage, #1f0a2b), var(--mat-stage, #12061a));
 }
 .sk-overlay--reveal {
   align-items: end;
@@ -908,7 +916,7 @@
   text-align: center;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%),
-    rgba(24, 9, 34, 0.9);
+    var(--sk-card-bg);
   border: 1px solid var(--sk-edge-strong);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -975,8 +983,8 @@
   padding: 12px 10px;
   margin: 3px;
   border: 0;
-  color: var(--text-0);
-  background: linear-gradient(180deg, #3a1446, #230a2c);
+  color: var(--mat-card-ink, var(--text-0));
+  background: linear-gradient(180deg, var(--mat-card-face, #3a1446), var(--mat-card-face, #230a2c));
   box-shadow:
     0 -3px 0 0 var(--edge),
     0 3px 0 0 var(--edge),
@@ -994,7 +1002,7 @@
 .sk-choice:focus-visible {
   --edge: var(--accent);
   transform: translateY(-3px);
-  background: linear-gradient(180deg, #52185f, #2c0c37);
+  background: linear-gradient(180deg, var(--mat-card-face, #52185f), var(--mat-card-face, #2c0c37));
   box-shadow:
     0 -3px 0 0 var(--edge),
     0 3px 0 0 var(--edge),
@@ -1024,7 +1032,7 @@
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent-2);
+  color: var(--mat-card-ink, var(--accent-2));
 }
 @keyframes sk-choice-in {
   from {
@@ -1813,11 +1821,11 @@
   gap: 18px;
 }
 .sk-frame {
-  --edge: #3a1446;
+  --edge: var(--mat-paper-edge, #3a1446);
   display: grid;
   gap: 0;
   padding: 8px 8px 0;
-  background: linear-gradient(180deg, #2c0f38, #1a0822);
+  background: linear-gradient(180deg, var(--mat-bezel, #2c0f38), var(--mat-bezel, #1a0822));
   box-shadow:
     0 -3px 0 0 var(--edge),
     0 3px 0 0 var(--edge),
@@ -1956,7 +1964,7 @@
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   color: var(--text-2);
-  background: rgba(5, 4, 12, 0.5);
+  background: var(--sk-well);
   text-align: left;
   transition:
     border-color var(--dur-2),
@@ -1970,7 +1978,7 @@
 .sk-cat[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--text-0);
-  background: color-mix(in srgb, var(--accent) 14%, rgba(5, 4, 12, 0.5));
+  background: color-mix(in srgb, var(--accent) 14%, var(--sk-well));
   box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .sk-cat:disabled {
@@ -2072,7 +2080,7 @@
   z-index: 10;
   margin: 0 calc(-16px - var(--safe-right)) calc(-40px - var(--safe-bottom)) calc(-16px - var(--safe-left));
   padding: 18px calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
-  background: linear-gradient(180deg, transparent, rgba(12, 5, 18, 0.9) 34%, rgba(12, 5, 18, 0.97));
+  background: linear-gradient(180deg, transparent, var(--sk-fade) 34%, var(--sk-fade-strong));
 }
 .sk-results__actions .sk-results__more {
   display: block;
@@ -2083,4 +2091,21 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-2);
+}
+
+/* ---------- Theme adapter ----------
+ * Delta Neon keeps the studio's hand-tuned violet glass above. Every other theme maps the chrome
+ * to its own panel/surface tokens (so light themes stay readable); the playfield already follows
+ * the theme's materials (bezel, paper edge, card face/ink, stage) through var(--mat-*) fallbacks.
+ * The drawing surface itself is never themed: drawings stay identical for everyone. */
+:root:not([data-theme='delta-neon']) .sk-stage {
+  --sk-glass: var(--panel-bg);
+  --sk-glass-2: var(--panel-bg-solid);
+  --sk-glass-solid: var(--panel-bg-opaque);
+  --sk-card-bg: var(--panel-bg-solid);
+  --sk-well: var(--surface-sunken-soft);
+  --sk-fade: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  --sk-fade-strong: color-mix(in srgb, var(--bg-1) 97%, transparent);
+  --sk-good-ink: color-mix(in srgb, var(--green) 40%, var(--text-0));
+  --sk-close-ink: color-mix(in srgb, var(--yellow) 35%, var(--text-0));
 }

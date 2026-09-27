@@ -467,7 +467,7 @@ export function Deploy({
           ) : null}
         </div>
 
-        <div className="sh-dock" role="list" aria-label="Your fleet">
+        <div className="sh-dock" data-part="fleet" role="list" aria-label="Your fleet">
           {fleet.map((id) => {
             const isPlaced = placed.has(id);
             const isSel = selected === id && !frozen;

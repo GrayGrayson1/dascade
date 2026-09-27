@@ -37,7 +37,7 @@ function Card({
   cta: string;
 }) {
   return (
-    <article className={`dn-card dn-card--${kind}`} aria-labelledby={`dn-card-${kind}`}>
+    <article className={`dn-card dn-card--${kind}`} data-part="table-card" aria-labelledby={`dn-card-${kind}`}>
       <div className="dn-card__art" onClick={() => goToTable(kind, seated)} aria-hidden>
         {art}
       </div>
@@ -173,7 +173,7 @@ export function Floor({ state, playerId, seated }: { state: DasinoPublicState; p
         </Card>
       </div>
 
-      <section className="dn-glass dn-standings" aria-labelledby="dn-standings">
+      <section className="dn-glass dn-standings" data-part="scoreboard" aria-labelledby="dn-standings">
         <header className="dn-side__head">
           <h2 id="dn-standings" className="dn-h3">
             On the floor

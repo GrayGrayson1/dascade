@@ -290,7 +290,7 @@ export function YouPanel({
   }
 
   return (
-    <section className="tk-you" data-tone={tone} aria-label="Your status">
+    <section className="tk-you" data-part="you-panel" data-tone={tone} aria-label="Your status">
       <PixelIcon name={icon} className="tk-you__icon" />
       <div className="tk-you__text">
         {mine ? (

@@ -8,7 +8,7 @@ import { applyTheme } from '@dascade/ui';
 import { getOrCreateGuestId, persistence } from '../persistence/index.ts';
 import { DEFAULT_THEME_PREF, SETTINGS_VERSION, migrateSettings, peekStoredTheme, type AppSettings } from './settings.ts';
 
-export type { AppSettings, FxLevel } from './settings.ts';
+export type { AppSettings, FxLevel, GameMusicWithJukebox, VisualizerPref } from './settings.ts';
 
 export interface Profile {
   name: string;
@@ -34,6 +34,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   musicVolume: 0.35,
   muted: false,
   musicEnabled: false,
+  jukeboxVolume: 0.7,
+  visualizer: 'auto',
+  gameMusicWithJukebox: 'mute',
   reducedMotion: prefersReducedMotion(),
   fx: 'high',
   theme: DEFAULT_THEME_PREF,

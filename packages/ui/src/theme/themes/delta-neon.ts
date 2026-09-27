@@ -9,6 +9,13 @@ export const DELTA_NEON: ThemeDefinition = {
   id: 'delta-neon',
   name: 'Delta Neon',
   description: 'The DASCADE house style: deep violet-black glass, neon accents, pixel bevels and restrained CRT textures.',
+  meta: {
+    era: 'Now · Premium neo-arcade',
+    tagline: 'Glass, neon and pixels. The house style.',
+    swatches: ['#05040b', '#19152f', '#ff4fd8', '#22d3ee'],
+    family: 'house',
+  },
+  effects: { surface: 'glass', crt: 0.35, grain: 0.15, analog: 0, ambient: 'sparkle', visualizer: 'neon-bars', transition: 'power' },
   colorScheme: 'dark',
   metaThemeColor: '#05040b',
   tokens: {

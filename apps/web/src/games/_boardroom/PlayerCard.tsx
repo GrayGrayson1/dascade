@@ -75,6 +75,7 @@ export function PlayerCard({
   return (
     <section
       className={cx('br-card', compact && 'br-card--compact', className)}
+      data-part="player-card"
       data-active={active || undefined}
       data-position={position}
       data-offline={!connected || undefined}

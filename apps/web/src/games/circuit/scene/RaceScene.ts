@@ -10,6 +10,7 @@ import { CarView } from './cars.ts';
 import { Effects } from './effects.ts';
 import { makeFxTextures } from './textures.ts';
 import { World } from './world.ts';
+import { circuitWorldPalette, type Materials } from '../themeAdapter.ts';
 
 export type FxLevel = 'high' | 'low' | 'off';
 
@@ -21,6 +22,10 @@ export interface SceneOptions {
   onProgress: (progress: number, ready: boolean) => void;
   /** Last-resort degrade step (the host lowers the render resolution). */
   onDegrade?: () => void;
+  /** Theme materials at creation (empty under Delta Neon = the game's own palette). */
+  materials?: Materials;
+  /** Theme asks for ambient rain (already gated by fx / reduced motion). */
+  ambientRain?: boolean;
 }
 
 export class RaceScene extends Phaser.Scene {
@@ -42,10 +47,14 @@ export class RaceScene extends Phaser.Scene {
   private vignette: Phaser.Filters.Vignette | null = null;
   /** Adaptive quality: frame-time watchdog that steps effects down on weak hardware. */
   private readonly perf = { acc: 0, frames: 0, slow: 0, level: 0, since: 0 };
+  private materials: Materials;
+  private ambientRain: boolean;
 
   constructor(opts: SceneOptions) {
     super({ key: 'circuit-race' });
     this.opts = opts;
+    this.materials = opts.materials ?? {};
+    this.ambientRain = opts.ambientRain ?? false;
   }
 
   create(): void {
@@ -54,7 +63,7 @@ export class RaceScene extends Phaser.Scene {
     this.fx = new Effects(this, this.fxQuality());
     this.buildWorld();
     const cam = this.cameras.main;
-    cam.setBackgroundColor('#070814');
+    cam.setBackgroundColor(this.world?.background ?? '#070814');
     if (fx === 'high' && this.game.renderer.type === Phaser.WEBGL) {
       const bloom = Phaser.Actions.AddEffectBloom(cam, { threshold: 0.62, blurRadius: 2, blurSteps: 3, blurQuality: 0, blendAmount: 0.55 });
       this.bloom = bloom[0]?.parallelFilters ?? null;
@@ -94,7 +103,22 @@ export class RaceScene extends Phaser.Scene {
       this.fx = new Effects(this, this.fxQuality());
     }
     this.worldTrack = ctrl.trackId;
-    this.world = new World(this, ctrl.track, ctrl.decor, this.quality());
+    this.world = new World(this, ctrl.track, ctrl.decor, this.quality(), circuitWorldPalette(ctrl.track.def.theme, this.materials));
+    this.world.setPalette(circuitWorldPalette(ctrl.track.def.theme, this.materials), this.ambientRain);
+    this.cameras?.main?.setBackgroundColor(this.world.background);
+  }
+
+  /**
+   * Theme changed: re-present the world in place (no scene restart, no state reset, no timing
+   * change). Safe to call before create() — the values are used when the world is built.
+   */
+  setTheme(materials: Materials, ambientRain: boolean): void {
+    this.materials = materials;
+    this.ambientRain = ambientRain;
+    const world = this.world;
+    if (!world) return;
+    world.setPalette(circuitWorldPalette(this.opts.controller.track.def.theme, materials), ambientRain);
+    this.cameras.main.setBackgroundColor(world.background);
   }
 
   /** Called by the host when the container resizes. */
@@ -122,6 +146,7 @@ export class RaceScene extends Phaser.Scene {
     this.lastNow = now;
 
     if (!world.ready) world.pump(this.reported < 0.35 ? 14 : 7);
+    else world.pumpRepaint(6);
     const progress = world.progress;
     if (progress !== this.reported) {
       this.reported = progress;

@@ -12,10 +12,15 @@
   --mp-gold: #f2c14e;
   --mp-gold-deep: #b7791f;
   --mp-gold-hi: #fff0b3;
-  --mp-canvas: #fbf6ea;
-  --mp-canvas-2: #f1e7d0;
-  --mp-ink: #1d1426;
-  --mp-ink-soft: #5b4d63;
+  /* The exhibit canvas + ink follow the theme's paper material (fallbacks = the gallery's own cream). */
+  --mp-canvas: var(--mat-paper, #fbf6ea);
+  --mp-canvas-2-mat: color-mix(in srgb, var(--mat-paper) 72%, var(--mat-paper-edge));
+  --mp-canvas-2: var(--mp-canvas-2-mat, #f1e7d0);
+  --mp-canvas-hi-mat: color-mix(in srgb, var(--mat-paper) 55%, #fff);
+  --mp-canvas-hi: var(--mp-canvas-hi-mat, #fffdf5);
+  --mp-ink: var(--mat-paper-ink, #1d1426);
+  --mp-ink-soft-mat: color-mix(in srgb, var(--mat-paper-ink) 70%, var(--mat-paper));
+  --mp-ink-soft: var(--mp-ink-soft-mat, #5b4d63);
   --mp-silver: #cfd6e4;
   --mp-bronze: #d08b4f;
   --mp-rank-0: var(--mp-gold);
@@ -63,7 +68,7 @@
   background:
     radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%),
     radial-gradient(120% 160% at 100% 100%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 55%),
-    var(--panel-bg);
+    var(--mat-paper, var(--panel-bg));
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--panel-border));
   box-shadow: var(--panel-shadow);
   text-align: center;
@@ -100,7 +105,8 @@
   font-size: var(--fs-xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--accent);
+  --mp-kicker-mat: color-mix(in srgb, var(--accent) 32%, var(--mat-paper-ink));
+  color: var(--mp-kicker-mat, var(--accent));
 }
 .mp-placard__text {
   margin: 0;
@@ -108,7 +114,7 @@
   font-weight: 700;
   font-size: clamp(1.2rem, 1.9vw + 0.6rem, 2.1rem);
   line-height: 1.25;
-  color: var(--text-0);
+  color: var(--mat-paper-ink, var(--text-0));
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -118,8 +124,11 @@
   font-weight: 400;
   font-size: clamp(1.7rem, 3.4vw + 0.8rem, 3.4rem);
   line-height: 1.05;
-  color: var(--mp-gold-hi);
-  text-shadow: 0 0 18px color-mix(in srgb, var(--mp-gold) 35%, transparent);
+  /* On a themed paper placard the pale gold would vanish: deepen it towards the ink. */
+  --mp-word-mat: color-mix(in srgb, var(--mp-gold-deep) 55%, var(--mat-paper-ink));
+  --mp-word-glow-mat: 0 2px 0 color-mix(in srgb, var(--mat-paper-edge) 85%, transparent);
+  color: var(--mp-word-mat, var(--mp-gold-hi));
+  text-shadow: var(--mp-word-glow-mat, 0 0 18px color-mix(in srgb, var(--mp-gold) 35%, transparent));
   overflow-wrap: anywhere;
 }
 .mp-placard__pos {
@@ -127,14 +136,14 @@
   font-family: var(--font-ui);
   font-style: italic;
   font-size: 0.42em;
-  color: var(--text-2);
+  color: var(--mp-ink-soft-mat, var(--text-2));
   text-shadow: none;
   vertical-align: middle;
 }
 .mp-placard__note {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
-  color: var(--text-2);
+  color: var(--mp-ink-soft-mat, var(--text-2));
 }
 .mp-placard--compact {
   padding: var(--sp-3) var(--sp-5);
@@ -173,9 +182,11 @@
   gap: var(--sp-3);
   width: min(100%, 720px);
   padding: clamp(24px, 4vw, 44px) clamp(18px, 4vw, 48px);
+  /* Themes: the round title is painted on the exhibit canvas (paper material) — the dark wall mix
+     below reads theme tokens, which light themes turn pale under the pale-gold title. */
   background:
     radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--mp-gold) 16%, transparent), transparent 60%),
-    color-mix(in srgb, var(--accent-deep, #2a0a10) 70%, var(--panel-bg-solid, #120c1c));
+    var(--mat-paper, color-mix(in srgb, var(--accent-deep, #2a0a10) 70%, var(--panel-bg-solid, #120c1c)));
   border: 6px solid var(--mp-gold);
   box-shadow:
     inset 0 0 0 2px var(--mp-gold-deep),
@@ -190,7 +201,8 @@
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  color: var(--mp-gold-hi);
+  --mp-icon-mat: color-mix(in srgb, var(--mp-gold-deep) 70%, var(--mat-paper-ink));
+  color: var(--mp-icon-mat, var(--mp-gold-hi));
   background: color-mix(in srgb, var(--mp-gold) 18%, transparent);
   border: 2px solid color-mix(in srgb, var(--mp-gold) 60%, transparent);
 }
@@ -205,15 +217,17 @@
   font-size: clamp(2rem, 5vw + 0.5rem, 4.4rem);
   line-height: 1;
   letter-spacing: var(--heading-tracking, 0.02em);
-  color: var(--mp-gold-hi);
-  text-shadow: 0 2px 0 var(--mp-gold-deep), 0 0 24px color-mix(in srgb, var(--mp-gold) 35%, transparent);
+  --mp-title-mat: color-mix(in srgb, var(--mp-gold-deep) 55%, var(--mat-paper-ink));
+  --mp-title-glow-mat: 0 2px 0 color-mix(in srgb, var(--mp-gold) 45%, transparent);
+  color: var(--mp-title-mat, var(--mp-gold-hi));
+  text-shadow: var(--mp-title-glow-mat, 0 2px 0 var(--mp-gold-deep), 0 0 24px color-mix(in srgb, var(--mp-gold) 35%, transparent));
   text-wrap: balance;
 }
 .mp-intro__blurb {
   margin: 0;
   max-width: 46ch;
   font-size: clamp(1rem, 0.6vw + 0.85rem, 1.25rem);
-  color: var(--text-1);
+  color: var(--mp-ink-soft-mat, var(--text-1));
 }
 .mp-intro__meta {
   display: flex;
@@ -560,7 +574,7 @@ button.mp-exhibit__hit {
   cursor: pointer;
 }
 button.mp-exhibit__hit:hover {
-  background: linear-gradient(180deg, #fffdf5, var(--mp-canvas));
+  background: linear-gradient(180deg, var(--mp-canvas-hi), var(--mp-canvas));
 }
 button.mp-exhibit__hit:focus-visible {
   outline: 3px solid var(--accent);
@@ -779,7 +793,9 @@ button.mp-exhibit__hit:focus-visible {
   font-family: var(--font-display);
   text-transform: uppercase;
   color: var(--mp-gold-hi);
-  background: color-mix(in srgb, var(--accent-deep, #2a0a10) 82%, transparent);
+  /* Themes: a dark ink plate so the pale-gold stamp reads on light and dark themes alike. */
+  --mp-stamp-mat: color-mix(in srgb, var(--mat-paper-ink) 88%, transparent);
+  background: var(--mp-stamp-mat, color-mix(in srgb, var(--accent-deep, #2a0a10) 82%, transparent));
   border: 4px solid var(--mp-gold);
   box-shadow: 0 0 0 3px var(--mp-gold-deep), var(--shadow-3), 0 0 38px color-mix(in srgb, var(--mp-gold) 40%, transparent);
   pointer-events: none;
@@ -787,7 +803,8 @@ button.mp-exhibit__hit:focus-visible {
 }
 .mp-stamp span {
   font-size: clamp(0.9rem, 1vw + 0.6rem, 1.3rem);
-  color: var(--text-1);
+  --mp-stamp-ink-mat: color-mix(in srgb, var(--mat-paper) 82%, transparent);
+  color: var(--mp-stamp-ink-mat, var(--text-1));
 }
 .mp-stamp strong {
   font-weight: 400;

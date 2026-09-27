@@ -110,7 +110,7 @@ export function RouletteTable({ state, settings, seat, playerId }: { state: Dasi
   return (
     <div className="dn-roulette">
       <section className="dn-roulette__wheel dn-glass" aria-label="Wheel" ref={wheelRef}>
-        <div className="dn-wheelwrap">
+        <div className="dn-wheelwrap" data-part="wheel">
           <RouletteWheel roulette={r} label={resultInfo && r.phase !== 'SPINNING' ? `Roulette wheel, last result ${r.result} ${resultInfo.color}` : 'Roulette wheel'} />
           <WheelOverlay state={state} />
         </div>
@@ -118,7 +118,7 @@ export function RouletteTable({ state, settings, seat, playerId }: { state: Dasi
         <History numbers={r.history} />
       </section>
 
-      <section className="dn-roulette__felt" aria-label="Betting table">
+      <section className="dn-roulette__felt" data-part="table" aria-label="Betting table">
         <header className="dn-felt__head">
           <div>
             <h2 className="dn-h2">European Roulette</h2>
@@ -268,7 +268,7 @@ function History({ numbers }: { numbers: number[] }) {
   const counts = { red: 0, black: 0, green: 0 };
   for (const n of numbers) counts[rouletteColor(n)]++;
   return (
-    <div className="dn-history">
+    <div className="dn-history" data-part="history">
       <div className="dn-history__head">
         <span className="dc-label">{numbers.length === 1 ? 'Last spin' : `Last ${numbers.length || ''} spins`}</span>
         {numbers.length ? (
@@ -400,6 +400,7 @@ function RouletteBoard({
   return (
     <div
       className="dn-board"
+      data-part="felt"
       data-orientation={orientation}
       data-touch={touch ? 'true' : undefined}
       data-open={r.phase === 'BETTING' ? 'true' : undefined}

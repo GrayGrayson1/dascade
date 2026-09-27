@@ -8,6 +8,9 @@ import { useApp } from '../app/store.ts';
 import { serverUrl } from '../net/serverUrl.ts';
 import { sfx } from '../audio/audio.ts';
 import { NeonWord } from './NeonWord.tsx';
+import { CABINET_LIST } from '@dascade/shared';
+import { fill, tickerItems, useThemeCopy, useThemeFlavour } from '../themes/copy.ts';
+import { ThemeButton } from '../themes/ThemeButton.tsx';
 
 export type ServerStatus = { state: 'checking' | 'online' | 'offline'; rooms: number };
 
@@ -93,19 +96,26 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
     sfx('click');
     openModal(m);
   };
+  const t = useThemeCopy();
+  const badge = useThemeFlavour('arcade.badge');
   return (
-    <header className="af-hud">
-      <div className="af-hud__brand">
+    <header className="af-hud" data-part="arcade-header">
+      <div className="af-hud__brand" data-part="arcade-brand">
         <h1 className="af-hud__logo">
           <span className="visually-hidden">DASCADE — Delta Alpha Sierra Arcade</span>
           <NeonWord className="af-hud__word" />
-          <span className="af-hud__sub" aria-hidden>
-            Delta Alpha Sierra Arcade
+          <span className="af-hud__sub" aria-hidden data-part="arcade-tagline">
+            {t('arcade.tagline', 'Delta Alpha Sierra Arcade')}
           </span>
         </h1>
+        {badge ? (
+          <span className="af-hud__badge" data-part="arcade-badge" aria-hidden>
+            {badge}
+          </span>
+        ) : null}
       </div>
       {kiosk ? <div className="af-hud__kiosk">{kiosk}</div> : null}
-      <div className="af-hud__actions">
+      <div className="af-hud__actions" data-part="arcade-hud">
         <ServerStatusPill status={status} className="af-hud__status" />
         <Button variant="secondary" icon="users" className="af-hud__join" onClick={() => open('join')}>
           Join with code
@@ -136,6 +146,7 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
             className="af-hud__motion"
             onClick={() => updateSettings({ reducedMotion: !reducedMotion })}
           />
+          <ThemeButton className="af-hud__theme" />
           <IconButton icon="gear" label="Settings" onClick={() => open('settings')} />
           <IconButton icon="help" label="Help and how to play" onClick={() => open('help')} />
         </span>
@@ -144,10 +155,35 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
   );
 });
 
+/**
+ * Ambient status ticker slot: a theme's `arcade.status` items ("MODEM READY|{cabinets} CABINETS ONLINE")
+ * with live {cabinets} / {rooms} / {online} values. Decorative (aria-hidden); nothing under Delta Neon.
+ */
+export function ArcadeStatusTicker({ status }: { status: ServerStatus }) {
+  const raw = useThemeFlavour('arcade.status');
+  const items = tickerItems(raw);
+  if (!items.length) return null;
+  const vars = {
+    cabinets: CABINET_LIST.length,
+    rooms: status.rooms,
+    online: status.state === 'online' ? 'ONLINE' : status.state === 'offline' ? 'OFFLINE' : 'CONNECTING',
+  };
+  return (
+    <span className="af-ticker" data-part="arcade-status" data-state={status.state} aria-hidden>
+      {items.map((item, i) => (
+        <span key={i} className="af-ticker__item" data-part="arcade-status-item">
+          {fill(item, vars)}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export const ArcadeFooter = memo(function ArcadeFooter({ status }: { status: ServerStatus }) {
   return (
-    <footer className="af-foot">
+    <footer className="af-foot" data-part="arcade-footer">
       <ServerStatusPill status={status} className="af-foot__status" />
+      <ArcadeStatusTicker status={status} />
       <span className="af-foot__legal">Virtual chips only — no real money, ever.</span>
       <span className="af-foot__keys" aria-hidden>
         <Kbd>←</Kbd>

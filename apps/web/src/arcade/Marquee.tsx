@@ -18,9 +18,9 @@ export function marqueeParts(marquee: string): { top?: string; main: string; bad
 export function MarqueeLogo({ subject, className }: { subject: MarqueeSubject; className?: string }) {
   const { top, main, badge } = marqueeParts(subject.marquee);
   return (
-    <span className={className ? `af-mq ${className}` : 'af-mq'} data-mq={subject.id} aria-hidden>
-      <span className="af-mq__art" />
-      <span className="af-mq__text">
+    <span className={className ? `af-mq ${className}` : 'af-mq'} data-mq={subject.id} data-part="marquee" aria-hidden>
+      <span className="af-mq__art" data-part="marquee-art" />
+      <span className="af-mq__text" data-part="marquee-text">
         {top ? <span className="af-mq__top">{top}</span> : null}
         <span className="af-mq__main">
           <PixelWord text={main} variant="logo" box=".af-mq" fitW={badge ? 0.68 : 0.88} fitH={top ? 0.5 : 0.64} />

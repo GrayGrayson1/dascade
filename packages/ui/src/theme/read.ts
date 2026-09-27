@@ -10,6 +10,7 @@
  */
 import { activeTheme } from './apply.ts';
 import type { ThemeTokens } from './types.ts';
+import { DEFAULT_EFFECTS, MATERIAL_KEYS, materialVar, type MaterialKey } from './materials.ts';
 
 export interface Rgba {
   r: number;
@@ -168,8 +169,17 @@ export function readThemeTokens(el?: Element | null, style?: StyleReader): Theme
       num: get('--font-num') || theme.tokens['--font-num'],
     },
   };
+  // Materials: read from CSS in scope of `el` (so <GameStage data-game> nudges apply); without a DOM,
+  // fall back to the theme definition. Unset (Delta Neon) = the game keeps its own palette.
+  const materials: Partial<Record<MaterialKey, string>> = {};
+  for (const key of MATERIAL_KEYS) {
+    const raw = cs ? get(materialVar(key)) : (theme.materials?.[key] ?? '');
+    if (raw) materials[key] = resolveColor(raw, raw);
+  }
   return {
     ...tokens,
+    materials,
+    effects: { ...DEFAULT_EFFECTS, ...theme.effects },
     int: {
       background: colorToInt(tokens.background),
       surface: colorToInt(tokens.surface),

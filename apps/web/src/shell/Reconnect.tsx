@@ -64,9 +64,10 @@ export function ReconnectingOverlay({ gameId, immersive }: { gameId: GameId; imm
   const grace = roomGrace ?? graceSeconds(gameId);
   const left = Math.max(0, grace - elapsed);
   return (
-    <div className="reconnect-overlay" data-immersive={immersive ? 'true' : undefined}>
+    <div className="reconnect-overlay" data-part="reconnect-overlay" data-immersive={immersive ? 'true' : undefined}>
       <section
         className="reconnect-card dc-panel dc-panel--brackets dc-panel--glow"
+        data-part="reconnect-card"
         role="alert"
         aria-live="assertive"
         aria-labelledby="reconnect-title"

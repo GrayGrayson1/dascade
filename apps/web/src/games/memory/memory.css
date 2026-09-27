@@ -1,6 +1,15 @@
 /* Memory Matrix (.mm-) — on top of the Classics kit (.cl-). */
 
 .mm-screen {
+  /*
+   * Themed screens: these two resolve ONLY when the theme defines --mat-screen (a var() without a
+   * fallback makes the whole custom property invalid otherwise), so Delta Neon keeps its original
+   * translucent banner and --text-0 tile ink. With a theme, the banner becomes an opaque chrome
+   * plate (theme text tokens stay readable on a dark CRT) and tile ink flips light/dark against
+   * the screen material.
+   */
+  --mm-plate: color-mix(in srgb, var(--mat-screen) 0%, var(--panel-bg-opaque, var(--bg-1)));
+  --mm-screen-ink: oklch(from var(--mat-screen) clamp(0, (0.6 - l) * 1000, 1) 0 0);
   position: absolute;
   inset: 0;
   display: grid;
@@ -16,7 +25,7 @@
   gap: 4px 12px;
   padding: 10px 14px 14px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-0) 55%, transparent);
+  background: var(--mm-plate, color-mix(in srgb, var(--bg-0) 55%, transparent));
   border: 1px solid var(--line);
   overflow: hidden;
 }
@@ -72,6 +81,8 @@
 }
 .mm-tile {
   --hue: var(--accent);
+  /* Unlit tile body: the theme's screen material, lifted a touch by its glow (Delta Neon: #0d0b1e). */
+  --mm-tile-base: color-mix(in srgb, var(--mat-screen, #0d0b1e) 88%, var(--mat-screen-glow, #0d0b1e));
   position: relative;
   display: grid;
   place-items: center;
@@ -82,11 +93,11 @@
   border: 1px solid color-mix(in srgb, var(--hue) 22%, var(--line));
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--light) 7%, transparent), transparent 55%),
-    color-mix(in srgb, var(--hue) 9%, #0d0b1e);
+    color-mix(in srgb, var(--hue) 9%, var(--mm-tile-base));
   box-shadow:
     inset 0 -4px 0 color-mix(in srgb, var(--shade) 55%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--light) 10%, transparent);
-  color: var(--text-0);
+  color: var(--mm-screen-ink, var(--text-0));
   cursor: default;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -102,7 +113,7 @@
 .mm-tile.is-live:hover {
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--light) 10%, transparent), transparent 55%),
-    color-mix(in srgb, var(--hue) 18%, #0d0b1e);
+    color-mix(in srgb, var(--hue) 18%, var(--mm-tile-base));
 }
 .mm-tile.is-lit,
 .mm-tile.is-pressed {
@@ -117,11 +128,11 @@
 .mm-tile.is-found {
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--light) 10%, transparent), transparent 55%),
-    color-mix(in srgb, var(--hue) 36%, #0d0b1e);
+    color-mix(in srgb, var(--hue) 36%, var(--mm-tile-base));
   border-color: color-mix(in srgb, var(--green) 70%, transparent);
 }
 .mm-tile.is-wrong {
-  background: color-mix(in srgb, var(--red) 45%, #0d0b1e);
+  background: color-mix(in srgb, var(--red) 45%, var(--mm-tile-base));
   border-color: var(--red);
   animation: mm-shake 260ms var(--ease-out);
 }
@@ -135,11 +146,11 @@
   font-weight: 700;
   /* Scales with the tile (grid side / n) so the replayed order reads at a glance on phones too. */
   font-size: clamp(0.9rem, calc(14cqh / var(--n, 3)), 2rem);
-  color: var(--text-0);
+  color: var(--mm-screen-ink, var(--text-0));
   text-shadow: 0 1px 2px var(--bg-0);
 }
 .mm-tile__mark {
-  color: var(--text-0);
+  color: var(--mm-screen-ink, var(--text-0));
 }
 @keyframes mm-shake {
   25% {

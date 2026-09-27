@@ -1,0 +1,338 @@
+/* =====================================================================
+ * Theme picker (engine-owned). Cards are drawn in the ACTIVE theme; each
+ * .tp-prev inside is drawn in ITS OWN theme via [data-theme-preview] tokens.
+ * ===================================================================== */
+
+.tp {
+  display: grid;
+  gap: var(--sp-3);
+}
+.tp__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-3);
+}
+.tp[data-variant='sheet'] .tp__grid {
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: var(--sp-4);
+}
+
+.tp__opt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-sunken-soft);
+  color: var(--text-1);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out),
+    background var(--dur-2) var(--ease-out);
+}
+.tp__opt:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+}
+.tp__opt[aria-checked='true'] {
+  border-color: var(--control-accent, var(--accent));
+  background: color-mix(in srgb, var(--control-accent, var(--accent)) 10%, var(--surface-sunken-soft));
+  box-shadow: var(--glow-sm);
+}
+.tp__opt:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+:root:not([data-reduced-motion='true']) .tp__opt:hover {
+  transform: translateY(-2px);
+}
+
+.tp__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.tp__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm, 14px);
+  color: var(--text-0);
+  line-height: 1.25;
+}
+.tp__check {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--control-accent, var(--accent));
+  color: var(--control-accent-ink, var(--accent-ink));
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tp__era {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.tp__tagline {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.tp__desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tp__swatches {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tp__swatches i {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--light) 25%, transparent);
+}
+
+/* Settings variant: compact — preview, name, era, swatches (the chosen theme's tagline is summarised below). */
+.tp[data-variant='settings'] .tp__tagline,
+.tp[data-variant='settings'] .tp__desc {
+  display: none;
+}
+.tp[data-variant='settings'] .tp__name {
+  font-size: 13px;
+}
+.tp__summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.tp__summary strong {
+  color: var(--text-0);
+}
+
+/* ---------- Live mini preview (in the previewed theme's own tokens) ---------- */
+.tp-prev {
+  position: relative;
+  display: grid;
+  grid-template-rows: 14% 1fr 12%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: calc(var(--radius) - 2px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 50%, transparent), transparent 70%),
+    var(--arcade-floor-bg, var(--page-bg));
+  color: var(--page-fg);
+  font-family: var(--font-ui);
+  box-shadow: inset 0 0 0 1px var(--line);
+  isolation: isolate;
+  color-scheme: dark;
+}
+.tp-prev[data-scheme='light'] {
+  color-scheme: light;
+}
+.tp-prev__bar {
+  display: flex;
+  align-items: center;
+  gap: 4%;
+  padding: 0 5%;
+  background: var(--shell-bar-bg);
+  border-bottom: 1px solid var(--shell-bar-border);
+}
+.tp-prev__bar i {
+  width: 6%;
+  height: 34%;
+  border-radius: 1px;
+  background: var(--text-2);
+  opacity: 0.8;
+}
+.tp-prev__bar b {
+  flex: 1;
+  height: 30%;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.tp-prev__stage {
+  display: grid;
+  grid-template-columns: 34% 1fr;
+  gap: 6%;
+  align-items: end;
+  padding: 5% 6% 0;
+  min-height: 0;
+}
+.tp-prev__cab {
+  display: grid;
+  grid-template-rows: 20% 1fr 18%;
+  gap: 5%;
+  height: 100%;
+  padding: 7%;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--cabinet-body), var(--cabinet-body-2));
+  box-shadow:
+    inset 0 0 0 1px var(--cabinet-edge),
+    0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.tp-prev__marquee {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 30%, var(--cabinet-body));
+  color: var(--marquee-ink);
+  font-family: var(--marquee-font);
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: var(--text-glow);
+}
+.tp-prev__screen {
+  position: relative;
+  border-radius: 2px;
+  background: var(--mat-screen, var(--cabinet-screen-bg));
+  box-shadow: inset 0 0 0 2px var(--mat-bezel, var(--cabinet-bezel));
+  overflow: hidden;
+}
+.tp-prev__screen i {
+  position: absolute;
+  inset: 30% 25%;
+  border-radius: 1px;
+  background: var(--mat-screen-glow, var(--accent));
+  opacity: 0.8;
+  box-shadow: var(--glow-sm);
+}
+.tp-prev__deck {
+  border-radius: 2px;
+  background: var(--cabinet-bezel);
+}
+.tp-prev__win {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6%;
+  align-self: center;
+  height: 88%;
+  min-width: 0;
+  padding-bottom: 6%;
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  background: var(--panel-sheen), var(--panel-bg-solid);
+  box-shadow: var(--panel-shadow);
+  overflow: hidden;
+}
+.tp-prev__title {
+  display: flex;
+  align-items: center;
+  padding: 2px 6%;
+  min-height: 12px;
+  background: var(--titlebar-bg);
+  color: var(--titlebar-fg);
+  font-family: var(--titlebar-font);
+  font-size: 7px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: var(--titlebar-transform);
+}
+.tp-prev__rows {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 0 8%;
+}
+.tp-prev__rows i {
+  height: 4px;
+  border-radius: 1px;
+  background: var(--text-2);
+  opacity: 0.55;
+}
+.tp-prev__rows i + i {
+  width: 70%;
+}
+.tp-prev__btn {
+  justify-self: start;
+  margin: 0 8%;
+  padding: 2px 8px;
+  border: var(--button-edge-width, 1px) solid var(--button-primary-edge, color-mix(in srgb, var(--accent) 60%, var(--shade)));
+  border-radius: var(--button-radius);
+  background: linear-gradient(180deg, var(--button-primary-bg, var(--accent)), var(--button-primary-bg-2, var(--accent)));
+  color: var(--button-primary-fg, var(--accent-ink));
+  font-family: var(--button-font);
+  font-size: 7px;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: var(--glow-sm);
+}
+.tp-prev__mats {
+  display: flex;
+  border-top: 1px solid var(--line);
+}
+.tp-prev__mats i {
+  flex: 1;
+}
+
+/* ---------- Quick-access sheet ---------- */
+.tp-sheet .dc-modal__body {
+  padding: var(--sp-4);
+}
+.tp-sheet__intro {
+  margin: 0 0 var(--sp-4);
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+@media (max-width: 640px) {
+  .tp[data-variant='sheet'] .tp__grid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-2);
+  }
+  .tp[data-variant='sheet'] .tp__opt {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+  }
+  .tp[data-variant='sheet'] .tp__desc {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .tp[data-variant='settings'] .tp__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Sheet layout: the dialog docks to the bottom edge on phones. */
+  .tp-sheet.dc-modal {
+    width: 100vw;
+    max-width: 100vw;
+    margin: auto 0 0;
+  }
+  .tp-sheet .dc-modal__frame {
+    max-height: 88dvh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+.tp[data-variant='settings'] .tp__check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--shade) 60%, transparent);
+}

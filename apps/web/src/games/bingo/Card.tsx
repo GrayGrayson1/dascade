@@ -171,6 +171,7 @@ export const BingoCardView = memo(function BingoCardView({
       style={{ '--n': size } as CSSProperties}
       role="group"
       aria-label={label}
+      data-part="bingo-card"
     >
       <div className="bg-card__inner">
       <div className="bg-card__head">
@@ -184,7 +185,7 @@ export const BingoCardView = memo(function BingoCardView({
           <span className="bg-card__title">{title ?? 'DAS BINGO'}</span>
         )}
       </div>
-      <div className="bg-card__grid">
+      <div className="bg-card__grid" data-part="board">
         {cells.map((token, i) => {
           const free = token === BINGO_FREE;
           const isCalled = free || called.has(token);

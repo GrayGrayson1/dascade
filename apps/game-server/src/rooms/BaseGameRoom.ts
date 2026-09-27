@@ -85,6 +85,8 @@ import {
   type BoundMatchRoom,
   type SeriesUpdate,
 } from '../platform/tournaments.ts';
+import { DJ, DjCommandSchema, DjConfigSchema, type DjState } from '@dascade/shared/jukebox';
+import { RoomDj, type DjResult } from '../platform/dj.ts';
 
 export interface PlayerRecord {
   /** Stable logical id for the lifetime of the room. Use this for all game state. */
@@ -218,6 +220,10 @@ export abstract class BaseGameRoom<
   private unknownTypeWarned = new Set<string>();
   /** Per-room byte budget for host settings updates (each one is re-broadcast to everyone). */
   private readonly settingsBytes = new TokenBucket(SETTINGS_BYTE_BUDGET);
+  /** Room DJ (synchronized jukebox playback; cosmetic, messages only — see "Room DJ" below). */
+  private readonly dj = new RoomDj({ now: () => Date.now(), newId: () => randomId(10, this.rng) });
+  /** End-of-track timer (platform-owned, like host migration: games' clearAllTimers() can't cancel it). */
+  private djTimer: Delayed | null = null;
 
   // ===========================================================================
   // Optional hooks (override in game rooms)
@@ -360,6 +366,7 @@ export abstract class BaseGameRoom<
     this.publishSettings();
     this.bindTournament(rawOptions);
     this.registerBaseMessages();
+    this.registerDjMessages();
     // Unknown message types: Colyseus would drop the client in production. A stale or buggy client
     // shouldn't lose its seat over it, so ignore them (logged once per type).
     this.onMessage('*', (_client: Client, type: string | number) => {
@@ -516,6 +523,8 @@ export abstract class BaseGameRoom<
     this.cancelHostMigration();
     this.emptyMatchCheck?.clear();
     this.emptyMatchCheck = null;
+    this.djTimer?.clear();
+    this.djTimer = null;
     this.safeHook(() => this.onRoomDisposed(), 'onRoomDisposed');
     if (this.codeAllocated) await releaseRoomCode(this.presence, this.roomId).catch(() => undefined);
   }
@@ -1223,6 +1232,7 @@ export abstract class BaseGameRoom<
     }
     this.cancelHostMigration();
     this.safeHook(() => this.onHostChanged(next, prev), 'onHostChanged');
+    this.djRefresh();
   }
 
   /**
@@ -1315,6 +1325,7 @@ export abstract class BaseGameRoom<
       reconnectGraceSeconds: this.reconnectGraceSeconds,
     };
     record.client?.send(SYS.welcome, payload);
+    this.djSendTo(record);
   }
 
   private sendChatHistory(record: PlayerRecord): void {
@@ -1611,6 +1622,100 @@ export abstract class BaseGameRoom<
 
   protected markMetadataDirty(): void {
     this.metadataDirty = true;
+    // Every roster/connection/host change marks metadata dirty — the DJ's listener set follows it.
+    this.djRefresh();
+  }
+
+  // ===========================================================================
+  // Room DJ — optional synchronized jukebox (packages/shared/src/jukebox.ts, platform/dj.ts)
+  // Purely cosmetic and fully isolated: it never touches game state, phases, game timers, outcomes
+  // or tournaments, and every entry point is wrapped so a DJ fault is logged and swallowed. No
+  // dj:state traffic flows until the host enables it (clients assume EMPTY_DJ_STATE). Off in
+  // Tournament Center matches (keeps matches distraction-free; the host would otherwise hold a
+  // cosmetic control over their opponent's audio).
+  // ===========================================================================
+
+  private registerDjMessages(): void {
+    const opts = { maxBytes: 512 } as const;
+    this.handle(
+      DJ.config,
+      DjConfigSchema,
+      (p, config) => {
+        if (this.tournamentBinding || this.tournamentInfo) {
+          return this.reject(p, DJ.config, 'not_allowed', 'The Room DJ is off in tournament matches.');
+        }
+        this.djApply(p, DJ.config, () => this.dj.configure(p.id, config), true);
+      },
+      { ...opts, rate: { burst: 6, perSecond: 2 } },
+    );
+    this.handle(DJ.command, DjCommandSchema, (p, command) => this.djApply(p, DJ.command, () => this.dj.command(p.id, command)), {
+      ...opts,
+      rate: { burst: 12, perSecond: 4 },
+    });
+    this.handle(DJ.skipVote, EmptySchema, (p) => this.djApply(p, DJ.skipVote, () => this.dj.voteSkip(p.id)), {
+      ...opts,
+      rate: { burst: 4, perSecond: 1 },
+    });
+  }
+
+  /** Run a DJ operation for a player: reply with the refusal, or publish the change. */
+  private djApply(player: PlayerRecord, type: string, op: () => DjResult, alwaysPublish = false): void {
+    this.djSafe(type, () => {
+      const result = op();
+      if (!result.ok) {
+        this.reject(player, type, result.code === 'not_host' ? 'not_host' : 'not_allowed', result.message);
+        return;
+      }
+      if (result.changed) this.djPublish(alwaysPublish);
+    });
+  }
+
+  /** Host / listener set follow the room (connected, seated players vote; the host always has authority). */
+  private djRefresh(): void {
+    this.djSafe('refresh', () => {
+      const listeners: string[] = [];
+      for (const p of this.players.values()) if (p.client && !p.away && !p.state.spectator) listeners.push(p.id);
+      const hostChanged = this.dj.setHost(this.state.hostId);
+      const listenersChanged = this.dj.setListeners(listeners);
+      if (hostChanged || listenersChanged) this.djPublish(false);
+    });
+  }
+
+  /** Broadcast the DJ state (while enabled, or once when it was just switched off) and re-arm the end-of-track timer. */
+  private djPublish(force: boolean): void {
+    if (this.dj.isEnabled || force) this.broadcast(DJ.state, this.dj.state() satisfies DjState);
+    this.djSchedule();
+  }
+
+  private djSendTo(record: PlayerRecord): void {
+    this.djSafe('sendTo', () => {
+      if (this.dj.isEnabled) this.sendTo(record, DJ.state, this.dj.state());
+    });
+  }
+
+  private djSchedule(): void {
+    this.djTimer?.clear();
+    this.djTimer = null;
+    const endsAt = this.dj.endsAt();
+    if (endsAt === null) return;
+    this.djTimer = this.clock.setTimeout(
+      () => {
+        this.djTimer = null;
+        this.djSafe('trackEnded', () => {
+          if (this.dj.trackEnded()) this.djPublish(false);
+          else this.djSchedule();
+        });
+      },
+      Math.max(50, endsAt - Date.now() + 50),
+    );
+  }
+
+  private djSafe(name: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      log.error('room DJ failed', { room: this.roomId, game: this.gameId, op: name, err: err as Error });
+    }
   }
 
   private flushMetadata(): void {

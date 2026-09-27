@@ -43,6 +43,7 @@ export function DawnReport({
   return (
     <section
       className="dx-reveal dx-reveal--dawn"
+      data-part="system-log"
       data-outcome={report.outcome}
       aria-live="polite"
       aria-label={`System log, night ${report.cycle}`}
@@ -126,7 +127,7 @@ export function VerdictReveal({ verdict, nodes }: { verdict: DeceptionVerdict; n
             ? 'The network skipped'
             : 'No votes — nobody is disconnected';
   return (
-    <section className="dx-reveal dx-reveal--verdict" data-outcome={verdict.outcome} aria-live="polite" aria-label="Vote result">
+    <section className="dx-reveal dx-reveal--verdict" data-part="vote-result" data-outcome={verdict.outcome} aria-live="polite" aria-label="Vote result">
       <p className="dx-reveal__kicker">{verdict.runoff ? 'Runoff result' : 'Vote result'}</p>
       <div className="dx-reveal__victim">
         {out ? (
@@ -143,7 +144,7 @@ export function VerdictReveal({ verdict, nodes }: { verdict: DeceptionVerdict; n
         </div>
       </div>
       {verdict.tally.length ? (
-        <ol className="dx-tally" aria-label="Vote totals">
+        <ol className="dx-tally" data-part="vote-tally" aria-label="Vote totals">
           {verdict.tally.map((t) => {
             const node = t.target === 'skip' ? null : nodes[t.target];
             const name = t.target === 'skip' ? 'Skip' : (node?.name ?? 'Player');

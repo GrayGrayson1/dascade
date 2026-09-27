@@ -42,6 +42,7 @@ export function BracketCanvas({ vm, onSelect, label }: { vm: BracketVM; onSelect
   return (
     <div
       className="tc-canvas"
+      data-part="bracket-canvas"
       ref={viewport}
       role="region"
       aria-label={label}
@@ -61,6 +62,7 @@ export function BracketCanvas({ vm, onSelect, label }: { vm: BracketVM; onSelect
           <div
             key={h.key}
             className="tc-canvas__header"
+            data-part="bracket-round"
             data-state={h.state}
             data-section={h.section}
             style={{ left: h.x, top: h.y, width: h.w }}
@@ -68,9 +70,9 @@ export function BracketCanvas({ vm, onSelect, label }: { vm: BracketVM; onSelect
             <span className="tc-canvas__round">{h.label}</span>
           </div>
         ))}
-        <svg className="tc-canvas__lines" width={layout.width} height={layout.height} aria-hidden>
+        <svg className="tc-canvas__lines" data-part="bracket-lines" width={layout.width} height={layout.height} aria-hidden>
           {layout.connectors.map((c) => (
-            <path key={c.key} d={c.d} data-decided={c.decided || undefined} data-mine={c.mine || undefined} />
+            <path key={c.key} d={c.d} data-part="bracket-line" data-decided={c.decided || undefined} data-mine={c.mine || undefined} />
           ))}
         </svg>
         {matches.map((m) => {

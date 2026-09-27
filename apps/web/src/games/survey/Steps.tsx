@@ -95,7 +95,7 @@ function StepTrack({ step, answered }: { step: Step; answered: boolean }) {
     { id: 'reveal', label: 'Reveal', state: 'next' },
   ];
   return (
-    <ol className="sv-track" aria-label="Question steps">
+    <ol className="sv-track" data-part="steps" aria-label="Question steps">
       {items.map((it, i) => (
         <li key={it.id} className="sv-track__item" data-state={it.state} aria-current={it.state === 'now' ? 'step' : undefined}>
           <span className="sv-track__num dc-num" aria-hidden="true">
@@ -198,7 +198,7 @@ function predictHeading(question: SurveyQuestion): { title: string; hint: string
 function PredictStep({ question, onPredict }: { question: SurveyQuestion; onPredict: (p: SurveyPrediction) => void }) {
   const h = predictHeading(question);
   return (
-    <section className="sv-step sv-step--predict" aria-labelledby="sv-predict-title" data-mode={question.mode}>
+    <section className="sv-step sv-step--predict" data-part="predict" aria-labelledby="sv-predict-title" data-mode={question.mode}>
       <header className="sv-step__head">
         <h3 id="sv-predict-title" className="sv-step__title">
           <PixelIcon name="eye" size={14} /> {h.title}
@@ -232,7 +232,7 @@ export function RankPicker({ options, onLock }: { options: string[]; onLock: (or
   const shown = complete ?? order;
   return (
     <div className="sv-rankpick">
-      <ul className="sv-rankpick__options" aria-label="Options">
+      <ul className="sv-rankpick__options" data-part="answer-grid" aria-label="Options">
         {options.map((opt, i) => {
           const pos = shown.indexOf(i);
           const placed = pos >= 0;
@@ -242,6 +242,7 @@ export function RankPicker({ options, onLock }: { options: string[]; onLock: (or
               <button
                 type="button"
                 className="sv-rankpick__opt"
+                data-part="answer-card"
                 data-slot={i % 6}
                 data-placed={placed ? 'true' : undefined}
                 data-auto={auto ? 'true' : undefined}
@@ -282,7 +283,7 @@ export function PercentDial({ target, onLock }: { target: string; onLock: (perce
   const [value, setValue] = useState(50);
   const set = (v: number) => setValue(Math.max(0, Math.min(100, Math.round(v))));
   return (
-    <div className="sv-dial">
+    <div className="sv-dial" data-part="dial">
       <div className="sv-dial__readout">
         <output className="sv-dial__value dc-num" aria-live="polite" htmlFor="sv-dial-slider">
           {value}

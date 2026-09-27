@@ -4,6 +4,8 @@ import { normalizeRoomCode } from '@dascade/shared';
 import { Spinner } from '@dascade/ui';
 import { ArcadeFloor } from '../arcade/ArcadeFloor.tsx';
 import { Toasts } from '../shell/Toasts.tsx';
+import { ThemeHost } from '../themes/ThemeHost.tsx';
+import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { useApp } from './store.ts';
 
@@ -15,6 +17,13 @@ const NotFoundScreen = lazy(() => import('../shell/RoomScreen.tsx').then((m) => 
 const CabinetPicker = lazy(() => import('../shell/CabinetPicker.tsx').then((m) => ({ default: m.CabinetPicker })));
 const TournamentCenter = lazy(() => import('../tournament/TournamentCenter.tsx').then((m) => ({ default: m.TournamentCenter })));
 const GlobalModals = lazy(() => import('../shell/modals.tsx').then((m) => ({ default: m.GlobalModals })));
+// The jukebox UI (dock + player) is global and outlives every route; its own chunk, and a failed load renders nothing.
+const Jukebox = lazy(() =>
+  import('../jukebox/Jukebox.tsx').then(
+    (m): { default: () => React.ReactNode } => ({ default: m.Jukebox }),
+    () => ({ default: () => null }),
+  ),
+);
 
 function JoinRedirect() {
   const { code } = useParams();
@@ -23,8 +32,11 @@ function JoinRedirect() {
 
 function RouteFallback() {
   return (
-    <main className="center-screen" id="main">
-      <Spinner label="Loading" />
+    <main className="center-screen" id="main" data-part="loading-screen">
+      <div className="loading-card" data-part="loading-card">
+        <LoadingFlavour />
+        <Spinner label="Loading" />
+      </div>
     </main>
   );
 }
@@ -42,6 +54,8 @@ function Modals() {
 export function App() {
   return (
     <BrowserRouter>
+      {/* Theme environment layer + transition overlay (+ quick picker). Outside <Routes>: never remounts screens. */}
+      <ThemeHost />
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -69,6 +83,9 @@ export function App() {
         <Modals />
       </ErrorBoundary>
       <Toasts />
+      <Suspense fallback={null}>
+        <Jukebox />
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -26,6 +26,7 @@ import { sfx } from '../audio/audio.ts';
 import type { GameClientModule, SettingsPanelProps } from '../games/types.ts';
 import { ChatPanel, GameStage, LeaveButton } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
+import { ThemedText } from '../themes/ThemedText.tsx';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
 
 type LobbyTab = 'players' | 'settings' | 'setup' | 'chat';
@@ -102,7 +103,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
 
   return (
     <GameStage gameId={gameId} className="lobby">
-      <div className="lobby__inner">
+      <div className="lobby__inner" data-part="lobby">
         <LobbyHero
           gameId={gameId}
           roomName={state.roomName}
@@ -117,8 +118,18 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
 
         <Tabs className="lobby__tabs" label="Lobby sections" value={tab} onChange={setTab} tabs={tabs} />
 
-        <div className="lobby__grid" data-tab={tab}>
-          <Panel className="lobby__players" data-section="players" title={`Players · ${seated.length}/${state.maxPlayers}`} brackets>
+        <div className="lobby__grid" data-part="lobby-grid" data-tab={tab}>
+          <Panel
+            className="lobby__players"
+            data-part="lobby-players"
+            data-section="players"
+            title={
+              <>
+                <ThemedText k="lobby.players" plain="Players" /> · {`${seated.length}/${state.maxPlayers}`}
+              </>
+            }
+            brackets
+          >
             <SeatMeter seated={seated.length} max={state.maxPlayers} min={minPlayers} />
             <PlayerList players={players} meId={game.playerId} hostView={isHost} maxPlayers={state.maxPlayers} locked={state.locked} />
             {me?.spectator && !me.queued ? (
@@ -128,7 +139,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
             ) : null}
           </Panel>
 
-          <div className="lobby__settings" data-section="settings">
+          <div className="lobby__settings" data-part="lobby-settings" data-section="settings">
             {SettingsPanel ? (
               <Panel title={isHost ? 'Game settings' : 'Game settings (host controls these)'}>
                 <SettingsPanel settings={game.settings} canEdit={isHost} update={updateSettings} />
@@ -149,12 +160,12 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           </div>
 
           {PlayerSetup ? (
-            <Panel className="lobby__setup" data-section="setup" title="Your setup">
+            <Panel className="lobby__setup" data-part="lobby-setup" data-section="setup" title="Your setup">
               <PlayerSetup />
             </Panel>
           ) : null}
 
-          <Panel className="lobby__chat" data-section="chat" title="Lobby chat" padded={false}>
+          <Panel className="lobby__chat" data-part="lobby-chat" data-section="chat" title="Lobby chat" padded={false}>
             <ChatPanel />
           </Panel>
         </div>
@@ -163,13 +174,14 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
       {/* In-flow sticky bar: it reserves its own height (never covers the end of the lobby). On
           phones it is one row — Leave and Spectate collapse to icons, Ready/Start fills the rest
           and the waiting note becomes a caption (see app.css). */}
-      <footer className="lobby__actions">
+      <footer className="lobby__actions" data-part="lobby-actions">
         <div className="lobby__actions-inner">
           <LeaveButton size="md" className="lobby__leave" collapseLabel />
           <span className="dc-spacer" />
           {me && !me.spectator && !isHost ? (
             <Button
               className="lobby__ready"
+              data-part="ready-button"
               variant={me.ready ? 'success' : 'secondary'}
               icon={me.ready ? 'check' : undefined}
               onClick={() => {
@@ -195,6 +207,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           {isHost ? (
             <Button
               className="lobby__start"
+              data-part="start-button"
               variant="primary"
               size="lg"
               icon="play"
@@ -282,9 +295,13 @@ function LobbyHero({
     } else await copy('link');
   };
   return (
-    <header className="lobby-hero">
+    <header className="lobby-hero" data-part="lobby-hero">
       <div className="lobby-hero__title">
-        <nav className="shell-crumb" aria-label="You are here" style={cabinet ? ({ '--crumb': cabinet.accent.primary } as CSSProperties) : undefined}>
+        <nav
+          className="shell-crumb"
+          aria-label="You are here"
+          style={cabinet ? ({ '--crumb': cabinet.accent.primary } as CSSProperties) : undefined}
+        >
           {multi && cabinet ? (
             <>
               <span className="shell-crumb__cabinet">{cabinet.title}</span>
@@ -297,7 +314,9 @@ function LobbyHero({
           <span className="shell-crumb__sep" aria-hidden>
             ·
           </span>
-          <span className="shell-crumb__here">Lobby</span>
+          <span className="shell-crumb__here">
+            <ThemedText k="lobby.title" plain="Lobby" />
+          </span>
         </nav>
         {editing ? (
           <form
@@ -308,17 +327,23 @@ function LobbyHero({
               setEditing(false);
             }}
           >
-            <TextInput value={name} maxLength={LIMITS.roomName} autoFocus aria-label="Room name" onChange={(e) => setName(e.currentTarget.value)} />
+            <TextInput
+              value={name}
+              maxLength={LIMITS.roomName}
+              autoFocus
+              aria-label="Room name"
+              onChange={(e) => setName(e.currentTarget.value)}
+            />
             <IconButton icon="check" label="Save room name" type="submit" variant="primary" />
           </form>
         ) : (
-          <h1 className="dc-title lobby-hero__name">
+          <h1 className="dc-title lobby-hero__name" data-part="lobby-title">
             {roomName}
             {canEdit ? <IconButton icon="pencil" label="Rename room" size="sm" onClick={() => setEditing(true)} /> : null}
           </h1>
         )}
         <p className="dc-muted">{catalog.tagline}</p>
-        <ul className="lobby-status" aria-label="Room status">
+        <ul className="lobby-status" data-part="lobby-status" aria-label="Room status">
           <li className="lobby-status__item">
             <PixelIcon name="users" />
             <span>
@@ -337,9 +362,9 @@ function LobbyHero({
           ) : null}
         </ul>
       </div>
-      <div className="lobby-code" aria-label={`Room code ${code}`}>
+      <div className="lobby-code" data-part="room-code" aria-label={`Room code ${code}`}>
         <span className="dc-label">Room code</span>
-        <button type="button" className="lobby-code__value" onClick={() => copy('code')} title="Copy code">
+        <button type="button" className="lobby-code__value" data-part="room-code-value" onClick={() => copy('code')} title="Copy code">
           {(code ?? '').split('').map((ch, i) => (
             <span key={i}>{ch}</span>
           ))}
@@ -361,9 +386,11 @@ function LobbyHero({
 function SeatMeter({ seated, max, min }: { seated: number; max: number; min: number }) {
   const label = `${seated} of ${max} seats taken${seated < min ? ` · ${min - seated} more needed to start` : ''}`;
   return (
-    <div className="seat-meter" role="img" aria-label={label} data-mode={max <= 12 ? 'pips' : 'bar'}>
+    <div className="seat-meter" data-part="seat-meter" role="img" aria-label={label} data-mode={max <= 12 ? 'pips' : 'bar'}>
       {max <= 12 ? (
-        Array.from({ length: max }, (_, i) => <i key={i} data-filled={i < seated ? 'true' : undefined} data-needed={i >= seated && i < min ? 'true' : undefined} />)
+        Array.from({ length: max }, (_, i) => (
+          <i key={i} data-filled={i < seated ? 'true' : undefined} data-needed={i >= seated && i < min ? 'true' : undefined} />
+        ))
       ) : (
         <i className="seat-meter__fill" style={{ '--fill': `${Math.min(100, (seated / Math.max(1, max)) * 100)}%` } as CSSProperties} />
       )}
@@ -389,7 +416,11 @@ function PlayerList({
   const watching = useMemo(() => players.filter((p) => p.spectator).sort((a, b) => a.joinOrder - b.joinOrder), [players]);
   const open = Math.max(0, maxPlayers - seated.length);
   const row = (p: PlayerView) => (
-    <li key={p.id} className={cx('player-list__item', p.ready && 'is-ready', p.id === meId && 'is-me', !p.connected && 'is-away')}>
+    <li
+      key={p.id}
+      data-part="player-row"
+      className={cx('player-list__item', p.ready && 'is-ready', p.id === meId && 'is-me', !p.connected && 'is-away')}
+    >
       <PlayerChip
         name={p.name}
         avatar={p.avatar}
@@ -411,7 +442,13 @@ function PlayerList({
       {hostView && p.id !== meId ? (
         menuFor === p.id ? (
           <span className="player-list__manage">
-            <Button size="sm" variant="ghost" icon="crown" onClick={() => (session.lobby.transferHost(p.id), setMenuFor(null))} disabled={!p.connected}>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="crown"
+              onClick={() => (session.lobby.transferHost(p.id), setMenuFor(null))}
+              disabled={!p.connected}
+            >
               Make host
             </Button>
             <Button size="sm" variant="danger" onClick={() => (session.lobby.kick(p.id), setMenuFor(null))}>
@@ -426,7 +463,7 @@ function PlayerList({
     </li>
   );
   return (
-    <ul className="player-list">
+    <ul className="player-list" data-part="player-list">
       {seated.map(row)}
       {open > 0 ? (
         locked ? (

@@ -1,133 +1,223 @@
 # Theming DASCADE
 
-DASCADE ships one theme, **Delta Neon** (`delta-neon`): deep violet-black glass, neon accents, pixel
-bevels and restrained CRT textures. The theme architecture exists so future aesthetic packs (say, a
-1990s-desktop skin) can restyle the whole arcade **without touching game logic, networking,
-tournaments, saves or matchmaking**. A theme is data: a set of CSS custom-property values plus a small
-palette for canvas renderers.
+DASCADE ships **eleven themes**. Delta Neon (`delta-neon`) is the default and the house style; the
+others (Shareware Casino '97, Corporate Desktop '98, Cyber Café 2001, Mall Arcade '92, VHS After Dark,
+Space Casino 2088, Basement LAN Party, Saturday Morning, Executive Edition, Neon Noir) restyle the
+**whole** arcade: floor, cabinets, pickers, title screens, lobbies, dialogs, Tournament Center, results,
+the jukebox, game chrome and playfield materials.
+
+Themes are **presentation only** and **local**. They never touch rules, scoring, networking, hidden
+state, timers, tournaments, saves, ratings or anything server-side, and they are never synchronized to a
+room: two players in the same room can use different themes.
+
+## Architecture: data + skin
+
+A theme has two halves.
+
+| Half     | Where                                  | Loaded                              | What it holds                                                                                                                 |
+| -------- | -------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Data** | `packages/ui/src/theme/themes/<id>.ts` | eagerly (small)                     | `ThemeDefinition`: tokens, overrides, renderer palette, **materials**, per-game materials, **effects**, **copy**, picker meta |
+| **Skin** | `apps/web/src/themes/<id>/`            | lazily: one chunk per theme, cached | `skin.css` (structural restyling) + optional `Environment`, `FloorDecor`, `JukeboxDecor` components                           |
 
 ```
 packages/ui/src/styles/tokens.css        token layers; its :root values ARE Delta Neon
-packages/ui/src/theme/tokens.ts          the token contract (required / optional / derived / foundation)
-packages/ui/src/theme/types.ts           ThemeDefinition, RendererPalette, ThemeTokens
-packages/ui/src/theme/themes/*.ts        theme definitions (delta-neon.ts mirrors tokens.css)
-packages/ui/src/theme/registry.ts        registry, validation, fallback to Delta Neon
+packages/ui/src/theme/tokens.ts          token contract (required / optional / derived / foundation)
+packages/ui/src/theme/materials.ts       MATERIAL_GROUPS / ThemeMaterials / ThemeEffects / DEFAULT_EFFECTS
+packages/ui/src/theme/copy.ts            THEME_COPY_KEYS (themed headings & flavour)
+packages/ui/src/theme/registry.ts        BUILT_IN_THEMES, validateTheme, getTheme (unknown → Delta Neon)
 packages/ui/src/theme/apply.ts           applyTheme(id): html[data-theme] + generated CSS + theme-color
-packages/ui/src/theme/read.ts, react.ts  readThemeTokens() / useThemeTokens() for Canvas & Phaser
-apps/web/src/app/settings.ts             `settings.theme` + versioned, fail-safe settings migration
+packages/ui/src/theme/read.ts, react.ts, watch.ts   readThemeTokens / useThemeTokens / subscribeThemeTokens / watchThemeTokens
+apps/web/src/themes/registry.ts          lazy skin loader (loadThemeSkin, useSkin, loadThemeSkinWithin)
+apps/web/src/themes/ThemeHost.tsx        environment layer, floor-decor slot, transition overlay, quick picker
+apps/web/src/themes/switcher.ts, controller.ts   switchTheme(id): load → cover → apply → reveal
+apps/web/src/themes/ThemePicker.tsx      picker (Settings → Display + quick sheet), live previews (preview.ts)
+apps/web/src/themes/copy.ts, ThemedText.tsx      useThemeCopy / useThemeFlavour / <ThemedText>
+apps/web/src/themes/place.ts             place detection (floor/cabinet/entry/lobby/game/tournament/other)
+apps/web/src/themes/cssScope.ts          skin.css scoping lint (skins.test.ts)
+apps/web/src/app/settings.ts             settings.theme + versioned, fail-safe migration
 ```
+
+### Boot and switching
+
+1. `main.tsx` calls `applyDocumentSettings()` before React renders: the stored theme id is read
+   synchronously (`peekStoredTheme`) and `applyTheme()` injects its token CSS, so tokens never flash.
+2. It then waits for the stored theme's **skin** chunk — at most **800 ms** (`loadThemeSkinWithin`) —
+   before the first render, so structure doesn't flash unskinned on a normal connection.
+3. `switchTheme(id)` (picker, `window.__DASCADE_THEME__.switchTheme`) loads the target skin first, covers
+   the screen with the target theme's `effects.transition` (cover 300 ms), applies the theme while
+   covered (`updateSettings({ theme })` → localStorage + Supabase profile when signed in), waits two
+   frames and reveals (360 ms). Reduced motion or fx MINIMAL → a 150 ms fade. Rapid switching retargets
+   the one running transition — overlays never stack. Nothing remounts (no React keys on routes), and the
+   session, room, jukebox and music are never touched.
+4. Unknown or removed ids render Delta Neon (tokens and skin) while the stored preference is kept.
+
+The transition overlay is a manual **popover** (top layer, above open dialogs), `pointer-events: none`.
+Styles implemented: `power` · `boot` · `shutter` · `fluorescent` · `tracking` · `warp` · `crt-off` · `wipe`
+· `fade`; each tints itself from the target theme's `meta.swatches`.
+
+## Layering
+
+```
+<body>            background: var(--page-bg)                  (canvas, bottom)
+#root             isolation: isolate
+  .theme-env      fixed, inset 0, z-index -1                  ← skin Environment   [data-part=theme-environment]
+  screens         floor / title / picker / room / tournament  (paint above the environment)
+    floor:  .af-room (pixel room)  →  [data-part=floor-decor]  →  HUD / carousel / plaque
+  top bar 50 · overlays 100 · modals 200 · toasts 300          (--z-* foundation tokens)
+  .theme-xfade    top-layer popover (z 10000 fallback)        ← transition overlay
+```
+
+Screens paint their own backdrops. To let an Environment show through, a theme makes them translucent:
+
+| Screen                                   | Token / hook                                                                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Arcade floor                             | `--arcade-floor-bg` (required token) + `arcadeRoom: 'hide'` on the ThemeSkin (skips Delta Neon's pixel room and its render loop) |
+| Cabinet title                            | `--entry-backdrop` (optional override)                                                                                           |
+| Cabinet picker                           | `--picker-backdrop` (optional override); the per-cabinet world art (`.cpb > *`) can be toned via skin CSS                        |
+| Game stages                              | `--game-backdrop` (optional override)                                                                                            |
+| Lobby, Tournament Center, loading, error | already transparent over the page                                                                                                |
+
+`<html data-place="…">` mirrors the current place, so skin CSS can react:
+`:root[data-theme='x'][data-place='game'] …`. Environments get `place` as a prop and must calm down
+when `place === 'game'`.
 
 ## Token layers
 
-| Layer          | Examples                                                                                                                                                                                                                                        | Themed?                                                                                                                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Foundation** | `--fs-*`, `--sp-*`, `--z-*`, `--topbar-h`, `--safe-*`, `--content-max`                                                                                                                                                                          | Never. Scales and layout metrics are shared so games lay out identically in every theme.                                                                                              |
-| **Palette**    | `--bg-0…5`, `--glass*`, `--line*`, `--text-0…3`, `--text-inverse`, neon hues (`--pink`, `--cyan`, …), `--shade`, `--light`                                                                                                                      | Yes. Raw colours; lots of game CSS references them directly.                                                                                                                          |
-| **Semantic**   | page, typography, shape, shadows, surfaces, windows/panels (title bar, brackets, backdrop), buttons, form controls, shell chrome (top bar, docks, toasts), HUD, cabinet chrome, marquee, textures, glow inputs, motion inputs, renderer palette | Yes. Roles, not colours. Components read these.                                                                                                                                       |
-| **Derived**    | `--glow-sm/md/lg`, `--text-glow`, `--scanline-opacity`, `--render-glow`, `--render-scanlines`, `--dur-1…4`                                                                                                                                      | Never set by a theme. They are scaled by the player's **Visual effects** (`html[data-fx]`) and **Reduce motion** settings from the theme's `*-full` / `*-soft` / `--motion-*` inputs. |
+| Layer          | Examples                                                                                                                                    | Themed?                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Foundation** | `--fs-*`, `--sp-*`, `--z-*`, `--topbar-h`, `--safe-*`, `--content-max`                                                                      | Never. Games lay out identically in every theme.                                                                            |
+| **Palette**    | `--bg-0…5`, `--glass*`, `--line*`, `--text-0…3`, neon hues, `--shade`, `--light`                                                            | Yes.                                                                                                                        |
+| **Semantic**   | page, typography, shape, shadows, surfaces, windows/panels, buttons, controls, shell, HUD, cabinet, marquee, textures, glow & motion inputs | Yes. Roles, not colours.                                                                                                    |
+| **Optional**   | `--button-primary-*`, `--control-accent`, `--game-backdrop`, `--entry-backdrop`, `--picker-backdrop`…                                       | Fixed-value replacements for accent-following recipes (`OPTIONAL_THEME_TOKENS`). Never reference `var(--accent)` in them.   |
+| **Derived**    | `--glow-sm/md/lg`, `--text-glow`, `--scanline-opacity`, `--render-glow`, `--render-scanlines`, `--dur-*`                                    | Never set by a theme; scaled by fx (`html[data-fx]`) and reduced motion from the `*-full` / `*-soft` / `--motion-*` inputs. |
+| **Materials**  | `--mat-felt`, `--mat-board-light`, `--mat-water`, `--mat-grass`, `--mat-asphalt`, `--mat-card-face`…                                        | Generated from `materials` (see below). Absent under Delta Neon.                                                            |
 
-The complete, grouped list lives in `THEME_TOKEN_GROUPS` (`packages/ui/src/theme/tokens.ts`).
+`applyTheme()` injects `:root[data-theme='<id>'] { … }` (plus per-game material rules) as
+`<style id="dc-theme">`; Delta Neon needs none (its values are the `:root` defaults in tokens.css).
 
-### Optional overrides (accent-following recipes)
+## Materials (playfield)
 
-A custom property resolves **where it is declared**. Games set `--accent` on their stage (`<GameStage>`),
-so a `:root` token whose value mentions `var(--accent)` would always use the _root_ accent. Components
-that should follow the game's accent therefore compute it in their own rule, behind an optional token:
+Chrome tokens restyle UI; **materials** restyle the playfield: felt and rails, board squares and pieces,
+water/radar, grass/sand/hazards, sky/ground, asphalt/curbs, card faces/backs, paper, stage/podium,
+screens/bezels, metal/LEDs (`MATERIAL_GROUPS`, ~50 keys). Every non-default theme defines **all** of
+them (enforced by `validateTheme`); Delta Neon defines **none**, so every game keeps its own hand-tuned
+palette there. A theme can nudge one game with `gameMaterials: { chess: { boardLight: '#…' } }`, emitted
+as `:root[data-theme='<id>'] [data-game='chess'] { --mat-board-light: … }`. `<GameStage>` sets
+`data-game` on every game (and the cabinet title screen carries it too).
 
-```css
-.dc-btn--primary {
-  --btn-bg: var(--button-primary-bg, color-mix(in srgb, var(--accent) 88%, var(--light)));
-}
-```
+### The adapter rule (everyone touching games)
 
-Delta Neon leaves these unset. A theme may set them to **fixed** values (a grey bevelled primary button,
-a navy control accent). The list is `OPTIONAL_THEME_TOKENS`: `--title-shadow`, `--button-primary-*`,
-`--button-secondary-edge`, `--bracket-color`, `--titlebar-marker`, `--panel-glow-border`,
-`--panel-glow-shadow`, `--control-accent` (+ `--control-accent-ink`), `--input-focus-ring`,
-`--game-backdrop`, `--shell-bar-rule`. Don't reference `var(--accent)` inside them.
-
-## Adding a theme
-
-1. Create `packages/ui/src/theme/themes/<id>.ts` exporting a `ThemeDefinition`. Start from Delta Neon and
-   override: `tokens: { ...DELTA_NEON.tokens, '--bg-0': '#008080', … }`. Every required token must be
-   present (the type and `validateTheme()` enforce it).
-2. Add it to `BUILT_IN_THEMES` in `registry.ts`.
-3. Give players a way to pick it: `useApp.getState().updateSettings({ theme: '<id>' })`. The Settings →
-   Display "Theme" line is where a picker goes (today it is a read-only line because only one theme ships).
-4. Run `pnpm vitest run packages/ui/src/theme` — it checks that every registered theme defines every
-   required token, never sets derived or foundation tokens, and uses safe values.
-5. Look at it: arcade floor, a cabinet picker, a title screen, a lobby, Settings, a toast, a results
-   screen and a few games, at desktop and phone sizes, with Visual effects on High/Low/Off.
-
-`applyTheme()` injects the theme as `:root[data-theme='<id>'] { … }` (a `<style id="dc-theme">`), which
-out-ranks the `:root` defaults. Delta Neon needs no injected CSS. Unknown or removed ids fall back to
-Delta Neon, and the stored preference is kept (so the theme comes back if it is re-added).
-
-### Values that work well
-
-- `--panel-sheen: none` removes the glass highlight (`background: none, <panel-bg>` is valid).
-- `--panel-blur` / `--shell-bar-blur` / `--overlay-blur` accept `none`.
-- Kill glow by setting the eight `--glow-*-full/-soft` inputs to `0 0 0 transparent` (`--text-glow-*`: `none`).
-- Remove CRT texture with `--scanline-opacity-full/-soft: 0`, `--noise-opacity: 0`, `--grid-ink: transparent`.
-- Snappier/softer motion: `--motion-1…4` and `--ease-*`. Reduced motion still collapses durations.
-- Square everything with `--radius-sm/--radius/--radius-lg/--panel-radius/--input-radius: 0px`.
-- Window chrome: `--titlebar-bg` (e.g. a gradient), `--titlebar-fg`, `--titlebar-font`,
-  `--titlebar-transform: none`, `--titlebar-marker-size: 0px`, `--bracket-size: 0px`.
-
-## Rules for game and arcade code
-
-- Use tokens for chrome (panels, HUD, buttons, text, lines, shadows): `--hud-*` for in-game scoreboards
-  and status strips, `--surface-*` for wells and rows, `--panel-*` for windows, `--shadow-*`.
-- Never write `rgba(0,0,0,x)` / `#fff` for chrome; use `color-mix(in srgb, var(--shade) 35%, transparent)`,
-  `var(--light)` or a semantic token.
-- **Game art** (boards, sprites, terrain, card faces, per-cabinet marquee art) may keep its own palette —
-  declare it once as CSS variables or constants in your folder so a theme could override it later.
-- Don't put theme text tokens on fixed art: if a surface is a hard-coded dark illustration, text on it
-  needs a local light ink declared next to the art (a light theme turns `--text-0` dark).
-- Your accent comes from the catalog via `<GameStage gameId>`; keep using `var(--accent)` in component
-  rules (it resolves to your game's accent there).
-- Fonts: `--font-display` (headings/labels), `--font-pixel` (tiny caps), `--font-ui` (body),
-  `--font-num` with `font-variant-numeric: tabular-nums` for every number, clock, score and code.
-  As a safety net `--font-display` starts with `'DASCADE Digits'` (declared in `apps/web/src/styles/app.css`):
-  Space Grotesk for the digits 0–9 only, so a number that slips into a pixel heading, button or segmented
-  option still reads clearly. A theme that swaps `--font-display` should keep that family first.
-- Honour `settings.reducedMotion` and `settings.fx` (use the derived tokens and they are honoured for you).
-
-### Canvas and Phaser renderers
-
-Renderers can't read CSS, so read the resolved values:
+- **DOM/CSS**: replace hard-coded playfield colours with `var(--mat-<key>, <today's colour>)`. The
+  fallback MUST be the exact current colour, so Delta Neon stays pixel-identical.
+- **Canvas / Phaser**: `const m = tokens.materials; fill = m.boardLight ?? CURRENT_HEX;` and re-render on
+  theme change. Missing materials are `undefined`, never a throw.
+- **Chrome** (panels, HUD, buttons, text) uses the existing tokens (`--hud-*`, `--panel-*`, …).
+- **Keep meaning**: accent colours, player/team/suit colours, piece identity, legal-move dots and danger
+  zones stay distinguishable in every theme — themes restyle materials, not meaning.
 
 ```ts
-import { readThemeTokens, subscribeThemeTokens, useThemeTokens } from '@dascade/ui';
+import { readThemeTokens, useThemeTokens, watchThemeTokens } from '@dascade/ui';
 
-// React: pass an element inside your <GameStage> so `accent` is your game's accent.
-const stageRef = useRef<HTMLDivElement>(null);
+// React: a ref inside <GameStage> → the game's accent and per-game materials are in scope.
 const t = useThemeTokens(stageRef); // re-reads on theme / fx / reduced-motion change
-ctx.fillStyle = t.background; // CSS strings for Canvas 2D
-ctx.shadowBlur = 16 * t.glow; // glow is 0 when Visual effects are off
-ctx.globalAlpha = t.gridAlpha; // grid lines in t.line
+ctx.fillStyle = t.materials.felt ?? '#0f5132';
+ctx.shadowBlur = 16 * t.glow; // 0 when effects are MINIMAL
 
-// Phaser (outside React):
-const t = readThemeTokens(parentEl);
-this.cameras.main.setBackgroundColor(t.int.background); // 0xRRGGBB integers in t.int
-const off = subscribeThemeTokens(() => applyPalette(readThemeTokens(parentEl)));
-this.events.once('shutdown', off);
+// Phaser / plain canvas: called now and on every change, coalesced to one call per frame.
+const stop = watchThemeTokens(stageEl, (t) => scene.applyPalette(t));
+this.events.once('shutdown', stop);
+scene.cameras.main.setBackgroundColor(readThemeTokens(stageEl).int.background);
 ```
 
-`ThemeTokens` also carries `surface`, `text`, `textMuted`, `accent2`, `accentDeep`, `success`,
-`warning`, `danger`, `info`, `scanlines` (fx-scaled), `fx`, `reducedMotion` and the font stacks.
+`ThemeTokens` carries `background`, `surface`, `text`, `textMuted`, `line`, `accent*`, status colours,
+`gridAlpha`, fx-scaled `glow`/`scanlines`, `fx`, `reducedMotion`, font stacks, `materials`, `effects`
+and `int` (0xRRGGBB for Phaser).
+
+## Effects
+
+`effects` (`ThemeEffects`, merged over `DEFAULT_EFFECTS`) are hints for renderers:
+`surface` (glass/bevel/flat/plastic/wood/chrome/paper/felt), `crt`, `grain`, `analog` (transitions and
+decorative screens only — never over a board), `ambient` (backdrop particles), `visualizer` (jukebox
+drawing style) and `transition` (the switch animation). Every renderer must look fine at neutral values.
+
+## Copy
+
+`copy` renames a handful of **headings and flavour lines** (`THEME_COPY_KEYS`). Functional labels,
+buttons, form labels, errors and accessible names stay plain.
+
+```tsx
+const t = useThemeCopy(); // t(key, fallback)
+<ThemedText k="results.title" plain="Results" />; // themed text visible, plain text for AT and tests
+const badge = useThemeFlavour('arcade.badge'); // optional slot: string | null (Delta Neon → null)
+```
+
+Slots wired today: `arcade.tagline` (under the floor logo), `arcade.badge`, `arcade.status` (floor
+footer ticker; `|`-separated, placeholders `{cabinets}` `{rooms}` `{online}`), `cabinet.heading`,
+`lobby.title`, `lobby.players`, `results.title` (kicker above `ResultsShell` titles), `tournament.title`,
+`tournament.subtitle`, `settings.title`, `jukebox.title` (jukebox window), `state.loading`, `state.connecting`,
+`state.error`.
+
+## Skins
+
+`apps/web/src/themes/<id>/index.ts` default-exports a `ThemeSkin` and imports `./skin.css`:
+
+```ts
+import './skin.css';
+import type { ThemeSkin } from '../types.ts';
+import { Environment } from './Environment.tsx';
+export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeRoom: 'hide' } satisfies ThemeSkin;
+```
+
+- **skin.css**: every selector starts with `:root[data-theme='<id>']` (or `:where(…)`/`:is(…)` of it),
+  also inside `@media`/`@supports`/`@container`/`@layer`. `@keyframes`/`@property` names use `<id>-` or
+  the theme's alias in `KEYFRAME_ALIASES` (`cssScope.ts`). No `@import`. Enforced by
+  `apps/web/src/themes/skins.test.ts`, which also fails on keyframe name clashes. Because every rule is
+  scoped, a loaded-but-inactive skin is inert, so skins are never unloaded.
+- **Target stable hooks**, not hashed/implementation classes: `data-part="…"` attributes on the floor,
+  carousel, cabinets (body/marquee/screen/control-panel), HUD, plaque, kiosk, picker, title screen,
+  lobby, room code, player list/rows, top bar, results, dialogs, toasts, loading/error screens, Tournament
+  Center, jukebox, game stages and playfields. The full list lives in the components (grep `data-part=`).
+- **Environment** (`SkinRenderContext { fx, reducedMotion, place }`): full-viewport ambience, already
+  `pointer-events: none` + `aria-hidden`. Pause when the tab is hidden (reuse `addFrameJob` from
+  `apps/web/src/arcade/scheduler.ts`), static at fx MINIMAL / reduced motion, subtle in games.
+- **FloorDecor**: rendered in the floor's `[data-part=floor-decor]` slot (over the room, under the
+  carousel). **JukeboxDecor**: inside the expanded jukebox.
+- Decor components are wrapped in an error boundary: a crash renders nothing instead of breaking the app.
+
+## Adding a theme end to end
+
+1. **Data**: `packages/ui/src/theme/themes/<id>.ts` exporting a `ThemeDefinition` — start from Delta Neon
+   (`tokens: { ...DELTA_NEON.tokens, … }`), add `meta` (era, tagline, 4 swatches, family), a complete
+   `materials` set, optional `gameMaterials`, `effects`, `copy`, `overrides`, `renderer`. Add it to
+   `BUILT_IN_THEMES`.
+2. **Skin**: `apps/web/src/themes/<id>/{index.ts,skin.css}` and register the loader in
+   `apps/web/src/themes/registry.ts`; add its keyframe alias to `KEYFRAME_ALIASES`.
+3. **Test**: `pnpm vitest run packages/ui/src/theme apps/web/src/themes` (validation, materials, effects,
+   copy keys, scoping lint, loader, switcher) and `e2e/theme.spec.ts` (iterates every theme id).
+4. **Look at it** at 1920×1080, 1440×900, 1024×768, 768×1024, 390×844 and 844×390, with fx
+   FULL/REDUCED/MINIMAL and reduced motion: floor, a picker, a title screen, a lobby, Settings, a toast,
+   results, the jukebox and several games.
+
+## Performance rules
+
+- Skins are separate chunks, loaded on demand and cached; only the active theme's skin is fetched at
+  boot. Token data for all themes is small and eager. The picker's live previews inject one
+  `<style id="dc-theme-previews">` while a picker is open and remove it when it closes.
+- Switching never accumulates `<style>` tags (one `dc-theme`, one stylesheet per skin, ever), listeners,
+  overlays or environment instances (one `.theme-env`); `e2e/theme.spec.ts` checks this.
+- Environments: one rAF loop at ≤ 30 fps, paused when hidden, cheap at fx REDUCED, static at MINIMAL.
+  Prefer CSS/SVG/procedural canvas over images; no heavy art in the default bundle.
+- Canvas renderers re-read tokens only on change (`watchThemeTokens` / `useThemeTokens`), never per frame.
 
 ## Settings persistence
 
-`AppSettings.theme` (default `'delta-neon'`) is stored with the other settings
-(`localStorage` key `dascade:v1:settings`, or the Supabase profile). `migrateSettings()` upgrades
-whatever is stored — v1 blobs get `theme`, invalid values fall back per key, **unknown keys are kept**,
-and a `settingsVersion` stamp is written. The boot script reads the stored theme synchronously
-(`peekStoredTheme`) and applies it before React renders.
+`AppSettings.theme` (default `'delta-neon'`) is stored with the other settings (`localStorage`
+`dascade:v1:settings`, or the Supabase profile). `migrateSettings()` keeps unknown-but-valid ids (they
+render Delta Neon until the theme exists again), corrects invalid values per key and keeps unknown keys.
+The fx setting is labelled **FULL / REDUCED / MINIMAL** (stored as `'high' | 'low' | 'off'`).
 
-## Proving a theme end to end
+## QA hooks
 
-`e2e/theme.spec.ts` registers a throwaway "1995 desktop" theme at runtime through
-`window.__DASCADE_THEME__` (`registerTheme`, `setTheme`, `listThemes`, `activeThemeId`, `readThemeTokens`) and asserts that
-the page background, top bar, lobby panels, buttons, dialog title bar and the cabinet picker change —
-and that after a reload the unknown id falls back to Delta Neon. That test theme is not shipped.
+`window.__DASCADE_THEME__`: `listThemes`, `registerTheme` (runtime test themes), `activeThemeId`,
+`setTheme(id)` (instant), `switchTheme(id)` (animated, what the picker does), `skinLoaded(id)`,
+`readThemeTokens(el)`.

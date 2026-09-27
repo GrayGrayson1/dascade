@@ -76,6 +76,7 @@ export function Network({
   return (
     <section
       className={cx('dx-network', dense && 'dx-network--dense')}
+      data-part="network"
       aria-label={label}
       style={accent ? ({ '--pick': accent } as CSSProperties) : undefined}
     >
@@ -221,7 +222,7 @@ function NodeCard({ node, player, isMe, isHost, mode, selected, tag, decor, verb
 
   if (!interactive) {
     return (
-      <div className={className} aria-label={ariaLabel} role="group">
+      <div className={className} data-part="node-card" aria-label={ariaLabel} role="group">
         {body}
       </div>
     );
@@ -230,6 +231,7 @@ function NodeCard({ node, player, isMe, isHost, mode, selected, tag, decor, verb
     <button
       type="button"
       className={className}
+      data-part="node-card"
       aria-label={ariaLabel}
       aria-pressed={mode === 'select' ? selected : undefined}
       onClick={() => (selectable ? onSelect?.(node.id) : onTag?.(node.id))}

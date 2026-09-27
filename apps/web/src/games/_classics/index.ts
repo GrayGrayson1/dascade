@@ -11,6 +11,7 @@ export { TouchButton, DPad, TouchDeck, TouchStick, useGestures, type GestureHand
 export { IntentInput, prefersTouch, type IntentSpec, type InputDevice, type PointerState } from './input.ts';
 export { FixedLoop, useFixedLoop, type FixedLoopOptions } from './loop.ts';
 export { useCanvasSurface, beginFrame, toLogical, blockSprite, drawBlock, shade, alpha, roundRect, type Surface, type BlockStyle } from './canvas.ts';
+export { useLiveMaterials, screenColors, hasScreenMaterials, tint, mix, deepen, lighten, luminance, type Materials, type ScreenColors } from './palette.ts';
 export { Particles, Shake, Popups, fxSettings, canvasFonts, type FxSettings } from './fx.ts';
 export { classicSfx, type ClassicSound } from './sfx.ts';
 export { VerifiedRunClient, type RunPhase } from './VerifiedRunClient.ts';

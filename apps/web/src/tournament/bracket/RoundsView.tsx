@@ -82,7 +82,7 @@ export function RoundsView({
 
   if (!section) return null;
   return (
-    <div className="tc-rounds">
+    <div className="tc-rounds" data-part="bracket-rounds">
       {sections.length > 1 ? (
         <Segmented<SectionId>
           label="Bracket section"
@@ -111,7 +111,7 @@ export function RoundsView({
       </div>
       <div className="tc-rounds__strip" ref={strip} onScroll={onScroll}>
         {rounds.map((r, i) => (
-          <section key={r.key} className="tc-rounds__col" aria-label={r.label} aria-hidden={Math.abs(i - active) > 1 || undefined}>
+          <section key={r.key} className="tc-rounds__col" data-part="bracket-round" aria-label={r.label} aria-hidden={Math.abs(i - active) > 1 || undefined}>
             <h3 className="tc-rounds__title">
               <span>{r.label}</span>
               <span className="tc-rounds__count">

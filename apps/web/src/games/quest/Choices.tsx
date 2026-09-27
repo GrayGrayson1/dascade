@@ -47,7 +47,7 @@ export function ChoiceList(props: ChoiceListProps) {
   }, [choices, canVote, tied, canBreakTie, onVote, onTiebreak]);
 
   return (
-    <ol ref={listRef} className={cx('qs-choices', reveal && 'is-revealed', choices.length <= 2 && 'qs-choices--few')} aria-label="Choices">
+    <ol ref={listRef} className={cx('qs-choices', reveal && 'is-revealed', choices.length <= 2 && 'qs-choices--few')} aria-label="Choices" data-part="choices">
       {choices.map((c, i) => {
         const voters = counts.get(c.id) ?? [];
         const mine = myVote === c.id;
@@ -178,7 +178,7 @@ export function VoteBar(p: VoteBarProps) {
   else status = 'Vote for what happens next';
 
   return (
-    <div className="qs-votebar" data-stage={p.stage} role="status" aria-live="polite">
+    <div className="qs-votebar" data-part="timer" data-stage={p.stage} role="status" aria-live="polite">
       {p.stage === 'voting' || p.stage === 'tiebreak' ? (
         <TimerRing seconds={p.paused ? 0 : seconds} progress={p.totalMs > 0 ? p.remainingMs / p.totalMs : 0} size={46} label={p.stage === 'tiebreak' ? 'Tie-break time' : 'Vote time'} />
       ) : (

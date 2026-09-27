@@ -19,6 +19,8 @@ import {
   type PowerKind,
 } from '@dascade/game-core/bricks';
 import { Particles, Popups, Shake, alpha, beginFrame, canvasFonts, drawBlock, fxSettings, roundRect, shade, type Surface } from '../_classics/index.ts';
+import type { Materials } from '../_classics/palette.ts';
+import { FIELD_ART, fieldArt, type FieldArt } from './palette.ts';
 
 export const TONES = ['#ff4fd8', '#ff8a3d', '#ffd23f', '#a3e635', '#2de38f', '#22d3ee', '#a78bfa'] as const;
 export const KIND_COLOR = { A: '#8fa2d8', X: '#ff5a5f', S: '#9aa0bf', P: '#ffd23f', M: '#7cf5ff' } as const;
@@ -49,6 +51,12 @@ export class BricksRenderer {
   private banner: { title: string; sub: string; t: number; color: string } | null = null;
   private fonts = canvasFonts();
   private flash = 0;
+  private field: FieldArt = FIELD_ART;
+
+  /** Theme materials changed: the field re-colours on the next frame (render-only). */
+  setMaterials(m: Materials): void {
+    this.field = fieldArt(m);
+  }
 
   reset(): void {
     this.particles.clear();
@@ -325,12 +333,13 @@ export class BricksRenderer {
 
   private drawField(ctx: CanvasRenderingContext2D): void {
     const bg = ctx.createLinearGradient(0, 0, 0, FIELD_H);
-    bg.addColorStop(0, '#0d0a22');
-    bg.addColorStop(0.7, '#07061a');
-    bg.addColorStop(1, '#0a0716');
+    const art = this.field;
+    bg.addColorStop(0, art.top);
+    bg.addColorStop(0.7, art.mid);
+    bg.addColorStop(1, art.bottom);
     ctx.fillStyle = bg;
     ctx.fillRect(-16, -16, FIELD_W + 32, FIELD_H + 32);
-    ctx.strokeStyle = 'rgba(160, 150, 255, 0.05)';
+    ctx.strokeStyle = art.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 0; x <= FIELD_W; x += 40) {
@@ -349,7 +358,7 @@ export class BricksRenderer {
     ctx.fillStyle = glow;
     ctx.fillRect(0, PADDLE_Y - 40, FIELD_W, FIELD_H - PADDLE_Y + 40);
     // Brick zone ceiling line.
-    ctx.fillStyle = 'rgba(124, 245, 255, 0.12)';
+    ctx.fillStyle = art.ceiling;
     ctx.fillRect(0, BRICK_TOP - CELL_H, FIELD_W, 1);
   }
 
@@ -446,10 +455,10 @@ export class BricksRenderer {
 }
 
 /** Tiny rival field preview ("level:rows:cells"). */
-export function drawFieldPreview(ctx: CanvasRenderingContext2D, preview: string, w: number, h: number, scale: number): void {
+export function drawFieldPreview(ctx: CanvasRenderingContext2D, preview: string, w: number, h: number, scale: number, art: FieldArt = FIELD_ART): void {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#07061a';
+  ctx.fillStyle = art.mid;
   ctx.fillRect(0, 0, w, h);
   const [, rowsRaw, cells = ''] = preview.split(':');
   const rows = Math.max(1, Number(rowsRaw) || 1);

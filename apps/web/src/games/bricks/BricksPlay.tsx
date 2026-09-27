@@ -29,6 +29,7 @@ import {
   formatScore,
   toLogical,
   useCanvasSurface,
+  useLiveMaterials,
   useFixedLoop,
   useHud,
   useVerifiedFlow,
@@ -39,6 +40,8 @@ import {
   type IntentSpec,
 } from '../_classics/index.ts';
 import { BricksRenderer, POWER_INFO, drawFieldPreview } from './art.ts';
+import { fieldArt } from './palette.ts';
+import type { Materials } from '../_classics/palette.ts';
 
 export const BRICKS_INFO: ClassicsGameInfo = {
   gameId: 'bricks',
@@ -86,6 +89,7 @@ export function BricksPlay() {
     createHudStore({ score: 0, level: 1, lives: 3, bricks: 0, ticks: 0, limit: 0, wide: 0, multi: 0, laser: 0, slow: 0, sticky: 0, life: 0, levelName: '', left: 0 }),
   );
   const renderer = useRef<BricksRenderer>(new BricksRenderer());
+  useLiveMaterials(screenRef, (m) => renderer.current.setMaterials(m));
   const sent = useRef({ target: -1, axis: 0, pointerVersion: 0 });
   const flow = useVerifiedFlow<BricksSim>('bricks', (seed, opts) => createBricksSim(seed, opts, true), () => {
     renderer.current.reset();
@@ -413,6 +417,9 @@ function sameMap(a: Record<string, string>, b: Record<string, string>): boolean 
 
 function FieldPreview({ preview, name, score, out, color, large }: { preview: string; name: string; score: number; out?: boolean; color?: string; large?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [materials, setMaterials] = useState<Materials>({});
+  useLiveMaterials(ref, setMaterials);
+  const art = useMemo(() => fieldArt(materials), [materials]);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -423,13 +430,13 @@ function FieldPreview({ preview, name, score, out, color, large }: { preview: st
       c.width = Math.round(r.width * dpr);
       c.height = Math.round(r.height * dpr);
       const ctx = c.getContext('2d');
-      if (ctx) drawFieldPreview(ctx, preview, r.width, r.height, dpr);
+      if (ctx) drawFieldPreview(ctx, preview, r.width, r.height, dpr, art);
     };
     paint();
     const ro = new ResizeObserver(paint);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [preview]);
+  }, [preview, art]);
   const lvl = preview.split(':')[0];
   return (
     <figure className={cx('bb-field', out && 'is-out', large && 'bb-field--large')} style={color ? ({ '--pc': color } as CSSProperties) : undefined}>

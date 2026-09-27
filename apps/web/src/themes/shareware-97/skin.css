@@ -1,0 +1,2825 @@
+/* =====================================================================
+ * SHAREWARE CASINO '97 — "DASCADE FUN PACK v3.7 · REGISTERED VERSION"
+ * Structural skin. EVERY selector is scoped under :root[data-theme='shareware-97'].
+ *
+ * Language: putty-beige application windows with mitred bevels and burgundy title bars,
+ * brass/gold trim, glossy red "physical" primary buttons, white inset text fields, tiny red LEDs
+ * and amber LCD readouts, bitmap status text, a gaudy casino carpet and velvet ropes.
+ * Window CONTENT stays a dark felt well so games keep their own colours; dialogs go fully beige.
+ * Original CSS/SVG only.
+ * ===================================================================== */
+
+/* ---------- Shared recipes (custom properties on :root) ---------- */
+:root[data-theme='shareware-97'] {
+  --sw-putty: #d9d1bd;
+  --sw-putty-hi: #fbf6e8;
+  --sw-putty-lo: #8a806a;
+  --sw-putty-dk: #3e372b;
+  --sw-brass: #c9a24a;
+  --sw-brass-hi: #f6dd8c;
+  --sw-brass-lo: #6e4f14;
+  --sw-oxblood: #7a0f1c;
+  --sw-red: #d8262a;
+  --sw-ink: #1a140b;
+  --sw-cream: #fff3c8;
+  --sw-lcd: #0b0f08;
+  --sw-amber: #ffb627;
+  --sw-led: #ff3b2f;
+  /* Raised / sunken bevels (drawn inside an element's border box). */
+  --sw-raised: inset -1px -1px 0 var(--sw-putty-dk), inset 1px 1px 0 var(--sw-putty-hi), inset -2px -2px 0 var(--sw-putty-lo), inset 2px 2px 0 #fff;
+  --sw-sunken: inset 1px 1px 0 var(--sw-putty-lo), inset -1px -1px 0 var(--sw-putty-hi), inset 2px 2px 0 var(--sw-putty-dk), inset -2px -2px 0 var(--sw-putty);
+  --sw-title-grad: linear-gradient(90deg, #6a0c18 0%, #a81b24 58%, #d8262a 100%);
+  --sw-brass-grad: linear-gradient(180deg, #fff0b8 0%, #e6c35f 22%, #b8862a 55%, #8f6218 78%, #e0b74f 100%);
+  --sw-gold-text: linear-gradient(180deg, #fffbe6 0%, #ffe38a 38%, #e0a92e 52%, #b97d17 70%, #ffe08a 100%);
+  /* Gaudy 1997 casino carpet (original pattern). */
+  --sw-carpet: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' fill='%233a0914'/%3E%3Cpath d='M0 80L80 0l80 80-80 80z' fill='none' stroke='%23b8862a' stroke-width='3'/%3E%3Cpath d='M20 80L80 20l60 60-60 60z' fill='none' stroke='%235e1422' stroke-width='6'/%3E%3Ccircle cx='80' cy='80' r='21' fill='%23103f58' stroke='%23e0b347' stroke-width='3'/%3E%3Cpath d='M80 64l4 12 12 4-12 4-4 12-4-12-12-4 12-4z' fill='%23f2c14e'/%3E%3Ccircle cx='0' cy='0' r='15' fill='%234e1670' stroke='%23e0b347' stroke-width='2.5'/%3E%3Ccircle cx='160' cy='0' r='15' fill='%234e1670' stroke='%23e0b347' stroke-width='2.5'/%3E%3Ccircle cx='0' cy='160' r='15' fill='%234e1670' stroke='%23e0b347' stroke-width='2.5'/%3E%3Ccircle cx='160' cy='160' r='15' fill='%234e1670' stroke='%23e0b347' stroke-width='2.5'/%3E%3Cpath d='M26 118q7-9 14 0t14 0M106 42q7-9 14 0t14 0' fill='none' stroke='%2336b7a8' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M118 112l6 6-6 6-6-6zM36 36l6 6-6 6-6-6z' fill='%23ff5fa8'/%3E%3Ccircle cx='40' cy='80' r='3' fill='%23f2c14e'/%3E%3Ccircle cx='120' cy='80' r='3' fill='%23f2c14e'/%3E%3Ccircle cx='80' cy='40' r='3' fill='%2336b7a8'/%3E%3Ccircle cx='80' cy='120' r='3' fill='%2336b7a8'/%3E%3C/svg%3E");
+  /* Burgundy damask wallpaper (original pattern). */
+  --sw-damask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='96' viewBox='0 0 64 96'%3E%3Cpath d='M32 6c9 12 18 18 18 30S41 58 32 90C23 58 14 48 14 36S23 18 32 6z' fill='%23ffd27a' fill-opacity='.07'/%3E%3Cpath d='M32 30c4 5 7 8 7 13s-3 9-7 15c-4-6-7-10-7-15s3-8 7-13z' fill='%23ffd27a' fill-opacity='.08'/%3E%3Ccircle cx='0' cy='48' r='3' fill='%23ffd27a' fill-opacity='.1'/%3E%3Ccircle cx='64' cy='48' r='3' fill='%23ffd27a' fill-opacity='.1'/%3E%3C/svg%3E");
+  /* Chasing marquee bulbs (a row of lamps; animate background-position). */
+  --sw-bulbs: radial-gradient(circle at 50% 50%, #fffbe0 0 2px, #ffd23a 2.6px 3.6px, rgba(255, 180, 40, 0.35) 4.2px, transparent 5.5px);
+  scrollbar-color: var(--sw-putty-lo) #120c0a;
+}
+
+:root[data-theme='shareware-97'] body {
+  background: #2a0810 var(--sw-carpet);
+  background-size: 160px 160px;
+}
+:root[data-theme='shareware-97'] ::selection {
+  background: #f2c14e;
+  color: var(--sw-ink);
+}
+
+/* =====================================================================
+ * ENVIRONMENT — the casino floor behind everything
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .sw-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #1c0509;
+}
+:root[data-theme='shareware-97'] .sw-env__wall {
+  position: absolute;
+  inset: 0 0 42% 0;
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 18%, rgba(255, 190, 80, 0.16), transparent 70%),
+    var(--sw-damask),
+    linear-gradient(180deg, #250610 0%, #4a0b18 62%, #5c1020 100%);
+  background-size: auto, 64px 96px, auto;
+}
+/* Wainscot: dark wood panelling under the brass rail. */
+:root[data-theme='shareware-97'] .sw-env__wall::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0 118px, rgba(0, 0, 0, 0.45) 118px 120px, rgba(255, 220, 160, 0.08) 120px 122px),
+    linear-gradient(180deg, #3a1a0e, #24100a);
+}
+:root[data-theme='shareware-97'] .sw-env__drape {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(40px, 7vw, 120px);
+  background:
+    linear-gradient(180deg, transparent 88%, rgba(0, 0, 0, 0.4)),
+    repeating-linear-gradient(90deg, #4c0712 0, #9a1528 14px, #c02238 20px, #7d0f20 30px, #4c0712 40px);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='shareware-97'] .sw-env__drape::before {
+  /* Gold-fringed valance. */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  background:
+    repeating-linear-gradient(90deg, #f2c14e 0 3px, #8f6218 3px 6px) bottom / 100% 8px no-repeat,
+    linear-gradient(180deg, #5c0a18, #8a1224);
+}
+:root[data-theme='shareware-97'] .sw-env__drape--l {
+  left: 0;
+}
+:root[data-theme='shareware-97'] .sw-env__drape--r {
+  right: 0;
+}
+:root[data-theme='shareware-97'] .sw-env__tube {
+  position: absolute;
+  top: clamp(96px, 17vh, 180px);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 16px 8px;
+  border: 2px solid rgba(246, 221, 140, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 2, 5, 0.55);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+:root[data-theme='shareware-97'] .sw-env__tube b {
+  font-size: clamp(18px, 1.9vw, 30px);
+}
+:root[data-theme='shareware-97'] .sw-env__tube small {
+  font-family: 'Silkscreen', monospace;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffe9b0;
+  opacity: 0.8;
+}
+:root[data-theme='shareware-97'] .sw-env__tube--l {
+  left: clamp(56px, 9vw, 170px);
+  transform: rotate(-3deg);
+  color: #ffd6ec;
+  text-shadow:
+    0 0 4px #ff5fa8,
+    0 0 12px #ff2d8a,
+    0 0 26px rgba(255, 45, 138, 0.6);
+}
+:root[data-theme='shareware-97'] .sw-env__tube--r {
+  right: clamp(56px, 9vw, 170px);
+  transform: rotate(2.5deg);
+  color: #d4fffa;
+  text-shadow:
+    0 0 4px #40d9cf,
+    0 0 12px #14b8ad,
+    0 0 26px rgba(20, 184, 173, 0.6);
+}
+:root[data-theme='shareware-97'] .sw-env[data-fx='low'] .sw-env__tube b {
+  text-shadow: 0 0 6px currentColor;
+}
+:root[data-theme='shareware-97'] .sw-env[data-animate='on'] .sw-env__tube--l b {
+  animation: sw-flicker 7s steps(1) infinite;
+}
+:root[data-theme='shareware-97'] .sw-env__rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 58%;
+  height: 7px;
+  background: var(--sw-brass-grad);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+:root[data-theme='shareware-97'] .sw-env__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 58%;
+  bottom: 0;
+  overflow: hidden;
+  perspective: 520px;
+  perspective-origin: 50% 0%;
+  background: #2a0810;
+}
+:root[data-theme='shareware-97'] .sw-env__carpet {
+  position: absolute;
+  left: -60%;
+  right: -60%;
+  top: 0;
+  height: 320%;
+  background: var(--sw-carpet);
+  background-size: 150px 150px;
+  transform-origin: 50% 0;
+  transform: rotateX(62deg);
+}
+:root[data-theme='shareware-97'] .sw-env__floor::after {
+  /* Depth haze near the rail + light fall-off. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(20, 2, 6, 0.85) 0%, rgba(20, 2, 6, 0.25) 35%, rgba(20, 2, 6, 0.1) 70%, rgba(10, 0, 3, 0.45) 100%);
+}
+:root[data-theme='shareware-97'] .sw-env__pools {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 34% 16% at 50% 72%, rgba(255, 200, 90, 0.16), transparent 70%),
+    radial-gradient(ellipse 18% 10% at 18% 64%, rgba(255, 95, 168, 0.1), transparent 70%),
+    radial-gradient(ellipse 18% 10% at 82% 64%, rgba(64, 217, 207, 0.1), transparent 70%);
+  mix-blend-mode: screen;
+}
+:root[data-theme='shareware-97'] .sw-env__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 100% at 50% 45%, transparent 55%, rgba(8, 0, 2, 0.7) 100%);
+}
+/* Calm modes. */
+:root[data-theme='shareware-97'] .sw-env[data-place='game'] .sw-env__wall,
+:root[data-theme='shareware-97'] .sw-env[data-place='game'] .sw-env__rail {
+  display: none;
+}
+:root[data-theme='shareware-97'] .sw-env[data-place='game'] .sw-env__floor {
+  top: 0;
+  perspective: none;
+}
+:root[data-theme='shareware-97'] .sw-env[data-place='game'] .sw-env__carpet {
+  transform: none;
+  height: 100%;
+  left: 0;
+  right: 0;
+  opacity: 0.45;
+}
+:root[data-theme='shareware-97'] .sw-env[data-place='game'] .sw-env__floor::after {
+  background: rgba(14, 3, 6, 0.72);
+}
+:root[data-theme='shareware-97'] .sw-env[data-place='lobby'] .sw-env__floor::after,
+:root[data-theme='shareware-97'] .sw-env[data-place='tournament'] .sw-env__floor::after,
+:root[data-theme='shareware-97'] .sw-env[data-place='other'] .sw-env__floor::after {
+  background: linear-gradient(180deg, rgba(20, 2, 6, 0.85), rgba(20, 2, 6, 0.55));
+}
+:root[data-theme='shareware-97'] .sw-env[data-fx='off'] .sw-env__carpet {
+  transform: none;
+  height: 100%;
+  left: 0;
+  right: 0;
+}
+:root[data-theme='shareware-97'] .sw-env[data-fx='off'] .sw-env__floor {
+  perspective: none;
+}
+
+/* =====================================================================
+ * FLOOR DECOR — bulb-lit sign + velvet ropes
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .sw-floor {
+  position: absolute;
+  inset: 0;
+}
+:root[data-theme='shareware-97'] .sw-sign {
+  position: absolute;
+  left: 50%;
+  top: clamp(82px, 9.5vh, 110px);
+  transform: translateX(-50%);
+  padding: 9px;
+  border-radius: 6px;
+  background: var(--sw-brass-grad);
+  box-shadow:
+    0 0 0 2px #3a2606,
+    0 10px 24px rgba(0, 0, 0, 0.6),
+    0 0 50px rgba(255, 190, 70, 0.25);
+}
+:root[data-theme='shareware-97'] .sw-sign__bulbs {
+  position: absolute;
+  inset: 1px;
+  border-radius: 5px;
+  background:
+    var(--sw-bulbs) 0 0 / 14px 9px repeat-x,
+    var(--sw-bulbs) 0 100% / 14px 9px repeat-x,
+    var(--sw-bulbs) 0 0 / 9px 14px repeat-y,
+    var(--sw-bulbs) 100% 0 / 9px 14px repeat-y;
+  pointer-events: none;
+}
+:root[data-theme='shareware-97'] .sw-floor[data-animate='on'] .sw-sign__bulbs {
+  animation: sw-chase 0.9s steps(2) infinite;
+}
+:root[data-theme='shareware-97'] .sw-sign__plate {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 8px 22px 7px;
+  background:
+    radial-gradient(ellipse 80% 90% at 50% 0%, rgba(255, 90, 90, 0.35), transparent 70%),
+    linear-gradient(180deg, #4a0612, #22030a);
+  border: 1px solid #1a0205;
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 140, 0.25);
+}
+:root[data-theme='shareware-97'] .sw-sign__word {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: clamp(22px, min(4.2vh, 3.4vw), 48px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: var(--sw-gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #3a0610) drop-shadow(0 0 10px rgba(255, 200, 80, 0.45));
+}
+:root[data-theme='shareware-97'] .sw-sign__sub {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffd9a0;
+  white-space: nowrap;
+}
+:root[data-theme='shareware-97'] .sw-floor[data-fx='off'] .sw-sign {
+  box-shadow:
+    0 0 0 2px #3a2606,
+    0 8px 16px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='shareware-97'] .sw-rope {
+  position: absolute;
+  bottom: calc(var(--plaque-h, 150px) + 70px);
+  width: clamp(150px, 17vw, 280px);
+  height: clamp(52px, 6vw, 96px);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.5));
+}
+:root[data-theme='shareware-97'] .sw-rope--l {
+  left: clamp(8px, 2vw, 40px);
+}
+:root[data-theme='shareware-97'] .sw-rope--r {
+  right: clamp(8px, 2vw, 40px);
+}
+
+/* =====================================================================
+ * BUTTONS — putty bevels, glossy red domes
+ * ===================================================================== */
+:where(:root[data-theme='shareware-97']) .dc-btn {
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.7),
+    inset -2px -2px 0 rgba(40, 30, 15, 0.38),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+  text-shadow: none;
+}
+:where(:root[data-theme='shareware-97']) .dc-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  filter: none;
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 2px 2px 0 rgba(40, 30, 15, 0.4),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.45),
+    1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn:focus-visible {
+  outline: 2px dotted var(--focus-ring);
+  outline-offset: 3px;
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--ghost {
+  --btn-fg: var(--text-1);
+  box-shadow: none;
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 240, 200, 0.28),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--ghost:active:not(:disabled) {
+  box-shadow:
+    inset 1px 1px 0 rgba(0, 0, 0, 0.45),
+    inset -1px -1px 0 rgba(255, 240, 200, 0.2);
+}
+/* The big glossy red physical button, in a brass bezel. */
+:where(:root[data-theme='shareware-97']) .dc-btn--primary {
+  margin: 4px;
+  border-radius: 12px;
+  font-family: 'Silkscreen', 'Tiny5', var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* Label contrast: the cap's red stays ≥ 4.5:1 under the cream label (the gloss stops above the text). */
+  text-shadow: 0 1px 0 #6a0810, 0 0 3px rgba(80, 0, 8, 0.55);
+  background:
+    radial-gradient(ellipse 88% 46% at 50% 2%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.06) 60%, transparent 62%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(255, 150, 120, 0.4), transparent 70%),
+    linear-gradient(180deg, #f45a48 0%, #cc1d23 45%, #a50c16 80%, #760810 100%);
+  box-shadow:
+    0 0 0 1px #4a060b,
+    0 0 0 3px var(--sw-brass),
+    0 0 0 4px var(--sw-brass-lo),
+    0 4px 0 3px #3a2606,
+    0 6px 14px 3px rgba(0, 0, 0, 0.45),
+    inset 0 -3px 0 rgba(60, 0, 6, 0.35),
+    0 0 22px 2px var(--btn-glow);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.05);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    0 0 0 1px #4a060b,
+    0 0 0 3px var(--sw-brass),
+    0 0 0 4px var(--sw-brass-lo),
+    0 1px 0 3px #3a2606,
+    inset 0 3px 6px rgba(60, 0, 6, 0.5);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--primary.dc-btn--block {
+  width: calc(100% - 8px);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--primary.dc-btn--sm {
+  border-radius: 9px;
+  font-size: var(--fs-xs);
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--gold,
+:where(:root[data-theme='shareware-97']) .dc-btn--success,
+:where(:root[data-theme='shareware-97']) .dc-btn--danger {
+  font-family: 'Silkscreen', 'Tiny5', var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+:where(:root[data-theme='shareware-97']) .dc-btn--gold {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 48%),
+    linear-gradient(180deg, var(--btn-bg), var(--btn-bg-2));
+}
+:where(:root[data-theme='shareware-97']) .dc-btn:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+}
+
+/* =====================================================================
+ * WINDOWS — panels, title bars, dialogs
+ * ===================================================================== */
+:where(:root[data-theme='shareware-97']) .dc-panel {
+  border-style: solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  background-clip: padding-box;
+}
+:where(:root[data-theme='shareware-97']) .dc-panel--glow {
+  border-color: var(--sw-brass-hi) var(--sw-brass-lo) var(--sw-brass-lo) var(--sw-brass-hi);
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__header {
+  min-height: 32px;
+  /* The right padding reserves room for the LEDs so header badges/buttons never sit on top of them. */
+  padding: 5px 38px 5px 10px;
+  /* Two tiny status LEDs at the right end of every title bar (decorative). */
+  background:
+    radial-gradient(circle at calc(100% - 14px) 50%, #b6ff9a 0 1.5px, #3fd35c 2px 3.5px, #0b3a14 4px 4.5px, transparent 5px),
+    radial-gradient(circle at calc(100% - 28px) 50%, #6a3a08 0 3.5px, #2a1402 4px 4.5px, transparent 5px),
+    var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-putty-dk);
+  box-shadow: inset 0 -1px 0 rgba(255, 220, 140, 0.35), inset 0 1px 0 rgba(255, 190, 170, 0.25);
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__header .dc-btn--ghost {
+  /* Title-bar buttons are little bevelled putty keys. */
+  --btn-fg: #1a140b;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #8a806a;
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__header .dc-btn--ghost:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f4eedd, #d4ccb6);
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #8a806a;
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__header .dc-btn--ghost:active:not(:disabled) {
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 1px 1px 0 #6e6553,
+    inset -1px -1px 0 #fbf6e8;
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__title {
+  font-weight: 700;
+  text-shadow: 0 1px 0 #3a0610;
+}
+:where(:root[data-theme='shareware-97']) .dc-panel__title::before {
+  /* Brass "chip" marker instead of a neon square. */
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, #fff3c8 0 30deg, #b8862a 30deg 60deg);
+  box-shadow:
+    0 0 0 1px #3a2606,
+    inset 0 0 0 3px #d8262a;
+}
+
+/* Dialogs: fully beige, weirdly serious. Re-ink everything inside. */
+:where(:root[data-theme='shareware-97']) .dc-modal {
+  --text-0: #1a140b;
+  --text-1: #2b2317;
+  --text-2: #463d2e;
+  --text-3: #5a5141;
+  --af-ink-0: #1a140b;
+  --af-ink-1: #2b2317;
+  --af-ink-2: #463d2e;
+  --af-ink-3: #5a5141;
+  --bg-0: #efe8d6;
+  --bg-1: #e6dfcc;
+  --bg-2: #d2cab5;
+  --bg-3: #c6bea8;
+  --bg-4: #b8af98;
+  --bg-5: #a39a83;
+  --glass: #d9d1bd;
+  --glass-strong: #d9d1bd;
+  --glass-light: rgba(255, 255, 255, 0.35);
+  --line: rgba(62, 55, 43, 0.25);
+  --line-strong: rgba(62, 55, 43, 0.45);
+  --line-bright: #3e372b;
+  --panel-bg: #d9d1bd;
+  --panel-bg-solid: #d9d1bd;
+  --panel-bg-opaque: #d9d1bd;
+  --panel-divider: #8a806a;
+  --surface-sunken: #cbc3ad;
+  --surface-sunken-soft: #d2cab5;
+  --surface-raised: rgba(255, 255, 255, 0.35);
+  --surface-hover: rgba(122, 15, 28, 0.08);
+  --control-track: #fffdf5;
+  --control-track-edge: #3e372b;
+  --control-accent: #8a1020;
+  --control-accent-ink: #fff3c8;
+  --accent: #8a1020;
+  --accent-2: #6e4200;
+  --accent-ink: #fff3c8;
+  --pink: #b3126b;
+  --cyan: #0b716d;
+  --yellow: #8a5d00;
+  --green: #17763a;
+  --orange: #a84a00;
+  --purple: #6a3bbf;
+  --red: #b3141b;
+  --blue: #1f4fb8;
+  --lime: #4a7700;
+  --focus-ring: #1a140b;
+  --scrollbar-thumb: #8a806a;
+  color: var(--text-0);
+}
+:where(:root[data-theme='shareware-97']) .dc-modal::backdrop {
+  background:
+    repeating-conic-gradient(rgba(0, 0, 0, 0.18) 0 25%, transparent 0 50%) 0 0 / 4px 4px,
+    var(--overlay-scrim);
+}
+:where(:root[data-theme='shareware-97']) .dc-modal__frame {
+  border: 3px solid;
+  border-color: #fbf6e8 #3e372b #3e372b #fbf6e8;
+  background: #d9d1bd;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset -1px -1px 0 #8a806a,
+    inset 1px 1px 0 #fff,
+    8px 8px 0 rgba(0, 0, 0, 0.45);
+}
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-panel__header {
+  padding-right: 10px;
+}
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-panel__title {
+  color: var(--sw-cream);
+}
+:where(:root[data-theme='shareware-97']) .dc-modal__footer {
+  border-top: 1px solid #8a806a;
+  box-shadow: inset 0 1px 0 #fbf6e8;
+}
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-btn--ghost {
+  --btn-fg: #2b2317;
+}
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-panel {
+  --panel-bg: #e6dfcc;
+  background: #e6dfcc;
+}
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-segmented,
+:where(:root[data-theme='shareware-97']) .dc-modal .dc-progress {
+  background: #fffdf5;
+}
+
+/* =====================================================================
+ * FORM CONTROLS
+ * ===================================================================== */
+:where(:root[data-theme='shareware-97']) .dc-input,
+:where(:root[data-theme='shareware-97']) .dc-select,
+:where(:root[data-theme='shareware-97']) .dc-textarea {
+  border: 1px solid var(--sw-putty-dk);
+  font-family: var(--font-ui);
+}
+:where(:root[data-theme='shareware-97']) .dc-input:focus,
+:where(:root[data-theme='shareware-97']) .dc-select:focus,
+:where(:root[data-theme='shareware-97']) .dc-textarea:focus {
+  border-color: #000;
+}
+:where(:root[data-theme='shareware-97']) .dc-select {
+  /* Classic drop-down with a bevelled arrow button. */
+  padding-right: 40px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #1a140b 50%),
+    linear-gradient(135deg, #1a140b 50%, transparent 50%),
+    linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  background-position:
+    calc(100% - 17px) 52%,
+    calc(100% - 12px) 52%,
+    calc(100% - 3px) 3px;
+  background-size:
+    5px 5px,
+    5px 5px,
+    26px calc(100% - 6px);
+}
+:where(:root[data-theme='shareware-97']) .dc-select option {
+  background: #fffdf5;
+  color: #1a140b;
+}
+:where(:root[data-theme='shareware-97']) .dc-field__label {
+  color: var(--text-1);
+}
+:where(:root[data-theme='shareware-97']) .dc-input--code {
+  background: var(--sw-lcd);
+  color: var(--sw-amber);
+  text-shadow: 0 0 8px rgba(255, 182, 39, 0.55);
+  border-color: #000;
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset 0 0 0 3px #1c2412,
+    0 0 0 2px var(--sw-putty),
+    0 0 0 3px var(--sw-putty-dk);
+}
+:where(:root[data-theme='shareware-97']) .dc-input--code::placeholder {
+  color: #6a5a2a;
+}
+/* Toggle: a tiny bevelled rocker. */
+:where(:root[data-theme='shareware-97']) .dc-toggle__track {
+  border: 0;
+  background: #0a110e;
+  box-shadow: var(--sw-sunken);
+}
+:where(:root[data-theme='shareware-97']) .dc-toggle__thumb {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--sw-putty);
+  box-shadow: var(--sw-raised);
+}
+:where(:root[data-theme='shareware-97']) .dc-toggle input:checked + .dc-toggle__track {
+  background: color-mix(in srgb, var(--control-accent) 70%, #000);
+}
+:where(:root[data-theme='shareware-97']) .dc-toggle input:checked + .dc-toggle__track .dc-toggle__thumb {
+  transform: translateX(22px);
+  background: var(--sw-brass-hi);
+  box-shadow: var(--sw-raised);
+}
+/* Slider: sunken slot + bevelled putty thumb. */
+:where(:root[data-theme='shareware-97']) .dc-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  box-shadow: var(--sw-sunken);
+}
+:where(:root[data-theme='shareware-97']) .dc-slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 26px;
+  margin-top: -10px;
+  background: var(--sw-putty);
+  border: 0;
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px #000;
+}
+:where(:root[data-theme='shareware-97']) .dc-slider::-moz-range-thumb {
+  width: 12px;
+  height: 24px;
+  background: var(--sw-putty);
+  border: 1px solid #000;
+  box-shadow: var(--sw-raised);
+}
+/* Segmented: a sunken well of radio "keys"; the selected one is a gold key. */
+:where(:root[data-theme='shareware-97']) .dc-segmented {
+  border: 0;
+  box-shadow: var(--sw-sunken);
+  padding: 4px;
+}
+:where(:root[data-theme='shareware-97']) .dc-segmented__item {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  border-radius: 0;
+}
+:where(:root[data-theme='shareware-97']) .dc-segmented__item[aria-checked='true'],
+:where(:root[data-theme='shareware-97']) .dc-segmented__item[aria-selected='true'] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--control-accent) 70%, #fff), var(--control-accent));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.6),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+/* Tabs: property-sheet folder tabs. */
+:where(:root[data-theme='shareware-97']) .dc-tabs {
+  gap: 2px;
+  border-bottom: 2px solid var(--sw-putty);
+  padding: 4px 4px 0;
+}
+:where(:root[data-theme='shareware-97']) .dc-tab {
+  min-height: 38px;
+  padding: 0 var(--sp-4);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  color: #2b2317;
+  background: linear-gradient(180deg, #c9c0aa, #b3aa94);
+  border: 2px solid;
+  border-color: #efe8d6 #3e372b transparent #efe8d6;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+:where(:root[data-theme='shareware-97']) .dc-tab:hover {
+  color: #000;
+  background: linear-gradient(180deg, #d6cdb8, #c1b8a2);
+}
+:where(:root[data-theme='shareware-97']) .dc-tab[aria-selected='true'] {
+  color: #000;
+  background: var(--sw-putty);
+  transform: translateY(1px);
+  padding-top: 2px;
+}
+:where(:root[data-theme='shareware-97']) .dc-tab[aria-selected='true']::after {
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: var(--sw-putty);
+  box-shadow: none;
+}
+/* Progress: chunky installer blocks. */
+:where(:root[data-theme='shareware-97']) .dc-progress {
+  height: 14px;
+  border: 0;
+  box-shadow: var(--sw-sunken);
+  padding: 2px;
+}
+:where(:root[data-theme='shareware-97']) .dc-progress::after {
+  inset: 3px;
+  width: calc(var(--value) - 6px);
+  max-width: calc(100% - 6px);
+  background: repeating-linear-gradient(90deg, var(--control-accent) 0 9px, transparent 9px 11px);
+  box-shadow: none;
+}
+/* Badges: stamped brass tags. */
+:where(:root[data-theme='shareware-97']) .dc-badge {
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.12), inset -1px -1px 0 rgba(0, 0, 0, 0.35);
+}
+:where(:root[data-theme='shareware-97']) .dc-kbd {
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  color: #1a140b;
+  border: 1px solid #3e372b;
+  border-bottom-width: 3px;
+  border-radius: 2px;
+  font-weight: 700;
+}
+/* Timer ring: a brass-bezel gauge. */
+:where(:root[data-theme='shareware-97']) .dc-timer {
+  box-shadow:
+    0 0 0 2px var(--sw-brass),
+    0 0 0 3px var(--sw-brass-lo),
+    2px 3px 0 3px rgba(0, 0, 0, 0.4);
+}
+:where(:root[data-theme='shareware-97']) .dc-timer::before {
+  background: radial-gradient(circle at 50% 35%, #1c2a22, #07100c);
+}
+:where(:root[data-theme='shareware-97']) .dc-spinner i {
+  background: var(--sw-led);
+  box-shadow: 0 0 6px var(--sw-led);
+}
+/* Titles: gold casino lettering. */
+:where(:root[data-theme='shareware-97']) .dc-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1.05;
+  background: var(--sw-gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 #3a0610) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+  padding-right: 0.08em;
+}
+:where(:root[data-theme='shareware-97']) .dc-divider {
+  height: 2px;
+  background: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid rgba(246, 221, 140, 0.28);
+}
+
+/* ---------- Toasts: little message boxes ---------- */
+:where(:root[data-theme='shareware-97']) .dc-toast {
+  border: 3px solid;
+  border-color: #f4eedd #3e372b #3e372b #f4eedd;
+  border-left: 3px solid #f4eedd;
+  background:
+    linear-gradient(90deg, var(--tone) 0 6px, transparent 6px),
+    #13211c;
+  padding-left: calc(var(--sp-4) + 4px);
+  font-family: var(--font-ui);
+}
+:where(:root[data-theme='shareware-97']) .dc-toast__close {
+  color: var(--text-1);
+}
+
+/* =====================================================================
+ * SHELL — top bar is the application title bar
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .topbar,
+:root[data-theme='shareware-97'] .shell-menu__panel {
+  --text-0: #fff7e3;
+  --text-1: #ffecc4;
+  --text-2: #f4d6a8;
+  --text-3: #e8c291;
+}
+:root[data-theme='shareware-97'] .topbar {
+  border-bottom: 2px solid #3a0610;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 170, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 3px 0 var(--sw-putty),
+    0 4px 0 var(--sw-putty-dk),
+    0 8px 18px rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+:root[data-theme='shareware-97'] .topbar::after {
+  bottom: -5px;
+  height: 1px;
+  opacity: 0.8;
+}
+:root[data-theme='shareware-97'] .topbar__left::before {
+  /* Tiny casino-chip application icon. */
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(#fff3c8 0 22.5deg, #d8262a 22.5deg 45deg);
+  box-shadow:
+    inset 0 0 0 4px #b00d17,
+    inset 0 0 0 5px #fff3c8,
+    0 0 0 1px #3a0610;
+}
+:root[data-theme='shareware-97'] .topbar__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #fff7e3;
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .topbar__cabinet {
+  color: var(--sw-brass-hi);
+}
+:root[data-theme='shareware-97'] .topbar__sep {
+  color: #f4d6a8;
+}
+/* Room code: a tiny amber LCD. */
+:root[data-theme='shareware-97'] .code-chip {
+  background: var(--sw-lcd);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset -1px -1px 0 #2a3320,
+    0 0 0 1px #3a0610,
+    1px 1px 0 1px rgba(255, 200, 170, 0.3);
+}
+:root[data-theme='shareware-97'] .code-chip:hover {
+  background: #141a0e;
+}
+:root[data-theme='shareware-97'] .code-chip__label {
+  color: #b5a36a;
+}
+:root[data-theme='shareware-97'] .code-chip__code {
+  color: var(--sw-amber);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.6);
+}
+:root[data-theme='shareware-97'] .code-chip .dc-icon {
+  color: var(--sw-amber);
+}
+/* Status lamps become LEDs. */
+:root[data-theme='shareware-97'] .conn-dot i,
+:root[data-theme='shareware-97'] .af-srv i {
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.35),
+    0 0 6px var(--tone, currentColor);
+}
+:root[data-theme='shareware-97'] .topbar .dc-badge {
+  font-family: 'Silkscreen', monospace;
+  background: var(--sw-lcd);
+  box-shadow: inset 1px 1px 0 #000, 0 0 0 1px #3a0610;
+}
+:root[data-theme='shareware-97'] .shell-menu__panel {
+  background: var(--sw-title-grad);
+}
+
+/* Sticky action docks (lobby Start bar, etc.) are a putty status bar. */
+:root[data-theme='shareware-97'] .lobby__actions,
+:root[data-theme='shareware-97'] .results-shell__actions,
+:root[data-theme='shareware-97'] .mp-voteline {
+  --text-0: #1a140b;
+  --text-1: #2b2317;
+  --text-2: #463d2e;
+  --text-3: #5a5141;
+  --surface-hover: rgba(122, 15, 28, 0.1);
+  box-shadow:
+    inset 0 2px 0 #fbf6e8,
+    0 -1px 0 #3e372b,
+    0 -8px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* =====================================================================
+ * ARCADE FLOOR
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .af-floor {
+  --af-ink-0: #fff7e3;
+  --af-ink-1: #ecdfbf;
+  --af-ink-2: #d2c49c;
+  --af-ink-3: #bfb08a;
+}
+/* The DASCADE lockup in gold neon. */
+:root[data-theme='shareware-97'] .af-hud__word path:nth-child(1) {
+  stroke: #ffb627;
+  stroke-opacity: 0.35;
+}
+:root[data-theme='shareware-97'] .af-hud__word path:nth-child(2) {
+  stroke: #f2c14e;
+}
+:root[data-theme='shareware-97'] .af-hud__word path:nth-child(3) {
+  stroke: #fff6d0;
+}
+:root[data-theme='shareware-97'] .af-hud__sub {
+  color: var(--sw-brass-hi);
+  font-family: 'Silkscreen', monospace;
+  letter-spacing: 0.12em;
+}
+:root[data-theme='shareware-97'] .af-hud__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  padding: 3px 8px 3px 6px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #231500;
+  background: var(--sw-brass-grad);
+  box-shadow:
+    0 0 0 1px #3a2606,
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+  transform: rotate(-2deg);
+  white-space: nowrap;
+}
+:root[data-theme='shareware-97'] .af-hud__badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1f9e4a;
+  box-shadow: inset 0 0 0 1px #0b4d22;
+}
+/* Server status: a bitmap LED readout. */
+:root[data-theme='shareware-97'] .af-srv {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9dff9a;
+  background: var(--sw-lcd);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset -1px -1px 0 #2a3320,
+    0 0 0 2px var(--sw-putty),
+    0 0 0 3px var(--sw-putty-dk);
+}
+:root[data-theme='shareware-97'] .af-srv[data-state='offline'] {
+  color: #ff8a80;
+}
+:root[data-theme='shareware-97'] .af-hud__profile {
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  color: #1a140b;
+  border: 0;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 2px 2px 0 rgba(255, 255, 255, 0.7),
+    inset -2px -2px 0 rgba(40, 30, 15, 0.38),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='shareware-97'] .af-hud__profile-name {
+  color: #1a140b;
+  font-weight: 700;
+}
+:root[data-theme='shareware-97'] .af-hud__icons .dc-btn--ghost,
+:root[data-theme='shareware-97'] .af-hud__icons .dc-btn {
+  --btn-fg: #fff3c8;
+}
+/* Footer: a putty status bar with LED readouts. */
+:root[data-theme='shareware-97'] .af-foot {
+  color: #ecdfbf;
+}
+:root[data-theme='shareware-97'] .af-ticker {
+  display: inline-flex;
+  gap: 0;
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sw-amber);
+  background: var(--sw-lcd);
+  padding: 3px 4px;
+  box-shadow:
+    inset 2px 2px 0 #000,
+    0 0 0 2px var(--sw-putty),
+    0 0 0 3px var(--sw-putty-dk);
+  text-shadow: 0 0 5px rgba(255, 182, 39, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+}
+:root[data-theme='shareware-97'] .af-ticker__item {
+  padding: 0 8px;
+}
+:root[data-theme='shareware-97'] .af-ticker__item + .af-ticker__item {
+  border-left: 1px solid rgba(255, 182, 39, 0.3);
+}
+/* Cabinet name plates on the carpet: brass plaques. */
+:root[data-theme='shareware-97'] .af-cab__name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  color: #fff3c8;
+  text-shadow: 0 1px 0 #3a0610, 0 0 10px rgba(255, 190, 70, 0.35);
+}
+:root[data-theme='shareware-97'] .af-cab__family {
+  color: var(--sw-brass-hi);
+}
+/* The info plaque: a brass-framed casino placard with a felt face. */
+:root[data-theme='shareware-97'] .af-plaque {
+  background:
+    radial-gradient(ellipse 60% 120% at 0% 50%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, #16261f, #0d1814);
+  border: 4px solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    0 0 0 4px var(--sw-brass),
+    0 0 0 5px var(--sw-brass-lo),
+    inset 0 0 0 1px #3e372b,
+    8px 10px 0 rgba(0, 0, 0, 0.4),
+    0 20px 50px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='shareware-97'] .af-plaque::before,
+:root[data-theme='shareware-97'] .af-plaque::after {
+  /* Carved brass corner rosettes. */
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 40% 35%, #fffbe0 0 2px, transparent 3px),
+    repeating-conic-gradient(#f6dd8c 0 20deg, #8f6218 20deg 40deg);
+  box-shadow:
+    0 0 0 2px #3a2606,
+    inset 0 0 0 5px #c9a24a;
+  filter: drop-shadow(1px 2px 0 rgba(0, 0, 0, 0.5));
+}
+:root[data-theme='shareware-97'] .af-plaque::before {
+  top: -14px;
+  left: -14px;
+}
+:root[data-theme='shareware-97'] .af-plaque::after {
+  bottom: -14px;
+  right: -14px;
+}
+:root[data-theme='shareware-97'] .af-lineup__arrow {
+  --btn-bg: #ebe4d2;
+  --btn-bg-2: #c9c0aa;
+  --btn-fg: #1a140b;
+  --btn-edge: #3e372b;
+}
+:root[data-theme='shareware-97'] .af-lineup__pager i[data-on='true'] {
+  background: var(--sw-led);
+  box-shadow: 0 0 6px var(--sw-led);
+}
+
+/* =====================================================================
+ * LOBBY / ROOM
+ * ===================================================================== */
+
+/* =====================================================================
+ * KEYFRAMES + motion guards
+ * ===================================================================== */
+@keyframes sw-chase {
+  to {
+    background-position:
+      7px 0,
+      -7px 100%,
+      0 -7px,
+      100% 7px;
+  }
+}
+@keyframes sw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sw-flicker {
+  0%,
+  62%,
+  66%,
+  100% {
+    opacity: 1;
+  }
+  63%,
+  65% {
+    opacity: 0.45;
+  }
+}
+:root[data-theme='shareware-97'][data-reduced-motion='true'] .sw-sign__bulbs,
+:root[data-theme='shareware-97'][data-reduced-motion='true'] .sw-cd__disc,
+:root[data-theme='shareware-97'][data-reduced-motion='true'] .sw-env__tube b,
+:root[data-theme='shareware-97'][data-reduced-motion='true'] .af-entry__marquee,
+:root[data-theme='shareware-97'][data-reduced-motion='true'] .cp__marquee {
+  animation: none !important;
+}
+
+/* =====================================================================
+ * WINDOW RECIPE for app surfaces that aren't dc-panels
+ * (title card, picker preview, tournament hero/board, wizard, notices)
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .af-entry__card,
+:root[data-theme='shareware-97'] .cp__preview,
+:root[data-theme='shareware-97'] .tc-hero,
+:root[data-theme='shareware-97'] .tc-board,
+:root[data-theme='shareware-97'] .tc-wiz,
+:root[data-theme='shareware-97'] .af-kiosk {
+  border: 4px solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  border-radius: 0;
+  background: linear-gradient(180deg, #16261f, #0d1814);
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 0 0 0 1px #3e372b,
+    6px 6px 0 rgba(0, 0, 0, 0.45),
+    0 20px 50px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .af-entry__card::before,
+:root[data-theme='shareware-97'] .af-entry__card::after {
+  display: none;
+}
+/* Title bars. */
+:root[data-theme='shareware-97'] .af-entry__card-head,
+:root[data-theme='shareware-97'] .tc-board__head,
+:root[data-theme='shareware-97'] .tc-wiz__head {
+  min-height: 34px;
+  padding: 6px 12px;
+  background: var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-putty-dk);
+  box-shadow: inset 0 -1px 0 rgba(255, 220, 140, 0.35), inset 0 1px 0 rgba(255, 190, 170, 0.25);
+  color: var(--sw-cream);
+}
+:root[data-theme='shareware-97'] .af-entry__card-head h2 {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .af-entry__card-head > :last-child:not(h2) {
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .af-entry__slot {
+  background: #0b0f08;
+  box-shadow:
+    inset 1px 1px 0 #000,
+    0 0 0 1px var(--sw-brass),
+    0 0 0 2px #3a2606;
+}
+/* Marquee boxes on the title screen / picker: brass frames lit with bulbs. */
+:root[data-theme='shareware-97'] .af-entry__marquee,
+:root[data-theme='shareware-97'] .cp__marquee {
+  position: relative;
+  padding: 9px;
+  border-radius: 6px;
+  background:
+    var(--sw-bulbs) 0 0 / 14px 9px repeat-x,
+    var(--sw-bulbs) 0 100% / 14px 9px repeat-x,
+    var(--sw-brass-grad);
+  box-shadow:
+    0 0 0 2px #3a2606,
+    0 10px 24px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(255, 190, 70, 0.22);
+}
+:root[data-theme='shareware-97'][data-reduced-motion='false'] .af-entry__marquee,
+:root[data-theme='shareware-97'][data-reduced-motion='false'] .cp__marquee {
+  animation: sw-chase-x 0.9s steps(2) infinite;
+}
+:root[data-theme='shareware-97'][data-fx='off'] .af-entry__marquee,
+:root[data-theme='shareware-97'][data-fx='off'] .cp__marquee {
+  animation: none;
+}
+:root[data-theme='shareware-97'] .af-entry__top .dc-btn.af-entry__back,
+:root[data-theme='shareware-97'] .af-entry__top .dc-btn.af-entry__help,
+:root[data-theme='shareware-97'] .cp__top .dc-btn.cp__back,
+:root[data-theme='shareware-97'] .dc-btn.cp__back {
+  --btn-bg: #ebe4d2;
+  --btn-bg-2: #c9c0aa;
+  --btn-fg: #1a140b;
+  --btn-edge: #3e372b;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  color: #1a140b;
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 2px 2px 0 rgba(255, 255, 255, 0.7),
+    inset -2px -2px 0 rgba(40, 30, 15, 0.38),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='shareware-97'] .af-entry__top .dc-btn.af-entry__back:hover:not(:disabled),
+:root[data-theme='shareware-97'] .af-entry__top .dc-btn.af-entry__help:hover:not(:disabled),
+:root[data-theme='shareware-97'] .dc-btn.cp__back:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f4eedd, #d4ccb6);
+}
+:root[data-theme='shareware-97'] .af-entry__controls {
+  border-left-color: var(--sw-brass);
+  background: rgba(8, 14, 12, 0.85);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(246, 221, 140, 0.25);
+}
+
+/* ---------- Cabinet picker ---------- */
+:root[data-theme='shareware-97'] .cp-item {
+  border: 2px solid;
+  border-color: rgba(244, 238, 221, 0.55) rgba(0, 0, 0, 0.7) rgba(0, 0, 0, 0.7) rgba(244, 238, 221, 0.55);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(22, 38, 31, 0.95), rgba(12, 22, 18, 0.95));
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .cp-item:hover,
+:root[data-theme='shareware-97'] .cp-item.is-selected {
+  border-color: var(--sw-brass-hi) var(--sw-brass-lo) var(--sw-brass-lo) var(--sw-brass-hi);
+  background:
+    linear-gradient(90deg, var(--ip) 0 5px, transparent 5px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ip) 16%, #16261f), #0d1814);
+  box-shadow:
+    0 0 0 1px #1a140b,
+    4px 4px 0 rgba(0, 0, 0, 0.45),
+    0 0 22px rgba(255, 200, 80, 0.18);
+}
+:root[data-theme='shareware-97'] .cp-item__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+:root[data-theme='shareware-97'] .cp-item__screen,
+:root[data-theme='shareware-97'] .cp-screen {
+  box-shadow:
+    0 0 0 2px #1a1410,
+    0 0 0 5px var(--sw-putty),
+    0 0 0 6px var(--sw-putty-dk);
+}
+:root[data-theme='shareware-97'] .cp__preview {
+  padding-top: 42px;
+}
+:root[data-theme='shareware-97'] .cp__preview::before {
+  content: 'Program Preview';
+  content: 'Program Preview' / '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 34px;
+  font: 700 var(--fs-sm) / 1 var(--font-ui);
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+  background:
+    radial-gradient(circle at 18px 50%, #fff3c8 0 3px, #d8262a 3.5px 5px, #fff3c8 5.5px 6px, transparent 6.5px),
+    var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-putty-dk);
+}
+
+/* ---------- Tournament Center ---------- */
+:root[data-theme='shareware-97'] .tc-top {
+  --text-0: #fff7e3;
+  --text-1: #ffecc4;
+  --text-2: #f4d6a8;
+  background: var(--shell-bar-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 170, 0.35),
+    0 3px 0 var(--sw-putty),
+    0 4px 0 var(--sw-putty-dk),
+    0 8px 18px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .tc-top .dc-btn--ghost {
+  --btn-fg: #fff3c8;
+}
+:root[data-theme='shareware-97'] .tc-top__crumb {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .tc-hero {
+  background:
+    radial-gradient(ellipse 50% 90% at 12% 50%, rgba(255, 200, 80, 0.16), transparent 70%),
+    linear-gradient(180deg, #16261f, #0d1814);
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    0 0 0 5px var(--sw-brass),
+    0 0 0 6px var(--sw-brass-lo),
+    inset 0 0 0 1px #3e372b,
+    9px 9px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .tc-marquee__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: var(--sw-gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 #3a0610) drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55));
+  padding-right: 0.1em;
+}
+:root[data-theme='shareware-97'] .tc-marquee__kicker {
+  color: var(--sw-brass-hi);
+}
+:root[data-theme='shareware-97'] .tc-join {
+  background: #0b1512;
+  border: 0;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] .tc-board__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-md);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .tc-board__head {
+  margin: 0 0 var(--sp-3);
+  --text-0: #fff7e3;
+  --text-1: #ffecc4;
+  --text-2: #f4d6a8;
+}
+:root[data-theme='shareware-97'] .tc-board__head .dc-btn--ghost {
+  --btn-fg: #fff3c8;
+}
+:root[data-theme='shareware-97'] .tc-board > :not(.tc-board__head) {
+  margin-inline: var(--sp-3);
+}
+:root[data-theme='shareware-97'] .tc-board {
+  padding-bottom: var(--sp-3);
+}
+:root[data-theme='shareware-97'] .tc-lamp {
+  border-radius: 50%;
+  background: #4a1512;
+  box-shadow: 0 0 0 1px #000;
+}
+:root[data-theme='shareware-97'] .tc-lamp[data-tone='live'] {
+  background: #52e07c;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 8px #52e07c;
+}
+:root[data-theme='shareware-97'] .tc-chip {
+  border-radius: 2px;
+  border: 0;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  color: #1a140b;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 2px 2px 0 rgba(255, 255, 255, 0.7),
+    inset -2px -2px 0 rgba(40, 30, 15, 0.38);
+}
+:root[data-theme='shareware-97'] .tc-chip--on {
+  background: linear-gradient(180deg, #f6dd8c, #d4a022);
+  box-shadow:
+    0 0 0 1px #6e4f14,
+    inset 2px 2px 0 rgba(60, 40, 0, 0.35),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.5);
+}
+:root[data-theme='shareware-97'] .tc-board__state {
+  border: 0;
+  background: #0a120f;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] .tc-row {
+  border-radius: 0;
+  border: 2px solid;
+  border-color: rgba(244, 238, 221, 0.4) rgba(0, 0, 0, 0.7) rgba(0, 0, 0, 0.7) rgba(244, 238, 221, 0.4);
+}
+:root[data-theme='shareware-97'] .tc-row__code {
+  font-family: var(--font-num);
+  color: var(--sw-amber);
+  background: var(--sw-lcd);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.5);
+}
+:root[data-theme='shareware-97'] .tc-how__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--sw-brass-hi);
+  text-shadow: 0 2px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] .tc-steps > li,
+:root[data-theme='shareware-97'] .tc-format {
+  border-radius: 0;
+  border: 3px solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  background: linear-gradient(180deg, #16261f, #0d1814);
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    4px 4px 0 rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='shareware-97'] .tc-steps__n {
+  border-radius: 50%;
+  /* a cream hub under the digit: the chip's red segments alone measured 3.7:1 */
+  background:
+    radial-gradient(circle, #fff3c8 0 44%, transparent 45%),
+    repeating-conic-gradient(#fff3c8 0 22.5deg, #d8262a 22.5deg 45deg);
+  color: #1a140b;
+  box-shadow:
+    inset 0 0 0 5px #b00d17,
+    0 0 0 1px #3a0610;
+  text-shadow: 0 0 3px #fff3c8;
+}
+
+/* Tournament kiosk on the floor: a brass-framed LED board. */
+:root[data-theme='shareware-97'] .af-kiosk {
+  background: #0b0f08;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 2px 2px 0 #000,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .af-kiosk__title {
+  color: var(--sw-amber);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.55);
+}
+:root[data-theme='shareware-97'] .af-kiosk__ticker,
+:root[data-theme='shareware-97'] .af-kiosk__track {
+  color: #9dff9a;
+}
+
+/* ---------- Lobby / room details ---------- */
+:root[data-theme='shareware-97'] .lobby-code__value span {
+  background: var(--sw-lcd);
+  border: 0;
+  color: var(--sw-amber);
+  text-shadow: 0 0 10px rgba(255, 182, 39, 0.6);
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset -1px -1px 0 #2a3320,
+    0 0 0 3px var(--sw-putty),
+    0 0 0 4px var(--sw-putty-dk),
+    3px 3px 0 4px rgba(0, 0, 0, 0.35);
+  margin: 4px;
+}
+:root[data-theme='shareware-97'] .lobby-hero__name .dc-title,
+:root[data-theme='shareware-97'] .results-shell__title {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+:root[data-theme='shareware-97'] .player-list__item {
+  border-radius: 0;
+  border: 2px solid;
+  border-color: rgba(0, 0, 0, 0.6) rgba(244, 238, 221, 0.25) rgba(244, 238, 221, 0.25) rgba(0, 0, 0, 0.6);
+  background: rgba(4, 9, 7, 0.55);
+}
+:root[data-theme='shareware-97'] .player-list__item.is-ready {
+  border-color: rgba(0, 0, 0, 0.6) rgba(82, 224, 124, 0.5) rgba(82, 224, 124, 0.5) rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='shareware-97'] .ready-pill--on {
+  color: #9dff9a;
+}
+:root[data-theme='shareware-97'] .chat__form .dc-btn {
+  border-radius: 2px;
+}
+
+@keyframes sw-chase-x {
+  to {
+    background-position:
+      7px 0,
+      -7px 100%,
+      0 0;
+  }
+}
+
+/* =====================================================================
+ * GAME CHROME + KITS (presentation only; materials do the playfields)
+ * ===================================================================== */
+/* Shared "window" frame for in-game HUD strips and side panels. */
+:root[data-theme='shareware-97'] .pk-topbar,
+:root[data-theme='shareware-97'] .pt-dock,
+:root[data-theme='shareware-97'] .pt-board,
+:root[data-theme='shareware-97'] .cl-top,
+:root[data-theme='shareware-97'] .ch-side,
+:root[data-theme='shareware-97'] .cl-panel {
+  border: 3px solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  border-radius: 0;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 0 0 0 1px #3e372b,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+/* Party compilation: the question sits in a bulb-lit game-show marquee. */
+:root[data-theme='shareware-97'] .pk-prompt {
+  border: 0;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px #3a2606,
+    0 0 0 12px var(--sw-brass),
+    0 0 0 13px #3a2606,
+    8px 10px 0 13px rgba(0, 0, 0, 0.4);
+  margin: 13px;
+}
+:root[data-theme='shareware-97'] .pk-prompt::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 10px;
+  pointer-events: none;
+  background:
+    var(--sw-bulbs) 0 0 / 16px 10px repeat-x,
+    var(--sw-bulbs) 0 100% / 16px 10px repeat-x,
+    var(--sw-bulbs) 0 0 / 10px 16px repeat-y,
+    var(--sw-bulbs) 100% 0 / 10px 16px repeat-y;
+  opacity: 0.95;
+}
+:root[data-theme='shareware-97'][data-fx='off'] .pk-prompt::before {
+  opacity: 0.55;
+}
+:root[data-theme='shareware-97'] .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='shareware-97'] .pk-hostbar {
+  border-radius: 0;
+}
+/* Boardroom: brass-framed boards and LED chess clocks. */
+:root[data-theme='shareware-97'] .br-board {
+  border-radius: 0;
+  box-shadow:
+    0 0 0 3px #3a2606,
+    0 0 0 5px #f6dd8c,
+    0 0 0 10px var(--sw-brass),
+    0 0 0 12px #8f6218,
+    0 0 0 13px #1a0e02,
+    10px 14px 0 13px rgba(0, 0, 0, 0.35),
+    0 26px 50px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='shareware-97'] .br-board::before {
+  /* Carved brass corner rosettes. */
+  content: '';
+  position: absolute;
+  inset: -19px;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #fffbe0 0 2px, #e6c35f 2.5px 5px, #6e4f14 5.5px 7px, transparent 7.5px) 0 0 / 26px 26px no-repeat,
+    radial-gradient(circle, #fffbe0 0 2px, #e6c35f 2.5px 5px, #6e4f14 5.5px 7px, transparent 7.5px) 100% 0 / 26px 26px no-repeat,
+    radial-gradient(circle, #fffbe0 0 2px, #e6c35f 2.5px 5px, #6e4f14 5.5px 7px, transparent 7.5px) 0 100% / 26px 26px no-repeat,
+    radial-gradient(circle, #fffbe0 0 2px, #e6c35f 2.5px 5px, #6e4f14 5.5px 7px, transparent 7.5px) 100% 100% / 26px 26px no-repeat;
+}
+:root[data-theme='shareware-97'] .br-clock {
+  border-radius: 0;
+  border: 0;
+  color: #8a7a4a;
+  background: var(--sw-lcd);
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset -1px -1px 0 #2a3320,
+    0 0 0 3px var(--sw-putty),
+    0 0 0 4px var(--sw-putty-dk);
+  margin: 4px;
+}
+:root[data-theme='shareware-97'] .br-clock[data-running] {
+  color: var(--sw-amber);
+  background: var(--sw-lcd);
+  text-shadow: 0 0 8px rgba(255, 182, 39, 0.65);
+  box-shadow:
+    inset 2px 2px 0 #000,
+    0 0 0 3px var(--sw-brass-hi),
+    0 0 0 4px var(--sw-brass-lo),
+    0 0 16px 4px rgba(255, 182, 39, 0.25);
+}
+:root[data-theme='shareware-97'] .br-clock[data-running]::before {
+  /* Red "running" LED next to the digits. */
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--sw-led);
+  box-shadow: 0 0 0 1px #000, 0 0 6px var(--sw-led);
+}
+:root[data-theme='shareware-97'] .br-clock[data-low] {
+  color: #ff6a5a;
+  background: #1a0505;
+  text-shadow: 0 0 8px rgba(255, 70, 50, 0.7);
+}
+:root[data-theme='shareware-97'] .br-clock[data-flagged] {
+  color: #fff0e0;
+  background: #7a1c20;
+}
+/* Classics: the playfield is a little beige-bezel CRT. */
+:root[data-theme='shareware-97'] .cl-screen {
+  border-radius: 14px;
+}
+:root[data-theme='shareware-97'] .cl-screen__bezel {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 36px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='shareware-97'] .cl-panel__title {
+  margin: -10px -10px 8px;
+  padding: 6px 10px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--sw-cream);
+  background: var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-putty-dk);
+}
+
+/* =====================================================================
+ * JUKEBOX — "DAS-CD Player 3.7": a ridiculous late-90s CD-ROM music utility
+ * ===================================================================== */
+:root[data-theme='shareware-97'] [data-jukebox] {
+  --jb-accent: #8a1020;
+  --jb-accent-2: var(--sw-amber);
+  --jb-radius: 0px;
+  --jb-blur: none;
+  --jb-font-title: var(--font-ui);
+  --jb-font-label: 'Silkscreen', 'Tiny5', monospace;
+  --jb-btn: 36px;
+  --jb-btn-play: 44px;
+  --jb-track-h: 44px;
+}
+/* The window: putty, bevelled, with a brass inner trim. Re-ink everything for beige. */
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='panel'] {
+  --text-0: #1a140b;
+  --text-1: #2b2317;
+  --text-2: #463d2e;
+  --text-3: #5a5141;
+  --jb-fg: #1a140b;
+  --jb-muted: #463d2e;
+  --jb-bg-solid: #d9d1bd;
+  --panel-divider: #8a806a;
+  --line: rgba(62, 55, 43, 0.3);
+  --line-strong: rgba(62, 55, 43, 0.5);
+  --surface-hover: rgba(122, 15, 28, 0.1);
+  --surface-sunken: #fffdf5;
+  --focus-ring: #1a140b;
+  --accent: #8a1020;
+  --control-accent: #8a1020;
+  --scrollbar-thumb: #8a806a;
+  scrollbar-color: #8a806a #e6dfcc;
+  color: #1a140b;
+  background: var(--sw-putty);
+  border: 3px solid;
+  border-color: #fbf6e8 #3e372b #3e372b #fbf6e8;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset -1px -1px 0 #8a806a,
+    inset 1px 1px 0 #fff,
+    inset 0 0 0 4px var(--sw-putty),
+    inset 0 0 0 5px var(--sw-brass),
+    8px 8px 0 rgba(0, 0, 0, 0.45);
+  backdrop-filter: none;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='header'] {
+  margin: 0;
+  padding: 3px 4px 3px 10px;
+  min-height: 32px;
+  background: var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-putty-dk);
+  box-shadow: inset 0 -1px 0 rgba(255, 220, 140, 0.35);
+  color: var(--sw-cream);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='title-bar'] {
+  color: var(--sw-cream);
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-titlebar__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-titlebar__icon {
+  color: var(--sw-brass-hi);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='close'] {
+  min-width: 26px;
+  min-height: 24px;
+  color: #1a140b;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #8a806a;
+}
+@media (pointer: coarse) {
+  :root[data-theme='shareware-97'] [data-jukebox] [data-part='close'] {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+/* The LCD: black glass, amber bitmap readout, disc tray in the corner. */
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='display'] {
+  --text-0: #ffcf6a;
+  --text-1: #ffb627;
+  --text-2: #c9922a;
+  --jb-fg: #ffcf6a;
+  --jb-muted: #c9922a;
+  --accent: #ffb627;
+  --accent-2: #ff3b2f;
+  --line: #5a4a1a;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse 90% 70% at 30% 0%, rgba(255, 182, 39, 0.08), transparent 70%),
+    #0b0f08;
+  box-shadow:
+    inset 2px 2px 0 #000,
+    inset -1px -1px 0 #2a3320,
+    0 0 0 2px var(--sw-putty-lo),
+    0 0 0 3px #fbf6e8;
+  margin: 3px;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-now {
+  padding-right: 64px;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-now__label {
+  font-family: 'Silkscreen', monospace;
+  color: #c9922a;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track-title'] {
+  font-family: 'Silkscreen', var(--font-ui);
+  font-weight: 400;
+  color: #ffcf6a;
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.5);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track-artist'] {
+  font-family: var(--font-ui);
+  color: #d9a441;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='display'] [data-part='art'] {
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 3px #3e372b;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='visualizer'] {
+  background: #050804;
+  box-shadow: inset 1px 1px 0 #000, 0 0 0 1px #2a3320;
+}
+/* Disc tray (JukeboxDecor), top-right of the LCD. */
+:root[data-theme='shareware-97'] .sw-cd {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 58px;
+  height: 58px;
+}
+:root[data-theme='shareware-97'] .sw-cd__tray {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1c2016 55%, #0a0c07 70%);
+  box-shadow:
+    inset 1px 2px 3px #000,
+    0 0 0 1px #2a3320;
+}
+:root[data-theme='shareware-97'] .sw-cd__disc {
+  position: relative;
+  display: block;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #0b0f08 0 4px, #cfd0d8 4.5px 7px, rgba(255, 255, 255, 0.35) 7.5px 8px, transparent 8.5px),
+    radial-gradient(circle, transparent 0 62%, rgba(255, 255, 255, 0.28) 63%, transparent 67%),
+    conic-gradient(from 20deg, #d9f3ff, #ffd6f0, #fff7c2, #c8ffe0, #d6ddff, #ffd6f0, #fff7c2, #d9f3ff);
+  box-shadow:
+    0 0 0 1px #6e6553,
+    inset 0 0 6px rgba(0, 0, 0, 0.25);
+}
+:root[data-theme='shareware-97'] .sw-cd__label {
+  position: absolute;
+  inset: 11px 11px auto;
+  height: 7px;
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(90deg, #8a1020, #d8262a);
+  opacity: 0.85;
+}
+:root[data-theme='shareware-97'] .sw-cd[data-spin='on'] .sw-cd__disc {
+  animation: sw-spin 1.6s linear infinite;
+}
+:root[data-theme='shareware-97'] .sw-cd__led {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4a1512;
+  box-shadow: 0 0 0 1px #000;
+}
+:root[data-theme='shareware-97'] .sw-cd[data-playing='true'] .sw-cd__led {
+  background: var(--sw-led);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 calc(3px + var(--sw-level, 0) * 10px) var(--sw-led);
+}
+:root[data-theme='shareware-97'] .sw-cd__tag {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  padding: 1px 3px;
+  font: 400 9px/1 'Silkscreen', monospace;
+  color: #1a140b;
+  background: var(--sw-brass-grad);
+  box-shadow: 0 0 0 1px #3a2606;
+}
+/* Transport: tiny bevelled putty keys + one glossy red PLAY. */
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='transport'] {
+  gap: 4px;
+  padding: 6px;
+  background: #cbc3ad;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--icon,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='mute'] {
+  color: #1a140b;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #8a806a;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--icon:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f4eedd, #d4ccb6);
+  border: 0;
+  color: #000;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--icon:active:not(:disabled),
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--icon[aria-pressed='true'] {
+  background: #bdb49d;
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 1px 1px 0 #6e6553,
+    inset -1px -1px 0 #fbf6e8;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--icon[aria-pressed='true'] {
+  color: #8a1020;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='play'] {
+  color: #fffaf0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 8%, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(180deg, #ff6a55, #d8262a 50%, #8e0a12);
+  box-shadow:
+    0 0 0 1px #4a060b,
+    0 0 0 3px var(--sw-brass),
+    0 0 0 4px var(--sw-brass-lo),
+    0 3px 0 3px #3a2606;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='play']:hover:not(:disabled) {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 8%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 64%),
+    linear-gradient(180deg, #ff7a66, #e5302f 50%, #9a0c14);
+  color: #fff;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='play']:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 1px #4a060b,
+    0 0 0 3px var(--sw-brass),
+    0 0 0 4px var(--sw-brass-lo),
+    0 1px 0 3px #3a2606;
+}
+/* Seek + volume: sunken slots. */
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='time'] {
+  font-family: var(--font-num);
+  color: #2b2317;
+}
+/* Tabs, search, sort, list box. */
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='tabs'] {
+  border-bottom: 2px solid #fbf6e8;
+  box-shadow: 0 1px 0 #8a806a;
+  gap: 2px;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-tab {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: #2b2317;
+  background: linear-gradient(180deg, #c9c0aa, #b3aa94);
+  border: 2px solid;
+  border-color: #efe8d6 #3e372b transparent #efe8d6;
+  border-radius: 4px 4px 0 0;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-tab[aria-selected='true'] {
+  color: #000;
+  background: var(--sw-putty);
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-tab[aria-selected='true']::after {
+  background: var(--sw-putty);
+  box-shadow: none;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-search,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='sort'] {
+  color: #1a140b;
+  background-color: #fffdf5;
+  border: 1px solid #3e372b;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #8a806a,
+    inset -1px -1px 0 #fbf6e8;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='search'] {
+  color: #1a140b;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track-list'],
+:root[data-theme='shareware-97'] [data-jukebox] .jb-queue .jb-tracks {
+  background: #fffdf5;
+  box-shadow:
+    inset 2px 2px 0 #8a806a,
+    inset -1px -1px 0 #fbf6e8,
+    0 0 0 1px #3e372b;
+  padding: 3px;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'],
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='queue-item'] {
+  border-radius: 0;
+  border: 0;
+  color: #1a140b;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track']:hover,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='queue-item']:hover {
+  background: rgba(122, 15, 28, 0.08);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] {
+  --jb-fg: #fff3c8;
+  --jb-muted: #f4d6a8;
+  --text-0: #fff3c8;
+  --text-2: #f4d6a8;
+  color: #fff3c8;
+  background: linear-gradient(90deg, #7a0f1c, #a81b24);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-btn,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-track__title,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-track__main {
+  color: #fff3c8;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-track__artist,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-track__dur,
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-time {
+  color: #f4d6a8;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-eq {
+  --jb-accent: #ffcf6a;
+  color: #ffcf6a;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current] .jb-btn--row:hover:not(:disabled) {
+  color: #8a1020;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-track__title {
+  font-weight: 700;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--row {
+  color: #463d2e;
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-theme='shareware-97'] [data-jukebox] .jb-btn--row:hover:not(:disabled) {
+  color: #8a1020;
+  background: linear-gradient(180deg, #ebe4d2, #c9c0aa);
+  box-shadow:
+    0 0 0 1px #3e372b,
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #8a806a;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='enable-audio'] {
+  color: #fffaf0;
+  font-family: 'Silkscreen', var(--font-ui);
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 10px;
+  border: 0;
+  background:
+    radial-gradient(ellipse 88% 56% at 50% 4%, rgba(255, 255, 255, 0.55), transparent 64%),
+    linear-gradient(180deg, #ff6a55, #c4121c);
+  box-shadow:
+    0 0 0 1px #4a060b,
+    0 0 0 3px var(--sw-brass),
+    0 3px 0 3px #3a2606;
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='dj-status'] {
+  background: #0b0f08;
+  color: #ffcf6a;
+  --text-0: #ffcf6a;
+  --text-2: #c9922a;
+  --jb-fg: #ffcf6a;
+  --jb-muted: #c9922a;
+  border-radius: 0;
+  border: 0;
+  box-shadow: inset 2px 2px 0 #000, 0 0 0 1px #3e372b;
+}
+/* The dock (mini player): a little putty remote with an LCD strip. */
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='float'] [data-part='mini'] {
+  --text-0: #1a140b;
+  --text-2: #463d2e;
+  --jb-fg: #1a140b;
+  --jb-muted: #463d2e;
+  color: #1a140b;
+  background: var(--sw-putty);
+  border: 2px solid;
+  border-color: #fbf6e8 #3e372b #3e372b #fbf6e8;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+  backdrop-filter: none;
+}
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='float'] [data-part='mini-title'] {
+  --jb-fg: #ffcf6a;
+  --jb-accent: #ffb627;
+  font-family: 'Silkscreen', var(--font-ui);
+  color: #ffcf6a;
+  background: #0b0f08;
+  padding: 3px 6px;
+  box-shadow: inset 1px 1px 0 #000;
+  text-shadow: 0 0 5px rgba(255, 182, 39, 0.45);
+}
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='float'] .jb-btn {
+  color: #1a140b;
+}
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='float'] [data-part='mini-open'] {
+  color: #1a140b;
+  border-radius: 0;
+}
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='topbar'] .jb-btn,
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='slot'] .jb-btn {
+  color: #fff3c8;
+}
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='topbar'] [data-part='mini-title'],
+:root[data-theme='shareware-97'] [data-jukebox][data-dock='slot'] [data-part='mini-title'] {
+  --jb-fg: #fff3c8;
+  --jb-accent: #ffcf6a;
+  font-family: var(--font-ui);
+  color: #fff3c8;
+}
+
+/* ---------- Floor decor: make room on small / short screens ---------- */
+@media (max-height: 860px) {
+  :root[data-theme='shareware-97'] .sw-sign__sub {
+    display: none;
+  }
+}
+@media (max-width: 760px), (max-height: 620px) {
+  :root[data-theme='shareware-97'] .sw-sign,
+  :root[data-theme='shareware-97'] .sw-env__tube {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  :root[data-theme='shareware-97'] .sw-rope {
+    display: none;
+  }
+}
+
+/* Result / intro cards inside games become little program windows. */
+:root[data-theme='shareware-97'] .br-result:not(.br-result--bar),
+:root[data-theme='shareware-97'] .cl-card {
+  border: 3px solid;
+  border-color: #f4eedd #6e6553 #6e6553 #f4eedd;
+  border-radius: 0;
+  background-clip: padding-box;
+  padding-top: calc(var(--sp-5) + 30px);
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 0 0 0 1px #3e372b,
+    8px 8px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .cl-card {
+  padding-top: calc(clamp(18px, 3vw, 28px) + 30px);
+}
+:root[data-theme='shareware-97'] .br-result--compact:not(.br-result--bar) {
+  padding-top: 42px;
+}
+:root[data-theme='shareware-97'] .br-result:not(.br-result--bar)::before,
+:root[data-theme='shareware-97'] .cl-card::before {
+  content: 'MATCH.EXE';
+  content: 'MATCH.EXE' / '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 32px;
+  font: 700 var(--fs-xs) / 1 var(--font-ui);
+  letter-spacing: 0.04em;
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+  background:
+    radial-gradient(circle at 17px 50%, #fff3c8 0 3px, #d8262a 3.5px 5px, #fff3c8 5.5px 6px, transparent 6.5px),
+    var(--sw-title-grad);
+  border: 0;
+  border-bottom: 2px solid var(--sw-putty-dk);
+  width: auto;
+  pointer-events: none;
+}
+:root[data-theme='shareware-97'] .cl-card::before {
+  content: 'CLASSICS.EXE';
+  content: 'CLASSICS.EXE' / '';
+}
+:root[data-theme='shareware-97'] .cl-card__corner {
+  display: none;
+}
+:root[data-theme='shareware-97'] .cl-screen {
+  box-shadow:
+    0 0 0 2px #1a1410,
+    0 0 0 12px var(--mat-bezel, #d9d1bd),
+    0 0 0 13px #3e372b,
+    6px 8px 0 13px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='shareware-97'] .sw-sign__bulbs,
+  :root[data-theme='shareware-97'] .sw-cd__disc,
+  :root[data-theme='shareware-97'] .sw-env__tube b,
+  :root[data-theme='shareware-97'] .af-entry__marquee,
+  :root[data-theme='shareware-97'] .cp__marquee {
+    animation: none !important;
+  }
+}
+/* Dialog status line: a tiny green LED and "Ready." (decorative, hidden from assistive tech). */
+:where(:root[data-theme='shareware-97']) .dc-modal__footer::before {
+  content: 'Ready.';
+  content: 'Ready.' / '';
+  align-self: center;
+  margin-right: auto;
+  padding-left: 14px;
+  font: 400 11px/1 'Silkscreen', monospace;
+  letter-spacing: 0.08em;
+  color: #463d2e;
+  background: radial-gradient(circle at 4px 50%, #52e07c 0 3px, #17632c 3.5px 4px, transparent 4.5px);
+}
+:root[data-theme='shareware-97'] [data-jukebox] [data-part='track'][data-current]::before {
+  background: #ffcf6a;
+  box-shadow: 0 0 6px rgba(255, 207, 106, 0.8);
+}
+
+/* =====================================================================
+ * BARGAIN-BIN BOX ART — each non-casino game gets one small jewel-case sticker or disc label,
+ * so the whole platform reads as the same $9.99 compilation. Decorative only: generated text is
+ * hidden from assistive tech (`/ ''`), never covers HUD, and only appears where there is room.
+ * ===================================================================== */
+@media (min-width: 1100px) and (min-height: 700px) {
+  :root[data-theme='shareware-97'] [data-part='game-stage'][data-game='putt']::after {
+    content: "DAS PUTT DELUXE '97 \2605  WACKY HOLES GALORE!  \2605  CD-ROM" / '';
+    position: absolute;
+    left: 18px;
+    top: 74px;
+    white-space: nowrap;
+    z-index: 3;
+    padding: 7px 12px 6px;
+    font: 700 12px/1.1 var(--font-ui);
+    letter-spacing: 0.04em;
+    color: #7a0d18;
+    background: linear-gradient(180deg, #fff27a, #ffd23a 60%, #f0b92a);
+    border: 2px solid #3a2606;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 #fffbd0;
+    transform: rotate(-3deg);
+    pointer-events: none;
+  }
+}
+/* DASQuest: the scene window is "Disc 1" of a forgotten multimedia adventure. */
+:root[data-theme='shareware-97'] [data-part='game-stage'][data-game='quest'] .qs-scene::after {
+  content: 'DISC 1 OF 4 \00B7  MULTIMEDIA CD-ROM' / '';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  padding: 4px 8px 3px;
+  font: 700 11px/1.1 var(--font-ui);
+  letter-spacing: 0.06em;
+  color: #1a140b;
+  background: var(--sw-putty);
+  box-shadow: var(--sw-raised), 2px 2px 0 rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+@media (max-width: 520px) {
+  :root[data-theme='shareware-97'] [data-part='game-stage'][data-game='quest'] .qs-scene::after {
+    display: none;
+  }
+}
+/* Classics touch pad: the keys take the putty --button-bg, so the glyphs need dark ink (cream on
+   cream was ≈1.2:1) — little bevelled keyboard keys. */
+:root[data-theme='shareware-97'] .cl-tbtn {
+  color: #1a140b;
+  border-radius: 6px;
+  border-color: #3e372b;
+}
+:root[data-theme='shareware-97'] .cl-tbtn__text {
+  color: #2b2317;
+}
+
+/* Phones / touch: the era's small controls still get ≥ 40px targets (tabs, the jukebox transport). Desktop keeps the compact look. */
+@media (pointer: coarse) {
+  :root[data-theme='shareware-97'] [data-jukebox] {
+    --jb-btn: 40px;
+  }
+  :root[data-theme='shareware-97'] :is(.dc-tab, [role='tab']) {
+    min-height: 40px;
+  }
+}
+
+/* =====================================================================
+ * SPORTS SHELF — DAS Tanks ($9.99 jewel case), DAS Putt Deluxe, DAS Ships, DASh Circuit Turbo.
+ * Beige application windows with LCD readouts inside; the playfields stay untouched (frames only
+ * sit on the viewport edge, never over the aim line, wind, power or turn indicators).
+ * ===================================================================== */
+/* Putty window + dark LCD interior for every floating HUD panel. */
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-glass,
+:root[data-theme='shareware-97'] [data-game='circuit'] .ci-glass,
+:root[data-theme='shareware-97'] [data-game='putt'] :is(.pt-plate, .pt-strokes),
+:root[data-theme='shareware-97'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 3px solid;
+  border-color: var(--sw-putty-hi) var(--sw-putty-lo) var(--sw-putty-lo) var(--sw-putty-hi);
+  border-radius: 0;
+  background: linear-gradient(180deg, #0f1c16, #08110d);
+  box-shadow:
+    0 0 0 1px var(--sw-ink),
+    inset 0 0 0 1px #000,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Whose turn: the window frame lights up in polished brass. */
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='shareware-97'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='shareware-97'] [data-game='ships'] .sh-panel--active {
+  border-color: #fff0b8 #8f6218 #8f6218 #fff0b8;
+  box-shadow:
+    0 0 0 1px var(--sw-ink),
+    inset 0 0 0 1px #000,
+    0 0 22px rgba(255, 210, 58, 0.35),
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+/* Chunky putty keys for every hold / step / aim button. */
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-hold {
+  border: 1px solid var(--sw-ink);
+  border-radius: 0;
+  background: var(--sw-putty);
+  color: var(--sw-ink);
+  box-shadow: var(--sw-raised);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  background: var(--sw-putty-hi);
+  border-color: var(--sw-ink);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-hold:active:not(:disabled) {
+  background: #cbc3ad;
+  box-shadow: var(--sw-sunken);
+  transform: none;
+}
+/* LCD readouts: amber segments in a sunken putty bezel. */
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='shareware-97'] [data-game='putt'] :is(.pt-dock__deg, .pt-dock__power-label b),
+:root[data-theme='shareware-97'] [data-game='circuit'] .ci-clock {
+  padding: 3px 8px 2px;
+  background: #0b0f08;
+  box-shadow: var(--sw-sunken);
+  color: var(--sw-amber);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.55);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-dial__value b {
+  color: var(--sw-amber);
+  text-shadow: 0 0 8px rgba(255, 182, 39, 0.6);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-dial__value small {
+  color: #d9b36a;
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+  padding: 3px 5px;
+  background: #050805;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i {
+  border-radius: 0;
+  background: rgba(255, 182, 39, 0.12);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i[data-on='true'] {
+  background: var(--wind-c, var(--sw-amber));
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-weapon__current {
+  border-radius: 0;
+  border: 1px solid var(--sw-brass);
+  background: #0b0f08;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-fuel__bar {
+  border-radius: 0;
+  background: #0b0f08;
+  box-shadow: inset 0 0 0 1px var(--sw-putty-lo);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] .tk-hints kbd {
+  border-radius: 0;
+  color: var(--sw-ink);
+  background: var(--sw-putty);
+  border-color: var(--sw-ink);
+  box-shadow:
+    inset -1px -1px 0 var(--sw-putty-lo),
+    inset 1px 1px 0 #fff;
+  text-shadow: none;
+}
+/* The glossy red FIRE dome in a brass bezel — the most important button on the box. */
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='fire'] {
+  border-radius: 50% / 46%;
+  color: var(--sw-cream);
+  background:
+    radial-gradient(ellipse 58% 36% at 50% 22%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(circle at 50% 70%, #ff5a44 0%, #d0141c 55%, #6e0610 100%);
+  box-shadow:
+    0 0 0 3px #3a2606,
+    0 0 0 6px var(--sw-brass),
+    0 0 0 7px #3a2606,
+    0 4px 0 7px #3a2606,
+    0 8px 14px 7px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 0 #5a0610;
+  animation: none;
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: sw97-fire-lamp 1.4s steps(2, jump-none) infinite;
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='fire']:active:not(:disabled) {
+  transform: translateY(3px);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #f4eedd;
+  text-shadow: 0 1px 0 #000;
+  background:
+    radial-gradient(ellipse 58% 36% at 50% 22%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(circle at 50% 70%, #8a806a 0%, #5a5141 60%, #2b2317 100%);
+}
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(58, 6, 16, 0.55);
+  color: var(--sw-cream);
+}
+:root[data-theme='shareware-97'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: none;
+}
+@keyframes sw97-fire-lamp {
+  0% {
+    filter: none;
+  }
+  100% {
+    filter: brightness(1.18) drop-shadow(0 0 10px rgba(255, 70, 50, 0.75));
+  }
+}
+/* The Putt dock's PUTT key is the same red dome family. */
+:root[data-theme='shareware-97'] [data-game='putt'] .pt-dock__putt {
+  border-radius: 999px;
+}
+/* Playfield framing: the game runs "maximised" inside a putty window edge. */
+:root[data-theme='shareware-97'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='shareware-97'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='shareware-97'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px #fff,
+    inset 0 0 0 5px var(--sw-putty),
+    inset 0 0 0 6px var(--sw-putty-lo),
+    inset 0 0 0 7px #000;
+}
+/* Ships: the two seas are MDI child windows with red title bars. */
+:root[data-theme='shareware-97'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  margin: -8px -12px 4px -8px;
+  padding: 4px 6px 4px 10px;
+  min-height: 30px;
+  background: var(--sw-title-grad);
+  border-bottom: 2px solid var(--sw-ink);
+}
+:root[data-theme='shareware-97'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  color: var(--sw-cream);
+  text-shadow: 0 1px 0 #3a0610;
+}
+:root[data-theme='shareware-97'] [data-game='ships'] [data-part='panel'] .sh-panel__meta {
+  padding: 2px 6px;
+  background: #0b0f08;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] [data-game='ships'] [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px #000,
+    0 0 0 4px var(--sw-putty-lo),
+    inset 0 0 36px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='shareware-97'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px #000,
+    0 0 0 4px var(--sw-brass),
+    0 0 18px rgba(255, 210, 58, 0.35),
+    inset 0 0 36px rgba(0, 0, 0, 0.5);
+}
+/* Circuit: gold-lit start gantry. */
+:root[data-theme='shareware-97'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 3px solid;
+  border-color: var(--sw-putty-hi) var(--sw-putty-lo) var(--sw-putty-lo) var(--sw-putty-hi);
+  border-radius: 0;
+  background: var(--sw-putty);
+  box-shadow:
+    0 0 0 1px var(--sw-ink),
+    6px 6px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__pod {
+  border-radius: 0;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] [data-game='circuit'] [data-part='minimap'] {
+  border: 3px solid;
+  border-color: var(--sw-putty-hi) var(--sw-putty-lo) var(--sw-putty-lo) var(--sw-putty-hi);
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px var(--sw-ink),
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+/* Desktop: real application title bars on the big windows (phones keep every pixel for play). */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='shareware-97'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='shareware-97'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch),
+  :root[data-theme='shareware-97'] [data-game='putt'] [data-part='controls'],
+  :root[data-theme='shareware-97'] [data-game='circuit'] [data-part='scoreboard'] {
+    padding-top: 30px;
+  }
+  :root[data-theme='shareware-97'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='shareware-97'] [data-game='putt'] [data-part='controls']::before,
+  :root[data-theme='shareware-97'] [data-game='circuit'] [data-part='scoreboard']::before {
+    content: 'TANKS97.EXE \2014  Artillery Deluxe \00B7  Registered Version' / '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 22px;
+    padding: 0 60px 0 8px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    font: 700 12px/1 var(--font-ui);
+    letter-spacing: 0.03em;
+    color: var(--sw-cream);
+    text-shadow: 0 1px 0 #3a0610;
+    background: var(--sw-title-grad);
+    border-bottom: 2px solid var(--sw-ink);
+    pointer-events: none;
+  }
+  :root[data-theme='shareware-97'] [data-game='putt'] [data-part='controls']::before {
+    content: 'PUTT.EXE \2014  Wacky Holes Galore!' / '';
+  }
+  :root[data-theme='shareware-97'] [data-game='circuit'] [data-part='scoreboard']::before {
+    content: 'TURBO97.EXE' / '';
+    padding-right: 8px;
+  }
+  /* Minimise / maximise / close studs on the title bar (decorative). */
+  :root[data-theme='shareware-97'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::after,
+  :root[data-theme='shareware-97'] [data-game='putt'] [data-part='controls']::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    width: 50px;
+    height: 14px;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--sw-putty), var(--sw-putty)) 0 0 / 14px 14px no-repeat,
+      linear-gradient(var(--sw-putty), var(--sw-putty)) 18px 0 / 14px 14px no-repeat,
+      linear-gradient(var(--sw-putty), var(--sw-putty)) 36px 0 / 14px 14px no-repeat;
+    filter: drop-shadow(1px 1px 0 var(--sw-ink));
+  }
+  /* The $9.99 price sticker, slapped on the corner of the jewel case. */
+  :root[data-theme='shareware-97'] [data-game='tanks'] [data-part='turn']::after {
+    content: 'ONLY $9.99!' / '';
+    position: absolute;
+    right: -30px;
+    bottom: -18px;
+    padding: 4px 7px 3px;
+    font: 700 11px/1 var(--font-ui);
+    color: #7a0d18;
+    background: linear-gradient(180deg, #fff27a, #ffd23a 60%, #f0b92a);
+    border: 2px solid #3a2606;
+    border-radius: 50%;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+    transform: rotate(9deg);
+    pointer-events: none;
+  }
+  :root[data-theme='shareware-97'] [data-game='tanks'] [data-part='turn'] {
+    position: relative;
+  }
+}
+/* Phones: slimmer frame, no title bars. */
+@media (max-width: 640px), (max-height: 560px) {
+  /* Keep the top bar's centre column narrow so the turn card keeps its words. */
+  :root[data-theme='shareware-97'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+    padding: 2px;
+  }
+  :root[data-theme='shareware-97'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='shareware-97'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='shareware-97'] [data-game='circuit'] [data-part='race']::after {
+    box-shadow:
+      inset 0 0 0 1px #fff,
+      inset 0 0 0 3px var(--sw-putty),
+      inset 0 0 0 4px #000;
+  }
+  :root[data-theme='shareware-97'] [data-game='tanks'] .tk-glass,
+  :root[data-theme='shareware-97'] [data-game='circuit'] .ci-glass,
+  :root[data-theme='shareware-97'] [data-game='putt'] :is(.pt-plate, .pt-strokes),
+  :root[data-theme='shareware-97'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+    border-width: 2px;
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza as a bargain-bin party-game compilation CD (party kit — trivia, survey,
+ * DASterpiece, DASwords, DASception). Velvet-curtained game-show stage with a scalloped gold
+ * valance; the question keeps its bulb marquee; answers are chunky putty bevel buttons with a
+ * bevelled gem in the answer's colour (letter + shape). Pressed = sunken. Presentation only.
+ * ===================================================================== */
+:root[data-theme='shareware-97'] .pk-stage {
+  --pk-stage-set: inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2) rgba(255, 210, 58, 0.14);
+  background:
+    radial-gradient(circle at 50% 0, #ffe08a 0 5px, #b8862a 6px 9px, transparent 10px) 0 22px / 40px 20px repeat-x,
+    radial-gradient(circle at 20px -6px, transparent 0 17px, #8f6218 18px 20px, #e6c35f 21px 23px, transparent 24px) 0 0 / 40px 32px repeat-x,
+    linear-gradient(180deg, #7a0f1c 0 22px, transparent 22px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55), transparent 5%, transparent 95%, rgba(0, 0, 0, 0.55)),
+    repeating-linear-gradient(90deg, #5e0a16 0 10px, #9a1826 10px 22px, #6e0c19 22px 30px) left top / clamp(28px, 4vw, 64px) 100% no-repeat,
+    repeating-linear-gradient(90deg, #6e0c19 0 8px, #9a1826 8px 20px, #5e0a16 20px 30px) right top / clamp(28px, 4vw, 64px) 100% no-repeat,
+    radial-gradient(40% 50% at 30% 0%, rgba(255, 210, 58, 0.16), transparent 70%),
+    radial-gradient(40% 50% at 70% 0%, rgba(255, 90, 170, 0.12), transparent 70%),
+    linear-gradient(180deg, #2a0e46, #1f0b35 70%, #170828);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-layout {
+  padding-top: calc(var(--sp-4) + 22px);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-prompt__kicker {
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--sw-lcd);
+  color: var(--sw-amber);
+  box-shadow: var(--sw-sunken);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.6);
+}
+/* Putty bevel buttons with a bevelled colour gem. */
+:root[data-theme='shareware-97'] .pk-stage .pk-answer {
+  --mat-card-ink: var(--sw-ink);
+  --pk-card-ink: var(--sw-ink);
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+    var(--sw-putty);
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    5px 5px 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer__badge {
+  border-radius: 0;
+  color: var(--sw-ink);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.55), transparent 45%),
+    var(--slot);
+  box-shadow:
+    inset -2px -2px 0 color-mix(in srgb, var(--slot) 55%, #000),
+    inset 2px 2px 0 color-mix(in srgb, var(--slot) 40%, #fff),
+    0 0 0 1px var(--sw-ink);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer__label {
+  font-weight: 800;
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer:hover:not(:disabled) {
+  transform: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 40%),
+    #e6dfcc;
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    5px 5px 0 1px rgba(0, 0, 0, 0.45),
+    0 0 18px color-mix(in srgb, var(--slot) 40%, transparent);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow:
+    var(--sw-sunken),
+    0 0 0 1px var(--sw-ink),
+    2px 2px 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  transform: translate(2px, 2px);
+  background:
+    repeating-conic-gradient(rgba(0, 0, 0, 0.04) 0 25%, transparent 0 50%) 0 0 / 4px 4px,
+    color-mix(in srgb, var(--slot) 22%, var(--sw-putty));
+  box-shadow:
+    var(--sw-sunken),
+    0 0 0 1px var(--sw-ink),
+    0 0 0 4px var(--slot),
+    0 0 0 5px var(--sw-ink),
+    0 0 24px color-mix(in srgb, var(--slot) 45%, transparent);
+  outline: 1px dotted var(--sw-ink);
+  outline-offset: -7px;
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer[data-state='correct'] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 40%),
+    #cfeab0;
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    0 0 0 5px #3fd46a,
+    0 0 0 6px var(--sw-ink),
+    0 0 28px rgba(63, 212, 106, 0.55);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer[data-state='wrong'] {
+  box-shadow:
+    var(--sw-sunken),
+    0 0 0 1px var(--sw-ink),
+    0 0 0 5px var(--sw-red),
+    0 0 0 6px var(--sw-ink);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer[data-state='correct'] .pk-answer__mark {
+  color: #146b2c;
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer[data-state='wrong'] .pk-answer__mark {
+  color: #a3121a;
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer[data-state='dim'] {
+  filter: grayscale(0.6);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-answer__bar {
+  background: color-mix(in srgb, var(--slot) 34%, transparent);
+}
+/* Vote cards: little dialog windows with a title bar in the slot colour. */
+:root[data-theme='shareware-97'] .pk-stage .pk-vote {
+  --mat-card-ink: var(--sw-ink);
+  --pk-card-ink: var(--sw-ink);
+  --pk-card-ink-muted: rgba(26, 20, 11, 0.72);
+  color: var(--sw-ink);
+  border: 0;
+  border-radius: 0;
+  padding-top: calc(var(--sp-4) + 14px);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--slot) 60%, #000), var(--slot)) 3px 3px / calc(100% - 6px) 14px no-repeat,
+    var(--sw-putty);
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    5px 5px 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-vote__content {
+  padding: 8px 10px;
+  background: #fffdf5;
+  box-shadow: var(--sw-sunken);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-vote[data-picked='true'] {
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    0 0 0 4px var(--slot),
+    0 0 0 5px var(--sw-ink),
+    0 0 22px color-mix(in srgb, var(--slot) 45%, transparent);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-vote[data-winner='true'] {
+  box-shadow:
+    var(--sw-raised),
+    0 0 0 1px var(--sw-ink),
+    0 0 0 5px var(--sw-brass-hi),
+    0 0 0 6px var(--sw-ink),
+    0 0 26px rgba(255, 210, 58, 0.5);
+}
+/* Segmented LED progress + LCD scores. */
+:root[data-theme='shareware-97'] .pk-stage .pk-timerbar {
+  height: 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--sw-lcd);
+  box-shadow: var(--sw-sunken), 0 0 0 1px var(--sw-ink);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-timerbar__fill {
+  inset: 3px;
+  background: repeating-linear-gradient(90deg, #5dff9a 0 6px, transparent 6px 8px);
+  box-shadow: 0 0 6px rgba(93, 255, 154, 0.6);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background: repeating-linear-gradient(90deg, var(--sw-led) 0 6px, transparent 6px 8px);
+}
+:root[data-theme='shareware-97'] .pk-stage :is(.pk-strip, .pk-board, .pk-teamboard, .pk-panel) {
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px #1a140b,
+    inset 0 0 0 1px #3e372b,
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-row {
+  border-radius: 0;
+}
+:root[data-theme='shareware-97'] .pk-stage :is(.pk-row__score, .pk-strip__count, .pk-standing__score) {
+  color: var(--sw-amber);
+  text-shadow: 0 0 6px rgba(255, 182, 39, 0.5);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-interstitial__icon {
+  border-radius: 0;
+  border: 0;
+  background: var(--sw-putty);
+  color: var(--sw-oxblood);
+  box-shadow: var(--sw-raised), 0 0 0 1px var(--sw-ink), 6px 6px 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='shareware-97'] .pk-stage .pk-podium__block {
+  border-radius: 0;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--player) 60%, #fff),
+    0 0 0 3px var(--sw-brass),
+    0 0 0 4px var(--sw-ink),
+    0 0 22px color-mix(in srgb, var(--player) 30%, transparent);
+}
+@media (max-width: 640px) {
+  :root[data-theme='shareware-97'] .pk-stage {
+    background-size: 40px 20px, 40px 32px, auto, auto, 14px 100%, 14px 100%, auto, auto, auto;
+  }
+}
+/* DASterpiece: the placard gets the compilation's bulb marquee; frames stay gaudy gold. */
+:root[data-theme='shareware-97'] [data-game='masterpiece'] .mp-placard {
+  border: 0;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px #3a2606,
+    0 0 0 12px var(--sw-brass),
+    0 0 0 13px #3a2606,
+    8px 10px 0 13px rgba(0, 0, 0, 0.4);
+  margin: 13px;
+}
+:root[data-theme='shareware-97'] [data-game='masterpiece'] .mp-placard::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 10px;
+  pointer-events: none;
+  background:
+    var(--sw-bulbs) 0 0 / 16px 10px repeat-x,
+    var(--sw-bulbs) 0 100% / 16px 10px repeat-x,
+    var(--sw-bulbs) 0 0 / 10px 16px repeat-y,
+    var(--sw-bulbs) 100% 0 / 10px 16px repeat-y;
+}
+:root[data-theme='shareware-97'] [data-game='masterpiece'] .mp-placard::after {
+  display: none;
+}

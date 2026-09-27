@@ -56,6 +56,30 @@
   --pick: var(--dx-vote);
 }
 
+/* Themed materials: keep each stage's mood on the theme's stage floor. These override the kit's
+   --pk-stage-set; every value references --mat-stage, so without materials (Delta Neon) they are
+   invalid and the stage keeps its current look. */
+.dx-stage:has(.pk-layout[data-stage='night']) {
+  --pk-stage-set:
+    inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2)
+      color-mix(in srgb, #6d28d9 34%, transparent),
+    inset 0 0 0 100vmax color-mix(in srgb, color-mix(in srgb, var(--mat-stage) 72%, var(--dx-night)) 92%, transparent);
+}
+.dx-stage:has(.pk-layout[data-stage='dawn']) {
+  --pk-stage-set:
+    inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2)
+      color-mix(in srgb, var(--dx-dawn) 30%, transparent),
+    inset 0 0 0 100vmax color-mix(in srgb, var(--mat-stage) 90%, transparent);
+}
+.dx-stage:has(.pk-layout[data-stage='vote']),
+.dx-stage:has(.pk-layout[data-stage='runoff']),
+.dx-stage:has(.pk-layout[data-stage='verdict']) {
+  --pk-stage-set:
+    inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2)
+      color-mix(in srgb, var(--dx-vote) 28%, transparent),
+    inset 0 0 0 100vmax color-mix(in srgb, var(--mat-stage) 90%, transparent);
+}
+
 /* Night scanlines (decorative; off with fx off). */
 .dx-scanlines {
   display: none;
@@ -281,7 +305,9 @@
   position: relative;
   padding: var(--sp-4);
   border-radius: var(--radius);
-  background: radial-gradient(130% 110% at 0% 0%, color-mix(in srgb, var(--role) 20%, transparent), transparent 60%), var(--panel-bg);
+  background: radial-gradient(130% 110% at 0% 0%, color-mix(in srgb, var(--role) 20%, transparent), transparent 60%), var(--mat-card-face, var(--panel-bg));
+  /* Card ink under themed materials; unset (inherited = today's look) without them. */
+  color: var(--pk-card-ink);
   border: 1px solid color-mix(in srgb, var(--role) 48%, var(--panel-border));
   box-shadow:
     var(--panel-shadow),
@@ -339,7 +365,7 @@
   font-size: var(--fs-2xs);
   letter-spacing: var(--label-tracking);
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .dx-rolecard__name {
   margin: 0;
@@ -347,7 +373,10 @@
   font-weight: 400;
   font-size: var(--fs-xl);
   line-height: 1;
-  color: var(--role);
+  /* On a themed card face the role hue is deepened towards the card ink so it stays readable
+     (same hue = same role); without materials it is the pure role colour. */
+  --dx-role-ink: color-mix(in srgb, var(--role) 58%, var(--mat-card-ink));
+  color: var(--dx-role-ink, var(--role));
   text-shadow: 0 0 16px color-mix(in srgb, var(--role) 55%, transparent);
 }
 .dx-rolecard--hero .dx-rolecard__name {
@@ -356,7 +385,7 @@
 .dx-rolecard__rule {
   margin: var(--sp-3) 0 0;
   font-size: var(--fs-md);
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   line-height: 1.45;
 }
 .dx-rolecard--hero .dx-rolecard__rule {
@@ -365,7 +394,7 @@
 .dx-rolecard__tip {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-sm);
-  color: var(--text-1);
+  color: var(--pk-card-ink-muted, var(--text-1));
 }
 .dx-rolecard__goal {
   margin: var(--sp-3) 0 0;
@@ -373,7 +402,7 @@
   align-items: center;
   gap: 6px;
   font-size: var(--fs-sm);
-  color: var(--text-1);
+  color: var(--pk-card-ink-muted, var(--text-1));
 }
 .dx-rolecard--hero .dx-rolecard__goal {
   justify-content: center;
@@ -410,7 +439,7 @@
 }
 .dx-rolecard__ally {
   font-weight: 700;
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
 }
 .dx-rolecard__power {
   margin: var(--sp-3) 0 0;
@@ -425,21 +454,40 @@
   background: var(--yellow);
 }
 .dx-rolecard__power.is-spent {
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
   background: rgba(255, 255, 255, 0.06);
 }
 .dx-rolecard.is-concealed {
   border-style: dashed;
+  /* Face down: the theme's card back (no-op without materials). */
+  background: var(--mat-card-back, radial-gradient(130% 110% at 0% 0%, color-mix(in srgb, var(--role) 20%, transparent), transparent 60%), var(--panel-bg));
+  /* Children read the kit's card-ink helpers: point them at the card-back ink (invalid → their
+     own fallbacks without materials). */
+  --pk-card-ink: var(--mat-card-back-ink);
+  --pk-card-ink-muted: color-mix(in srgb, var(--mat-card-back-ink) 72%, transparent);
+  color: var(--pk-card-ink);
+}
+.dx-rolecard__allies :is(.dc-muted, .dc-label) {
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .dx-rolecard.is-concealed .dx-rolecard__name {
-  color: var(--text-2);
+  color: var(--mat-card-back-ink, var(--text-2));
   text-shadow: none;
 }
 .dx-rolecard.is-offline {
   filter: saturate(0.6);
 }
+.dx-rolecard__peek {
+  /* Readable on a themed card face / back; today's ghost-button ink without materials. */
+  --btn-fg: var(--pk-card-ink, var(--button-fg));
+}
 .dx-rolecard__peek[aria-pressed='true'] {
   color: var(--yellow);
+}
+/* Team badge on a themed card face: deepen the team hue towards the card ink (same hue, readable). */
+.dx-rolecard .dx-team:not(.dc-badge--solid) {
+  --dx-team-ink: color-mix(in srgb, var(--badge, var(--accent)) 55%, var(--mat-card-ink));
+  color: var(--dx-team-ink, color-mix(in srgb, var(--badge, var(--accent)) 80%, var(--light)));
 }
 .dx-team.dx-team--sm {
   font-size: var(--fs-2xs);
@@ -502,10 +550,10 @@
   gap: 4px;
   padding: 16px 8px 12px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 45%), var(--panel-bg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 45%), var(--mat-card-face, var(--panel-bg));
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow-1);
-  color: var(--text-0);
+  color: var(--pk-card-ink, var(--text-0));
   font: inherit;
   text-align: center;
   transition:
@@ -546,7 +594,7 @@ button.dx-node {
 .dx-node.is-selected {
   --node-accent: var(--pick);
   border-color: var(--pick);
-  background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--pick) 28%, transparent), transparent 70%), var(--panel-bg);
+  background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--pick) 28%, transparent), transparent 70%), var(--mat-card-face, var(--panel-bg));
   box-shadow:
     inset 0 0 0 1px var(--pick),
     0 0 26px color-mix(in srgb, var(--pick) 40%, transparent);
@@ -561,12 +609,14 @@ button.dx-node {
 }
 .dx-node.is-offline {
   --node-accent: var(--text-3);
-  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0 6px, transparent 6px 12px), rgba(10, 8, 20, 0.7);
+  --dx-mat-node-off: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mat-card-ink) 7%, transparent) 0 6px, transparent 6px 12px),
+    color-mix(in srgb, var(--mat-card-face) 55%, transparent);
+  background: var(--dx-mat-node-off, repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0 6px, transparent 6px 12px), rgba(10, 8, 20, 0.7));
   border-style: dashed;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .dx-node.is-offline .dx-node__name {
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--dx-glitch) 70%, transparent);
 }
@@ -599,7 +649,9 @@ button.dx-node {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--node-accent) 16%, transparent), transparent 70%);
+  /* The terminal's screen: the theme's screen material behind the avatar (no-op without materials). */
+  --dx-mat-port: radial-gradient(circle, color-mix(in srgb, var(--node-accent) 22%, var(--mat-screen)), var(--mat-screen) 72%);
+  background: var(--dx-mat-port, radial-gradient(circle, color-mix(in srgb, var(--node-accent) 16%, transparent), transparent 70%));
   border: 1px solid color-mix(in srgb, var(--node-accent) 35%, transparent);
 }
 .dx-node__led {
@@ -609,7 +661,7 @@ button.dx-node {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid var(--bg-1);
+  border: 2px solid var(--mat-bezel, var(--bg-1));
 }
 .dx-node__led.is-on {
   background: var(--green);
@@ -644,13 +696,14 @@ button.dx-node {
   font-size: 0.625rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--pk-card-ink-muted, var(--text-2));
 }
 .dx-node__you {
   padding: 0 5px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--cyan) 22%, transparent);
-  color: var(--cyan);
+  --dx-you-ink: color-mix(in srgb, var(--cyan) 50%, var(--mat-card-ink));
+  color: var(--dx-you-ink, var(--cyan));
   font-family: var(--font-pixel);
   font-size: 0.625rem;
   letter-spacing: 0.06em;
@@ -665,7 +718,8 @@ button.dx-node {
   border-radius: 999px;
   font-size: var(--fs-2xs);
   font-weight: 700;
-  color: var(--role);
+  --dx-role-ink: color-mix(in srgb, var(--role) 58%, var(--mat-card-ink));
+  color: var(--dx-role-ink, var(--role));
   background: color-mix(in srgb, var(--role) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--role) 45%, transparent);
   white-space: nowrap;
@@ -919,6 +973,10 @@ button.dx-node {
 }
 .dx-reveal--dawn {
   border-color: color-mix(in srgb, var(--dx-dawn) 40%, var(--panel-border));
+  /* The system log is a terminal screen: the theme's screen material + glow (no-op without). */
+  background: var(--mat-screen, var(--surface-sunken));
+  --dx-mat-log-glow: inset 0 0 40px color-mix(in srgb, var(--mat-screen-glow) 16%, transparent);
+  box-shadow: var(--panel-shadow), var(--dx-mat-log-glow, 0 0 transparent);
 }
 .dx-reveal--dawn[data-outcome='corrupted'] {
   border-color: color-mix(in srgb, var(--dx-glitch) 60%, var(--panel-border));

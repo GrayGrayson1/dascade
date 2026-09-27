@@ -129,13 +129,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cx(
-        'dc-btn',
-        `dc-btn--${variant}`,
-        size !== 'md' && `dc-btn--${size}`,
-        block && 'dc-btn--block',
-        className,
-      )}
+      className={cx('dc-btn', `dc-btn--${variant}`, size !== 'md' && `dc-btn--${size}`, block && 'dc-btn--block', className)}
       disabled={disabled || loading}
       data-loading={loading ? 'true' : undefined}
       aria-busy={loading || undefined}
@@ -159,15 +153,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref,
 ) {
   return (
-    <Button
-      ref={ref}
-      variant={variant}
-      size={size}
-      className={cx('dc-btn--icon', className)}
-      aria-label={label}
-      title={label}
-      {...rest}
-    >
+    <Button ref={ref} variant={variant} size={size} className={cx('dc-btn--icon', className)} aria-label={label} title={label} {...rest}>
       <PixelIcon name={icon} size={size === 'sm' ? 16 : 20} />
     </Button>
   );
@@ -194,12 +180,13 @@ export function Panel({ title, actions, brackets, glow, solid, padded = true, as
     <Tag
       className={cx('dc-panel', brackets && 'dc-panel--brackets', glow && 'dc-panel--glow', solid && 'dc-panel--solid', className)}
       aria-labelledby={title ? headingId : undefined}
+      data-part="panel"
       {...rest}
     >
       {title || actions ? (
-        <header className="dc-panel__header">
+        <header className="dc-panel__header" data-part="panel-header">
           {title ? (
-            <h2 id={headingId} className="dc-panel__title">
+            <h2 id={headingId} className="dc-panel__title" data-part="panel-title">
               {title}
             </h2>
           ) : (
@@ -208,7 +195,13 @@ export function Panel({ title, actions, brackets, glow, solid, padded = true, as
           {actions ? <div className="dc-row">{actions}</div> : null}
         </header>
       ) : null}
-      {padded ? <div className="dc-panel__body">{children}</div> : children}
+      {padded ? (
+        <div className="dc-panel__body" data-part="panel-body">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </Tag>
   );
 }
@@ -378,7 +371,11 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
           type="button"
           role="radio"
           aria-checked={opt.value === value}
-          tabIndex={rovingTabIndex(opt.value === value, i, options.some((o) => o.value === value))}
+          tabIndex={rovingTabIndex(
+            opt.value === value,
+            i,
+            options.some((o) => o.value === value),
+          )}
           disabled={disabled || opt.disabled}
           className="dc-segmented__item"
           onClick={() => onChange(opt.value)}
@@ -409,7 +406,11 @@ export function Tabs<T extends string>({ value, tabs, onChange, label, className
           type="button"
           role="tab"
           aria-selected={t.value === value}
-          tabIndex={rovingTabIndex(t.value === value, i, tabs.some((x) => x.value === value))}
+          tabIndex={rovingTabIndex(
+            t.value === value,
+            i,
+            tabs.some((x) => x.value === value),
+          )}
           className="dc-tab"
           onClick={() => onChange(t.value)}
         >
@@ -447,7 +448,8 @@ export function Modal({ open, onClose, title, children, footer, wide, dismissibl
     if (!dialog || !open) return;
     // Remember the opener: the modal is often unmounted while still open (e.g. a global modal
     // store resets), which skips the native dialog's focus restoration and drops focus on <body>.
-    const opener = document.activeElement instanceof HTMLElement && !dialog.contains(document.activeElement) ? document.activeElement : null;
+    const opener =
+      document.activeElement instanceof HTMLElement && !dialog.contains(document.activeElement) ? document.activeElement : null;
     if (!dialog.open) dialog.showModal();
     return () => {
       if (dialog.open) dialog.close();
@@ -461,6 +463,7 @@ export function Modal({ open, onClose, title, children, footer, wide, dismissibl
       ref={ref}
       aria-labelledby={titleId}
       className={cx('dc-modal', wide && 'dc-modal--wide', className)}
+      data-part="dialog"
       onCancel={(e) => {
         e.preventDefault();
         if (dismissible) onCloseRef.current();
@@ -475,11 +478,18 @@ export function Modal({ open, onClose, title, children, footer, wide, dismissibl
           glow
           padded={false}
           className="dc-modal__frame"
+          data-part="dialog-frame"
           title={<span id={titleId}>{title}</span>}
           actions={dismissible ? <IconButton icon="close" label="Close" size="sm" onClick={() => onCloseRef.current()} /> : null}
         >
-          <div className="dc-modal__body">{children}</div>
-          {footer ? <footer className="dc-modal__footer">{footer}</footer> : null}
+          <div className="dc-modal__body" data-part="dialog-body">
+            {children}
+          </div>
+          {footer ? (
+            <footer className="dc-modal__footer" data-part="dialog-footer">
+              {footer}
+            </footer>
+          ) : null}
         </Panel>
       ) : null}
     </dialog>
@@ -516,7 +526,7 @@ export function Kbd({ children }: { children: ReactNode }) {
 
 export function Spinner({ label = 'Loading' }: { label?: string }) {
   return (
-    <span className="dc-spinner" role="status" aria-label={label}>
+    <span className="dc-spinner" role="status" aria-label={label} data-part="spinner">
       <i />
       <i />
       <i />
@@ -568,7 +578,7 @@ export function TimerRing({
 
 export function EmptyState({ icon = 'sparkle', title, children }: { icon?: IconName; title: ReactNode; children?: ReactNode }) {
   return (
-    <div className="dc-empty">
+    <div className="dc-empty" data-part="empty-state">
       <PixelIcon name={icon} className="dc-empty__icon" />
       <strong style={{ color: 'var(--text-1)' }}>{title}</strong>
       {children ? <div>{children}</div> : null}
@@ -619,9 +629,20 @@ export interface PlayerChipProps {
   className?: string;
 }
 
-export function PlayerChip({ name, avatar, color, isHost, isYou, connected = true, spectator, size = 36, meta, className }: PlayerChipProps) {
+export function PlayerChip({
+  name,
+  avatar,
+  color,
+  isHost,
+  isYou,
+  connected = true,
+  spectator,
+  size = 36,
+  meta,
+  className,
+}: PlayerChipProps) {
   return (
-    <div className={cx('dc-player', className)}>
+    <div className={cx('dc-player', className)} data-part="player-chip">
       <Avatar avatar={avatar} color={color} size={size} offline={!connected} />
       <div style={{ minWidth: 0 }}>
         <div className="dc-row" style={{ gap: 6 }}>
@@ -672,7 +693,11 @@ export function ColorSwatches({
           type="button"
           role="radio"
           aria-checked={c.toLowerCase() === value.toLowerCase()}
-          tabIndex={rovingTabIndex(c.toLowerCase() === value.toLowerCase(), i, colors.some((x) => x.toLowerCase() === value.toLowerCase()))}
+          tabIndex={rovingTabIndex(
+            c.toLowerCase() === value.toLowerCase(),
+            i,
+            colors.some((x) => x.toLowerCase() === value.toLowerCase()),
+          )}
           aria-label={c}
           className="dc-swatch"
           style={{ '--swatch': c } as CSSProperties}

@@ -17,6 +17,7 @@ export function HudStat({
   className,
   title,
   bump,
+  part = 'stat',
 }: {
   label: string;
   value: ReactNode;
@@ -26,6 +27,8 @@ export function HudStat({
   title?: string;
   /** Drives the change flash when `value` is an element (primitives bump automatically). */
   bump?: string | number;
+  /** data-part hook for skins (default 'stat'). */
+  part?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useApp((s) => s.settings.reducedMotion);
@@ -42,7 +45,7 @@ export function HudStat({
     el.classList.add('is-bump');
   }, [key, reduced]);
   return (
-    <div ref={ref} className={cx('cl-stat', emphasis && 'cl-stat--big', className)} title={title}>
+    <div ref={ref} className={cx('cl-stat', emphasis && 'cl-stat--big', className)} data-part={part} title={title}>
       <span className="cl-stat__label">
         {icon ? <PixelIcon name={icon} size={12} /> : null}
         {label}
@@ -76,7 +79,7 @@ export function HudTimer({ endsAt, label = 'Time' }: { endsAt: number; label?: s
   const ms = useCountdown(endsAt);
   const s = Math.ceil(ms / 1000);
   const text = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  return <HudStat label={label} icon="clock" value={<span className={cx(s <= 10 && s > 0 && 'cl-warn')}>{text}</span>} />;
+  return <HudStat label={label} icon="clock" part="timer" value={<span className={cx(s <= 10 && s > 0 && 'cl-warn')}>{text}</span>} />;
 }
 
 /** Counts up to `value` (skipped under reduced motion). */

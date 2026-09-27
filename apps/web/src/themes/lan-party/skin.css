@@ -1,0 +1,1324 @@
+/* =====================================================================
+ * Basement LAN Party — structural skin.
+ * Lights off, CRTs on: every panel is a monitor (dark glass in a beige
+ * bezel), buttons are chunky beige PC plastic, green phosphor + amber LEDs,
+ * masking-tape labels, and every player row is a computer on the switch
+ * (a link light, and a CRT power-on when someone joins).
+ * Every rule is scoped under :root[data-theme='lan-party'].
+ * ===================================================================== */
+
+/* ---------- Fonts ---------- */
+/* VT323 (OFL) scaled up so its small x-height matches the other faces at every token size. */
+@font-face {
+  font-family: 'LAN VT323';
+  src: url('@fontsource/vt323/files/vt323-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 130%;
+}
+
+/* ---------- Environment ---------- */
+:root[data-theme='lan-party'] .lp-env {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0b0a08;
+}
+:root[data-theme='lan-party'] .lp-env__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+:root[data-theme='lan-party'] .lp-env__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 45%, transparent 45%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(180deg, rgba(5, 4, 3, 0.35), rgba(5, 4, 3, 0.1) 40%, rgba(5, 4, 3, 0.4));
+}
+/* On the floor the cabinets are the stations: keep the wall, lights and switch, drop the far table. */
+:root[data-theme='lan-party'] .lp-env[data-place='floor'] .lp-table,
+:root[data-theme='lan-party'] .lp-env[data-place='floor'] .lp-glows,
+:root[data-theme='lan-party'] .lp-env[data-place='floor'] .lp-chairs,
+:root[data-theme='lan-party'] .lp-env[data-place='floor'] .lp-cables,
+:root[data-theme='lan-party'] .lp-env[data-place='floor'] .lp-pizza {
+  display: none;
+}
+:root[data-theme='lan-party'] .lp-env[data-place='game'] {
+  filter: brightness(0.6);
+}
+/* Behind lobbies and the Tournament Center the room dims so panels and headings stay crisp. */
+:root[data-theme='lan-party'] .lp-env[data-place='lobby'],
+:root[data-theme='lan-party'] .lp-env[data-place='tournament'],
+:root[data-theme='lan-party'] .lp-env[data-place='other'],
+:root[data-theme='lan-party'] .lp-env[data-place='cabinet'],
+:root[data-theme='lan-party'] .lp-env[data-place='entry'] {
+  filter: brightness(0.55) saturate(0.8);
+}
+
+:root[data-theme='lan-party'] .lp-led {
+  fill: #1e2a1f;
+}
+:root[data-theme='lan-party'] .lp-led--on {
+  fill: #63f07e;
+  filter: drop-shadow(0 0 3px rgba(99, 240, 126, 0.9));
+}
+:root[data-theme='lan-party'] .lp-led--amber {
+  fill: #ffa94d;
+  filter: drop-shadow(0 0 3px rgba(255, 169, 77, 0.8));
+}
+:root[data-theme='lan-party'] .lp-strip {
+  filter: drop-shadow(0 0 4px rgba(255, 90, 74, 0.9));
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='still'] .lp-led,
+:root[data-theme='lan-party'] .lp-env[data-motion='still'] .lp-strip {
+  filter: none;
+}
+
+/* Motion: opacity-only, cheap, paused while hidden. */
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-led--on,
+:root[data-theme='lan-party'] .lp-env[data-motion='low'] .lp-led--on {
+  animation: lp-link 2.3s steps(1, end) infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-led--amber {
+  animation: lp-activity 1.7s steps(1, end) infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-led--slow,
+:root[data-theme='lan-party'] .lp-env[data-motion='low'] .lp-led--slow {
+  animation: none;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-led--hdd {
+  animation: lp-activity 0.9s steps(1, end) infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-glow {
+  animation: lp-glow 4.2s ease-in-out infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='low'] .lp-glow {
+  animation: lp-glow 8s ease-in-out infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-motion='full'] .lp-bulb {
+  animation: lp-twinkle 3s ease-in-out infinite;
+}
+:root[data-theme='lan-party'] .lp-env[data-paused='true'] * {
+  animation-play-state: paused !important;
+}
+@keyframes lp-link {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.25;
+  }
+  12% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0.3;
+  }
+  55% {
+    opacity: 1;
+  }
+}
+@keyframes lp-activity {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  34% {
+    opacity: 0.2;
+  }
+  61% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.25;
+  }
+}
+@keyframes lp-glow {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes lp-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- Page ---------- */
+:root[data-theme='lan-party'] {
+  scrollbar-color: #6a6252 #12100d;
+}
+:root[data-theme='lan-party'] ::selection {
+  background: rgba(99, 240, 126, 0.35);
+  color: #fff;
+}
+:root[data-theme='lan-party'] .dc-input,
+:root[data-theme='lan-party'] .dc-textarea {
+  caret-color: #63f07e;
+}
+
+/* Headings: terminal type, a touch tighter. */
+:root[data-theme='lan-party'] .dc-title {
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='lan-party'] .dc-display {
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Buttons: chunky beige PC plastic ---------- */
+:root[data-theme='lan-party'] .dc-btn:not(.dc-btn--ghost) {
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 0 2px 0 var(--button-bevel-hi),
+    inset 0 -3px 0 var(--button-bevel-lo),
+    0 3px 0 rgba(0, 0, 0, 0.55),
+    0 0 16px var(--btn-glow);
+}
+:root[data-theme='lan-party'] .dc-btn:active:not(:disabled):not(.dc-btn--ghost) {
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 0 2px 3px rgba(60, 50, 30, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='lan-party'] .dc-btn--ghost {
+  --btn-fg: var(--text-0);
+}
+:root[data-theme='lan-party'] .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 244, 214, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(232, 218, 184, 0.3);
+}
+:root[data-theme='lan-party'] .dc-btn:focus-visible {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* ---------- Panels: CRT monitors ---------- */
+:root[data-theme='lan-party'] .dc-panel__header {
+  color: var(--titlebar-fg);
+  border-bottom: 2px solid #7d735c;
+  border-radius: calc(var(--panel-radius) - 1px) calc(var(--panel-radius) - 1px) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+:root[data-theme='lan-party'] .dc-panel__title::before {
+  border-radius: 50%;
+  background: #63f07e;
+  box-shadow: 0 0 6px rgba(99, 240, 126, 0.9);
+}
+:root[data-theme='lan-party'][data-fx='off'] .dc-panel__title::before {
+  box-shadow: none;
+}
+:root[data-theme='lan-party'] .dc-panel__header .dc-btn--ghost {
+  --btn-fg: #221e16;
+}
+:root[data-theme='lan-party'] .dc-panel__header .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(34, 30, 22, 0.1);
+}
+/* CRT scanlines on panel glass (decorative, very light, not on fx off). */
+:root[data-theme='lan-party']:not([data-fx='off']) .dc-panel__body {
+  background-image: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px);
+}
+:root[data-theme='lan-party'] [data-part='dialog-frame'] {
+  box-shadow:
+    0 0 0 5px #cfc5a9,
+    0 0 0 6px #7d735c,
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 0 30px rgba(0, 0, 0, 0.6),
+    0 30px 80px rgba(0, 0, 0, 0.7);
+}
+
+/* Segmented / tabs: rocker switches. */
+:root[data-theme='lan-party'] .dc-segmented {
+  background: #0b0c0a;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.6), 0 0 0 1px #6f6650;
+}
+:root[data-theme='lan-party'] .dc-segmented__item[aria-checked='true'],
+:root[data-theme='lan-party'] .dc-segmented__item[aria-selected='true'] {
+  background: linear-gradient(180deg, #a9ffb7, #3fd060);
+  color: #04150a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(0, 60, 20, 0.4), 0 0 10px rgba(99, 240, 126, 0.3);
+}
+:root[data-theme='lan-party'] .dc-toggle__thumb {
+  background: linear-gradient(180deg, #ebe3cd, #b9ae93);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='lan-party'] .dc-kbd {
+  background: linear-gradient(180deg, #ebe3cd, #c9bfa3);
+  color: #1f1b14;
+  border-color: #6f6650;
+  box-shadow: 0 2px 0 #6f6650;
+}
+
+/* ---------- Top bar ---------- */
+:root[data-theme='lan-party'] .topbar {
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.6), 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='lan-party'] .code-chip {
+  border: 1px solid #6f6650;
+  background: #070807;
+  color: #a9ffb7;
+  box-shadow: inset 0 0 10px rgba(99, 240, 126, 0.08);
+}
+
+/* ---------- Arcade floor ---------- */
+:root[data-theme='lan-party'] .af-hud {
+  background: linear-gradient(180deg, rgba(6, 5, 4, 0.9), rgba(6, 5, 4, 0.55) 62%, rgba(6, 5, 4, 0));
+}
+:root[data-theme='lan-party'] .af-hud__word {
+  filter: drop-shadow(0 0 4px rgba(99, 240, 126, 0.75)) drop-shadow(0 0 12px rgba(99, 240, 126, 0.3));
+}
+:root[data-theme='lan-party'] .af-hud__word path:nth-child(1) {
+  stroke: #3fd060;
+}
+:root[data-theme='lan-party'] .af-hud__word path:nth-child(2) {
+  stroke: #63f07e;
+}
+:root[data-theme='lan-party'] .af-hud__word path:nth-child(3) {
+  stroke: #e6ffe9;
+}
+:root[data-theme='lan-party'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='lan-party'] .af-hud__sub {
+  color: var(--chat-name, #ffc27a);
+  text-shadow: none;
+}
+/* Flavour badge on masking tape. */
+:root[data-theme='lan-party'] .af-hud__badge {
+  color: #2a2418;
+  border: 0;
+  padding: 3px 10px;
+  background: linear-gradient(180deg, #efe6c9, #ddd2b0);
+  transform: rotate(-2deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
+}
+:root[data-theme='lan-party'] .af-hud__profile {
+  background: #0b0c0a;
+  border-color: #8b8069;
+}
+:root[data-theme='lan-party'] .af-ticker__item::before {
+  border-radius: 0;
+  width: 7px;
+  height: 7px;
+}
+
+/* Tournament kiosk: a green-screen terminal. */
+:root[data-theme='lan-party'] .af-kiosk {
+  --k-led: #7dff94;
+  --k-led-2: #ffa94d;
+  border-radius: 4px;
+  border-color: #6f6650;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 120% at 50% 40%, #0d1f10, #050a05);
+  box-shadow:
+    inset 0 0 0 2px #000,
+    inset 0 0 18px rgba(99, 240, 126, 0.1),
+    0 0 0 4px #cfc5a9,
+    0 0 0 5px #6f6650,
+    0 8px 22px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='lan-party'] .af-kiosk:hover {
+  box-shadow:
+    inset 0 0 0 2px #000,
+    inset 0 0 24px rgba(99, 240, 126, 0.18),
+    0 0 0 4px #ddd3b8,
+    0 0 0 5px #6f6650,
+    0 0 24px rgba(99, 240, 126, 0.2),
+    0 8px 22px rgba(0, 0, 0, 0.6);
+}
+
+/* Plaque: a big CRT on the folding table. */
+:root[data-theme='lan-party'] .af-plaque {
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 40%),
+    radial-gradient(130% 120% at 50% 30%, #1b1e19, #0b0c0a);
+  border: 2px solid #1a1813;
+  box-shadow:
+    0 0 0 6px #cfc5a9,
+    0 0 0 7px #7d735c,
+    inset 0 0 30px rgba(0, 0, 0, 0.6),
+    0 22px 50px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='lan-party'] .af-plaque::before {
+  /* the monitor's power LED on the bezel */
+  top: auto;
+  left: auto;
+  right: 4px;
+  bottom: -10px;
+  width: 7px;
+  height: 7px;
+  border: 0;
+  border-radius: 50%;
+  background: #63f07e;
+  filter: drop-shadow(0 0 4px rgba(99, 240, 126, 0.9));
+}
+:root[data-theme='lan-party'] .af-plaque::after {
+  display: none;
+}
+:root[data-theme='lan-party'] .af-floor__plaque-wrap {
+  padding-inline: 8px;
+}
+/* Cabinet name plates: masking tape with marker writing. */
+:root[data-theme='lan-party'] .af-cab__plate {
+  background: linear-gradient(180deg, #efe6c9, #dcd0ad);
+  color: #231d12;
+  border: 0;
+  border-radius: 1px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+  transform: rotate(-1.5deg);
+  --af-ink-0: #231d12;
+  --af-ink-1: #3a3222;
+  --af-ink-2: #4d4330;
+  --af-ink-3: #4d4330;
+}
+:root[data-theme='lan-party'] .af-slot[data-active='true'] .af-cab__name {
+  color: #1d180f;
+  text-shadow: none;
+}
+:root[data-theme='lan-party'] .af-cab__family b {
+  color: color-mix(in srgb, var(--p) 45%, #1d180f);
+}
+:root[data-theme='lan-party'] .af-slot:nth-child(even) .af-cab__plate {
+  transform: rotate(1.2deg);
+}
+:root[data-theme='lan-party'] .af-foot {
+  color: #b1a891;
+}
+
+/* ---------- Title screen ---------- */
+:root[data-theme='lan-party'] .af-entry__bg {
+  background: rgba(8, 7, 5, 0.45);
+}
+:root[data-theme='lan-party'] .af-entry__screen {
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 2px #0a0907,
+    0 0 0 14px #bdb398,
+    0 0 0 15px #6f6650,
+    0 0 70px rgba(99, 240, 126, 0.12);
+}
+:root[data-theme='lan-party'] .af-entry__scrim {
+  background:
+    linear-gradient(90deg, rgba(10, 9, 7, 0.94) 0%, rgba(10, 9, 7, 0.84) 44%, rgba(10, 9, 7, 0.5) 72%, rgba(10, 9, 7, 0.62) 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%);
+}
+@media (max-width: 900px) {
+  :root[data-theme='lan-party'] .af-entry__scrim {
+    background:
+      linear-gradient(180deg, rgba(10, 9, 7, 0.55) 0%, rgba(10, 9, 7, 0.84) 30%, rgba(10, 9, 7, 0.92) 100%),
+      radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%);
+  }
+  :root[data-theme='lan-party'] .af-entry__screen {
+    box-shadow:
+      0 0 0 2px #0a0907,
+      0 0 0 6px #bdb398,
+      0 0 40px rgba(99, 240, 126, 0.1);
+  }
+}
+:root[data-theme='lan-party'] .af-entry__card {
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px),
+    radial-gradient(130% 110% at 50% 30%, #1b1e19, #0c0d0b);
+  border: 2px solid #1a1813;
+  box-shadow:
+    0 0 0 6px #cfc5a9,
+    0 0 0 7px #7d735c,
+    inset 0 0 30px rgba(0, 0, 0, 0.6),
+    0 30px 70px rgba(0, 0, 0, 0.65);
+}
+:root[data-theme='lan-party'] .af-entry__card::before,
+:root[data-theme='lan-party'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='lan-party'] .af-entry__card-head {
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, #e2d9c0, #cfc5a9);
+  border-bottom: 2px solid #7d735c;
+  --af-ink-0: #221e16;
+  --af-ink-1: #3a3222;
+  --af-ink-2: #4d4330;
+  color: #221e16;
+}
+/* The light card head: the game-accent credit ('1P') would be accent-on-pale; use the head's ink. */
+:root[data-theme='lan-party'] .af-entry__card-head .af-entry__credit {
+  color: var(--af-ink-1);
+}
+:root[data-theme='lan-party'] .af-entry__marquee,
+:root[data-theme='lan-party'] .cp__marquee {
+  border-radius: 4px;
+  background: linear-gradient(180deg, #d8cfb5, #a89e84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 0 1px #5d5645,
+    0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- Cabinet picker ---------- */
+:root[data-theme='lan-party'] .cp {
+  background: transparent;
+}
+:root[data-theme='lan-party'] .cpb {
+  background: rgba(8, 7, 5, 0.45);
+}
+:root[data-theme='lan-party'] .cpb > :not(.cpb__vignette) {
+  display: none;
+}
+:root[data-theme='lan-party'] .cp-item {
+  border-radius: 4px;
+  border: 1px solid #3b362c;
+  border-left: 4px solid color-mix(in srgb, var(--ip) 70%, #3b362c);
+  background: linear-gradient(90deg, rgba(20, 21, 18, 0.95), rgba(14, 15, 12, 0.95));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='lan-party'] .cp-item:hover,
+:root[data-theme='lan-party'] .cp-item.is-selected {
+  border-color: #cfc5a9;
+  border-left-color: var(--ip);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ip) 12%, #161814), #111210);
+  box-shadow:
+    0 0 0 2px rgba(207, 197, 169, 0.35),
+    0 0 20px rgba(99, 240, 126, 0.1),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='lan-party'] .cp__preview {
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px),
+    radial-gradient(130% 110% at 50% 30%, #1b1e19, #0c0d0b);
+  border: 2px solid #1a1813;
+  box-shadow:
+    0 0 0 6px #cfc5a9,
+    0 0 0 7px #7d735c,
+    0 24px 60px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='lan-party'] .cp-screen {
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 3px #000,
+    0 0 0 4px #3a3730,
+    0 0 30px rgba(99, 240, 126, 0.12);
+}
+:root[data-theme='lan-party'] .cp__tourney {
+  color: #7dff94;
+  border-color: #6f6650;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+    #07100a;
+  text-shadow: 0 0 6px rgba(99, 240, 126, 0.6);
+  box-shadow: 0 0 0 3px #cfc5a9;
+}
+
+/* ---------- Lobby / room ---------- */
+:root[data-theme='lan-party'] .lobby-code__value span {
+  border: 0;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+    #070a07;
+  color: #7dff94;
+  text-shadow: 0 0 10px rgba(99, 240, 126, 0.7);
+  box-shadow:
+    inset 0 0 12px rgba(99, 240, 126, 0.12),
+    0 0 0 3px #cfc5a9,
+    0 0 0 4px #6f6650,
+    0 4px 0 4px rgba(0, 0, 0, 0.4);
+  margin: 4px 2px;
+}
+:root[data-theme='lan-party'][data-fx='off'] .lobby-code__value span {
+  text-shadow: none;
+}
+
+/* Player rows: computers on the LAN. A link light on each; a CRT power-on when one joins. */
+:root[data-theme='lan-party'] .player-list__item {
+  padding-right: 30px;
+  background: linear-gradient(90deg, rgba(99, 240, 126, 0.05), rgba(255, 244, 214, 0.02));
+  border-color: rgba(232, 218, 184, 0.18);
+}
+:root[data-theme='lan-party'] .player-list__item::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 1px;
+  background: #63f07e;
+  box-shadow:
+    0 0 6px rgba(99, 240, 126, 0.9),
+    -10px 0 0 -1px #ffa94d;
+}
+:root[data-theme='lan-party'] .player-list__item.is-away::after {
+  background: #3a2a1f;
+  box-shadow: -10px 0 0 -1px #3a2a1f;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme='lan-party']:not([data-reduced-motion='true']):not([data-fx='off']) .player-list__item {
+    animation: lp-online 760ms steps(12, end) both;
+  }
+  :root[data-theme='lan-party']:not([data-reduced-motion='true']):not([data-fx='off']) .player-list__item:not(.is-away)::after {
+    animation: lp-link 2.3s steps(1, end) 800ms infinite;
+  }
+}
+@keyframes lp-online {
+  0% {
+    opacity: 0.2;
+    clip-path: inset(49% 0 49% 0);
+    filter: brightness(3) saturate(0);
+  }
+  35% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1.8) saturate(0.4);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    filter: none;
+  }
+}
+:root[data-theme='lan-party'] .seat-meter,
+:root[data-theme='lan-party'] .lobby-status__item {
+  border-radius: 2px;
+}
+:root[data-theme='lan-party'] .chat__list {
+  font-family: var(--font-ui);
+}
+:root[data-theme='lan-party'] .chat__name {
+  color: var(--chat-name, #ffc27a);
+}
+
+/* Results / notices */
+:root[data-theme='lan-party'] .countdown-overlay__num {
+  font-family: var(--font-num);
+  color: #d9ffe0;
+  text-shadow:
+    0 0 20px rgba(99, 240, 126, 0.8),
+    0 4px 0 #0a1a0d;
+}
+
+/* ---------- Tournament Center: brackets taped to the wall ---------- */
+:root[data-theme='lan-party'] .tc-hero {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 6px #cfc5a9,
+    0 0 0 7px #7d735c,
+    inset 0 0 30px rgba(0, 0, 0, 0.6),
+    0 24px 60px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='lan-party'] .tc-board {
+  border-style: solid;
+  border-color: rgba(232, 218, 184, 0.2);
+  background: rgba(10, 11, 9, 0.85);
+}
+:root[data-theme='lan-party'] .tc-chip {
+  border-radius: 2px;
+}
+
+/* ---------- Game chrome ---------- */
+/* Beige CRT bezel around playfields — but not Hold'em's community-card row, which sits on the felt. */
+:root[data-theme='lan-party'] [data-part='board']:not(.hd-board) {
+  box-shadow: 0 0 0 6px #cdc3a7, 0 0 0 7px #6f6650, 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- Jukebox: the shared MP3 computer ---------- */
+:root[data-theme='lan-party'] [data-jukebox] {
+  --jb-radius: 8px;
+  --jb-bg: radial-gradient(130% 110% at 50% 20%, #1b1e19, #0c0d0b);
+  --jb-border: #1a1813;
+  --jb-shadow: 0 0 0 5px #cfc5a9, 0 0 0 6px #7d735c, 0 20px 50px rgba(0, 0, 0, 0.7);
+  --jb-font-title: var(--font-pixel);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='title-bar'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='header'] {
+  background: linear-gradient(180deg, #e2d9c0, #cfc5a9);
+  color: #221e16;
+  border-bottom: 2px solid #7d735c;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='header'] button {
+  color: #221e16;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='display'] {
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 110% at 50% 40%, #0e2211, #040804);
+  box-shadow: inset 0 0 0 2px #000, inset 0 0 26px rgba(0, 0, 0, 0.7), 0 0 0 3px #3a3730;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--font-display);
+  font-size: 1.35em;
+  color: #9dffad;
+  text-shadow: 0 0 8px rgba(99, 240, 126, 0.55);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='track-artist'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='time'] {
+  color: var(--chat-name, #ffc27a);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='visualizer'] {
+  background: #040804;
+  border-radius: 10px;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='library']::before {
+  content: 'SHARED \203A  MP3S';
+  content: 'SHARED \203A  MP3S' / '';
+  display: block;
+  padding: 6px 10px;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #b1a891;
+  border-bottom: 1px solid rgba(232, 218, 184, 0.14);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='track'] {
+  border-radius: 2px;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='track'][data-current] {
+  background: #63f07e;
+  color: #04150a;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='track'][data-current] * {
+  color: inherit;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='play'] {
+  background: linear-gradient(180deg, #a9ffb7, #3fd060);
+  color: #04150a;
+  box-shadow: 0 0 0 1px #1b6b2d, inset 0 2px 0 rgba(255, 255, 255, 0.6), inset 0 -3px 0 rgba(0, 60, 20, 0.4), 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='prev'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='next'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='shuffle'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='repeat'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='mute'] {
+  background: linear-gradient(180deg, #ebe3cd, #c9bfa3);
+  color: #1f1b14;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #6f6650, inset 0 2px 0 rgba(255, 255, 255, 0.6), inset 0 -3px 0 rgba(70, 58, 36, 0.45), 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='shuffle'][aria-pressed='true'],
+:root[data-theme='lan-party'] [data-jukebox] [data-part='repeat']:not([data-mode='off']),
+:root[data-theme='lan-party'] [data-jukebox] [data-part='mute'][aria-pressed='true'] {
+  background: linear-gradient(180deg, #ffe39a, #f0b93a);
+  color: #241902;
+}
+:root[data-theme='lan-party'] [data-jukebox] [data-part='mini'] {
+  border-radius: 4px;
+}
+
+/* Jukebox decor: a burned CD-R peeking out of the display. */
+:root[data-theme='lan-party'] .lp-jbd {
+  position: absolute;
+  right: -44px;
+  top: -40px;
+  width: 128px;
+  height: 128px;
+  opacity: 0.4;
+}
+:root[data-theme='lan-party'] .lp-jbd__cd {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+:root[data-theme='lan-party'] .lp-jbd[data-spin='true'] .lp-jbd__cd {
+  animation: lp-cd-spin 2.4s linear infinite;
+}
+@keyframes lp-cd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Place-aware layering ---------- */
+/* In the lobby the basement shows through: the switch lights one port per computer that joins. */
+:root[data-theme='lan-party'][data-place='lobby'] .game-stage.dc-game-backdrop {
+  background: linear-gradient(180deg, rgba(8, 7, 5, 0.55), rgba(8, 7, 5, 0.3) 40%, rgba(8, 7, 5, 0.6));
+}
+/* Cabinet screens read as CRTs in beige bezels: the cabinets are the party's stations. */
+:root[data-theme='lan-party'] .af-cab__screen {
+  border-radius: 3.2cqi;
+  box-shadow:
+    0 0 0 0.9cqi #bdb398,
+    0 0 0 1.1cqi #5d5645;
+}
+
+/* Floor decor: cables, power strip and snacks at the stations' feet. */
+:root[data-theme='lan-party'] .lp-floor {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  opacity: 0.9;
+}
+
+/* Focus rings on this theme's pale title bars / plates: the default light ring measured < 3:1 there, so
+   controls inside them get a dark ring instead (a11y review). */
+:root[data-theme='lan-party'] .dc-panel__header,
+:root[data-theme='lan-party'] [data-jukebox] [data-part='header'],
+:root[data-theme='lan-party'] [data-jukebox][data-dock='float'] [data-part='mini'] {
+  --focus-ring: #221e16;
+}
+
+/* Floor footer / status ticker on the dark basement floor: the default lilac inks read 3.9:1. */
+:root[data-theme='lan-party'] .af-foot {
+  --af-ink-2: #cfc6ae;
+  --af-ink-3: #bdb49c;
+}
+
+/* =====================================================================
+ * SPORTS GAMES AT THE LAN — every HUD panel is a little CRT in a beige plastic bezel with green
+ * phosphor read-outs, keyboard-key buttons, and the playfield sits behind a 15" monitor bezel with
+ * a power LED. FIRE is the big beige Enter key. Playfields untouched.
+ * ===================================================================== */
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-glass,
+:root[data-theme='lan-party'] [data-game='circuit'] .ci-glass,
+:root[data-theme='lan-party'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='lan-party'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 4px solid;
+  border-color: #ebe2c8 #9d937a #9d937a #ebe2c8;
+  border-radius: 7px;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(99, 240, 126, 0.06), transparent 70%), #0c0e0b;
+  box-shadow:
+    0 0 0 1px #5e5644,
+    inset 0 0 0 1px #000,
+    inset 0 0 14px rgba(0, 0, 0, 0.8),
+    0 10px 24px rgba(0, 0, 0, 0.6);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='lan-party'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='lan-party'] [data-game='ships'] .sh-panel--active {
+  box-shadow:
+    0 0 0 1px #5e5644,
+    inset 0 0 0 1px #000,
+    inset 0 0 14px rgba(0, 0, 0, 0.8),
+    0 0 0 3px rgba(99, 240, 126, 0.5),
+    0 0 24px rgba(99, 240, 126, 0.25),
+    0 10px 24px rgba(0, 0, 0, 0.6);
+}
+/* Keyboard keys. */
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-hold {
+  border: 1px solid #6e654f;
+  border-radius: 6px;
+  color: #231d12;
+  background: linear-gradient(180deg, #f1e9d2, #d8cfb5 70%, #c4ba9e);
+  box-shadow:
+    inset 0 -3px 0 rgba(90, 80, 60, 0.35),
+    0 3px 0 #7d735c,
+    0 4px 6px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  border-color: #6e654f;
+  background: linear-gradient(180deg, #faf3de, #e2d9bf 70%, #cfc5a9);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-hold:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 -1px 0 rgba(90, 80, 60, 0.35),
+    0 1px 0 #7d735c;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-weapon__current {
+  border-radius: 4px;
+  border: 1px solid rgba(99, 240, 126, 0.35);
+  background: #070907;
+}
+/* Green phosphor read-outs. */
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='lan-party'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='lan-party'] [data-game='circuit'] .ci-clock {
+  color: #7dff95;
+  text-shadow: 0 0 8px rgba(99, 240, 126, 0.65);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] .tk-dial__value b {
+  color: #7dff95;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 400;
+  text-shadow: 0 0 10px rgba(99, 240, 126, 0.7);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i {
+  border-radius: 0;
+  background: rgba(99, 240, 126, 0.12);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='wind'] .tk-wind__half i[data-on='true'] {
+  background: var(--wind-c, var(--cyan));
+}
+/* FIRE: the big beige Enter key, red legend, green "ready" LED. */
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire'] {
+  border: 1px solid #6e654f;
+  border-radius: 10px;
+  color: #a3160f;
+  background: linear-gradient(180deg, #fbf4df, #e0d7bd 65%, #c9bfa3);
+  box-shadow:
+    inset 0 -5px 0 rgba(90, 80, 60, 0.3),
+    0 5px 0 #7d735c,
+    0 7px 12px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  animation: none;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint {
+  color: #3a3222;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(60, 50, 30, 0.14);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire'][data-state='ready']::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #63f07e;
+  box-shadow: 0 0 8px #63f07e;
+  animation: lan-led-blink 0.9s steps(2, jump-none) infinite;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire']:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 -2px 0 rgba(90, 80, 60, 0.3),
+    0 1px 0 #7d735c;
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #5e5644;
+  text-shadow: none;
+  background: linear-gradient(180deg, #cfc6ad, #b3a98e);
+}
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='fire']:disabled .tk-fire__hint {
+  color: #3a3222;
+}
+:root[data-theme='lan-party'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready']::after {
+  animation: none;
+}
+@keyframes lan-led-blink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+/* The playfield is on a 15-inch monitor: beige bezel, rounded glass, a green power LED. */
+:root[data-theme='lan-party'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='lan-party'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='lan-party'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 22px / 18px;
+  box-shadow:
+    0 0 0 60px #cfc5a9,
+    inset 0 0 0 1px #ebe2c8,
+    inset 0 0 0 7px #cfc5a9,
+    inset 0 0 0 8px #5e5644,
+    inset 0 0 0 9px #1a1813,
+    inset 0 0 80px rgba(0, 0, 0, 0.35);
+}
+/* Ships: two CRTs side by side, each with a masking-tape label. */
+:root[data-theme='lan-party'] [data-game='ships'] [data-part='panel'] .sh-panel__head {
+  margin: -8px -12px 6px -8px;
+  padding: 4px 8px 4px 12px;
+  min-height: 30px;
+  background: linear-gradient(180deg, #e2d9bf, #cfc5a9);
+  border-bottom: 2px solid #7d735c;
+}
+:root[data-theme='lan-party'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  color: #231d12;
+}
+:root[data-theme='lan-party'] [data-game='ships'] [data-part='panel'] .sh-panel__meta {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #0c0e0b;
+}
+:root[data-theme='lan-party'] [data-game='ships'] [data-part='board-frame'] {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px #1a1813,
+    0 0 0 5px #cfc5a9,
+    0 0 0 6px #7d735c,
+    inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='lan-party'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px #1a1813,
+    0 0 0 5px #cfc5a9,
+    0 0 0 6px #63f07e,
+    0 0 20px rgba(99, 240, 126, 0.3),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+/* Circuit: beige start-light box and minimap monitor. */
+:root[data-theme='lan-party'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 4px solid;
+  border-color: #ebe2c8 #9d937a #9d937a #ebe2c8;
+  border-radius: 8px;
+  background: #cfc5a9;
+}
+:root[data-theme='lan-party'] [data-game='circuit'] [data-part='minimap'] {
+  border: 5px solid;
+  border-color: #ebe2c8 #9d937a #9d937a #ebe2c8;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px #5e5644,
+    0 10px 24px rgba(0, 0, 0, 0.6);
+}
+/* Desktop: masking-tape labels and the monitor's power LED. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='lan-party'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='lan-party'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='lan-party'] [data-game='putt'] [data-part='controls']::before,
+  :root[data-theme='lan-party'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: 'TANKS LAN \2014  \\\\STATION-07 \2014  do NOT unplug!!' / '';
+    position: absolute;
+    top: -16px;
+    right: 34px;
+    padding: 4px 12px 3px;
+    white-space: nowrap;
+    font: 700 12px/1.1 var(--font-ui);
+    letter-spacing: 0.02em;
+    color: #3a3222;
+    background: rgba(238, 226, 188, 0.96);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    transform: rotate(-1.5deg);
+    pointer-events: none;
+  }
+  :root[data-theme='lan-party'] [data-game='putt'] [data-part='controls']::before {
+    content: 'mini golf \2014  winner stays on' / '';
+  }
+  :root[data-theme='lan-party'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: 'NO SHOUTING AT THE RACE PC' / '';
+    top: auto;
+    right: auto;
+    left: 10px;
+    bottom: -18px;
+    transform: rotate(1.5deg);
+  }
+  :root[data-theme='lan-party'] [data-game='tanks'] [data-part='battlefield']::before,
+  :root[data-theme='lan-party'] [data-game='putt'] [data-part='course']::before,
+  :root[data-theme='lan-party'] [data-game='circuit'] [data-part='race']::before {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    right: 18px;
+    bottom: 1px;
+    width: 7px;
+    height: 4px;
+    border-radius: 2px;
+    background: #63f07e;
+    box-shadow: 0 0 6px #63f07e;
+    pointer-events: none;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  :root[data-theme='lan-party'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='lan-party'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='lan-party'] [data-game='circuit'] [data-part='race']::after {
+    border-radius: 14px / 12px;
+    box-shadow:
+      0 0 0 60px #cfc5a9,
+      inset 0 0 0 3px #cfc5a9,
+      inset 0 0 0 4px #1a1813;
+  }
+  :root[data-theme='lan-party'] [data-game='tanks'] .tk-glass,
+  :root[data-theme='lan-party'] [data-game='circuit'] .ci-glass,
+  :root[data-theme='lan-party'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+  :root[data-theme='lan-party'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+    border-width: 3px;
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza: quiz night on the shared PC (party kit — trivia, survey, DASterpiece, DASwords,
+ * DASception). The question runs on a beige-bezel CRT in phosphor green; answers are big
+ * keyboard keycaps (the answer colour is the coloured key cap with its letter + shape, like the
+ * one key everybody re-coloured). Folding-table desk below. Presentation only.
+ * ===================================================================== */
+:root[data-theme='lan-party'] .pk-stage {
+  --lnp-phosphor: #63f07e;
+  --lnp-beige: #d8cfb5;
+  --pk-stage-set: inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2) rgba(99, 240, 126, 0.07);
+  background:
+    radial-gradient(50% 36% at 50% 30%, rgba(99, 240, 126, 0.1), transparent 72%),
+    linear-gradient(180deg, transparent 84%, #26251f 84%, #3a3831 84.5%, #22211c 85.2%, #181713 100%),
+    linear-gradient(180deg, #121310, #0d0e0b);
+}
+/* The monitor: thick beige bezel, dark glass, phosphor text, a power LED. */
+:root[data-theme='lan-party'] .pk-stage .pk-prompt {
+  --mat-card-ink: #c9ffd3;
+  --pk-card-ink: #c9ffd3;
+  --pk-card-ink-muted: rgba(201, 255, 211, 0.72);
+  margin: 16px 16px 24px;
+  border: 0;
+  border-radius: 16px / 20px;
+  background:
+    repeating-linear-gradient(180deg, rgba(99, 240, 126, 0.05) 0 1px, transparent 1px 3px),
+    radial-gradient(110% 100% at 50% 45%, #0f2012 0%, #081208 60%, #030603 100%);
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 2px #020402,
+    0 0 0 4px #9c9485,
+    0 0 0 16px var(--lnp-beige),
+    0 0 0 17px #8c846f,
+    0 0 0 18px #efe8d4,
+    0 22px 0 18px #b9b094,
+    0 30px 30px 18px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  bottom: -20px;
+  width: 10px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--lnp-phosphor);
+  box-shadow: 0 0 8px var(--lnp-phosphor), -22px 0 0 -1px #8c846f, -36px 0 0 -1px #8c846f;
+  pointer-events: none;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt__kicker {
+  font-family: 'LAN VT323', ui-monospace, monospace;
+  font-size: var(--fs-md);
+  letter-spacing: 0.08em;
+  color: #ffc46b;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt__kicker::before {
+  content: 'C:\\QUIZ> ' / '';
+  color: var(--lnp-phosphor);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt__text {
+  font-family: 'LAN VT323', ui-monospace, monospace;
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 10px rgba(99, 240, 126, 0.55);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt--lg .pk-prompt__text {
+  font-size: clamp(1.5rem, 3vw + 0.6rem, 2.9rem);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt--md .pk-prompt__text {
+  font-size: clamp(1.3rem, 2vw + 0.6rem, 2.1rem);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt .pk-chip {
+  border-radius: 2px;
+  color: #c9ffd3;
+  background: rgba(99, 240, 126, 0.08);
+  border-color: rgba(99, 240, 126, 0.45);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-prompt[data-tone='final'] {
+  --mat-card-ink: #ffe0b0;
+  --pk-card-ink: #ffe0b0;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 169, 77, 0.05) 0 1px, transparent 1px 3px),
+    radial-gradient(110% 100% at 50% 45%, #241a0c 0%, #120d05 60%, #060402 100%);
+}
+/* Keycaps: beige plastic with a dished top face; the answer colour is the coloured cap. */
+:root[data-theme='lan-party'] .pk-stage .pk-answer {
+  --mat-card-ink: #1a1712;
+  --pk-card-ink: #1a1712;
+  border: 1px solid #6d6655;
+  border-radius: 10px;
+  background:
+    radial-gradient(120% 90% at 50% 30%, #f4eedd, #e3dbc4 70%),
+    #e3dbc4;
+  box-shadow:
+    inset 0 0 0 5px rgba(255, 255, 255, 0.0),
+    inset 0 -8px 0 #c3b999,
+    inset 0 -9px 0 #a89e80,
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    0 3px 0 #6d6655,
+    0 8px 14px rgba(0, 0, 0, 0.5);
+  padding-bottom: 16px;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer__badge {
+  border-radius: 7px;
+  color: #14120e;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--slot) 72%, #fff), var(--slot));
+  box-shadow:
+    inset 0 -4px 0 color-mix(in srgb, var(--slot) 65%, #000),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer__letter {
+  font-family: 'LAN VT323', ui-monospace, monospace;
+  font-size: 1.6rem;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 -8px 0 #c3b999,
+    inset 0 -9px 0 #a89e80,
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    0 4px 0 #6d6655,
+    0 0 18px color-mix(in srgb, var(--slot) 40%, transparent);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 -4px 0 #c3b999,
+    inset 0 -5px 0 #a89e80,
+    0 0 0 #6d6655;
+}
+/* Held-down key: pressed in, slot-coloured glow + ring. */
+:root[data-theme='lan-party'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  transform: translateY(3px);
+  border-color: #14120e;
+  background:
+    radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--slot) 22%, #f4eedd), color-mix(in srgb, var(--slot) 18%, #e3dbc4) 70%);
+  box-shadow:
+    inset 0 -4px 0 #c3b999,
+    inset 0 -5px 0 #a89e80,
+    0 0 0 3px var(--slot),
+    0 0 22px color-mix(in srgb, var(--slot) 55%, transparent);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer[data-state='correct'] {
+  border-color: #14120e;
+  background: radial-gradient(120% 90% at 50% 30%, #e6fbe0, #c8ecc0 70%);
+  box-shadow:
+    inset 0 -8px 0 #9fcf95,
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    0 0 0 3px var(--lnp-phosphor),
+    0 0 26px rgba(99, 240, 126, 0.55);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer[data-state='wrong'] {
+  border-color: #14120e;
+  box-shadow:
+    inset 0 -8px 0 #c3b999,
+    0 0 0 3px #ff5a4d,
+    0 0 18px rgba(255, 90, 77, 0.4);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer[data-state='correct'] .pk-answer__mark {
+  color: #17692a;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer[data-state='wrong'] .pk-answer__mark {
+  color: #b3261c;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-answer__bar {
+  background: color-mix(in srgb, var(--slot) 26%, transparent);
+}
+/* Vote cards: printouts on tractor-feed paper. */
+:root[data-theme='lan-party'] .pk-stage .pk-vote {
+  --mat-card-ink: #1a1712;
+  --pk-card-ink: #1a1712;
+  --pk-card-ink-muted: rgba(26, 23, 18, 0.72);
+  color: #1a1712;
+  border: 0;
+  border-radius: 0;
+  padding-inline: calc(var(--sp-4) + 14px);
+  background:
+    radial-gradient(circle at 7px 12px, #121310 0 3.5px, transparent 4px) 0 0 / 14px 24px repeat-y,
+    radial-gradient(circle at 7px 12px, #121310 0 3.5px, transparent 4px) 100% 0 / 14px 24px repeat-y,
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 80%, #000) 0 4px, transparent 4px),
+    repeating-linear-gradient(180deg, #f6f1e4 0 24px, #e3eedc 24px 48px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-vote[data-picked='true'] {
+  box-shadow:
+    0 0 0 3px var(--slot),
+    0 0 22px color-mix(in srgb, var(--slot) 45%, transparent);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-vote[data-winner='true'] {
+  box-shadow:
+    0 0 0 3px #ffd23f,
+    0 0 24px rgba(255, 210, 63, 0.4);
+}
+/* Progress bar = file-copy progress; readouts in phosphor. */
+:root[data-theme='lan-party'] .pk-stage .pk-timerbar {
+  height: 14px;
+  border-radius: 0;
+  background: #060a06;
+  border: 2px solid #9c9485;
+}
+:root[data-theme='lan-party'] .pk-stage .pk-timerbar__fill {
+  background: repeating-linear-gradient(90deg, var(--lnp-phosphor) 0 8px, transparent 8px 11px);
+  box-shadow: 0 0 8px rgba(99, 240, 126, 0.5);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background: repeating-linear-gradient(90deg, #ffa94d 0 8px, transparent 8px 11px);
+}
+:root[data-theme='lan-party'] .pk-stage :is(.pk-row__score, .pk-strip__count, .pk-standing__score) {
+  color: var(--lnp-phosphor);
+  text-shadow: 0 0 8px rgba(99, 240, 126, 0.45);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-interstitial__icon {
+  border-radius: 12px;
+  border: 0;
+  background: radial-gradient(110% 100% at 50% 45%, #0f2012, #030603);
+  color: var(--lnp-phosphor);
+  box-shadow: 0 0 0 3px #9c9485, 0 0 0 10px var(--lnp-beige), 0 0 0 11px #8c846f, 0 12px 20px 10px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='lan-party'] .pk-stage .pk-podium__block {
+  border-radius: 8px 8px 2px 2px;
+  box-shadow:
+    inset 0 -6px 0 rgba(0, 0, 0, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 0 20px color-mix(in srgb, var(--player) 30%, transparent);
+}
+@media (max-width: 560px) {
+  :root[data-theme='lan-party'] .pk-stage .pk-prompt {
+    margin: 10px 10px 18px;
+    box-shadow:
+      inset 0 0 30px rgba(0, 0, 0, 0.8),
+      0 0 0 3px #9c9485,
+      0 0 0 10px var(--lnp-beige),
+      0 0 0 11px #8c846f,
+      0 14px 0 11px #b9b094,
+      0 20px 20px 11px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme='lan-party'] .pk-stage .pk-prompt::after {
+    right: 4px;
+    bottom: -13px;
+  }
+}
+/* Beige podium blocks (PC-case plastic): dark place numbers so they read on the light plastic. */
+:root[data-theme='lan-party'] .pk-stage .pk-podium__place {
+  color: #1a1712;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+/* DASterpiece: entries shown on a wall of beige monitors (paper stays paper inside the bezel). */
+:root[data-theme='lan-party'] [data-game='masterpiece'] .mp-exhibit__frame {
+  padding: 10px 10px 16px;
+  background:
+    radial-gradient(circle at calc(100% - 14px) calc(100% - 8px), #63f07e 0 2px, transparent 3px),
+    linear-gradient(180deg, #efe8d4, #d8cfb5 60%, #b9b094);
+}
+:root[data-theme='lan-party'] [data-game='masterpiece'] .mp-exhibit__hit {
+  box-shadow: inset 0 0 0 2px #6d6655, inset 0 0 22px rgba(0, 0, 0, 0.12);
+}
+:root[data-theme='lan-party'] [data-game='masterpiece'] .mp-placard {
+  border: 0;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px #9c9485,
+    0 0 0 12px #d8cfb5,
+    0 0 0 13px #8c846f,
+    0 18px 24px 13px rgba(0, 0, 0, 0.5);
+  margin: 14px;
+}

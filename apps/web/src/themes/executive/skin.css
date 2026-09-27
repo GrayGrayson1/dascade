@@ -1,0 +1,2091 @@
+/* =====================================================================
+ * Executive Edition — structural skin.
+ * A ridiculous 1990s corner office: polished mahogany, engraved brass nameplates, green banker
+ * lamps, leather, heavy conference tables, bad presentation gradients and fax-machine seriousness.
+ * Every rule is scoped under :root[data-theme='executive'] (dc-* component restyles use
+ * :where(:root[data-theme='executive']) so they never out-rank a game's own classes).
+ * Heavy chrome on desktop; slim on phones (see the responsive block at the end).
+ * ===================================================================== */
+
+:root[data-theme='executive'] {
+  --ex-brass: #c9a24a;
+  --ex-brass-hi: #f0d78e;
+  --ex-brass-lo: #8a6a32;
+  --ex-brass-dk: #5e4418;
+  --ex-ink: #2a1806;
+  --ex-cream: #f6ecd6;
+  --ex-paper: #f3e9d0;
+  --ex-green: #1f5a3c;
+  --ex-green-hi: #3f8f5f;
+  --ex-mahog: #4a2714;
+  --ex-mahog-dk: #1e0f08;
+  --ex-leather: #2a1510;
+  --ex-plate: linear-gradient(180deg, #f3dc98 0%, #d8b560 38%, #b8923f 52%, #a88638 70%, #c9a24a 100%);
+  --ex-plate-shadow: inset 0 1px 0 rgba(255, 246, 214, 0.7), inset 0 -1px 0 rgba(60, 40, 10, 0.55), 0 1px 0 rgba(0, 0, 0, 0.5);
+  --ex-engrave: 0 1px 0 rgba(255, 240, 200, 0.55);
+  --ex-screws:
+    radial-gradient(circle at 9px 50%, #7a5a20 0 2px, #f6e6b8 2.5px 3px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 9px) 50%, #7a5a20 0 2px, #f6e6b8 2.5px 3px, transparent 3.5px);
+  --ex-wood:
+    repeating-linear-gradient(97deg, rgba(255, 205, 140, 0.03) 0 3px, rgba(0, 0, 0, 0.06) 3px 9px, rgba(255, 205, 140, 0.02) 9px 14px, rgba(0, 0, 0, 0.035) 14px 23px),
+    linear-gradient(180deg, #5a2e16, #3e2010 60%, #2f180b);
+  --ex-serif: 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', Georgia, 'Times New Roman', serif;
+  --af-ink-0: #f6ecd6;
+  --af-ink-1: #e6d6b4;
+  --af-ink-2: #c9b38c;
+  --af-ink-3: #b09a74;
+  --entry-backdrop: #140a06;
+  --picker-backdrop: transparent;
+  --arcade-floor-bg: transparent;
+}
+
+/* The floor, title screen and picker declare their own art inks; retint them to cream/parchment. */
+:root[data-theme='executive'] :is(.af-floor, .af-entry, .cp) {
+  --af-ink-0: #f6ecd6;
+  --af-ink-1: #e6d6b4;
+  --af-ink-2: #c9b38c;
+  --af-ink-3: #b09a74;
+}
+
+/* ---------- Base ---------- */
+:root[data-theme='executive'] body {
+  background: #160b07;
+}
+:root[data-theme='executive'] ::selection {
+  background: var(--ex-brass);
+  color: var(--ex-ink);
+}
+
+/* ---------- Typography ---------- */
+:where(:root[data-theme='executive']) .dc-title {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ex-cream);
+}
+:where(:root[data-theme='executive']) .dc-label,
+:where(:root[data-theme='executive']) .dc-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ex-brass);
+}
+:where(:root[data-theme='executive']) .dc-neon {
+  color: var(--ex-brass-hi);
+  text-shadow: none;
+}
+/* Pixel-font words become engraved serif type (the accessible text is already in the DOM). */
+:where(:root[data-theme='executive']) :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) > .af-pw {
+  display: none;
+}
+:where(:root[data-theme='executive']) :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) > .visually-hidden {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+:root[data-theme='executive'] :is(.af-plaque__title, .cp__title, .cp-detail__title, .af-entry__title) {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  color: var(--ex-cream);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- Buttons ---------- */
+:where(:root[data-theme='executive']) .dc-btn {
+  font-weight: 700;
+  text-transform: none;
+  box-shadow:
+    0 0 0 1px var(--btn-edge),
+    inset 0 1px 0 var(--button-bevel-hi),
+    inset 0 -2px 0 var(--button-bevel-lo),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+}
+:where(:root[data-theme='executive']) .dc-btn--primary,
+:where(:root[data-theme='executive']) .dc-btn--gold {
+  background: var(--ex-plate);
+  text-shadow: var(--ex-engrave);
+  box-shadow:
+    0 0 0 1px var(--ex-brass-dk),
+    var(--ex-plate-shadow),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 18px var(--btn-glow);
+}
+:where(:root[data-theme='executive']) .dc-btn--primary:hover:not(:disabled),
+:where(:root[data-theme='executive']) .dc-btn--gold:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.05);
+}
+:where(:root[data-theme='executive']) .dc-btn--ghost {
+  box-shadow: none;
+  text-shadow: none;
+}
+:where(:root[data-theme='executive']) .dc-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 228, 180, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(201, 162, 74, 0.35);
+}
+:where(:root[data-theme='executive']) .dc-btn:focus-visible {
+  outline: 2px solid var(--ex-brass-hi);
+  outline-offset: 3px;
+}
+
+/* ---------- Panels: polished mahogany, engraved brass nameplates ---------- */
+:where(:root[data-theme='executive']) .dc-panel {
+  color: var(--ex-cream);
+}
+:where(:root[data-theme='executive']) .dc-panel__header {
+  position: relative;
+  min-height: 34px;
+  margin: 8px 10px 0;
+  padding: 4px 8px 4px 22px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--ex-screws), var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow);
+}
+:where(:root[data-theme='executive']) .dc-panel__title {
+  font-weight: 700;
+  color: var(--ex-ink);
+  text-shadow: var(--ex-engrave);
+}
+:where(:root[data-theme='executive']) .dc-panel__header .dc-btn {
+  color: var(--ex-ink);
+  background: transparent;
+  box-shadow: none;
+  text-shadow: var(--ex-engrave);
+  margin: 0;
+}
+:where(:root[data-theme='executive']) .dc-panel__header .dc-btn:hover:not(:disabled) {
+  background: rgba(255, 246, 214, 0.35);
+}
+:where(:root[data-theme='executive']) .dc-panel--brackets::before,
+:where(:root[data-theme='executive']) .dc-panel--brackets::after {
+  display: none;
+}
+:where(:root[data-theme='executive']) .dc-modal[open] {
+  animation: ex-settle var(--dur-3) var(--ease-out);
+}
+:where(:root[data-theme='executive']) .dc-modal::backdrop {
+  background: radial-gradient(ellipse at 50% 30%, rgba(40, 20, 8, 0.55), rgba(8, 4, 2, 0.84));
+}
+:where(:root[data-theme='executive']) .dc-divider {
+  background: linear-gradient(90deg, transparent, var(--ex-brass-lo), transparent);
+}
+@keyframes ex-settle {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------- Form controls: leather wells, brass hardware ---------- */
+:where(:root[data-theme='executive']) :is(.dc-input, .dc-select, .dc-textarea) {
+  background-color: rgba(12, 6, 3, 0.72);
+}
+:where(:root[data-theme='executive']) .dc-select option {
+  background: #29140b;
+  color: var(--ex-cream);
+}
+:where(:root[data-theme='executive']) .dc-toggle__track {
+  border-radius: 12px;
+  border-color: var(--ex-brass-lo);
+  background: #120905;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+:where(:root[data-theme='executive']) .dc-toggle__thumb {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f6e6b8, #b8923f 60%, #6e5220);
+}
+:where(:root[data-theme='executive']) .dc-toggle input:checked + .dc-toggle__track {
+  background: var(--ex-green);
+  border-color: var(--ex-brass);
+}
+:where(:root[data-theme='executive']) .dc-toggle input:checked + .dc-toggle__track .dc-toggle__thumb {
+  background: radial-gradient(circle at 35% 30%, #fff4d0, #d8b560 55%, #8a6a32);
+  box-shadow: 0 0 6px rgba(240, 200, 110, 0.5);
+}
+:where(:root[data-theme='executive']) .dc-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  background: linear-gradient(90deg, var(--ex-brass) var(--fill), #120905 var(--fill));
+}
+:where(:root[data-theme='executive']) .dc-slider::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff4d0, #d8b560 55%, #8a6a32);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+:where(:root[data-theme='executive']) .dc-slider::-moz-range-thumb {
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff4d0, #d8b560 55%, #8a6a32);
+}
+:where(:root[data-theme='executive']) .dc-segmented {
+  padding: 3px;
+  border-color: var(--ex-brass-lo);
+  background: rgba(12, 6, 3, 0.6);
+}
+:where(:root[data-theme='executive']) .dc-segmented__item {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: var(--af-ink-1);
+}
+:where(:root[data-theme='executive']) .dc-segmented__item[aria-checked='true'],
+:where(:root[data-theme='executive']) .dc-segmented__item[aria-selected='true'] {
+  background: var(--ex-plate);
+  color: var(--ex-ink);
+  text-shadow: var(--ex-engrave);
+  box-shadow: var(--ex-plate-shadow);
+}
+:where(:root[data-theme='executive']) .dc-tab {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+:where(:root[data-theme='executive']) .dc-tab[aria-selected='true'] {
+  color: var(--ex-brass-hi);
+}
+:where(:root[data-theme='executive']) .dc-tab[aria-selected='true']::after {
+  height: 2px;
+  background: var(--ex-brass);
+  box-shadow: none;
+}
+/* Badges = small brass-rimmed plaques. */
+:where(:root[data-theme='executive']) .dc-badge {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--badge, var(--ex-brass)) 55%, #fff4e0);
+  background: rgba(12, 6, 3, 0.55);
+  border: 1px solid color-mix(in srgb, var(--badge, var(--ex-brass)) 55%, var(--ex-brass-lo));
+  border-radius: 2px;
+}
+:where(:root[data-theme='executive']) .dc-badge--solid {
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  border-color: var(--ex-brass-dk);
+}
+:where(:root[data-theme='executive']) .dc-kbd {
+  font-family: var(--font-ui);
+  color: var(--ex-cream);
+  background: linear-gradient(180deg, #4a2714, #2a1409);
+  border-color: var(--ex-brass-lo);
+}
+:where(:root[data-theme='executive']) .dc-avatar {
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, color-mix(in srgb, var(--player, var(--ex-brass)) 40%, #3a1c0c), #1e0f08);
+  box-shadow:
+    0 0 0 2px var(--ex-brass-lo),
+    0 0 0 3px var(--player, var(--ex-brass));
+}
+:where(:root[data-theme='executive']) .dc-progress {
+  height: 10px;
+  border-radius: 5px;
+  border-color: rgba(0, 0, 0, 0.6);
+  background: #120905;
+}
+:where(:root[data-theme='executive']) .dc-progress::after {
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f3dc98, #b8923f);
+  box-shadow: none;
+}
+:where(:root[data-theme='executive']) .dc-timer {
+  --tone: var(--ex-brass);
+  background: conic-gradient(var(--tone) calc(var(--p) * 360deg), #120905 0);
+  box-shadow: 0 0 0 1px var(--ex-brass-lo);
+}
+:where(:root[data-theme='executive']) .dc-timer::before {
+  background: radial-gradient(circle at 40% 35%, #f7f0de, #e3d6b8);
+}
+:where(:root[data-theme='executive']) .dc-timer span {
+  color: var(--ex-ink);
+}
+:where(:root[data-theme='executive']) .dc-timer[data-urgent='true'] {
+  --tone: var(--danger);
+}
+:where(:root[data-theme='executive']) .dc-spinner i {
+  border-radius: 50%;
+  background: var(--ex-brass);
+}
+:where(:root[data-theme='executive']) .dc-empty__icon {
+  color: var(--ex-brass);
+}
+
+/* ---------- Toasts = inter-office memos ---------- */
+:where(:root[data-theme='executive']) .dc-toast {
+  color: #2a1a0c;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 21px, rgba(120, 90, 40, 0.12) 21px 22px),
+    var(--ex-paper);
+  border: 1px solid #b8a27a;
+  border-left: 5px solid var(--tone);
+  border-radius: 1px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  backdrop-filter: none;
+}
+:where(:root[data-theme='executive']) .dc-toast__close {
+  color: #5a4630;
+}
+:where(:root[data-theme='executive']) .dc-toast__close:hover {
+  color: #2a1a0c;
+  background: rgba(120, 90, 40, 0.12);
+}
+:where(:root[data-theme='executive']) .dc-toast {
+  --tone: #2c5f7a;
+}
+:where(:root[data-theme='executive']) .dc-toast[data-kind='success'] {
+  --tone: #1f6a3c;
+}
+:where(:root[data-theme='executive']) .dc-toast[data-kind='warning'] {
+  --tone: #9a6a00;
+}
+:where(:root[data-theme='executive']) .dc-toast[data-kind='error'] {
+  --tone: #9a1f1a;
+}
+
+/* =====================================================================
+ * Shell: top bar = walnut desk strip with a brass rule
+ * ===================================================================== */
+:root[data-theme='executive'] .topbar {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 205, 140, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 7px),
+    linear-gradient(180deg, #2e170c, #1d0e07);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='executive'] .topbar__title {
+  font-family: var(--ex-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ex-brass-hi);
+  text-shadow: none;
+}
+:root[data-theme='executive'] .topbar__cabinet,
+:root[data-theme='executive'] .topbar__sep {
+  color: var(--af-ink-2);
+}
+:root[data-theme='executive'] .code-chip {
+  color: var(--ex-cream);
+  background: rgba(12, 6, 3, 0.6);
+  border: 1px solid var(--ex-brass-lo);
+  border-radius: 2px;
+}
+:root[data-theme='executive'] .code-chip:hover {
+  border-color: var(--ex-brass);
+  background: rgba(40, 20, 8, 0.8);
+}
+:root[data-theme='executive'] .code-chip__label {
+  font-family: var(--ex-serif);
+  letter-spacing: 0.12em;
+  color: var(--ex-brass);
+}
+:root[data-theme='executive'] .code-chip__code {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .topbar__count {
+  font-family: var(--font-ui);
+  color: var(--af-ink-1);
+}
+
+/* =====================================================================
+ * Arcade floor = the corner office
+ * ===================================================================== */
+:root[data-theme='executive'] .af-floor .dc-btn {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+:root[data-theme='executive'] .af-floor .dc-btn--xl {
+  font-size: 18px;
+}
+:root[data-theme='executive'] .af-hud {
+  background:
+    linear-gradient(180deg, rgba(20, 10, 5, 0.96), rgba(20, 10, 5, 0.82) 70%, rgba(20, 10, 5, 0));
+}
+/* The DASCADE lockup becomes a brass desk nameplate. */
+:root[data-theme='executive'] .af-hud__logo {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 22px 7px;
+  border-radius: 2px;
+  background: var(--ex-screws), var(--ex-plate);
+  box-shadow:
+    var(--ex-plate-shadow),
+    0 0 0 3px #2a1409,
+    0 0 0 4px rgba(201, 162, 74, 0.35),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .af-hud__logo::before {
+  content: 'DASCADE';
+  content: 'DASCADE' / '';
+  font-family: var(--ex-serif);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  margin-right: -0.34em;
+  line-height: 1;
+  color: var(--ex-ink);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .af-hud__word {
+  display: none;
+}
+:root[data-theme='executive'] .af-hud__sub {
+  font-family: var(--ex-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #2e1e08;
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .af-hud__badge {
+  margin-left: 12px;
+  padding: 3px 8px;
+  font-family: var(--ex-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--ex-brass);
+  border: 1px solid var(--ex-brass-lo);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+:root[data-theme='executive'] .af-hud__brand {
+  display: flex;
+  align-items: center;
+}
+:root[data-theme='executive'] .af-srv {
+  font-family: var(--font-tech);
+  color: var(--af-ink-1);
+  background: rgba(12, 6, 3, 0.7);
+  border-color: rgba(201, 162, 74, 0.3);
+  border-radius: 2px;
+}
+:root[data-theme='executive'] .af-hud__profile {
+  color: var(--ex-cream);
+  background: linear-gradient(180deg, #3a1c0c, #24110a);
+  border-color: var(--ex-brass-lo);
+  border-radius: 3px;
+}
+:root[data-theme='executive'] .af-hud__profile:hover {
+  border-color: var(--ex-brass);
+  background: linear-gradient(180deg, #4a2714, #2a1409);
+}
+:root[data-theme='executive'] .af-hud__profile-name[data-empty='true'] {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .af-hud__icons .dc-btn {
+  color: var(--af-ink-1);
+}
+:root[data-theme='executive'] .af-hud__icons .dc-btn:hover:not(:disabled) {
+  color: var(--ex-brass-hi);
+}
+
+/* Tournament kiosk = a brass-framed boardroom directory plate. */
+:root[data-theme='executive'] .af-kiosk {
+  --k-led: var(--ex-brass-hi);
+  color: var(--ex-brass-hi);
+  background: var(--ex-wood);
+  border: 1px solid var(--ex-brass);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 2px #1e0f08,
+    inset 0 1px 0 rgba(255, 228, 180, 0.15),
+    0 8px 22px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .af-kiosk::before {
+  background:
+    linear-gradient(var(--ex-brass-lo), var(--ex-brass-lo)) left / 2px 100% no-repeat,
+    linear-gradient(var(--ex-brass-lo), var(--ex-brass-lo)) right / 2px 100% no-repeat;
+}
+:root[data-theme='executive'] .af-kiosk:hover {
+  border-color: var(--ex-brass-hi);
+  box-shadow:
+    inset 0 0 0 2px #1e0f08,
+    0 0 20px rgba(240, 200, 110, 0.2),
+    0 8px 22px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .af-kiosk__trophy {
+  color: var(--ex-brass-hi);
+  background: none;
+  filter: drop-shadow(0 1px 0 #000);
+}
+:root[data-theme='executive'] .af-kiosk__title {
+  font-family: var(--ex-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ex-brass-hi);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme='executive'] .af-kiosk__track {
+  font-family: var(--font-tech);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ffb84a;
+  text-shadow: 0 0 6px rgba(255, 160, 40, 0.45);
+}
+:root[data-theme='executive'] .af-kiosk__track span::after {
+  content: '▲';
+  content: '▲' / '';
+  color: #5fd07a;
+  font-size: 8px;
+}
+:root[data-theme='executive'] .af-kiosk__go {
+  color: var(--ex-brass-hi);
+}
+
+/* Lineup: cabinets stand on the office carpet under the lamp light. */
+:root[data-theme='executive'] .af-lineup::before {
+  display: none;
+}
+:root[data-theme='executive'] .af-cab__halo {
+  background: radial-gradient(closest-side, rgba(255, 214, 140, 0.35), transparent 70%);
+}
+:root[data-theme='executive'] .af-cab__sparks {
+  display: none;
+}
+:root[data-theme='executive'] .af-cab__name {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--af-ink-1);
+}
+:root[data-theme='executive'] .af-cab__family {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ex-brass);
+}
+:root[data-theme='executive'] .af-cab__family b {
+  color: var(--af-ink-2);
+}
+:root[data-theme='executive'] .af-slot[data-active='true'] .af-cab__name {
+  color: var(--ex-ink);
+  padding: 2px 12px;
+  border-radius: 2px;
+  background: var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow), 0 3px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .af-lineup__pager i {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(201, 162, 74, 0.3);
+}
+:root[data-theme='executive'] .af-lineup__pager i[data-on='true'] {
+  background: var(--ex-brass-hi);
+}
+
+/* Plaque = a mahogany desk panel with a brass rim and an engraved kicker. */
+:root[data-theme='executive'] .af-plaque {
+  background:
+    radial-gradient(120% 140% at 50% 0%, rgba(255, 214, 140, 0.08), transparent 55%),
+    var(--ex-wood);
+  border: 1px solid var(--ex-brass);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 3px #1e0f08,
+    inset 0 0 0 4px rgba(201, 162, 74, 0.4),
+    inset 0 1px 0 rgba(255, 228, 180, 0.12),
+    0 22px 50px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .af-plaque::before,
+:root[data-theme='executive'] .af-plaque::after {
+  display: none;
+}
+:root[data-theme='executive'] .af-plaque__kicker {
+  display: inline-block;
+  width: fit-content;
+  padding: 2px 10px;
+  font-family: var(--ex-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  border-radius: 1px;
+  box-shadow: var(--ex-plate-shadow);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .af-plaque__count {
+  color: #2b1a07;
+  opacity: 1;
+}
+:root[data-theme='executive'] .af-plaque__title {
+  font-size: clamp(22px, 2.1vw, 32px);
+}
+:root[data-theme='executive'] .af-plaque__tagline {
+  font-style: italic;
+  font-family: var(--ex-serif);
+  color: var(--af-ink-1);
+}
+:root[data-theme='executive'] .af-plaque__desc {
+  color: var(--af-ink-1);
+}
+:root[data-theme='executive'] .af-plaque__games li {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: var(--ex-cream);
+  background: rgba(12, 6, 3, 0.55);
+  border-color: rgba(201, 162, 74, 0.45);
+  border-radius: 2px;
+}
+
+/* Footer: a fax-machine / stock-ticker readout. */
+:root[data-theme='executive'] .af-foot {
+  color: var(--af-ink-2);
+}
+:root[data-theme='executive'] .af-ticker {
+  display: inline-flex;
+  gap: 18px;
+  padding: 4px 12px;
+  font-family: var(--font-tech);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ffb84a;
+  background: #0b0704;
+  border: 1px solid #3a2a1a;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 6px rgba(255, 160, 40, 0.35);
+}
+:root[data-theme='executive'] .af-ticker__item::before {
+  content: '▲';
+  content: '▲' / '';
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 9px;
+  color: #5fd07a;
+}
+:root[data-theme='executive'] .af-ticker__item:nth-child(3n)::before {
+  content: '▼';
+  content: '▼' / '';
+  color: #e0625b;
+}
+
+/* =====================================================================
+ * Picker ("Select a portfolio") and title screen
+ * ===================================================================== */
+:root[data-theme='executive'] .cp .dc-btn,
+:root[data-theme='executive'] .af-entry .dc-btn {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+:root[data-theme='executive'] .cp .cp-item {
+  background: linear-gradient(90deg, rgba(58, 30, 16, 0.94), rgba(30, 15, 8, 0.94));
+  border: 1px solid rgba(201, 162, 74, 0.28);
+  border-left: 4px solid var(--ex-brass-lo);
+  border-radius: 3px;
+}
+:root[data-theme='executive'] .cp .cp-item:hover,
+:root[data-theme='executive'] .cp .cp-item.is-selected {
+  background: linear-gradient(90deg, rgba(90, 46, 22, 0.96), rgba(40, 20, 10, 0.96));
+  border-color: var(--ex-brass);
+  border-left-color: var(--ex-brass-hi);
+  box-shadow: 0 0 22px rgba(240, 200, 110, 0.12), 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='executive'] .cp .cp-item.is-selected::before {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .cp .cp-item__title {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+:root[data-theme='executive'] .cp .cp-item__meta {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+:root[data-theme='executive'] .cp .cp-item__players {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .cp .cp-item__go {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .cp .cp__preview {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 214, 140, 0.08), transparent 60%),
+    var(--ex-wood);
+  border: 1px solid var(--ex-brass);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 3px #1e0f08,
+    inset 0 0 0 4px rgba(201, 162, 74, 0.4),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .cp .cp-screen {
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 3px #140a06,
+    0 0 0 6px var(--ex-brass),
+    0 0 0 7px var(--ex-brass-dk),
+    0 16px 30px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='executive'] .cp .cp-detail__kicker,
+:root[data-theme='executive'] .cp .cp__label {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ex-brass);
+}
+:root[data-theme='executive'] .cp .cp__crumbs ol {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+}
+:root[data-theme='executive'] .cp .cp__family {
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .cp .cp__marquee,
+:root[data-theme='executive'] .af-entry__marquee {
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3a1c0c, #1e0f08);
+  box-shadow:
+    0 0 0 1px var(--ex-brass),
+    0 0 0 4px #1e0f08,
+    0 0 0 5px rgba(201, 162, 74, 0.4),
+    0 12px 26px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='executive'] .cp .cp__tourney {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: var(--ex-brass-hi);
+  background: var(--ex-wood);
+  border: 1px solid var(--ex-brass);
+  border-radius: 3px;
+  text-shadow: none;
+}
+:root[data-theme='executive'] .cpb {
+  display: none;
+}
+/* Title screen: the attract art behind smoked glass in a mahogany frame; the coin card is a leather portfolio. */
+:root[data-theme='executive'] .af-entry__screen {
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 2px var(--ex-brass-lo),
+    0 0 0 clamp(0px, 0.9vw, 12px) #2a1409,
+    0 0 0 calc(clamp(0px, 0.9vw, 12px) + 1px) var(--ex-brass);
+}
+:root[data-theme='executive'] .af-entry__kicker {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--ex-brass);
+  text-shadow: none;
+}
+:root[data-theme='executive'] .af-entry__tagline {
+  font-family: var(--ex-serif);
+  font-style: italic;
+  color: var(--ex-brass-hi);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .af-entry__controls {
+  background: rgba(12, 6, 3, 0.62);
+  border-color: rgba(201, 162, 74, 0.25);
+  border-left-color: var(--ex-brass);
+}
+:root[data-theme='executive'] .af-entry__label {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--ex-brass);
+}
+:root[data-theme='executive'] .af-entry__card {
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 214, 140, 0.06), transparent 60%),
+    repeating-linear-gradient(35deg, rgba(255, 255, 255, 0.012) 0 2px, rgba(0, 0, 0, 0.03) 2px 4px),
+    linear-gradient(180deg, #2e1712, #1c0d09);
+  border: 1px solid var(--ex-brass-lo);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 5px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 6px rgba(201, 162, 74, 0.28),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .af-entry__card::before,
+:root[data-theme='executive'] .af-entry__card::after {
+  display: none;
+}
+:root[data-theme='executive'] .af-entry__card-head {
+  margin: 12px 14px 0;
+  padding: 7px 14px 7px 24px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--ex-screws), var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow);
+}
+:root[data-theme='executive'] .af-entry__card-head h2 {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--ex-ink);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .af-entry__slot {
+  display: none;
+}
+:root[data-theme='executive'] .af-entry__credit {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: #4a3212;
+}
+:root[data-theme='executive'] .af-entry__hint .dc-icon {
+  color: var(--ex-brass);
+}
+
+/* =====================================================================
+ * Lobby = the conference room; results = the performance review
+ * ===================================================================== */
+:root[data-theme='executive'] .lobby-hero__title,
+:root[data-theme='executive'] .lobby-hero__name {
+  font-family: var(--ex-serif);
+  color: var(--ex-cream);
+}
+:root[data-theme='executive'] .shell-crumb {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+}
+:root[data-theme='executive'] .lobby-code__value span {
+  font-family: var(--ex-serif);
+  color: var(--ex-ink);
+  text-shadow: var(--ex-engrave);
+  background: var(--ex-plate);
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 2px;
+  box-shadow: var(--ex-plate-shadow), 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+/* The player list is the conference table: polished top, brass seat plates. */
+:root[data-theme='executive'] .player-list {
+  padding: 8px;
+  border-radius: 40px / 22px;
+  background:
+    radial-gradient(90% 60% at 50% 30%, rgba(255, 214, 140, 0.12), transparent 70%),
+    var(--ex-wood);
+  box-shadow:
+    inset 0 0 0 2px #1e0f08,
+    inset 0 0 0 3px rgba(201, 162, 74, 0.35),
+    inset 0 10px 24px rgba(0, 0, 0, 0.35),
+    0 10px 24px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='executive'] .player-list__item {
+  background: rgba(12, 6, 3, 0.35);
+  border-color: rgba(201, 162, 74, 0.18);
+  border-radius: 3px;
+}
+:root[data-theme='executive'] .ready-pill {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+}
+:root[data-theme='executive'] .ready-pill--on {
+  color: #d9f5e2;
+  background: var(--ex-green);
+  border-color: var(--ex-green-hi);
+}
+:root[data-theme='executive'] .lobby__actions {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 205, 140, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 7px),
+    linear-gradient(180deg, #2a1409, #1a0c06);
+  border-top: 1px solid var(--ex-brass-lo);
+}
+:root[data-theme='executive'] .chat__name {
+  font-family: var(--ex-serif);
+  color: var(--chat-name, var(--ex-brass-hi));
+}
+:root[data-theme='executive'] .results-shell__header {
+  position: relative;
+}
+:root[data-theme='executive'] .results-shell__title {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ex-cream);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='executive'] .results-shell__subtitle {
+  font-family: var(--ex-serif);
+  font-style: italic;
+}
+:root[data-theme='executive'] .countdown-overlay__num {
+  font-family: var(--ex-serif);
+  color: var(--ex-brass-hi);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* =====================================================================
+ * Tournament Center = "Tournament Operations Dashboard" — with a proper 1995 slide deck.
+ * ===================================================================== */
+:root[data-theme='executive'] .tc-center {
+  background: transparent;
+}
+:root[data-theme='executive'] .tc-top__crumb {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: var(--ex-brass-hi);
+  text-shadow: none;
+}
+/* The hero is the title slide: a deep blue presentation gradient, yellow drop-shadowed headline,
+   inside a heavy mahogany frame with a brass fillet. */
+:root[data-theme='executive'] .tc-hero {
+  background:
+    radial-gradient(60% 90% at 85% 10%, rgba(120, 200, 255, 0.25), transparent 60%),
+    linear-gradient(135deg, #061a4a 0%, #0f3f8a 45%, #1f6fa8 70%, #0a2a6b 100%);
+  border: 1px solid var(--ex-brass);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 6px #3a1c0c,
+    0 0 0 7px var(--ex-brass-lo),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .tc-marquee__title {
+  font-family: Arial, 'Helvetica Neue', Helvetica, 'Inter Variable', sans-serif;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: #ffe45c;
+  text-shadow:
+    3px 3px 0 #00123a,
+    4px 4px 6px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .tc-marquee__kicker {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #bfe2ff;
+  text-shadow: 1px 1px 0 #00123a;
+}
+:root[data-theme='executive'] .tc-marquee__sub {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #00123a;
+}
+:root[data-theme='executive'] .tc-join {
+  background: rgba(0, 10, 40, 0.45);
+  border: 1px solid rgba(191, 226, 255, 0.35);
+  border-radius: 2px;
+}
+:root[data-theme='executive'] .tc-join__label {
+  color: #bfe2ff;
+}
+:root[data-theme='executive'] .tc-board__title,
+:root[data-theme='executive'] .tc-how__title {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ex-cream);
+}
+:root[data-theme='executive'] .tc-board__title::after {
+  content: ' · Q4';
+  content: ' · Q4' / '';
+  color: var(--ex-brass);
+  font-size: 0.7em;
+  letter-spacing: 0.1em;
+}
+:root[data-theme='executive'] .tc-chip {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--af-ink-1);
+  background: rgba(12, 6, 3, 0.55);
+  border-color: rgba(201, 162, 74, 0.35);
+  border-radius: 2px;
+}
+:root[data-theme='executive'] .tc-chip:is([aria-pressed='true'], [aria-checked='true'], [aria-selected='true'], .tc-chip--on) {
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  border-color: var(--ex-brass-dk);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] .tc-row {
+  background: var(--ex-wood);
+  border-color: rgba(201, 162, 74, 0.3);
+  border-radius: 3px;
+}
+:root[data-theme='executive'] .tc-row:hover {
+  border-color: var(--ex-brass);
+}
+:root[data-theme='executive'] .tc-row__name {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+}
+:root[data-theme='executive'] .tc-match {
+  background: linear-gradient(180deg, #2e170c, #1e0f08);
+  border-color: rgba(201, 162, 74, 0.4);
+}
+:root[data-theme='executive'] .tc-slot__name {
+  font-family: var(--ex-serif);
+}
+:root[data-theme='executive'] .tc-canvas__lines {
+  color: var(--ex-brass);
+}
+:root[data-theme='executive'] .tb {
+  color: var(--ex-cream);
+  background: var(--ex-wood);
+  border: 1px solid var(--ex-brass);
+  border-radius: 3px;
+}
+
+/* =====================================================================
+ * Game chrome + kits
+ * ===================================================================== */
+/* Executive Chess / Checkers: the board rests on a mahogany desk with a brass fillet. */
+:root[data-theme='executive'] [data-part='game-stage'][data-game='chess'] [data-part='board'],
+:root[data-theme='executive'] [data-part='game-stage'][data-game='checkers'] [data-part='board'] {
+  box-shadow:
+    0 0 0 3px #2a1409,
+    0 0 0 5px var(--ex-brass),
+    0 0 0 6px var(--ex-brass-dk),
+    0 0 0 18px #4a2714,
+    0 0 0 19px rgba(201, 162, 74, 0.35),
+    0 30px 60px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] [data-part='clock'] {
+  font-family: var(--font-num);
+  color: #ffb84a;
+  background: #0b0704;
+  border-color: var(--ex-brass-lo);
+  text-shadow: 0 0 8px rgba(255, 160, 40, 0.35);
+}
+:root[data-theme='executive'] [data-part='scoreboard'] {
+  border-color: var(--ex-brass-lo);
+}
+
+/* =====================================================================
+ * Jukebox = the ridiculously expensive executive stereo
+ * ===================================================================== */
+:root[data-theme='executive'] [data-jukebox] {
+  --jb-bg: linear-gradient(180deg, #3e2010, #24110a);
+  --jb-fg: var(--ex-cream);
+  --jb-muted: #c9b38c;
+  --jb-border: var(--ex-brass);
+  --jb-radius: 4px;
+  --jb-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  --jb-blur: none;
+  --jb-accent: #ffb84a;
+  --jb-accent-2: #5fd07a;
+  --jb-font-title: var(--ex-serif);
+  --jb-font-label: var(--ex-serif);
+  --accent: #ffb84a;
+  --accent-2: #5fd07a;
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='panel'] {
+  color: var(--ex-cream);
+  background:
+    repeating-linear-gradient(97deg, rgba(255, 205, 140, 0.03) 0 3px, rgba(0, 0, 0, 0.06) 3px 9px),
+    linear-gradient(180deg, #4a2714, #2a1409);
+  border: 1px solid var(--ex-brass);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 4px #1e0f08,
+    inset 0 0 0 5px rgba(201, 162, 74, 0.35),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+/* A brushed-brass faceplate across the top. */
+:root[data-theme='executive'] [data-jukebox] :is([data-part='header'], [data-part='title-bar']) {
+  color: var(--ex-ink);
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.04) 1px 3px),
+    var(--ex-plate);
+  border-radius: 2px;
+  box-shadow: var(--ex-plate-shadow);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='title-bar'] {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='close'] {
+  color: var(--ex-ink);
+  background: transparent;
+  border: 0;
+}
+/* Amber vacuum-fluorescent display. */
+:root[data-theme='executive'] [data-jukebox] [data-part='display'] {
+  color: #ffb84a;
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 184, 74, 0.06), transparent 60%),
+    #0b0704;
+  border: 1px solid var(--ex-brass-lo);
+  border-radius: 3px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='track-title'] {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  color: #ffc766;
+  text-shadow: 0 0 8px rgba(255, 160, 40, 0.35);
+}
+:root[data-theme='executive'] [data-jukebox] :is([data-part='track-artist'], [data-part='time']) {
+  font-family: var(--font-tech);
+  color: #d99a3c;
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='art'] {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--ex-brass), 0 0 0 3px #1e0f08;
+}
+/* Round brass buttons. */
+:root[data-theme='executive'] [data-jukebox] :is([data-part='prev'], [data-part='play'], [data-part='next'], [data-part='mute'], [data-part='shuffle'], [data-part='repeat'], [data-part='mini-toggle'], [data-part='mini-next'], [data-part='mini-open']) {
+  color: var(--ex-ink);
+  background: radial-gradient(circle at 38% 30%, #fff1c4, #d8b560 45%, #8a6a32 100%);
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 214, 0.7),
+    0 2px 5px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] [data-jukebox] :is([data-part='shuffle'], [data-part='repeat'], [data-part='mute'])[aria-pressed='true'],
+:root[data-theme='executive'] [data-jukebox] [data-part='repeat']:not([data-mode='off']) {
+  box-shadow:
+    inset 0 2px 4px rgba(60, 40, 10, 0.6),
+    0 0 0 2px #5fd07a;
+}
+:root[data-theme='executive'] [data-jukebox] :is([data-part='track-list'], [data-part='queue']) {
+  background: rgba(12, 6, 3, 0.5);
+  border: 1px solid rgba(201, 162, 74, 0.28);
+  border-radius: 3px;
+}
+:root[data-theme='executive'] [data-jukebox] :is([data-part='track'], [data-part='queue-item']) {
+  font-family: var(--ex-serif);
+  border-bottom: 1px solid rgba(201, 162, 74, 0.12);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='track'][data-current] {
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='track'][data-current] * {
+  color: var(--ex-ink);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='tabs'] {
+  font-family: var(--ex-serif);
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='enable-audio'] {
+  color: #2a1a0c;
+  background: var(--ex-paper);
+  border: 1px solid #b8a27a;
+  border-radius: 1px;
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='mini'] {
+  color: var(--ex-cream);
+  background: linear-gradient(180deg, #4a2714, #2a1409);
+  border: 1px solid var(--ex-brass);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px #1e0f08, 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] [data-jukebox][data-dock='topbar'] [data-part='mini'] {
+  box-shadow: none;
+}
+:root[data-theme='executive'] [data-jukebox] [data-part='mini-title'] {
+  font-family: var(--ex-serif);
+  color: #ffc766;
+}
+
+/* =====================================================================
+ * Environment: wood-panelled office, brass chair rail, carpet, lamp light
+ * ===================================================================== */
+:root[data-theme='executive'] .ex-env {
+  position: absolute;
+  inset: 0;
+  background: #1c0d07;
+}
+:root[data-theme='executive'] .ex-env > i,
+:root[data-theme='executive'] .ex-env > canvas {
+  position: absolute;
+  display: block;
+}
+/* Raised panels: a stile every 180px with a recessed field and a warm top highlight. */
+:root[data-theme='executive'] .ex-env__wall {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 64%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0 3px, rgba(255, 210, 150, 0.06) 3px 5px, transparent 5px 175px, rgba(0, 0, 0, 0.3) 175px 180px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(0, 0, 0, 0.12) 18px 20px, rgba(255, 210, 150, 0.03) 20px 160px, rgba(0, 0, 0, 0.14) 160px 162px, transparent 162px 180px),
+    repeating-linear-gradient(97deg, rgba(255, 205, 140, 0.025) 0 3px, rgba(0, 0, 0, 0.05) 3px 9px, rgba(255, 205, 140, 0.015) 9px 14px),
+    linear-gradient(180deg, #2a1208, #45210f 45%, #3a1b0c 100%);
+}
+:root[data-theme='executive'] .ex-env__rail {
+  left: 0;
+  right: 0;
+  top: 64%;
+  height: 7px;
+  background: linear-gradient(180deg, #f0d78e, #b8923f 50%, #6e5220);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+/* Office carpet: deep green with a small woven diamond, darker toward the viewer. */
+:root[data-theme='executive'] .ex-env__carpet {
+  left: 0;
+  right: 0;
+  top: calc(64% + 7px);
+  bottom: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 22%, rgba(0, 0, 0, 0.35)),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 12px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 12px),
+    #173826;
+}
+:root[data-theme='executive'] .ex-env__lamps {
+  inset: 0;
+  background:
+    radial-gradient(34% 46% at 8% 12%, rgba(255, 206, 120, 0.2), transparent 70%),
+    radial-gradient(34% 46% at 92% 12%, rgba(255, 206, 120, 0.2), transparent 70%),
+    radial-gradient(40% 36% at 50% 0%, rgba(255, 220, 160, 0.1), transparent 70%);
+}
+:root[data-theme='executive'] .ex-env[data-fx='low'] .ex-env__lamps {
+  opacity: 0.7;
+}
+:root[data-theme='executive'] .ex-env__dust {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+}
+:root[data-theme='executive'] .ex-env__vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 90% 80% at 50% 42%, transparent 55%, rgba(6, 3, 1, 0.6) 100%);
+}
+:root[data-theme='executive'] .ex-env[data-place='game'] .ex-env__lamps {
+  opacity: 0.5;
+}
+
+/* Floor decor: banker's lamp (left) and a motivational print (right) on roomy screens. */
+:root[data-theme='executive'] .ex-decor {
+  display: none;
+}
+@media (min-width: 1680px) and (min-height: 760px) {
+  :root[data-theme='executive'] .ex-decor {
+    display: block;
+    position: absolute;
+    inset: 0;
+  }
+}
+:root[data-theme='executive'] .ex-lamp {
+  position: absolute;
+  left: clamp(14px, 1.6vw, 40px);
+  top: calc(64% - 150px);
+  width: 150px;
+  height: 190px;
+}
+:root[data-theme='executive'] .ex-lamp > i {
+  position: absolute;
+  display: block;
+}
+:root[data-theme='executive'] .ex-lamp__glow {
+  left: -60px;
+  right: -60px;
+  top: 40px;
+  height: 180px;
+  background: radial-gradient(50% 50% at 50% 30%, rgba(255, 214, 140, 0.28), transparent 70%);
+}
+:root[data-theme='executive'] .ex-decor[data-fx='off'] .ex-lamp__glow {
+  display: none;
+}
+:root[data-theme='executive'] .ex-lamp__shade {
+  left: 22px;
+  top: 30px;
+  width: 106px;
+  height: 34px;
+  border-radius: 53px 53px 8px 8px / 30px 30px 8px 8px;
+  background:
+    radial-gradient(60% 80% at 40% 20%, rgba(180, 255, 200, 0.35), transparent 60%),
+    linear-gradient(180deg, #2f8f5a, #125233 70%, #0c3a24);
+  box-shadow:
+    inset 0 -3px 0 #c9a24a,
+    0 8px 14px rgba(255, 214, 140, 0.18);
+}
+:root[data-theme='executive'] .ex-lamp__stem {
+  left: 72px;
+  top: 62px;
+  width: 6px;
+  height: 64px;
+  background: linear-gradient(90deg, #8a6a32, #f0d78e, #8a6a32);
+}
+:root[data-theme='executive'] .ex-lamp__base {
+  left: 44px;
+  top: 124px;
+  width: 62px;
+  height: 14px;
+  border-radius: 7px 7px 2px 2px;
+  background: linear-gradient(180deg, #f0d78e, #b8923f 50%, #6e5220);
+}
+:root[data-theme='executive'] .ex-lamp__table {
+  left: 0;
+  top: 138px;
+  width: 150px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--ex-wood);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 228, 180, 0.2),
+    0 30px 0 -8px #2a1409,
+    0 10px 20px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .ex-print {
+  position: absolute;
+  right: clamp(14px, 1.6vw, 40px);
+  top: calc(64% - 330px);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 150px;
+  padding: 12px 12px 14px;
+  text-align: center;
+  background: #0b0908;
+  box-shadow:
+    0 0 0 6px #6b4a22,
+    0 0 0 7px #c9a24a,
+    0 14px 26px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='executive'] .ex-print__art {
+  position: relative;
+  width: 100%;
+  height: 78px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1c3f6e, #c98f5a 80%, #3a2a1a 81%);
+}
+:root[data-theme='executive'] .ex-print__art i {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  height: 44%;
+  clip-path: polygon(0 100%, 30% 20%, 45% 55%, 62% 0, 100% 100%);
+  background: #1a120c;
+}
+:root[data-theme='executive'] .ex-print b {
+  font-family: var(--ex-serif);
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+  color: #f6ecd6;
+}
+:root[data-theme='executive'] .ex-print span {
+  font-family: var(--ex-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.3;
+  color: #c9b38c;
+}
+
+/* Jukebox decor: model badge + standby LED. */
+:root[data-theme='executive'] .ex-jbdecor {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+:root[data-theme='executive'] .ex-jbdecor__led {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8a1f1a;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .ex-jbdecor[data-playing='true'] .ex-jbdecor__led {
+  background: #5fd07a;
+  box-shadow: 0 0 6px rgba(95, 208, 122, 0.7);
+}
+:root[data-theme='executive'] .ex-jbdecor__badge {
+  padding: 1px 6px;
+  font-family: var(--ex-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  border-radius: 1px;
+  box-shadow: var(--ex-plate-shadow);
+  text-shadow: var(--ex-engrave);
+  white-space: nowrap;
+}
+
+/* =====================================================================
+ * Phones / small screens: keep the chrome slim so it never eats the screen.
+ * ===================================================================== */
+@media (max-width: 699px), (max-height: 540px) and (orientation: landscape) {
+  :where(:root[data-theme='executive']) .dc-panel__header {
+    min-height: 30px;
+    margin: 5px 6px 0;
+  }
+  :root[data-theme='executive'] .af-hud__logo {
+    padding: 4px 14px 5px;
+    box-shadow:
+      var(--ex-plate-shadow),
+      0 4px 10px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme='executive'] .af-hud__logo::before {
+    font-size: 15px;
+    letter-spacing: 0.24em;
+    margin-right: -0.24em;
+  }
+  :root[data-theme='executive'] .af-hud__sub,
+  :root[data-theme='executive'] .af-hud__badge {
+    display: none;
+  }
+  :root[data-theme='executive'] .af-plaque {
+    box-shadow:
+      inset 0 0 0 2px #1e0f08,
+      0 10px 24px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme='executive'] .tc-hero {
+    box-shadow:
+      0 0 0 3px #3a1c0c,
+      0 10px 24px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme='executive'] .player-list {
+    border-radius: 6px;
+  }
+  :root[data-theme='executive'] [data-part='game-stage'][data-game='chess'] [data-part='board'],
+  :root[data-theme='executive'] [data-part='game-stage'][data-game='checkers'] [data-part='board'] {
+    box-shadow:
+      0 0 0 2px #2a1409,
+      0 0 0 3px var(--ex-brass),
+      0 8px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+@media (max-width: 1599px) {
+  :root[data-theme='executive'] .af-hud__badge {
+    display: none;
+  }
+}
+@media (max-width: 1199px) {
+  :root[data-theme='executive'] .af-hud .dc-btn {
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+  :root[data-theme='executive'] .af-hud__sub {
+    display: none;
+  }
+  :root[data-theme='executive'] .af-hud__profile {
+    max-width: 180px;
+  }
+}
+@media (max-width: 699px), (max-height: 540px) and (orientation: landscape) {
+  :root[data-theme='executive'] .af-ticker {
+    display: none;
+  }
+  :root[data-theme='executive'] .af-plaque__kicker {
+    padding: 1px 7px;
+    letter-spacing: 0.1em;
+  }
+  :root[data-theme='executive'] .af-plaque__title {
+    font-size: 22px;
+  }
+  :root[data-theme='executive'] .af-plaque__games li {
+    min-height: 26px;
+    font-size: 12px;
+  }
+  :root[data-theme='executive'] .af-kiosk__title {
+    letter-spacing: 0.06em;
+  }
+  :root[data-theme='executive'] .af-floor .dc-btn {
+    letter-spacing: 0.06em;
+  }
+}
+
+/* Focus rings on this theme's pale title bars / plates: the default light ring measured < 3:1 there, so
+   controls inside them get a dark ring instead (a11y review). */
+:root[data-theme='executive'] [data-jukebox] [data-part='header'] {
+  --focus-ring: #2a1606;
+}
+
+/* =====================================================================
+ * SPORTS GAMES, EXECUTIVE EDITION — mahogany panels trimmed in brass, engraved brass plaques for
+ * the read-outs, brass keys, a green enamel FIRE button, a leather scorecard and one discreet
+ * department plaque per game. Playfields untouched; a thin mahogany/brass edge frames the view.
+ * ===================================================================== */
+:root[data-theme='executive'] [data-game='tanks'] .tk-glass,
+:root[data-theme='executive'] [data-game='circuit'] .ci-glass,
+:root[data-theme='executive'] [data-game='putt'] :is(.pt-plate, .pt-strokes, [data-part='scoreboard'], [data-part='controls']),
+:root[data-theme='executive'] [data-game='ships'] :is([data-part='hud'], [data-part='panel']) {
+  border: 2px solid var(--ex-brass);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(
+      92deg,
+      rgba(0, 0, 0, 0.06) 0 2px,
+      transparent 2px 7px,
+      rgba(255, 200, 150, 0.03) 7px 9px,
+      transparent 9px 15px
+    ),
+    linear-gradient(180deg, #4a2714, #2e170b);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 230, 160, 0.22),
+    0 0 0 1px var(--ex-mahog-dk),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='turn'].is-mine,
+:root[data-theme='executive'] [data-game='tanks'] [data-part='controls'][data-turn='mine'],
+:root[data-theme='executive'] [data-game='ships'] [data-part='hud'][data-turn='mine'],
+:root[data-theme='executive'] [data-game='ships'] .sh-panel--active {
+  border-color: var(--ex-brass-hi);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 230, 160, 0.35),
+    0 0 0 1px var(--ex-mahog-dk),
+    0 0 22px rgba(240, 215, 142, 0.3),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+}
+/* Brass keys. */
+:root[data-theme='executive'] [data-game='tanks'] .tk-hold {
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 4px;
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow);
+}
+:root[data-theme='executive'] [data-game='tanks'] .tk-hold:hover:not(:disabled) {
+  border-color: var(--ex-brass-dk);
+  background: linear-gradient(180deg, #f8e6b0 0%, #e0c070 40%, #c9a24a 60%, #d8b560 100%);
+}
+:root[data-theme='executive'] [data-game='tanks'] .tk-weapon__current {
+  border: 1px solid var(--ex-brass);
+  border-radius: 4px;
+  background: rgba(20, 10, 4, 0.6);
+}
+/* Engraved brass read-out plaques. */
+:root[data-theme='executive'] [data-game='tanks'] .tk-dial__value,
+:root[data-theme='executive'] [data-game='putt'] :is(.pt-dock__deg, .pt-strokes b),
+:root[data-theme='executive'] [data-game='circuit'] .ci-clock {
+  padding: 3px 10px 2px;
+  border-radius: 3px;
+  background: var(--ex-plate);
+  color: var(--ex-ink);
+  box-shadow: var(--ex-plate-shadow);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] [data-game='circuit'] .ci-clock {
+  border: 1px solid var(--ex-brass-dk);
+}
+:root[data-theme='executive'] [data-game='circuit'] .ci-clock svg {
+  color: var(--ex-ink);
+}
+:root[data-theme='executive'] [data-game='tanks'] .tk-dial__value b {
+  color: var(--ex-ink);
+  font-family: var(--font-num);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] [data-game='tanks'] .tk-dial__value small,
+:root[data-theme='executive'] [data-game='tanks'] .tk-dial__label {
+  color: #4a3212;
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: rgba(20, 10, 4, 0.7);
+  box-shadow: inset 0 0 0 1px var(--ex-brass-lo);
+}
+/* FIRE: green enamel in a brass bezel ("Approve"). */
+:root[data-theme='executive'] [data-game='tanks'] [data-part='fire'] {
+  border-radius: 8px;
+  color: var(--ex-cream);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 45%),
+    radial-gradient(circle at 50% 70%, #3f8f5f, #1f5a3c 60%, #0f3322);
+  box-shadow:
+    0 0 0 2px var(--ex-mahog-dk),
+    0 0 0 5px var(--ex-brass),
+    0 0 0 6px var(--ex-brass-dk),
+    0 8px 16px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  animation: none;
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='fire'] .tk-fire__label {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: exec-lamp 2.2s ease-in-out infinite;
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='fire']:disabled {
+  color: #c9b38c;
+  text-shadow: none;
+  background: linear-gradient(180deg, #3e2010, #24110a);
+}
+:root[data-theme='executive'] [data-game='tanks'] [data-part='fire'] .tk-fire__hint kbd {
+  background: rgba(0, 0, 0, 0.25);
+}
+:root[data-theme='executive'][data-reduced-motion='true'] [data-game='tanks'] [data-part='fire'][data-state='ready'] {
+  animation: none;
+}
+@keyframes exec-lamp {
+  50% {
+    filter: brightness(1.14) drop-shadow(0 0 10px rgba(95, 208, 122, 0.55));
+  }
+}
+/* Leather scorecard + summary folders (Putt). */
+:root[data-theme='executive'] [data-game='putt'] :is([data-part='summary'], [data-part='results']) {
+  background: radial-gradient(120% 80% at 30% 0%, rgba(255, 220, 170, 0.07), transparent 60%), linear-gradient(180deg, #3a1c12, #24110a);
+  border: 2px solid var(--ex-brass);
+  outline: 1px dashed rgba(240, 215, 142, 0.45);
+  outline-offset: -8px;
+}
+:root[data-theme='executive'] [data-game='putt'] [data-part='scorecard'] thead th {
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  text-shadow: var(--ex-engrave);
+}
+/* Mahogany edge with a brass inlay around the view. */
+:root[data-theme='executive'] [data-game='tanks'] [data-part='battlefield']::after,
+:root[data-theme='executive'] [data-game='putt'] [data-part='course']::after,
+:root[data-theme='executive'] [data-game='circuit'] [data-part='race']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 5px var(--ex-mahog),
+    inset 0 0 0 6px var(--ex-brass-lo),
+    inset 0 0 0 7px var(--ex-brass-hi),
+    inset 0 0 0 8px var(--ex-mahog-dk);
+}
+/* Ships: engraved plaque titles, brass-ringed sea charts. */
+:root[data-theme='executive'] [data-game='ships'] [data-part='panel'] .sh-panel__title {
+  padding: 2px 12px 1px;
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 2px;
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow);
+  text-shadow: var(--ex-engrave);
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+:root[data-theme='executive'] [data-game='ships'] [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px var(--ex-mahog-dk),
+    0 0 0 4px var(--ex-brass),
+    0 0 0 5px var(--ex-brass-dk),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] [data-game='ships'] .is-active [data-part='board-frame'] {
+  box-shadow:
+    0 0 0 2px var(--ex-mahog-dk),
+    0 0 0 4px var(--ex-brass-hi),
+    0 0 0 5px var(--ex-brass-dk),
+    0 0 20px rgba(240, 215, 142, 0.3),
+    inset 0 0 40px rgba(0, 0, 0, 0.45);
+}
+/* Circuit: brass start gantry, minimap in a brass bezel. */
+:root[data-theme='executive'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__rig {
+  border: 2px solid var(--ex-brass);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #4a2714, #2e170b);
+}
+:root[data-theme='executive'] [data-game='circuit'] [data-part='start-lights'] .ci-lights__title {
+  border: 1px solid var(--ex-brass-dk);
+  border-radius: 2px;
+  color: var(--ex-ink);
+  background: var(--ex-plate);
+  text-shadow: var(--ex-engrave);
+}
+:root[data-theme='executive'] [data-game='circuit'] [data-part='minimap'] {
+  border: 2px solid var(--ex-brass);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px var(--ex-mahog-dk),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+}
+/* Desktop: one discreet department plaque per game. */
+@media (min-width: 900px) and (min-height: 620px) {
+  :root[data-theme='executive'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch) {
+    position: relative;
+  }
+  :root[data-theme='executive'] [data-game='tanks'] .tk-deck:not(.tk-deck--watch)::before,
+  :root[data-theme='executive'] [data-game='putt'] [data-part='controls']::before,
+  :root[data-theme='executive'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: 'ARTILLERY DIVISION \00B7  FIELD OPERATIONS' / '';
+    position: absolute;
+    top: -12px;
+    right: 30px;
+    padding: 4px 14px 3px;
+    white-space: nowrap;
+    font: 700 11px/1.1 var(--ex-serif);
+    letter-spacing: 0.14em;
+    color: var(--ex-ink);
+    background: var(--ex-plate);
+    border: 1px solid var(--ex-brass-dk);
+    border-radius: 2px;
+    box-shadow:
+      var(--ex-plate-shadow),
+      0 3px 8px rgba(0, 0, 0, 0.45);
+    text-shadow: var(--ex-engrave);
+    pointer-events: none;
+  }
+  :root[data-theme='executive'] [data-game='putt'] [data-part='controls']::before {
+    content: 'STRATEGIC PUTTING DIVISION' / '';
+  }
+  :root[data-theme='executive'] [data-game='circuit'] [data-part='scoreboard']::after {
+    content: 'FLEET LOGISTICS' / '';
+    top: auto;
+    right: auto;
+    left: 12px;
+    bottom: -12px;
+  }
+}
+@media (max-width: 640px), (max-height: 560px) {
+  /* Keep the top bar's centre column narrow so the turn card keeps its words. */
+  :root[data-theme='executive'] [data-game='tanks'] [data-part='wind'] .tk-wind__meter {
+    padding: 2px;
+  }
+  :root[data-theme='executive'] [data-game='tanks'] [data-part='battlefield']::after,
+  :root[data-theme='executive'] [data-game='putt'] [data-part='course']::after,
+  :root[data-theme='executive'] [data-game='circuit'] [data-part='race']::after {
+    box-shadow:
+      inset 0 0 0 2px var(--ex-mahog),
+      inset 0 0 0 3px var(--ex-brass);
+  }
+}
+
+/* =====================================================================
+ * DAStravaganza: the quarterly all-hands (party kit — trivia, survey, DASterpiece, DASwords,
+ * DASception). Mahogany-panelled boardroom; the question is a presentation slide (with a proper
+ * bad 90s gradient) in a mahogany frame; answers are brass-edged ballot cards with an enamel seal
+ * carrying each answer's colour, shape and letter. Presentation only.
+ * ===================================================================== */
+:root[data-theme='executive'] .pk-stage {
+  --pk-stage-set: inset 0 clamp(70px, 14vh, 160px) clamp(110px, 22vh, 240px) calc(clamp(110px, 22vh, 240px) / -2) rgba(240, 210, 122, 0.12);
+  background:
+    radial-gradient(40% 30% at 8% 100%, rgba(95, 208, 122, 0.16), transparent 70%),
+    radial-gradient(40% 30% at 92% 100%, rgba(95, 208, 122, 0.16), transparent 70%),
+    radial-gradient(60% 40% at 50% 0%, rgba(240, 210, 122, 0.14), transparent 70%),
+    repeating-linear-gradient(90deg, transparent 0 calc(25% - 3px), rgba(0, 0, 0, 0.28) calc(25% - 3px) calc(25% - 1px), rgba(255, 205, 140, 0.08) calc(25% - 1px) 25%),
+    linear-gradient(180deg, transparent 84%, #1a0c06 84%, #1a0c06 85%, rgba(201, 162, 74, 0.35) 85%, rgba(201, 162, 74, 0.35) 85.4%, transparent 85.4%),
+    var(--ex-wood);
+}
+/* The slide: navy→teal presentation gradient, cream serif title, mahogany frame + brass fillet. */
+:root[data-theme='executive'] .pk-stage .pk-prompt {
+  --mat-card-ink: #fbf3dc;
+  --pk-card-ink: #fbf3dc;
+  --pk-card-ink-muted: rgba(251, 243, 220, 0.75);
+  margin: 12px;
+  border: 0;
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg, transparent 6%, rgba(240, 215, 142, 0.9) 6% 94%, transparent 94%) 0 calc(100% - 22px) / 100% 2px no-repeat,
+    radial-gradient(120% 80% at 0% 0%, rgba(120, 190, 220, 0.3), transparent 60%),
+    linear-gradient(160deg, #1b2c63 0%, #1d4a7a 48%, #1e6a78 100%);
+  box-shadow:
+    0 0 0 2px #1a0c06,
+    0 0 0 4px var(--ex-brass),
+    0 0 0 5px #3a1c0c,
+    0 0 0 14px #4a2714,
+    0 0 0 15px #1e0f08,
+    0 18px 34px 14px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='executive'] .pk-stage .pk-prompt__text {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+:root[data-theme='executive'] .pk-stage .pk-prompt__kicker {
+  display: inline-block;
+  padding: 0 0 4px;
+  border-bottom: 2px solid var(--ex-brass-hi);
+  font-family: var(--ex-serif);
+  font-size: var(--fs-sm);
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: var(--ex-brass-hi);
+}
+:root[data-theme='executive'] .pk-stage .pk-prompt__corner {
+  display: none;
+}
+:root[data-theme='executive'] .pk-stage .pk-prompt .pk-chip {
+  border-color: rgba(240, 215, 142, 0.6);
+  background: rgba(10, 20, 50, 0.45);
+  color: #fbf3dc;
+}
+:root[data-theme='executive'] .pk-stage .pk-prompt[data-tone='final'] {
+  background: linear-gradient(160deg, #4a1426 0%, #7a2a2a 50%, #a0622a 100%);
+}
+/* Ballot cards: cream stock, double brass edge, an enamel seal for the answer's identity. */
+:root[data-theme='executive'] .pk-stage .pk-answer {
+  --mat-card-ink: #24160a;
+  --pk-card-ink: #24160a;
+  border: 2px solid var(--ex-brass);
+  border-radius: 3px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--slot) 20%, transparent) 0 36px, transparent 36px),
+    linear-gradient(180deg, #fbf5e4, #f1e6c9);
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    inset 0 0 0 3px rgba(138, 106, 50, 0.7),
+    0 0 0 1px #1a0c06,
+    0 4px 0 #1a0c06,
+    0 10px 18px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer__badge {
+  grid-template-columns: auto;
+  justify-items: center;
+  gap: 0;
+  min-width: 0;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 50%;
+  color: #fff;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45), transparent 45%),
+    color-mix(in srgb, var(--slot) 72%, #000);
+  box-shadow:
+    0 0 0 3px var(--ex-brass),
+    0 0 0 4px var(--ex-brass-dk),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 3px 6px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer__badge .pk-shape {
+  width: 11px;
+  height: 11px;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer__letter {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer__label {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+  font-size: clamp(1.05rem, 0.6vw + 0.9rem, 1.3rem);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    inset 0 0 0 3px rgba(138, 106, 50, 0.7),
+    0 0 0 1px #1a0c06,
+    0 6px 0 #1a0c06,
+    0 0 22px rgba(240, 210, 122, 0.35);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer:active:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    inset 0 0 0 3px rgba(138, 106, 50, 0.7),
+    0 0 0 1px #1a0c06,
+    0 1px 0 #1a0c06;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer:is([data-state='selected'], [data-state='locked']) {
+  border-color: var(--ex-brass-hi);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--slot) 75%, #000) 0 8px, transparent 8px),
+    linear-gradient(135deg, color-mix(in srgb, var(--slot) 26%, transparent) 0 40%, transparent 70%),
+    linear-gradient(180deg, #fffaf0, #f4ead0);
+  box-shadow:
+    inset 0 0 0 2px #fffaf0,
+    inset 0 0 0 3px var(--ex-brass-lo),
+    0 0 0 1px #1a0c06,
+    0 0 0 5px var(--ex-brass-hi),
+    0 0 0 6px #1a0c06,
+    0 0 26px rgba(240, 210, 122, 0.45);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer[data-state='correct'] {
+  border-color: #3f8f5f;
+  background:
+    linear-gradient(90deg, #1f5a3c 0 8px, transparent 8px),
+    linear-gradient(180deg, #eef7e6, #d8ecd0);
+  box-shadow:
+    inset 0 0 0 2px #eef7e6,
+    0 0 0 1px #1a0c06,
+    0 0 0 5px #5fd07a,
+    0 0 0 6px #1a0c06,
+    0 0 28px rgba(95, 208, 122, 0.45);
+}
+:root[data-theme='executive'] .pk-stage .pk-answer[data-state='wrong'] {
+  border-color: #b3312c;
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    0 0 0 1px #1a0c06,
+    0 0 0 5px #d9534f,
+    0 0 0 6px #1a0c06;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer[data-state='correct'] .pk-answer__mark {
+  color: #1f5a3c;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer[data-state='wrong'] .pk-answer__mark {
+  color: #a3221c;
+}
+:root[data-theme='executive'] .pk-stage .pk-answer__bar {
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--slot) 26%, transparent) 0 6px, color-mix(in srgb, var(--slot) 16%, transparent) 6px 12px);
+}
+/* Vote cards: memo stock on a brass clip. */
+:root[data-theme='executive'] .pk-stage .pk-vote {
+  --mat-card-ink: #24160a;
+  --pk-card-ink: #24160a;
+  --pk-card-ink-muted: rgba(36, 22, 10, 0.72);
+  color: #24160a;
+  border: 2px solid var(--ex-brass);
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--slot) 70%, #000) 0 5px, transparent 5px),
+    repeating-linear-gradient(180deg, transparent 0 27px, rgba(31, 90, 60, 0.12) 27px 28px),
+    linear-gradient(180deg, #fbf5e4, #f1e6c9);
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    0 0 0 1px #1a0c06,
+    0 10px 18px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='executive'] .pk-stage .pk-vote__content {
+  font-family: var(--ex-serif);
+}
+:root[data-theme='executive'] .pk-stage .pk-vote[data-picked='true'] {
+  border-color: var(--ex-brass-hi);
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    0 0 0 1px #1a0c06,
+    0 0 0 5px var(--ex-brass-hi),
+    0 0 0 6px #1a0c06,
+    0 0 24px rgba(240, 210, 122, 0.4);
+}
+:root[data-theme='executive'] .pk-stage .pk-vote[data-winner='true'] {
+  border-color: var(--ex-brass-hi);
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    0 0 0 1px #1a0c06,
+    0 0 0 5px #5fd07a,
+    0 0 0 6px #1a0c06,
+    0 0 26px rgba(95, 208, 122, 0.4);
+}
+/* Brass progress rail, leather-and-brass scoreboard. */
+:root[data-theme='executive'] .pk-stage .pk-timerbar {
+  height: 12px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1e0f08, #3a1c0c);
+  border: 1px solid var(--ex-brass-lo);
+  box-shadow: 0 0 0 1px #1a0c06, inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='executive'] .pk-stage .pk-timerbar__fill {
+  background: var(--ex-plate);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 214, 0.7);
+}
+:root[data-theme='executive'] .pk-stage .pk-timerbar[data-urgent='true'] .pk-timerbar__fill {
+  background: linear-gradient(180deg, #f08a7a, #b3312c);
+}
+:root[data-theme='executive'] .pk-stage .pk-row {
+  border-radius: 2px;
+  border-color: rgba(201, 162, 74, 0.2);
+}
+:root[data-theme='executive'] .pk-stage .pk-row.is-me {
+  border-color: var(--ex-brass);
+}
+:root[data-theme='executive'] .pk-stage .pk-interstitial__icon {
+  border-radius: 50%;
+  border: 0;
+  background: radial-gradient(circle at 35% 30%, #f3dc98, #b8923f 60%, #8a6a32);
+  color: var(--ex-ink);
+  box-shadow: 0 0 0 3px #3a1c0c, 0 0 0 5px var(--ex-brass-hi), 0 12px 24px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='executive'] .pk-stage .pk-interstitial__title {
+  font-family: var(--ex-serif);
+  font-weight: 700;
+}
+:root[data-theme='executive'] .pk-stage .pk-podium {
+  background:
+    radial-gradient(50% 60% at 50% 100%, rgba(240, 210, 122, 0.2), transparent 72%),
+    radial-gradient(30% 30% at 50% 0%, rgba(95, 208, 122, 0.12), transparent 70%);
+}
+@media (max-width: 560px) {
+  :root[data-theme='executive'] .pk-stage .pk-prompt {
+    margin: 8px;
+    box-shadow:
+      0 0 0 2px #1a0c06,
+      0 0 0 3px var(--ex-brass),
+      0 0 0 4px #3a1c0c,
+      0 0 0 9px #4a2714,
+      0 0 0 10px #1e0f08,
+      0 12px 24px 8px rgba(0, 0, 0, 0.45);
+  }
+  :root[data-theme='executive'] .pk-stage .pk-answer__badge {
+    width: 44px;
+    height: 44px;
+  }
+}
+/* Results: mahogany plinths with a brass plate carrying the place. */
+:root[data-theme='executive'] .pk-stage .pk-podium__block {
+  border: 0;
+  border-radius: 2px 2px 0 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--player) 70%, #000) 0 5px, transparent 5px),
+    var(--ex-wood);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 205, 140, 0.15),
+    0 0 0 1px #1a0c06,
+    0 0 0 3px var(--ex-brass-lo),
+    0 12px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='executive'] .pk-stage .pk-podium__place {
+  min-width: 2.2em;
+  padding: 0 0.3em;
+  border-radius: 2px;
+  background: var(--ex-plate);
+  box-shadow: var(--ex-plate-shadow);
+  color: var(--ex-ink);
+  font-family: var(--ex-serif);
+  font-size: clamp(1.3rem, 3vw, 2rem);
+  text-shadow: var(--ex-engrave);
+}
+/* DASterpiece: the boardroom art collection — mahogany frames with a brass fillet, a framed placard. */
+:root[data-theme='executive'] [data-game='masterpiece'] .mp-exhibit__frame {
+  padding: 5px;
+  background: var(--ex-plate);
+}
+:root[data-theme='executive'] [data-game='masterpiece'] .mp-exhibit__hit {
+  box-shadow:
+    inset 0 0 0 1px #1e0f08,
+    inset 0 0 0 8px #4a2714,
+    inset 0 0 0 9px var(--ex-brass-hi),
+    inset 0 0 26px rgba(42, 24, 6, 0.2);
+  padding-top: 28px;
+}
+:root[data-theme='executive'] [data-game='masterpiece'] .mp-exhibit__text {
+  font-family: var(--ex-serif);
+}
+:root[data-theme='executive'] [data-game='masterpiece'] .mp-placard {
+  border: 2px solid var(--ex-brass);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 2px #fbf5e4,
+    inset 0 0 0 3px rgba(138, 106, 50, 0.7),
+    0 0 0 1px #1a0c06,
+    0 0 0 9px #4a2714,
+    0 0 0 10px #1e0f08,
+    0 14px 26px 10px rgba(0, 0, 0, 0.45);
+  margin: 10px;
+}
+/* DASception: the team plaque on the (light) role card gets a light face so its deepened ink reads. */
+:root[data-theme='executive'] [data-game='deception'] .dx-rolecard .dx-team:not(.dc-badge--solid) {
+  background: color-mix(in srgb, var(--badge, var(--ex-brass)) 14%, #fbf5e4);
+}

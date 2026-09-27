@@ -49,7 +49,7 @@ function useTurn(): TurnInfo | null {
 
 export function Hud() {
   return (
-    <div className="tk-hud">
+    <div className="tk-hud" data-part="hud">
       <TurnCard />
       <WindGauge />
       <Roster />
@@ -83,7 +83,7 @@ function TurnCard() {
             : 'Aiming…'
         : 'Next turn…';
   return (
-    <section className={cx('tk-turn tk-glass', mine && 'is-mine')} aria-label="Turn" style={{ '--tank': turn.color } as CSSProperties}>
+    <section className={cx('tk-turn tk-glass', mine && 'is-mine')} aria-label="Turn" data-part="turn" style={{ '--tank': turn.color } as CSSProperties}>
       <span className="tk-turn__chip" aria-hidden />
       <div className="tk-turn__text">
         <span className="tk-turn__who" aria-live="polite">
@@ -115,7 +115,7 @@ export function WindGauge() {
   const label = abs === 0 ? 'Wind: calm' : `Wind: ${abs} to the ${dir}${level === 'strong' ? ' (strong)' : ''}`;
   const segs = Math.max(5, max);
   return (
-    <div className="tk-wind tk-glass" role="img" aria-label={label} data-level={level} data-dir={dir}>
+    <div className="tk-wind tk-glass" data-part="wind" role="img" aria-label={label} data-level={level} data-dir={dir}>
       <span className="tk-wind__label">
         <PixelIcon name="flag" size={12} /> WIND
       </span>
@@ -161,7 +161,7 @@ function Roster() {
   if (rows.length === 0) return null;
   const aliveCount = rows.filter((t) => ui.alive[t.id] ?? t.alive).length;
   return (
-    <section className={cx('tk-roster tk-glass', !open && 'is-collapsed')} aria-label="Tanks">
+    <section className={cx('tk-roster tk-glass', !open && 'is-collapsed')} aria-label="Tanks" data-part="scoreboard">
       <button type="button" className="tk-roster__toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         <PixelIcon name="users" size={14} /> Tanks <b>{aliveCount}</b>/{rows.length}
         <PixelIcon name={open ? 'chevron-up' : 'chevron-down'} size={12} />

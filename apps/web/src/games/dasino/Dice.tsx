@@ -164,7 +164,7 @@ export function DiceTable({ state, settings, seat, playerId }: { state: DasinoPu
 
   return (
     <div className="dn-dice">
-      <section className="dn-dice__stage dn-glass" aria-label="Dice table">
+      <section className="dn-dice__stage dn-glass" data-part="table" aria-label="Dice table">
         <header className="dn-felt__head">
           <div>
             <h2 className="dn-h2">Dice High / Low</h2>
@@ -174,7 +174,7 @@ export function DiceTable({ state, settings, seat, playerId }: { state: DasinoPu
         </header>
 
         <div className="dn-dice__arena">
-          <div className="dn-point" aria-label={`Point ${point}`}>
+          <div className="dn-point" data-part="scoreboard" aria-label={`Point ${point}`}>
             <span className="dc-label">Point</span>
             <div className="dn-point__dice">
               <Die3D value={Math.max(1, d.pointA)} size={44} />
@@ -183,7 +183,7 @@ export function DiceTable({ state, settings, seat, playerId }: { state: DasinoPu
             <span className="dn-point__num dc-num">{point >= 2 ? point : '–'}</span>
           </div>
 
-          <div className="dn-tray" data-phase={d.phase} data-outcome={outcome ?? undefined}>
+          <div className="dn-tray" data-part="felt" data-phase={d.phase} data-outcome={outcome ?? undefined}>
             {showRoll ? (
               <div className="dn-tray__dice">
                 <Die3D

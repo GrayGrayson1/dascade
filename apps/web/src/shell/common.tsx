@@ -4,7 +4,17 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { AVATARS, GAME_CATALOG, LIMITS, cabinetForGame, cabinetPath, isGameId, type Avatar, type ChatMessage, type GameId } from '@dascade/shared';
+import {
+  AVATARS,
+  GAME_CATALOG,
+  LIMITS,
+  cabinetForGame,
+  cabinetPath,
+  isGameId,
+  type Avatar,
+  type ChatMessage,
+  type GameId,
+} from '@dascade/shared';
 import {
   Avatar as AvatarBadge,
   Button,
@@ -25,6 +35,7 @@ import { getStateSnapshot, session, useSessionStore } from '../net/session.ts';
 import { useGame, useRoomSelector } from '../net/hooks.ts';
 import { sfx } from '../audio/audio.ts';
 import { leaveRoomTo, useTournamentExit } from '../tournament/exit.ts';
+import { useThemeFlavour } from '../themes/copy.ts';
 
 export { Toasts } from './Toasts.tsx';
 
@@ -50,7 +61,7 @@ export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean
     }
   };
   return (
-    <div className="profile-editor">
+    <div className="profile-editor" data-part="profile-editor">
       {!compact ? (
         <div className="profile-preview">
           <span className="dc-label">How others see you</span>
@@ -144,9 +155,10 @@ export function ChatPanel({
     setText('');
   };
   return (
-    <div className={cx('chat', className)}>
+    <div className={cx('chat', className)} data-part="chat">
       <div
         className="chat__list"
+        data-part="chat-list"
         ref={listRef}
         role="log"
         aria-live="polite"
@@ -161,9 +173,9 @@ export function ChatPanel({
           renderMessage ? (
             <div key={m.id}>{renderMessage(m)}</div>
           ) : (
-            <div key={m.id} className="chat__msg" data-kind={m.kind}>
+            <div key={m.id} className="chat__msg" data-part="chat-message" data-kind={m.kind}>
               {m.playerId && m.kind !== 'system' && m.kind !== 'correct' ? (
-                <span className="chat__name" style={{ color: m.color }}>
+                <span className="chat__name" style={{ '--chat-name': m.color } as CSSProperties}>
                   {m.name}
                 </span>
               ) : null}
@@ -174,6 +186,7 @@ export function ChatPanel({
       </div>
       <form
         className="chat__form"
+        data-part="chat-form"
         onSubmit={(e) => {
           e.preventDefault();
           send();
@@ -210,7 +223,7 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
     // Tournament Center match: the series runs itself — no "Play again". Participants stay for the
     // next game; once the match is over (or for spectators) the way out leads back to the kiosk.
     return (
-      <div className="results-actions">
+      <div className="results-actions" data-part="results-buttons">
         {extra}
         {tournament.over || !tournament.participant ? (
           <BackToCabinetButton />
@@ -224,7 +237,7 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
   }
   const isHost = Boolean(playerId && hostId === playerId);
   return (
-    <div className="results-actions">
+    <div className="results-actions" data-part="results-buttons">
       {isHost ? (
         <Button variant="primary" size="lg" icon="refresh" onClick={() => session.lobby.toLobby()}>
           Play again
@@ -271,7 +284,14 @@ export function BackToCabinetButton({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg'
     navigate(cabinetPath(cabinet));
   };
   return (
-    <Button size={size} variant="secondary" icon="arrow-left" loading={busy} onClick={go} title={`Leave the room and return to ${cabinet.title}`}>
+    <Button
+      size={size}
+      variant="secondary"
+      icon="arrow-left"
+      loading={busy}
+      onClick={go}
+      title={`Leave the room and return to ${cabinet.title}`}
+    >
       Back to cabinet
     </Button>
   );
@@ -282,6 +302,16 @@ export function BackToCabinetButton({ size = 'lg' }: { size?: 'sm' | 'md' | 'lg'
  * the game's own results content, and a sticky action row — "Play again" for the host, "Leave" for
  * everyone, plus optional extra `actions`. Render it inside your <GameStage>.
  */
+/** Theme flavour line above a results title ("MATCH PERFORMANCE REVIEW"); nothing under Delta Neon. */
+function ResultsKicker() {
+  const kicker = useThemeFlavour('results.title');
+  return kicker ? (
+    <p className="results-shell__kicker" data-part="results-kicker" aria-hidden>
+      {kicker}
+    </p>
+  ) : null;
+}
+
 export function ResultsShell({
   title,
   subtitle,
@@ -300,16 +330,19 @@ export function ResultsShell({
 }) {
   const headingId = useId();
   return (
-    <section className={cx('results-shell', className)} aria-labelledby={headingId}>
-      <header className="results-shell__header">
+    <section className={cx('results-shell', className)} data-part="results" aria-labelledby={headingId}>
+      <header className="results-shell__header" data-part="results-header">
         {icon ? <PixelIcon name={icon} className="results-shell__icon" /> : null}
-        <h1 id={headingId} className="dc-title results-shell__title">
+        <ResultsKicker />
+        <h1 id={headingId} className="dc-title results-shell__title" data-part="results-title">
           {title}
         </h1>
         {subtitle ? <p className="results-shell__subtitle">{subtitle}</p> : null}
       </header>
-      <div className="results-shell__body">{children}</div>
-      <footer className="results-shell__actions">
+      <div className="results-shell__body" data-part="results-body">
+        {children}
+      </div>
+      <footer className="results-shell__actions" data-part="results-actions">
         <ResultsActions extra={actions} />
       </footer>
     </section>
@@ -357,7 +390,17 @@ export function LeaveButton({
 
 // ---------------------------------------------------------------------------
 /** Full-bleed themed container for a game view (below the top bar). */
-export function GameStage({ gameId, className, children, style }: { gameId: GameId; className?: string; children: ReactNode; style?: CSSProperties }) {
+export function GameStage({
+  gameId,
+  className,
+  children,
+  style,
+}: {
+  gameId: GameId;
+  className?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   const accent = GAME_CATALOG[gameId].accent;
   // While auto-reconnecting every action would be dropped: make the stage inert (no clicks/focus)
   // and dim it, so players aren't pressing buttons that silently do nothing. The top bar / shell
@@ -368,7 +411,9 @@ export function GameStage({ gameId, className, children, style }: { gameId: Game
       accent={accent}
       as="main"
       className={cx('game-stage dc-game-backdrop', className)}
+      data-game={gameId}
       style={style}
+      data-part="game-stage"
       id="main"
       inert={reconnecting || undefined}
       aria-busy={reconnecting || undefined}
@@ -391,11 +436,18 @@ export function ConnectionDot() {
         : status === 'connecting'
           ? 'Connecting…'
           : 'Offline';
-  const tone = status === 'connected' ? (ping !== null && ping > 250 ? 'var(--yellow)' : 'var(--green)') : status === 'reconnecting' || status === 'connecting' ? 'var(--yellow)' : 'var(--red)';
+  const tone =
+    status === 'connected'
+      ? ping !== null && ping > 250
+        ? 'var(--yellow)'
+        : 'var(--green)'
+      : status === 'reconnecting' || status === 'connecting'
+        ? 'var(--yellow)'
+        : 'var(--red)';
   // Not a live region: the ping changes every few seconds and would be re-announced each time.
   // Connection changes are announced by the reconnect banner (role=alert) and toasts instead.
   return (
-    <span className="conn-dot" title={label} style={{ '--tone': tone } as CSSProperties}>
+    <span className="conn-dot" data-part="connection-dot" title={label} style={{ '--tone': tone } as CSSProperties}>
       <i data-pulse={status !== 'connected' ? 'true' : undefined} aria-hidden />
       <span className="conn-dot__text" aria-hidden>
         {status === 'connected' && ping !== null ? `${ping}ms` : status === 'connected' ? 'Online' : label}
@@ -426,16 +478,26 @@ export function NoticeCard({
 }) {
   const headingId = useId();
   return (
-    <section className="notice-card dc-panel dc-panel--brackets" data-tone={tone} role={role} aria-labelledby={headingId}>
+    <section
+      className="notice-card dc-panel dc-panel--brackets"
+      data-part="notice-card"
+      data-tone={tone}
+      role={role}
+      aria-labelledby={headingId}
+    >
       <div className="notice-card__icon" aria-hidden>
         <PixelIcon name={icon} />
       </div>
       {crumb ? <p className="notice-card__crumb">{crumb}</p> : null}
-      <h1 id={headingId} className="notice-card__title">
+      <h1 id={headingId} className="notice-card__title" data-part="notice-title">
         {title}
       </h1>
       {children}
-      {actions ? <div className="notice-card__actions">{actions}</div> : null}
+      {actions ? (
+        <div className="notice-card__actions" data-part="notice-actions">
+          {actions}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -447,7 +509,7 @@ export function PendingGameView() {
   const title = useMemo(() => (gameId && isGameId(gameId) ? GAME_CATALOG[gameId].title : 'Game'), [gameId]);
   return (
     <GameStage gameId={gameId ?? 'wheel'}>
-      <div className="center-screen">
+      <div className="center-screen" data-part="loading-screen">
         <EmptyState icon="sparkle" title={`${title} is loading its cartridge…`}>
           This cabinet is being wired up. Phase: {game?.phase ?? '—'}
         </EmptyState>

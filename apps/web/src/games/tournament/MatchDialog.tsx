@@ -54,7 +54,7 @@ function Side({
   showPoints: boolean;
 }) {
   return (
-    <div className="tk-side" data-winner={winner || undefined} data-empty={!p || undefined}>
+    <div className="tk-side" data-part="match-side" data-winner={winner || undefined} data-empty={!p || undefined}>
       {p ? (
         <Avatar avatar={p.avatar} color={winner ? 'var(--accent)' : 'var(--text-1)'} size={40} />
       ) : (

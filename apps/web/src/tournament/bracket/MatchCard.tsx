@@ -69,6 +69,7 @@ export function MatchCard({
     <button
       type="button"
       className={cx('tc-match', fluid && 'tc-match--fluid', className)}
+      data-part="bracket-match"
       data-status={match.status}
       data-mine={match.involvesMe || undefined}
       style={style}

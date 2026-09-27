@@ -32,7 +32,7 @@ export function HighScoreBoard({
   const entries = data?.entries ?? [];
   const label = statLabel || data?.statLabel || '';
   return (
-    <section className={cx('cl-board', compact && 'cl-board--compact')} aria-label={title}>
+    <section className={cx('cl-board', compact && 'cl-board--compact')} data-part="scoreboard" aria-label={title}>
       <header className="cl-board__head">
         <PixelIcon name="trophy" size={14} />
         <h3 className="cl-board__title">{title}</h3>
@@ -84,7 +84,7 @@ export function StandingsPanel({
 }) {
   if (variant === 'strip') {
     return (
-      <ol className="cl-strip" aria-label={title}>
+      <ol className="cl-strip" data-part="standings" aria-label={title}>
         {rows.map((r, i) => (
           <li key={r.id} className={cx('cl-strip__item', r.id === me && 'is-you', r.status !== 'playing' && 'is-done')} style={{ ['--pc' as string]: r.color }}>
             <span className="cl-strip__rank">{r.rank || i + 1}</span>
@@ -97,7 +97,7 @@ export function StandingsPanel({
     );
   }
   return (
-    <section className={cx('cl-standings', variant === 'table' && 'cl-standings--table')} aria-label={title}>
+    <section className={cx('cl-standings', variant === 'table' && 'cl-standings--table')} data-part="standings" aria-label={title}>
       <header className="cl-board__head">
         <PixelIcon name="users" size={14} />
         <h3 className="cl-board__title">{title}</h3>

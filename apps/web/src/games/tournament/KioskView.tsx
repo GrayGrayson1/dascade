@@ -144,10 +144,10 @@ export function Kiosk({ view, me }: { view: TournamentView; me: TournamentMe | n
 
   return (
     <GameStage gameId="tournament" className="tk">
-      <div className="tk__inner">
+      <div className="tk__inner" data-part="kiosk">
         <KioskHeader view={view} live={live} />
         {view.status === 'COMPLETE' ? <ChampionBanner view={view} /> : null}
-        <div className="tk__top">
+        <div className="tk__top" data-part="kiosk-top">
           {/* An organizer who isn't playing only needs the next-step card once the event is under way. */}
           {organizer && !myId && (view.status === 'IN_PROGRESS' || view.status === 'COMPLETE' || view.status === 'CANCELLED') ? null : (
             <YouPanel view={view} me={me} onConfirm={setConfirm} onSelectMatch={select} />
@@ -158,7 +158,7 @@ export function Kiosk({ view, me }: { view: TournamentView; me: TournamentMe | n
         </div>
 
         <ScrollTabs className="tk__tabs" label="Tournament sections" value={activeTab} onChange={setTab} tabs={tabs} />
-        <div className="tk__panel" role="tabpanel" aria-label={TAB_NAMES[activeTab]}>
+        <div className="tk__panel" data-part="kiosk-panel" role="tabpanel" aria-label={TAB_NAMES[activeTab]}>
           {activeTab === 'bracket' ? <BracketView vm={vm} onSelect={select} label={`${view.config.name} bracket`} /> : null}
           {activeTab === 'standings' ? (
             elim ? (
@@ -222,7 +222,7 @@ function KioskHeader({ view, live }: { view: TournamentView; live: number }) {
     }
   };
   return (
-    <header className="tk-head" style={{ '--g': game.accent.primary, '--g2': game.accent.secondary } as CSSProperties}>
+    <header className="tk-head" data-part="kiosk-header" style={{ '--g': game.accent.primary, '--g2': game.accent.secondary } as CSSProperties}>
       <div className="tk-head__main">
         <span className="tk-head__game">{game.marquee}</span>
         <h1 className="tk-head__name">{view.config.name}</h1>
@@ -239,7 +239,7 @@ function KioskHeader({ view, live }: { view: TournamentView; live: number }) {
         </ul>
       </div>
       <div className="tk-head__side">
-        <div className="tk-board-status" data-tone={tone}>
+        <div className="tk-board-status" data-part="status" data-tone={tone}>
           <span className="tc-lamp" data-tone={tone} aria-hidden />
           <span className="tk-board-status__label">{view.paused ? 'Paused' : TOURNAMENT_STATUS_LABELS[view.status]}</span>
           {view.status === 'IN_PROGRESS' && view.totalRounds > 0 ? (
@@ -282,7 +282,7 @@ function ChampionBanner({ view }: { view: TournamentView }) {
   const podium = view.standings.rows.filter((r) => r.rank >= 2 && r.rank <= 3).slice(0, 3);
   if (!champ) {
     return (
-      <section className="tk-champ" aria-label="Result">
+      <section className="tk-champ" data-part="podium" aria-label="Result">
         <PixelTrophy className="tk-champ__trophy" />
         <div>
           <span className="tk-champ__kicker">Tournament complete</span>
@@ -329,7 +329,7 @@ function Placings({ view, me }: { view: TournamentView; me: string | null }) {
   const rows = [...view.standings.rows].sort((a, b) => (a.rank || 999) - (b.rank || 999));
   if (rows.length === 0) return <p className="dc-muted tc-empty">Placings fill in as players are knocked out.</p>;
   return (
-    <ol className="tk-placings">
+    <ol className="tk-placings" data-part="standings">
       {rows.map((r) => {
         const p = people.get(r.participantId);
         return (
@@ -371,7 +371,7 @@ function PlayersList({ view, me }: { view: TournamentView; me: string | null }) 
     );
   }
   return (
-    <ul className="tk-players">
+    <ul className="tk-players" data-part="players">
       {view.participants.map((p) => {
         const gone = p.status === 'withdrawn' || p.status === 'disqualified' || p.status === 'no_show';
         return (
@@ -422,7 +422,7 @@ function AuditLog({ view }: { view: TournamentView }) {
   const entries = [...view.audit].reverse();
   if (entries.length === 0) return <p className="dc-muted tc-empty">Nothing logged yet.</p>;
   return (
-    <ol className="tk-log" aria-label="Tournament log, newest first">
+    <ol className="tk-log" data-part="log" aria-label="Tournament log, newest first">
       {entries.map((e) => (
         <li key={e.id} data-actor={e.actor} data-action={e.action}>
           <time className="tk-log__time dc-num" dateTime={new Date(e.at).toISOString()}>

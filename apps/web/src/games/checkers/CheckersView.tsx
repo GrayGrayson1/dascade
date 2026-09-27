@@ -216,8 +216,8 @@ export function CheckersView() {
         ) : null}
         <div className="ck-slot ck-slot--bottom">{card(bottom, 'bottom')}</div>
 
-        <aside className="ck-side" aria-label="Game panel">
-          <section className={cx('ck-status', myTurn && 'is-my-turn', over && 'is-over')} aria-live="polite">
+        <aside className="ck-side" data-part="hud" aria-label="Game panel">
+          <section className={cx('ck-status', myTurn && 'is-my-turn', over && 'is-over')} data-part="status" aria-live="polite">
             <div className="ck-status__line">
               {!over ? <PieceSwatch tone={turnColor} className="ck-status__swatch" /> : <PixelIcon name="trophy" />}
               <span className="ck-status__text" data-testid="checkers-status">

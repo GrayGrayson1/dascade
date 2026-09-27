@@ -222,7 +222,7 @@ export function NextStep({
   }
 
   return (
-    <section className="tk-next" aria-label="Organizer: next step">
+    <section className="tk-next" data-part="organizer-next" aria-label="Organizer: next step">
       <span className="tk-next__tag">
         <PixelIcon name="crown" /> Organizer
       </span>
@@ -255,7 +255,7 @@ export function OrganizerConsole({
   const pre = PRE_START.has(view.status);
   const finished = view.status === 'COMPLETE' || view.status === 'CANCELLED';
   return (
-    <div className="tk-console">
+    <div className="tk-console" data-part="organizer">
       <ol className="tk-stepper" aria-label="Tournament lifecycle">
         {steps.map((s, i) => (
           <li
