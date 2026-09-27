@@ -64,8 +64,21 @@ export class FakeAudioContext {
   mediaSources = 0;
   refuseMediaSource = false;
   resumeResult: AudioContextState = 'running';
+  private stateListeners = new Set<() => void>();
   constructor() {
     FakeAudioContext.instances.push(this);
+  }
+  addEventListener(type: string, fn: () => void) {
+    if (type === 'statechange') this.stateListeners.add(fn);
+  }
+  removeEventListener(type: string, fn: () => void) {
+    if (type === 'statechange') this.stateListeners.delete(fn);
+  }
+  /** Test helper: the browser/OS changes the state (e.g. 'suspended' on iOS backgrounding). */
+  setState(state: AudioContextState) {
+    if (state === this.state) return;
+    this.state = state;
+    for (const fn of [...this.stateListeners]) fn();
   }
   private make(kind: string) {
     const n = new FakeNode(kind, this);
@@ -91,7 +104,7 @@ export class FakeAudioContext {
     return { getChannelData: () => data };
   }
   resume() {
-    this.state = this.resumeResult;
+    this.setState(this.resumeResult);
     return Promise.resolve();
   }
   countOf(kind: string) {
@@ -117,9 +130,13 @@ export class FakeAudioElement {
   preload = '';
   crossOrigin: string | null = null;
   playsInline = false;
-  /** How the next play() behaves. */
-  playBehavior: 'resolve' | 'notAllowed' | 'notSupported' = 'resolve';
+  /** MediaError stand-in: set by fail(), cleared by a new load (like the real element). */
+  error: { code: number } | null = null;
+  /** How the next play() behaves ('defer' = the element starts loading; settle the promise via `deferred`). */
+  playBehavior: 'resolve' | 'notAllowed' | 'notSupported' | 'defer' = 'resolve';
   playCalls = 0;
+  /** Pending play() promises (playBehavior 'defer'), oldest first. */
+  deferred: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
   constructor() {
     FakeAudioElement.instances.push(this);
   }
@@ -134,6 +151,7 @@ export class FakeAudioElement {
     this.currentTime = 0;
     this.duration = Number.NaN;
     this.ended = false;
+    this.error = null;
   }
   getAttribute(n: string) {
     return this.attrs.get(n) ?? null;
@@ -165,6 +183,10 @@ export class FakeAudioElement {
     this.playCalls++;
     if (this.playBehavior === 'notAllowed') return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' }));
     if (this.playBehavior === 'notSupported') return Promise.reject(Object.assign(new Error('bad'), { name: 'NotSupportedError' }));
+    if (this.playBehavior === 'defer') {
+      this.paused = false; // play() flips `paused` at once; 'playing' waits for data
+      return new Promise((resolve, reject) => this.deferred.push({ resolve, reject }));
+    }
     if (this.paused) {
       this.paused = false;
       this.emit('play');
@@ -198,7 +220,12 @@ export class FakeAudioElement {
     this.emit('ended');
   }
   fail() {
+    this.error = { code: 4 }; // MEDIA_ERR_SRC_NOT_SUPPORTED
     this.emit('error');
+  }
+  /** The browser/OS pauses playback on its own (audio focus lost, headphones unplugged…). */
+  externalPause() {
+    this.pause();
   }
 }
 

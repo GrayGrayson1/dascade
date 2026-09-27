@@ -119,9 +119,53 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-family: var(--font-tech);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-sm);
   color: var(--text-1);
+}
+
+/* Leave confirmation in tight bars (top bar, lobby action bar): a small popover anchored to the
+   button, so confirming never widens the bar (it overflowed at 360–412 px). */
+.leave-confirm {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.leave-confirm__trigger {
+  cursor: pointer;
+}
+.leave-confirm > .leave-confirm__pop {
+  position: absolute;
+  z-index: var(--z-overlay);
+  left: 0;
+  display: grid;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: calc(100vw - 24px - var(--safe-left) - var(--safe-right));
+  padding: var(--sp-3);
+  box-shadow: var(--panel-shadow), var(--shadow-2);
+}
+.leave-confirm[data-placement='below'] > .leave-confirm__pop {
+  top: calc(100% + 6px);
+}
+/* The top bar is its own stacking context (sticky, z-shell) below the reconnecting overlay: while its
+   leave confirmation is open, lift the whole bar so the popover stays clickable during a reconnect. */
+.topbar:has(.leave-confirm__pop) {
+  z-index: calc(var(--z-overlay) + 1);
+}
+.leave-confirm[data-placement='above'] > .leave-confirm__pop {
+  bottom: calc(100% + 6px);
+}
+.leave-confirm__text {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+}
+.leave-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
 }
 
 .code-chip {
@@ -164,7 +208,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-tech);
+  /* The ping is a number: --font-num (tabular, so it doesn't jitter as it updates). */
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--fs-xs);
   color: var(--text-2);
   white-space: nowrap;
@@ -951,7 +997,7 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
   }
-  .lobby__leave.dc-btn,
+  .lobby__leave > .dc-btn,
   .lobby__spectate.dc-btn {
     width: 44px;
     padding: 0;

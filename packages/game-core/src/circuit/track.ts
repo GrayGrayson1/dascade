@@ -6,7 +6,7 @@
  * derived from that polyline.
  */
 import type { CircuitTrackId } from '@dascade/shared/games/circuit';
-import { mod, pointSegDist2, segIntersect, wrapAngle } from './math.ts';
+import { datan2, dhypot, mod, pointSegDist2, segIntersect, wrapAngle } from './math.ts';
 
 export interface TrackTheme {
   /** Ambient ground colour between city blocks. */
@@ -127,9 +127,9 @@ function catmullRom(
   p3: readonly [number, number],
   u: number,
 ): [number, number] {
-  const alpha = 0.5;
+  // Centripetal knot spacing |b − a|^α with α = 0.5, i.e. √|b − a| (no Math.pow: see math.ts).
   const tj = (ti: number, a: readonly [number, number], b: readonly [number, number]) =>
-    ti + Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), alpha) || ti + 1e-4;
+    ti + Math.sqrt(dhypot(b[0] - a[0], b[1] - a[1])) || ti + 1e-4;
   const t0 = 0;
   const t1 = tj(t0, p0, p1);
   const t2 = tj(t1, p1, p2);
@@ -166,7 +166,7 @@ export function buildTrack(def: TrackDef): Track {
   for (let i = 0; i < dn; i++) {
     const a = dense[i]!;
     const b = dense[(i + 1) % dn]!;
-    dS[i + 1] = dS[i]! + Math.hypot(b[0] - a[0], b[1] - a[1]);
+    dS[i + 1] = dS[i]! + dhypot(b[0] - a[0], b[1] - a[1]);
   }
   const length = dS[dn]!;
 
@@ -176,7 +176,7 @@ export function buildTrack(def: TrackDef): Track {
   const { xs, ys } = ring;
   const n = xs.length;
   let dense2Len = 0;
-  for (let i = 0; i < n; i++) dense2Len += Math.hypot(xs[(i + 1) % n]! - xs[i]!, ys[(i + 1) % n]! - ys[i]!);
+  for (let i = 0; i < n; i++) dense2Len += dhypot(xs[(i + 1) % n]! - xs[i]!, ys[(i + 1) % n]! - ys[i]!);
   const spacing = dense2Len / n;
 
   // 3. Per-sample tangents, segment lengths, arc length and curvature.
@@ -189,10 +189,10 @@ export function buildTrack(def: TrackDef): Track {
     const pv = (i - 1 + n) % n;
     const dx = xs[nx]! - xs[pv]!;
     const dy = ys[nx]! - ys[pv]!;
-    const l = Math.hypot(dx, dy) || 1;
+    const l = dhypot(dx, dy) || 1;
     tx[i] = dx / l;
     ty[i] = dy / l;
-    segLen[i] = Math.hypot(xs[nx]! - xs[i]!, ys[nx]! - ys[i]!);
+    segLen[i] = dhypot(xs[nx]! - xs[i]!, ys[nx]! - ys[i]!);
   }
   let acc = 0;
   for (let i = 0; i < n; i++) {
@@ -202,8 +202,8 @@ export function buildTrack(def: TrackDef): Track {
   const realLength = acc;
   const curvature = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    const a = Math.atan2(ty[(i - 1 + n) % n]!, tx[(i - 1 + n) % n]!);
-    const b = Math.atan2(ty[(i + 1) % n]!, tx[(i + 1) % n]!);
+    const a = datan2(ty[(i - 1 + n) % n]!, tx[(i - 1 + n) % n]!);
+    const b = datan2(ty[(i + 1) % n]!, tx[(i + 1) % n]!);
     curvature[i] = wrapAngle(b - a) / (2 * spacing);
   }
 
@@ -250,7 +250,7 @@ export function buildTrack(def: TrackDef): Track {
     const sPos = mod(-(96 + row * 66 + (k % 2) * 33), realLength);
     const p = pointAt(track, sPos);
     const off = side * def.halfWidth * 0.42;
-    track.grid.push({ x: p.x - p.ty * off, y: p.y + p.tx * off, heading: Math.atan2(p.ty, p.tx), s: sPos });
+    track.grid.push({ x: p.x - p.ty * off, y: p.y + p.tx * off, heading: datan2(p.ty, p.tx), s: sPos });
   }
 
   // 5. Self-crossings become bridges (the later pass is elevated).
@@ -334,7 +334,7 @@ function smoothRing(ring: { xs: Float64Array; ys: Float64Array }, iterations: nu
   const dense: Array<[number, number]> = [];
   for (let i = 0; i < n; i++) dense.push([xs[i]!, ys[i]!]);
   const dS = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) dS[i + 1] = dS[i]! + Math.hypot(xs[(i + 1) % n]! - xs[i]!, ys[(i + 1) % n]! - ys[i]!);
+  for (let i = 0; i < n; i++) dS[i + 1] = dS[i]! + dhypot(xs[(i + 1) % n]! - xs[i]!, ys[(i + 1) % n]! - ys[i]!);
   return resample(dense, dS, dS[n]!);
 }
 
@@ -351,7 +351,7 @@ export function pointAt(track: Track, sPos: number): { x: number; y: number; tx:
   const y = track.ys[i]! + (track.ys[i2]! - track.ys[i]!) * w;
   const tx = track.tx[i]! + (track.tx[i2]! - track.tx[i]!) * w;
   const ty = track.ty[i]! + (track.ty[i2]! - track.ty[i]!) * w;
-  const l = Math.hypot(tx, ty) || 1;
+  const l = dhypot(tx, ty) || 1;
   return { x, y, tx: tx / l, ty: ty / l };
 }
 
@@ -399,7 +399,7 @@ export function projectOnTrack(track: Track, x: number, y: number, hint = -1): T
   const ay = track.ys[i]!;
   const dx = track.xs[i2]! - ax;
   const dy = track.ys[i2]! - ay;
-  const len = Math.hypot(dx, dy) || 1;
+  const len = dhypot(dx, dy) || 1;
   const tx = dx / len;
   const ty = dy / len;
   const cx = ax + dx * best.t;

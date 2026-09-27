@@ -61,7 +61,7 @@ export class CarView {
   private tailR: Phaser.GameObjects.Image;
   private label: Phaser.GameObjects.Image;
   private arrow: Phaser.GameObjects.Image | null = null;
-  private readonly glowAlpha: number;
+  private glowAlpha: number;
   /** Textures this car currently holds a reference to. */
   private texKeys: string[] = [];
   seen = 0;
@@ -78,6 +78,11 @@ export class CarView {
     this.body = scene.add.image(car.x, car.y, 'ci-dot');
     this.label = scene.add.image(car.x, car.y, 'ci-dot').setDepth(DEPTH.label);
     this.applyLook(car, local);
+  }
+
+  /** Underglow strength for the FX level (applied from the next frame). */
+  setGlowAlpha(alpha: number): void {
+    this.glowAlpha = alpha;
   }
 
   private applyLook(car: RaceCar, local: boolean): void {

@@ -226,12 +226,12 @@ Kits are shared by design: extend them additively (new optional props or hooks, 
   - Answer matching: `normalizeAnswer`, `matchAnswer` (typo tolerance), `parseNumberAnswer`.
   - `anonymize` gives opaque keys for anonymous entries.
 - **Server** `rooms/party/PartyRoom.ts` (`class MyRoom extends PartyRoom<MyState, MySettings>`, with state from `PartyRoomState.extend(...)`):
-  - Stage machine: `runStage(stage, ms, onEnd)`, `finishStage()`, `endStageSoon()`, host pause/resume/skip (`skippableStages`), and an auto-resume after `maxPauseMs`. A skip carries the `stageSeq` the host is looking at (the kit's `HostBar` sends it); a stale skip is ignored, so a double tap never skips two stages.
+  - Stage machine: `runStage(stage, ms, onEnd)`, `finishStage()`, `endStageSoon()`, host pause/resume/skip (`skippableStages`), and an auto-resume after `maxPauseMs`. A skip carries the `stageSeq` the host is looking at (the kit's `HostBar` sends it); a stale skip is ignored, so a double tap never skips two stages. While paused nothing locks in: the kit's submit/lock helpers refuse, and handlers with their own collectors call `refuseWhilePaused(player, type)`. Resuming re-checks "everyone answered" (games with other completion checks re-run them in a `resumeStage()` override, calling `super` first).
   - Collection: `openAnswers()` / `openVote()`, or custom collectors via `track()`; `submitAnswer` / `submitVote` with friendly rejections. A stage ends early when every present eligible player has locked in. With `lateJoinersCanAnswer`, late joiners **and** seated players who were offline when the prompt opened may still answer it — for `openAnswers()`/`openVote()` without an explicit eligible list and for custom collectors that implement `addEligible()`; an explicit list stays fixed.
   - Private mailbox: `sendPrivate(player, type, payload)` is re-sent on reconnect, and spectators only receive it if you opt in.
   - Teams: `setupTeams`; late joiners go to the smallest team.
   - Scores: `addPoints` → `commitScores()` (deltas, ranks, team totals, `scoreSeq`).
-  - `finishParty({ details?, extras?, placements? })` writes the podium, calls `reportOutcome` and `endMatch`. Pass `placements` for results that aren't score-ordered, such as hidden teams.
+  - `finishParty({ details?, extras?, placements? })` writes the podium, calls `reportOutcome` and `endMatch`. Pass `placements` for results that aren't score-ordered, such as hidden teams. Players who left mid-match are appended as the last place of the reported outcome (the podium lists only who's still there).
   - **Anonymous votes where some players can't vote:** don't `track()` per-seat flags, because a seat that never answers identifies the author. Show only an aggregate count.
 - **Client** `games/_party/`:
   - `PartyStage`, `PartyTopBar`, `PromptCard`, `TimerBar` / `StageTimer`, `HostBar`, `PausedBanner`, `RulesDrawer`, `Interstitial`;

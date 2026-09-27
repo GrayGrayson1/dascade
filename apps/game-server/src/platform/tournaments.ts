@@ -63,6 +63,8 @@ export interface MatchRoomStatus {
 /** Implemented by TournamentRoom. */
 export interface TournamentHost {
   readonly code: string;
+  /** Rate-limit key (ipRateKey) of the address that created it, once its organizer has joined. */
+  readonly creatorKey?: string | null;
   listing(): TournamentListing | null;
   matchRoomStatus(matchId: string, roomCode: string, status: MatchRoomStatus): void;
   matchGameStarted(matchId: string, roomCode: string, gameNumber: number): void;
@@ -105,6 +107,14 @@ export function unregisterTournament(code: string, host: TournamentHost): void {
 
 export function getTournament(code: string): TournamentHost | undefined {
   return hosts.get(code);
+}
+
+/** Live kiosks on this process (optionally only those matching `filter`). */
+export function countTournaments(filter?: (host: TournamentHost) => boolean): number {
+  if (!filter) return hosts.size;
+  let n = 0;
+  for (const host of hosts.values()) if (filter(host)) n++;
+  return n;
 }
 
 export function listTournaments(): TournamentListing[] {

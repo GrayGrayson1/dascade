@@ -235,6 +235,8 @@ export interface HoldemPublicState extends BaseRoomView {
   runout: boolean;
   /** Short line for the table ("Waiting for players…"). */
   tableMessage: string;
+  /** The host asked to end the game: it ends once the hand in progress is finished. */
+  endRequested: boolean;
   standings: HoldemStandingView[];
 }
 

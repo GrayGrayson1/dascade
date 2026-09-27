@@ -212,6 +212,26 @@ describe('skin loader', () => {
     }
   });
 
+  it('a failed chunk is not cached: the next load retries and then caches the real skin', async () => {
+    const { registerTheme, unregisterTheme } = await import('@dascade/ui');
+    registerTheme({ ...getTheme('neon-noir'), id: 'flaky-skin', name: 'Flaky' });
+    try {
+      let fail = true;
+      const loader = vi.fn(() => (fail ? Promise.reject(new Error('network blip')) : Promise.resolve({ default: { id: 'flaky-skin', arcadeRoom: 'hide' as const } })));
+      registerSkinLoader('flaky-skin', loader);
+      await expect(loadThemeSkin('flaky-skin')).resolves.toEqual({ id: 'flaky-skin' });
+      expect(loadedSkin('flaky-skin')).toBeNull(); // the token-only fallback isn't remembered
+      fail = false;
+      const skin = await loadThemeSkin('flaky-skin');
+      expect(skin).toEqual({ id: 'flaky-skin', arcadeRoom: 'hide' });
+      expect(loadedSkin('flaky-skin')).toBe(skin);
+      await loadThemeSkin('flaky-skin');
+      expect(loader).toHaveBeenCalledTimes(2);
+    } finally {
+      unregisterTheme('flaky-skin');
+    }
+  });
+
   it('caches: concurrent and repeated loads call the loader once', async () => {
     const { registerTheme, unregisterTheme } = await import('@dascade/ui');
     registerTheme({ ...getTheme('neon-noir'), id: 'counted-skin', name: 'Counted' });

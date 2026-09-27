@@ -172,11 +172,24 @@ interface GolferView {
 
 const golfer = (seat: MatchSeat, id = seat.playerId()) => (stateOf(seat.room).golfers as Map<string, GolferView>).get(id);
 
-/** Pick the ball up (the concede button). Paced like a person: retried if the action rate limit bites. */
+/**
+ * Pick the ball up (the concede button) — in Classic (turns) only on the golfer's own turn, as the
+ * room requires. Paced like a person: retried if the action rate limit bites.
+ */
 async function puttPickup(seat: MatchSeat, observer: MatchSeat = seat): Promise<void> {
   const me = seat.playerId();
   const index = stateOf(observer.room).holeIndex;
+  const moved = () => stateOf(observer.room).holeIndex !== index || stateOf(observer.room).phase !== 'PLAYING';
   for (let attempt = 0; attempt < 6; attempt++) {
+    await waitFor(
+      () =>
+        moved() ||
+        Boolean(golfer(observer, me)?.pickedUp) ||
+        ((stateOf(observer.room).mode !== 'turns' || stateOf(observer.room).turnId === me) && golfer(observer, me)?.moving === false),
+      8000,
+      'pickup turn',
+    );
+    if (moved() || golfer(observer, me)?.pickedUp) return;
     const errors = seat.errors.length;
     seat.room.send(PUTT_MSG.pickup, {});
     try {
@@ -248,9 +261,8 @@ const puttDriver: GameDriver = {
       if (over()) return;
       // Totals so far cover the finished holes: once ahead, the winner can pick up too.
       const ahead = (golfer(winner)?.total ?? 0) < (golfer(winner, loser.playerId())?.total ?? 0);
-      await puttPickup(loser, winner);
-      if (ahead) await puttPickup(winner);
-      else await puttHoleOut(winner);
+      // Each golfer acts on their own turn (Classic), so both run side by side.
+      await Promise.all([puttPickup(loser, winner), ahead ? puttPickup(winner) : puttHoleOut(winner)]);
     }
   },
   async draw(a, b) {

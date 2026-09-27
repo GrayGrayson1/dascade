@@ -83,7 +83,6 @@ export class World {
   private readonly track: Track;
   private readonly decor: Decor;
   private q: WorldQuality;
-  private readonly key: string;
   private pendingTiles: Array<{ x: number; y: number }> = [];
   private readonly buildings: BuildingView[] = [];
   private gantryG!: Phaser.GameObjects.Graphics;
@@ -96,6 +95,14 @@ export class World {
   private beams: Phaser.GameObjects.Image[] = [];
   private rain: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private ripples: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  /** Running weather: '' (none) or `${'track' | 'theme'}-${detail}`. */
+  private rainKey = '';
+  /** Theme asks for drizzle (effects.ambient === 'rain', gated by fx / reduced motion by the host). */
+  private ambientRain = false;
+  /** The frame-time watchdog stepped the world down (rain and searchlights stay off). */
+  private degraded = false;
+  /** Stopped weather emitters letting their last drops fall; freed on the next weather change. */
+  private spentRain: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   /** World palette (theme materials → colours). Unthemed = the game's own constants. */
   private pal: CircuitWorldPalette;
   private walls: string[];
@@ -105,8 +112,6 @@ export class World {
   private readonly tileImages = new Map<string, { img: Phaser.GameObjects.Image; quality: 'high' | 'low' }>();
   /** Theme repaint jobs (swap a layer's texture in place; the old one is destroyed once unused). */
   private repaint: Array<() => void> = [];
-  /** Theme-driven drizzle (effects.ambient === 'rain'); independent of the Neon Loop weather. */
-  private themeRain = false;
   private gateFlash = new Map<number, number>();
   private standFrame = 0;
   private lastStandSwap = 0;
@@ -121,8 +126,17 @@ export class World {
     this.q = quality;
     this.pal = palette ?? circuitWorldPalette(track.def.theme);
     this.walls = wallTones(this.pal);
-    this.key = `${track.def.id}-${quality.tileScale}`;
     this.build();
+  }
+
+  /** Texture key stem for resolution-dependent layers (deck, track tiles). */
+  private get key(): string {
+    return `${this.track.def.id}-${this.q.tileScale}`;
+  }
+
+  /** Track tile detail for the current quality. */
+  private get tileDetail(): 'high' | 'low' {
+    return this.q.detail === 'high' ? 'high' : 'low';
   }
 
   /** Texture key suffix: '' for the game's own look (keys unchanged), '~sig' when themed. */
@@ -214,30 +228,59 @@ export class World {
       this.stands.push(img);
     }
 
-    // Ambient traffic on the city streets.
-    if (this.q.detail !== 'off' && d.streets.length) {
-      const count = this.q.detail === 'high' ? 34 : 16;
-      const cols = [0xff5a5f, 0xf8f6ff, 0x60a5fa, 0xffd23f, 0x2de38f, 0xa78bfa, 0xfb923c];
-      for (let i = 0; i < count; i++) {
-        const street = Math.floor(rnd() * d.streets.length);
-        const sprite = scene.add.image(0, 0, 'ci-traffic').setDepth(DEPTH.traffic).setTint(cols[i % cols.length]!);
-        const light = scene.add.image(0, 0, 'ci-glow').setDepth(DEPTH.traffic).setBlendMode(Phaser.BlendModes.ADD).setScale(0.28).setTint(0xfff1c9).setAlpha(0.7);
-        this.vehicles.push({ sprite, light, street, t: rnd(), dir: rnd() < 0.5 ? 1 : -1, speed: 70 + rnd() * 90 });
-      }
-    }
+    // Ambient traffic on the city streets, searchlights from the grandstands, weather.
+    this.syncTraffic(rnd);
+    this.syncBeams();
+    this.syncRain();
+  }
 
-    // Searchlights from the grandstands.
-    if (this.q.detail === 'high') {
-      const stands = d.stands.filter((_, i) => i % 5 === 0).slice(0, 3);
-      stands.forEach((s, i) => {
-        const beam = scene.add.image(s.x, s.y, 'ci-beam').setOrigin(0, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.sky);
-        beam.setScale(3.2, 2.2).setAlpha(0.06).setTint(hexToInt(NEON[i % NEON.length]!));
-        this.beams.push(beam);
-      });
+  /** Ambient traffic: 34 cars (high), 16 (low) or none; existing cars keep driving. */
+  private syncTraffic(rnd: () => number = artRng(this.track.def.decorSeed + 101)): void {
+    const d = this.decor;
+    const count = this.q.detail === 'off' || !d.streets.length ? 0 : this.q.detail === 'high' ? 34 : 16;
+    while (this.vehicles.length > count) {
+      const v = this.vehicles.pop()!;
+      v.sprite.destroy();
+      v.light.destroy();
     }
+    const cols = [0xff5a5f, 0xf8f6ff, 0x60a5fa, 0xffd23f, 0x2de38f, 0xa78bfa, 0xfb923c];
+    for (let i = this.vehicles.length; i < count; i++) {
+      const street = Math.floor(rnd() * d.streets.length);
+      const sprite = this.scene.add.image(0, 0, 'ci-traffic').setDepth(DEPTH.traffic).setTint(cols[i % cols.length]!);
+      const light = this.scene.add.image(0, 0, 'ci-glow').setDepth(DEPTH.traffic).setBlendMode(Phaser.BlendModes.ADD).setScale(0.28).setTint(0xfff1c9).setAlpha(0.7);
+      this.vehicles.push({ sprite, light, street, t: rnd(), dir: rnd() < 0.5 ? 1 : -1, speed: 70 + rnd() * 90 });
+    }
+  }
 
-    // Weather: drizzle on the Neon Loop.
-    if (this.track.def.id === 'neon-loop' && this.q.detail !== 'off') this.startRain();
+  /** Searchlights sweep only at high detail. */
+  private syncBeams(): void {
+    const want = this.q.detail === 'high' && !this.degraded;
+    if (want === this.beams.length > 0) return;
+    for (const b of this.beams) b.destroy();
+    this.beams = [];
+    if (!want) return;
+    const stands = this.decor.stands.filter((_, i) => i % 5 === 0).slice(0, 3);
+    stands.forEach((s, i) => {
+      const beam = this.scene.add.image(s.x, s.y, 'ci-beam').setOrigin(0, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.sky);
+      beam.setScale(3.2, 2.2).setAlpha(0.06).setTint(hexToInt(NEON[i % NEON.length]!));
+      this.beams.push(beam);
+    });
+  }
+
+  /** Weather: drizzle on the Neon Loop, or the theme's ambient drizzle elsewhere (softer). */
+  private syncRain(): void {
+    const detail = this.q.detail;
+    const mode = detail === 'off' || this.degraded ? '' : this.track.def.id === 'neon-loop' ? 'track' : this.ambientRain ? 'theme' : '';
+    const key = mode ? `${mode}-${detail}` : '';
+    if (key === this.rainKey) return;
+    this.rainKey = key;
+    for (const e of this.spentRain) e.destroy();
+    this.spentRain = [];
+    this.rain?.destroy();
+    this.ripples?.destroy();
+    this.rain = null;
+    this.ripples = null;
+    if (mode) this.startRain(mode === 'theme');
   }
 
   private startRain(soft = false): void {
@@ -265,12 +308,46 @@ export class World {
   /** Weak hardware: stop drawing lit windows, rain and searchlights. */
   degrade(): void {
     this.q = { ...this.q, detail: this.q.detail === 'high' ? 'low' : 'off' };
-    this.rain?.stop();
-    this.ripples?.stop();
+    this.degraded = true;
+    // Let the falling drops finish instead of popping them.
+    for (const e of [this.rain, this.ripples]) {
+      if (!e) continue;
+      e.stop();
+      this.spentRain.push(e);
+    }
     this.rain = null;
     this.ripples = null;
-    for (const b of this.beams) b.setVisible(false);
-    this.beams = [];
+    this.rainKey = '';
+    this.syncBeams();
+  }
+
+  /**
+   * FX level / reduced motion changed: re-present the world IN PLACE, like setPalette.
+   * Lean, lit windows and animations follow on the next frame; traffic, searchlights,
+   * rain and beacons are added or removed; resolution-dependent layers (city, deck,
+   * track tiles) are re-rendered at the new scale/detail through the repaint queue,
+   * nearest the camera first. Never touches gameplay, cars, camera or timing, and never
+   * restarts the scene. An explicit change also lifts a watchdog degrade (as a rebuild did).
+   */
+  setQuality(next: WorldQuality): void {
+    const prev = this.q;
+    const prevTiles = this.tileDetail;
+    this.q = next;
+    this.degraded = false;
+    this.syncTraffic();
+    this.syncBeams();
+    this.syncRain();
+    for (const bv of this.buildings) {
+      if (next.detail === 'off') {
+        bv.beacon?.destroy();
+        bv.beacon = null;
+      } else if (bv.g && !bv.beacon) {
+        bv.beacon = this.makeBeacon(bv.b)?.setVisible(bv.g.visible) ?? null;
+      }
+    }
+    if (prev.tileScale === next.tileScale && prevTiles === this.tileDetail) return;
+    for (const entry of this.tileImages.values()) entry.quality = this.tileDetail;
+    this.queueRepaint();
   }
 
   /** Generate pending track tiles within a time budget. Returns true when done. */
@@ -282,7 +359,7 @@ export class World {
     }
     const t0 = performance.now();
     const scale = this.q.tileScale;
-    const quality = this.q.detail === 'high' ? 'high' : 'low';
+    const quality = this.tileDetail;
     while (this.pendingTiles.length && performance.now() - t0 < budgetMs) {
       const tile = this.pendingTiles.shift()!;
       const key = this.tileTexture(tile, quality);
@@ -346,7 +423,7 @@ export class World {
 
   private tileTexture(tile: { x: number; y: number }, quality: 'high' | 'low'): string {
     const scale = this.q.tileScale;
-    return this.addCanvas(`ci-tile-${this.key}-${tile.x}-${tile.y}${this.tk}`, () => {
+    return this.addCanvas(`ci-tile-${this.key}-${tile.x}-${tile.y}${quality === 'high' ? '' : '-lo'}${this.tk}`, () => {
       const c = document.createElement('canvas');
       c.width = Math.round(TILE * scale);
       c.height = Math.round(TILE * scale);
@@ -363,26 +440,40 @@ export class World {
    * timing, and never restarts the scene.
    */
   setPalette(next: CircuitWorldPalette, ambientRain: boolean): void {
-    this.setAmbientRain(ambientRain);
+    this.ambientRain = ambientRain;
+    this.syncRain();
     if (next.sig === this.pal.sig) return;
     this.pal = next;
     this.walls = wallTones(next);
+    this.queueRepaint();
+  }
+
+  /**
+   * Queues a repaint of every layer to the CURRENT palette and quality. Jobs read the state
+   * when they run and are no-ops for layers already up to date, so a new queue can safely
+   * replace a pending one (e.g. a quality change in the middle of a theme repaint).
+   */
+  private queueRepaint(): void {
     const jobs: Array<{ x: number; y: number; run: () => void }> = [];
     const at = (x: number, y: number, run: () => void) => jobs.push({ x, y, run });
     if (this.city) {
       const city = this.city;
-      at(-Infinity, -Infinity, () => this.swap(city, this.cityTexture()));
+      at(-Infinity, -Infinity, () => {
+        this.swap(city, this.cityTexture());
+        city.setTileScale(1 / this.q.tileScale, 1 / this.q.tileScale);
+      });
     }
     if (this.deck) {
       const deck = this.deck;
       at(-Infinity, -Infinity, () => {
         const { key, pos } = this.deckTexture(0);
         this.swap(deck, key);
-        deck.setPosition(pos.x, pos.y);
+        deck.setPosition(pos.x, pos.y).setScale(1 / this.q.tileScale);
       });
     }
     if (this.stands.length) {
       at(-Infinity, -Infinity, () => {
+        if (this.stands[0]!.texture.key === this.standKey(this.standFrame)) return;
         const prev = [0, 1].map((f) => this.stands[0]!.texture.key.replace(/-[01](~[a-z0-9]+)?$/, `-${f}$1`));
         this.standTextures();
         for (const st of this.stands) st.setTexture(this.standKey(this.standFrame));
@@ -395,10 +486,14 @@ export class World {
       const roof = bv.roof;
       if (roof) at(bv.b.x, bv.b.y, () => this.swap(roof, this.roofTexture(bv.b)));
     }
-    // Tiles keep the detail they were built with (a round trip back to a theme is pixel-identical).
-    for (const [k, { img, quality }] of this.tileImages) {
+    // Tiles keep the detail they were built with across theme changes (a round trip back to a
+    // theme is pixel-identical); setQuality updates it.
+    for (const [k, entry] of this.tileImages) {
       const [x, y] = k.split(',').map(Number) as [number, number];
-      at(x + TILE / 2, y + TILE / 2, () => this.swap(img, this.tileTexture({ x, y }, quality)));
+      at(x + TILE / 2, y + TILE / 2, () => {
+        this.swap(entry.img, this.tileTexture({ x, y }, entry.quality));
+        entry.img.setScale(1 / this.q.tileScale);
+      });
     }
     // Nearest the camera first (global layers carry -Infinity so they go first).
     const c = this.cam;
@@ -442,19 +537,6 @@ export class World {
     const t0 = performance.now();
     while (this.repaint.length && performance.now() - t0 < budgetMs) this.repaint.shift()!();
     this.release();
-  }
-
-  private setAmbientRain(on: boolean): void {
-    const want = on && this.q.detail !== 'off' && this.track.def.id !== 'neon-loop';
-    if (want === this.themeRain) return;
-    this.themeRain = want;
-    if (want) this.startRain(true);
-    else {
-      this.rain?.destroy();
-      this.ripples?.destroy();
-      this.rain = null;
-      this.ripples = null;
-    }
   }
 
   flashGate(gate: number, now: number): void {
@@ -594,15 +676,19 @@ export class World {
     const b = bv.b;
     bv.g = scene.add.graphics();
     bv.roof = scene.add.image(b.x, b.y, this.roofTexture(b)).setOrigin(0, 0);
-    if (b.height > 0.7 && this.q.detail !== 'off') {
-      bv.beacon = scene.add.image(b.x, b.y, 'ci-glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0xff2a4a).setScale(0.32).setAlpha(0.12);
-    }
+    if (this.q.detail !== 'off') bv.beacon = this.makeBeacon(b);
     if (b.sign) {
       const color = NEON[b.neon % NEON.length]!;
       const skey = `ci-sign-${b.sign}-${b.neon}`;
       if (!scene.textures.exists(skey)) scene.textures.addCanvas(skey, signCanvas(b.sign, color, 2));
       bv.sign = scene.add.image(b.x, b.y, skey).setOrigin(0, 1).setScale(0.5);
     }
+  }
+
+  /** Blinking aircraft beacon for tall towers (null for lower buildings). */
+  private makeBeacon(b: Building): Phaser.GameObjects.Image | null {
+    if (b.height <= 0.7) return null;
+    return this.scene.add.image(b.x, b.y, 'ci-glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0xff2a4a).setScale(0.32).setAlpha(0.12);
   }
 
   /** Neon signs occasionally stutter; tall towers blink their aircraft beacons. */

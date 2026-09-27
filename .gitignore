@@ -11,3 +11,6 @@ test-results
 playwright-report
 blob-report
 .vite
+
+# Local CNVS canvas state (agent memory) — never published
+.cnvs/

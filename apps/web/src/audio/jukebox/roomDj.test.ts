@@ -135,6 +135,9 @@ describe('Room DJ bridge', () => {
     h.port.join(djState());
     expect(h.state().source).toBe('room');
     expect(h.state().currentId).toBe('c');
+    // The user had paused: the room's track is cued, not started; their play button joins in.
+    expect(h.state()).toMatchObject({ wantPlaying: false, playing: false });
+    h.engine.toggle();
     expect(h.state().playing).toBe(true);
     h.el().loadMeta(100);
     expect(h.el().currentTime).toBeCloseTo(10);
@@ -143,6 +146,38 @@ describe('Room DJ bridge', () => {
     expect(h.state()).toMatchObject({ source: 'personal', currentId: 'a', wantPlaying: false, playing: false, room: null });
     h.el().loadMeta(100);
     expect(h.el().currentTime).toBeCloseTo(20);
+  });
+
+  it('joining a DJ room: music on or never touched → listen; paused (now or in a restored session) → stays paused', async () => {
+    // Never touched the jukebox: hear the room straight away.
+    const fresh = await roomSetup();
+    fresh.port.join(djState());
+    expect(fresh.state()).toMatchObject({ source: 'room', wantPlaying: true, playing: true });
+    // Music on: keep listening, now to the room.
+    const on = await roomSetup();
+    on.engine.play('a');
+    on.port.join(djState());
+    expect(on.state()).toMatchObject({ source: 'room', currentId: 'c', playing: true });
+    // A restored session that was left paused: cued silently.
+    const restored = await roomSetup({ stored: JSON.stringify({ currentId: 'b', position: 5, wantPlaying: false }) });
+    restored.port.join(djState());
+    expect(restored.state()).toMatchObject({ source: 'room', currentId: 'c', wantPlaying: false, playing: false });
+    // …until the room's music is explicitly started again.
+    restored.engine.play();
+    expect(restored.state().playing).toBe(true);
+  });
+
+  it('the host who had paused locally hears the track they start for the room', async () => {
+    const h = await roomSetup();
+    h.engine.play('a');
+    h.engine.pause();
+    h.port.join(djState({ current: null, playing: false }));
+    expect(h.state()).toMatchObject({ source: 'room', wantPlaying: false });
+    h.engine.dj.play('b');
+    expect(h.port.sent.at(-1)).toEqual([DJ.command, { op: 'play', track: { trackId: 'b', duration: 100 } }]);
+    expect(h.state().wantPlaying).toBe(true);
+    h.port.push(djState({ version: 2, current: { trackId: 'b', duration: 100, addedBy: 'host' } }));
+    expect(h.state()).toMatchObject({ currentId: 'b', playing: true });
   });
 
   it('late join: replays the last dj:state delivered before the bridge noticed the room', async () => {

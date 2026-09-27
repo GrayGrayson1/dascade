@@ -6,7 +6,7 @@
  * (Content, not outcomes — the seeded RNG is fine here.)
  */
 import { createSeededRng, type Rng } from '@dascade/shared';
-import { mod, pointSegDist2 } from './math.ts';
+import { datan2, mod, pointSegDist2 } from './math.ts';
 import { levelAt, pointAt, projectOnTrack, type Track } from './track.ts';
 
 export type BuildingKind = 'tower' | 'block' | 'arcade' | 'hotel' | 'garage' | 'dome';
@@ -225,7 +225,7 @@ function buildDecor(track: Track): Decor {
   for (let k = -4; k <= 3; k++) {
     const sPos = mod(k * (standLen + 18) + 40, track.length);
     const p = pointAt(track, sPos);
-    const angle = Math.atan2(p.ty, p.tx);
+    const angle = datan2(p.ty, p.tx);
     for (const side of [-1, 1]) {
       const off = track.wall + 26 + 34;
       stands.push({ x: p.x - p.ty * off * side, y: p.y + p.tx * off * side, angle, length: standLen, depth: 58, side });
@@ -246,7 +246,7 @@ function buildDecor(track: Track): Decor {
     const bxp = p.x - p.ty * off * side;
     const byp = p.y + p.tx * off * side;
     if (distToTrack(track, bxp, byp) < track.wall + 20 || levelAt(track, sPos)) continue;
-    billboards.push({ x: bxp, y: byp, angle: Math.atan2(p.ty, p.tx), text: BOARDS[boardIdx++ % BOARDS.length]!, tone: rng.int(4) });
+    billboards.push({ x: bxp, y: byp, angle: datan2(p.ty, p.tx), text: BOARDS[boardIdx++ % BOARDS.length]!, tone: rng.int(4) });
   }
   let side = 1;
   for (let sPos = 60; sPos < L; sPos += 230) {
@@ -262,7 +262,7 @@ function buildDecor(track: Track): Decor {
   // Gantries over every checkpoint gate (gate 0 carries the start lights).
   const gantries: Gantry[] = track.gates.map((sPos, gate) => {
     const p = pointAt(track, sPos);
-    return { x: p.x, y: p.y, angle: Math.atan2(p.ty, p.tx), span: track.wall * 2 + 24, gate };
+    return { x: p.x, y: p.y, angle: datan2(p.ty, p.tx), span: track.wall * 2 + 24, gate };
   });
 
   // Streets for ambient traffic: grid lines split wherever they approach the corridor.

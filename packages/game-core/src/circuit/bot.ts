@@ -6,7 +6,7 @@
  */
 import type { CarInput } from '@dascade/shared/games/circuit';
 import type { CarSpec, CarState } from './car.ts';
-import { clamp, wrapAngle } from './math.ts';
+import { clamp, datan2, dcos, dhypot, dsin, wrapAngle } from './math.ts';
 import { pointAt, projectOnTrack, segAt, type Track } from './track.ts';
 
 export interface BotOptions {
@@ -30,13 +30,13 @@ export function createBotMemory(): BotMemory {
 export function autopilot(state: CarState, spec: CarSpec, track: Track, memory: BotMemory, opts: BotOptions = {}): CarInput {
   const skill = clamp(opts.skill ?? 0.85, 0.4, 1.05);
   const proj = projectOnTrack(track, state.x, state.y, state.seg);
-  const speed = Math.hypot(state.vx, state.vy);
-  const fx = Math.cos(state.heading);
-  const fy = Math.sin(state.heading);
+  const speed = dhypot(state.vx, state.vy);
+  const fx = dcos(state.heading);
+  const fy = dsin(state.heading);
   const facing = fx * proj.tx + fy * proj.ty;
 
   // Recovery: stuck against a barrier or another car → reverse out, swinging the nose toward the track.
-  const trackAngle = Math.atan2(proj.ty, proj.tx);
+  const trackAngle = datan2(proj.ty, proj.tx);
   if (memory.reverseTicks > 0) {
     memory.reverseTicks--;
     const want = wrapAngle(trackAngle - state.heading);
@@ -55,8 +55,8 @@ export function autopilot(state: CarState, spec: CarSpec, track: Track, memory: 
   const target = pointAt(track, proj.s + look);
   const tx = target.x - target.ty * lane;
   const ty = target.y + target.tx * lane;
-  let desired = Math.atan2(ty - state.y, tx - state.x);
-  if (facing < -0.2) desired = Math.atan2(proj.ty, proj.tx); // turn around toward the track direction
+  let desired = datan2(ty - state.y, tx - state.x);
+  if (facing < -0.2) desired = datan2(proj.ty, proj.tx); // turn around toward the track direction
   const err = wrapAngle(desired - state.heading);
   const steer = clamp(err * 2.6 - state.angVel * 0.12, -1, 1);
 

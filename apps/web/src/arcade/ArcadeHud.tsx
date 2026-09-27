@@ -132,6 +132,8 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
           </span>
         </button>
         <span className="af-hud__icons">
+          {/* The jukebox's quick control (the jukebox UI portals it in; the machine itself stands on the floor). */}
+          <span className="af-hud__jukebox" data-jukebox-slot="hud" data-jukebox-variant="compact" />
           <IconButton
             icon={muted ? 'sound-off' : 'sound-on'}
             label={muted ? 'Unmute sound' : 'Mute sound'}

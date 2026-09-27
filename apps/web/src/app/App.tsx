@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router';
+import { lazy, Suspense, type ReactNode } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 import { normalizeRoomCode } from '@dascade/shared';
 import { Spinner } from '@dascade/ui';
 import { ArcadeFloor } from '../arcade/ArcadeFloor.tsx';
@@ -41,6 +41,22 @@ function RouteFallback() {
   );
 }
 
+/** Screens: a crash (or a stale chunk) shows the recovery screen; navigating elsewhere clears it. */
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
+
+/** Global chrome (theme layer, toasts, jukebox): a failure renders nothing instead of blanking the page. */
+function QuietBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary resetKey={pathname} fallback={null}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 function Modals() {
   const modal = useApp((s) => s.modal);
   if (!modal) return null;
@@ -55,11 +71,13 @@ export function App() {
   return (
     <BrowserRouter>
       {/* Theme environment layer + transition overlay (+ quick picker). Outside <Routes>: never remounts screens. */}
-      <ThemeHost />
+      <QuietBoundary>
+        <ThemeHost />
+      </QuietBoundary>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <ErrorBoundary>
+      <RouteBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<ArcadeFloor />} />
@@ -81,11 +99,15 @@ export function App() {
           </Routes>
         </Suspense>
         <Modals />
-      </ErrorBoundary>
-      <Toasts />
-      <Suspense fallback={null}>
-        <Jukebox />
-      </Suspense>
+      </RouteBoundary>
+      <QuietBoundary>
+        <Toasts />
+      </QuietBoundary>
+      <QuietBoundary>
+        <Suspense fallback={null}>
+          <Jukebox />
+        </Suspense>
+      </QuietBoundary>
     </BrowserRouter>
   );
 }

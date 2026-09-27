@@ -35,6 +35,10 @@ function DasinoView() {
   const playerId = game?.playerId ?? null;
   const seat = playerId ? game?.state.seats?.[playerId] : undefined;
   const roomCode = useSessionStore((s) => s.code);
+  // "Your spins" belong to one room: a different room starts with an empty log.
+  useEffect(() => {
+    if (roomCode) useDasinoUi.getState().enterRoom(roomCode);
+  }, [roomCode]);
 
   // Entering from a table's title screen (/play/dasino?table=…) walks to that table once;
   // after a refresh/reconnect, return to the table the server remembers.
@@ -55,6 +59,8 @@ function DasinoView() {
   const settings: DasinoSettings = { ...DEFAULT_DASINO_SETTINGS, ...game.settings };
   const spectator = !seat;
   const view = phase === 'RESULTS' ? 'results' : table;
+  const seatedCount = Object.values(state.players ?? {}).filter((p) => !p.spectator).length;
+  const canSit = spectator && phase === 'PLAYING' && Boolean(playerId && state.players?.[playerId]) && seatedCount < state.maxPlayers;
 
   return (
     <GameStage gameId="dasino" className="dn" style={{ '--dn-gold': '#ffd23f' } as React.CSSProperties}>
@@ -63,7 +69,7 @@ function DasinoView() {
           <>
             <header className="dn-hud" data-part="hud">
               <TableNav state={state} seated={!spectator} />
-              <BalanceHud seat={seat} settings={settings} isHost={isHost} spectator={spectator && phase === 'PLAYING'} />
+              <BalanceHud seat={seat} settings={settings} isHost={isHost} spectator={spectator && phase === 'PLAYING'} canSit={canSit} />
             </header>
             <Ticker ticker={state.ticker ?? []} />
           </>

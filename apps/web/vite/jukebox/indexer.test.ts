@@ -348,13 +348,16 @@ describe('readJukeboxFolder (disk)', () => {
     expect(r.found).toBe(1); // the sidecar isn't a "file found"
   });
 
-  it('indexes the real DASCADE jukebox folder: 7 unique tracks + 1 byte-identical duplicate', () => {
+  // The folder is the library: people drop MP3s in without touching code, so this checks what must hold
+  // for any contents rather than pinning today's songs.
+  it('indexes the real DASCADE jukebox folder cleanly', () => {
     const real = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public/audio/jukebox');
     const r = readJukeboxFolder(real);
-    expect(r.tracks).toHaveLength(7);
-    expect(r.duplicates).toEqual([{ file: "Hope's Turnaround (1).mp3", duplicateOf: "Hope's Turnaround.mp3" }]);
+    expect(r.tracks.length).toBeGreaterThanOrEqual(1);
     expect(r.rejected).toEqual([]);
-    expect(new Set(r.tracks.map((t) => t.id)).size).toBe(7);
+    expect(new Set(r.tracks.map((t) => t.id)).size).toBe(r.tracks.length);
+    const files = new Set(r.tracks.map((t) => t.file));
+    expect(r.duplicates.every((d) => files.has(d.duplicateOf))).toBe(true);
     expect(r.tracks.every((t) => t.duration > 30 && t.artist && t.title)).toBe(true);
     expect(JukeboxManifestSchema.safeParse(r.manifest).success).toBe(true);
   });

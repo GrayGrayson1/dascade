@@ -6,6 +6,8 @@ export interface RaceGame {
   game: Phaser.Game;
   scene: RaceScene;
   resize(cssW: number, cssH: number): void;
+  /** FX level / reduced motion changed: applied to the live game (no rebuild, canvas kept). */
+  setQuality(fx: SceneOptions['fx'], reducedMotion: boolean): void;
   destroy(): void;
 }
 
@@ -112,6 +114,14 @@ export function createRaceGame(parent: HTMLElement, opts: SceneOptions): RaceGam
       scene.setView(w, h, dpr);
       if (game.scale.width !== W || game.scale.height !== H) game.scale.resize(W, H);
       styleCanvas();
+    },
+    setQuality(fx: SceneOptions['fx'], reducedMotion: boolean) {
+      scene.setQuality(fx, reducedMotion);
+      // Render resolution follows the FX level (and a new level lifts the watchdog's last-resort drop).
+      const next = pixelRatio(fx, opts.mobile);
+      if (next === dpr || !host) return;
+      dpr = next;
+      host.resize(parent.clientWidth, parent.clientHeight);
     },
     destroy() {
       game.destroy(true);

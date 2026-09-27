@@ -1,9 +1,11 @@
 /**
- * The expanded jukebox: a non-modal panel (desktop popover, phone bottom sheet, phone-landscape
- * side sheet). Escape / close button / outside tap close it; focus moves in on open and back to the
- * dock on close. Gameplay keeps running underneath.
+ * The expanded jukebox — the machine up close: a dome with the record turning on its turntable,
+ * bubble-tube pillars, chrome push buttons and the title-strip rack, on a lit plinth. It opens as a
+ * non-modal panel (desktop popover rising from the jukebox that opened it, phone bottom sheet,
+ * phone-landscape side sheet). Escape / close button / outside tap close it; focus moves in on open
+ * and back to the jukebox on close. Gameplay keeps running underneath.
  */
-import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useThemeId } from '@dascade/ui';
 import { jukebox, showsPlaying, useJukebox } from '../audio/jukebox/index.ts';
 import { useApp } from '../app/store.ts';
@@ -11,18 +13,20 @@ import { useSkin } from '../themes/registry.ts';
 import { SkinBoundary } from '../themes/SkinBoundary.tsx';
 import { ThemedText } from '../themes/ThemedText.tsx';
 import { useSkinContext } from '../themes/ThemeHost.tsx';
-import { Art } from './Art.tsx';
+import { sortTracks } from './format.ts';
 import { Glyph } from './icons.tsx';
 import { Library, type LibraryActions } from './Library.tsx';
 import { Queue } from './Queue.tsx';
+import { Record } from './Record.tsx';
 import { Seek } from './Seek.tsx';
 import { useJukeboxPrefs } from './prefs.ts';
+import { selectionCode } from './strips.ts';
 import { Visualizer } from './visualizer/Visualizer.tsx';
 
 const DjPanel = lazy(() => import('./DjPanel.tsx'));
 
 export type PlayerLayout = 'popover' | 'sheet' | 'side';
-export type PlayerAnchor = 'top-right' | 'bottom-left' | 'bottom-right';
+export type PlayerAnchor = 'top-right' | 'bottom-left' | 'bottom-right' | 'floor';
 type Tab = 'library' | 'queue' | 'dj';
 
 const SHEET_MQ = '(max-width: 640px) and (min-height: 501px)';
@@ -96,6 +100,12 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
   const updateSettings = useApp((s) => s.updateSettings);
 
   const track = currentId ? (tracks.find((t) => t.id === currentId) ?? null) : null;
+  // The playing record's selection code (catalogue order, as on the title strips).
+  const code = useMemo(() => {
+    if (!currentId) return null;
+    const i = sortTracks(tracks, 'order').findIndex((t) => t.id === currentId);
+    return i >= 0 ? selectionCode(i) : null;
+  }, [tracks, currentId]);
   const followingRoom = source === 'room';
   const perm = jukebox.djPermissions();
   const roomLocked = followingRoom && !perm.control;
@@ -108,6 +118,35 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
     const panel = panelRef.current;
     if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
   }, [open]);
+
+  // Popover placement from what opened it: from the jukebox standing on the floor the machine rises
+  // from where it stands; from a toolbar control it drops down just below that button.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const panel = panelRef.current;
+    if (!open || layout !== 'popover' || !root || !panel) return;
+    if (anchor === 'floor') {
+      const machine = document.querySelector<HTMLElement>('[data-jukebox][data-dock="floor"] [data-part="machine"]');
+      if (!machine) return;
+      const m = machine.getBoundingClientRect();
+      root.style.setProperty('--jb-floor-left', `${Math.round(m.left)}px`);
+      const p = panel.getBoundingClientRect();
+      panel.style.transformOrigin = `${Math.round(m.left + m.width / 2 - p.left)}px ${Math.round(m.top + m.height / 2 - p.top)}px`;
+    } else if (anchor === 'top-right') {
+      const control = document.querySelector<HTMLElement>(
+        '[data-jukebox]:is([data-dock="slot"], [data-dock="topbar"]) [data-part="mini-open"]',
+      );
+      const r = control?.getBoundingClientRect();
+      if (!r || r.width === 0) {
+        root.style.removeProperty('--jb-anchor-top');
+        root.style.removeProperty('--jb-anchor-right');
+        return;
+      }
+      root.style.setProperty('--jb-anchor-top', `${Math.round(r.bottom + 8)}px`);
+      root.style.setProperty('--jb-anchor-right', `${Math.max(12, Math.round(window.innerWidth - r.right))}px`);
+      panel.style.transformOrigin = 'top right';
+    }
+  }, [open, anchor, layout]);
 
   // Outside tap closes (the dock and the player itself don't count).
   useEffect(() => {
@@ -197,37 +236,45 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
           </button>
         </header>
 
+        <span className="jb-pillar" data-side="l" aria-hidden />
+        <span className="jb-pillar" data-side="r" aria-hidden />
         <div className="jb-body">
-          <div className="jb-display" data-part="display" ref={displayRef} style={{ '--jb-level': 0 } as CSSProperties}>
-            <div className="jb-decor" data-part="decor" aria-hidden>
-              {open ? <Decor playing={playing} expanded={open} level={level} /> : null}
+          <div className="jb-dome" data-part="dome">
+            {/* The arched glass on top of the machine, the record turning behind it. */}
+            <div className="jb-dome__glass" data-part="dome-glass" aria-hidden>
+              <Record track={track} playing={playing} />
             </div>
-            <Art track={track} />
-            <div className="jb-now">
-              <p className="jb-now__label">
-                {followingRoom
-                  ? room?.playing
-                    ? 'Room is playing'
-                    : room?.current
-                      ? 'Room paused'
-                      : 'Room is quiet'
-                  : playing
-                    ? 'Now playing'
-                    : track
-                      ? wantPlaying
-                        ? 'Starting…'
-                        : 'Paused'
-                      : 'Pick a track'}
-              </p>
-              <p className="jb-now__title" data-part="track-title" title={track?.title}>
-                {track?.title ?? (libraryStatus === 'ready' ? 'Nothing playing' : 'Loading…')}
-              </p>
-              <p className="jb-now__artist" data-part="track-artist">
-                {track?.artist ?? (track ? 'DASCADE Jukebox' : ' ')}
-              </p>
-            </div>
-            <div className="jb-vis-wrap">
-              <Visualizer active={open} levelTarget={displayRef} onLevel={setLevel} />
+            <div className="jb-display" data-part="display" ref={displayRef} style={{ '--jb-level': 0 } as CSSProperties}>
+              <div className="jb-decor" data-part="decor" aria-hidden>
+                {open ? <Decor playing={playing} expanded={open} level={level} /> : null}
+              </div>
+              <div className="jb-now">
+                <p className="jb-now__label">
+                  {followingRoom
+                    ? room?.playing
+                      ? 'Room is playing'
+                      : room?.current
+                        ? 'Room paused'
+                        : 'Room is quiet'
+                    : playing
+                      ? 'Now playing'
+                      : track
+                        ? wantPlaying
+                          ? 'Starting…'
+                          : 'Paused'
+                        : 'Pick a song'}
+                  {code ? <span className="jb-now__code">{code}</span> : null}
+                </p>
+                <p className="jb-now__title" data-part="track-title" title={track?.title}>
+                  {track?.title ?? (libraryStatus === 'ready' ? 'Nothing playing' : 'Loading…')}
+                </p>
+                <p className="jb-now__artist" data-part="track-artist">
+                  {track?.artist ?? (track ? 'DASCADE Jukebox' : ' ')}
+                </p>
+              </div>
+              <div className="jb-vis-wrap">
+                <Visualizer active={open} levelTarget={displayRef} onLevel={setLevel} />
+              </div>
             </div>
           </div>
 
@@ -366,8 +413,8 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
           >
             {(
               [
-                ['library', 'Library'],
-                ['queue', queueLen ? `Queue · ${queueLen}` : 'Queue'],
+                ['library', 'Selections'],
+                ['queue', queueLen ? `Up next · ${queueLen}` : 'Up next'],
                 ...(showDj ? ([['dj', 'Room DJ']] as const) : []),
               ] as ReadonlyArray<readonly [Tab, string]>
             ).map(([value, label]) => (
@@ -403,6 +450,7 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
             )}
           </div>
         </div>
+        <span className="jb-plinth" data-part="plinth" aria-hidden />
       </section>
     </div>
   );

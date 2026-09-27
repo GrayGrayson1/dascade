@@ -59,6 +59,15 @@ function mixSettings(s: AppSettings): MixSettings {
 }
 
 const ctxNow = (): AudioContext | null => mixer.context();
+/**
+ * The context only while it actually runs. A suspended/interrupted context (iOS backgrounding, a call)
+ * has a frozen clock: nodes scheduled on it would all fire at once when it resumes, so sfx()/synth
+ * skip scheduling until then.
+ */
+const liveCtx = (): AudioContext | null => {
+  const c = mixer.context();
+  return c && c.state === 'running' ? c : null;
+};
 
 let audioInstalled = false;
 
@@ -83,6 +92,16 @@ export function installAudio(): void {
   for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click'] as const) {
     window.addEventListener(type, onGesture, { capture: true, passive: true });
   }
+  // Back from the background (or the bfcache): try to resume a context the OS suspended/interrupted
+  // without waiting for a tap. Where a gesture is still required it stays suspended — sfx()/synth
+  // skip scheduling meanwhile and the jukebox asks for a tap (core.ts, onContextState).
+  const wake = () => {
+    if (document.visibilityState !== 'visible') return;
+    const c = mixer.context();
+    if (c && c.state !== 'running' && c.state !== 'closed') void mixer.resume();
+  };
+  document.addEventListener('visibilitychange', wake);
+  window.addEventListener('pageshow', wake);
   useApp.subscribe((state, prev) => {
     if (state.settings === prev.settings) return;
     mixer.setSettings(mixSettings(state.settings));
@@ -217,7 +236,7 @@ const QUIET_SFX: ReadonlySet<SfxName> = new Set(['hover', 'tick', 'message', 'cl
 
 /** Play a UI/game sound effect. Safe to call anywhere; no-ops until audio is unlocked. */
 export function sfx(name: SfxName, minGapMs = 30): void {
-  if (!unlocked || !ctxNow()) return;
+  if (!unlocked || !liveCtx()) return;
   const s = useApp.getState().settings;
   if (s.muted || s.masterVolume <= 0 || s.sfxVolume <= 0) return;
   const now = performance.now();
@@ -234,20 +253,21 @@ export function sfx(name: SfxName, minGapMs = 30): void {
 /** Direct synth access for games that want custom procedural sounds. */
 export const synth = {
   tone: (opts: ToneOpts) => {
-    if (!unlocked) return;
+    if (!unlocked || !liveCtx()) return;
     if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN && (!opts.bus || opts.bus === mixer.buses()?.sfx)) mixer.sfxPriority();
     tone(opts);
   },
   noise: (opts: Parameters<typeof noise>[0]) => {
-    if (!unlocked) return;
+    if (!unlocked || !liveCtx()) return;
     if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN) mixer.sfxPriority();
     noise(opts);
   },
   /** Sustained sound (engine hum, loops): hold a gentle jukebox dip while `on` (mixPolicy 3b). */
   hold: (key: string, on: boolean) => mixer.sfxHold(key, on),
   note: NOTE,
+  /** The running context (null until unlocked, and while the OS has it suspended). */
   get context(): AudioContext | null {
-    return unlocked ? mixer.context() : null;
+    return unlocked ? liveCtx() : null;
   },
   get sfxBus(): GainNode | null {
     return mixer.buses()?.sfx ?? null;

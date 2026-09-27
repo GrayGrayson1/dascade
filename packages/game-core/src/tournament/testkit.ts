@@ -77,6 +77,19 @@ export function invariantViolations(engine: TournamentEngine): string[] {
       if (p?.status === 'eliminated') out.push(`${pid} is eliminated but plays ${m.id}`);
     }
   }
+  if (d.config.format === 'single_elimination' || d.config.format === 'double_elimination') {
+    // A bracket slot is filled only when its feeder finishes, so nobody ever sits in two unfinished matches
+    // (e.g. both brackets at once after a result change).
+    const slotted = new Map<string, string>();
+    for (const m of d.matches) {
+      if (isFinished(m)) continue;
+      for (const pid of [m.a, m.b]) {
+        if (!pid) continue;
+        if (slotted.has(pid)) out.push(`${pid} slotted in two unfinished matches (${slotted.get(pid)}, ${m.id})`);
+        slotted.set(pid, m.id);
+      }
+    }
+  }
   for (const m of d.matches) {
     if (isFinished(m) && m.status !== 'VOID' && m.resultKind !== 'bye' && m.resultKind !== 'double_forfeit' && !m.draw && !m.winner) {
       out.push(`${m.id} finished without a winner`);

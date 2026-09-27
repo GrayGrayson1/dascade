@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import type { GameId } from './catalog.ts';
 import { formatRaceTime } from './format.ts';
+import { GUEST_ID_PATTERN } from './protocol.ts';
 
 /** Per-player numeric extras a game may attach to an outcome: `details.playerStats[playerId][key] = n`. */
 export type PlayerStatsDetails = Record<string, Record<string, number>>;
@@ -199,12 +200,7 @@ export interface PlayerStatsResponse {
 
 /** Query accepted by GET /api/stats/me (the access token travels in the Authorization header). */
 export const StatsQuerySchema = z.object({
-  guestId: z
-    .string()
-    .min(4)
-    .max(64)
-    .regex(/^[A-Za-z0-9_-]+$/)
-    .optional(),
+  guestId: z.string().min(4).max(64).regex(GUEST_ID_PATTERN).optional(),
 });
 
 export const STATS_ROUTE = '/api/stats/me';

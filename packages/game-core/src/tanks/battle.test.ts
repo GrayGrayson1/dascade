@@ -181,6 +181,35 @@ describe('turn order', () => {
     expect(seq.filter((id) => id === 'b1')).toHaveLength(4);
   });
 
+  it('teams prefer present members: an absent teammate never burns the team turn', () => {
+    const rng = createSeededRng('presence');
+    const list: BattleEntrant[] = [
+      { id: 'a1', name: 'a1', color: '#fff', team: 0 },
+      { id: 'a2', name: 'a2', color: '#fff', team: 0 },
+      { id: 'b1', name: 'b1', color: '#fff', team: 1 },
+    ];
+    const b = createBattle(rng, list, { ...CONFIG, mode: 'teams' });
+    const present = (id: string) => id !== 'a2';
+    const seq: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const r = nextTurn(b, rng, present);
+      if (r.kind !== 'turn') throw new Error(r.kind);
+      seq.push(r.activeId);
+    }
+    expect(seq).not.toContain('a2');
+    expect(seq.filter((id) => id === 'a1')).toHaveLength(4);
+    expect(upcoming(b, 4, present)).not.toContain('a2');
+    // Nobody on a side present: that side still gets its turn (the room skips it quickly).
+    const ids = [nextTurn(b, rng, (id) => id === 'b1'), nextTurn(b, rng, (id) => id === 'b1')].map((r) => (r.kind === 'turn' ? r.activeId : ''));
+    expect(ids.some((id) => id.startsWith('a'))).toBe(true);
+    // Without a predicate the rotation is unchanged (everyone counts as present).
+    const plain = createBattle(createSeededRng('presence'), list, { ...CONFIG, mode: 'teams' });
+    const withAll = createBattle(createSeededRng('presence'), list, { ...CONFIG, mode: 'teams' });
+    const rngA = createSeededRng('x');
+    const rngB = createSeededRng('x');
+    for (let i = 0; i < 6; i++) expect(nextTurn(plain, rngA)).toEqual(nextTurn(withAll, rngB, () => true));
+  });
+
   it('changes the wind every turn within the configured bounds', () => {
     const { b, rng } = battle(3, { windMax: 15 });
     const winds = new Set<number>();

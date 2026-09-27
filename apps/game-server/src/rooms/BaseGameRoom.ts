@@ -304,8 +304,11 @@ export abstract class BaseGameRoom<
   // Colyseus lifecycle (do not override in game rooms)
   // ===========================================================================
 
-  /** Per-IP matchmaking throttle (applies to create/join before a seat is reserved). */
-  static override async onAuth(_token: string, _options: unknown, context: AuthContext): Promise<boolean> {
+  /**
+   * Per-IP matchmaking throttle (applies to create/join before a seat is reserved). Subclasses may
+   * return auth data instead of `true` (it becomes `client.auth`).
+   */
+  static override async onAuth(_token: string, _options: unknown, context: AuthContext): Promise<unknown> {
     // Never trust client-supplied X-Forwarded-For / X-Real-IP here (Colyseus' context.ip does):
     // the HTTP server stamps the socket address (or the trusted proxy hop) — see server.ts.
     const ip = ipRateKey(clientIpFromAuth(context));
@@ -340,6 +343,8 @@ export abstract class BaseGameRoom<
     // isn't kicked right after a network hiccup.
     this.maxMessagesPerSecond = 240;
     this.autoDispose = true;
+    // Rooms are reached by code only (joinById): never matched by join/joinOrCreate (see server.ts).
+    void this.setPrivate(true);
 
     const state = this.createState();
     state.gameId = this.gameId;
@@ -697,14 +702,18 @@ export abstract class BaseGameRoom<
     for (const p of this.seatedPlayers()) {
       if (!roster.has(p.id)) roster.set(p.id, { playerId: p.id, name: p.state.name, guestId: p.guestId, userId: p.userId, spectator: false });
     }
+    // Declared non-player placeholders (CPU tanks…) keep their place but are never credited.
+    const bots = new Set((outcome.nonPlayerIds ?? []).filter((id) => !roster.has(id)));
     const seen = new Set<string>();
     const placements = outcome.placements
-      .map((group) => group.filter((id) => roster.has(id) && !seen.has(id) && (seen.add(id), true)))
+      .map((group) => group.filter((id) => (roster.has(id) || bots.has(id)) && !seen.has(id) && (seen.add(id), true)))
       .filter((group) => group.length > 0);
-    if (placements.length === 0) return;
+    if (!placements.some((group) => group.some((id) => roster.has(id)))) return;
     this.outcomeReportedFor = this.matchSerial;
+    const { nonPlayerIds: _declared, ...rest } = outcome;
+    const placedBots = placements.flat().filter((id) => bots.has(id));
     emitOutcome(
-      { ...outcome, placements },
+      { ...rest, placements, ...(placedBots.length ? { nonPlayerIds: placedBots } : {}) },
       {
         gameId: this.gameId,
         roomCode: this.roomId,
@@ -1402,20 +1411,22 @@ export abstract class BaseGameRoom<
   private joinTournamentMatch(client: Client, options: JoinOptions): void {
     const binding = this.tournamentBinding!;
     const info = this.tournamentInfo!;
-    const participantId = options.ticket && binding.status !== 'closed' ? binding.tickets.get(options.ticket) : undefined;
+    const ticketed = options.ticket && binding.status !== 'closed' ? binding.tickets.get(options.ticket) : undefined;
+    // Only the match's current pair is seated (a stale ticket from before a re-pairing is not).
+    const entry = ticketed ? info.participants.find((p) => p.participantId === ticketed) : undefined;
+    const participantId = entry?.participantId;
     let record: PlayerRecord;
     let notice: string | null = null;
-    if (participantId) {
+    if (entry && participantId) {
       const existing = this.players.get(binding.playerOf.get(participantId) ?? '');
       if (existing) {
         this.rebind(existing, client);
         return;
       }
-      const entry = info.participants.find((p) => p.participantId === participantId);
-      record = this.createRecord(client, { ...options, name: entry?.name ?? options.name }, false, false);
+      record = this.createRecord(client, { ...options, name: entry.name }, false, false);
       record.data.tournamentParticipantId = participantId;
       binding.playerOf.set(participantId, record.id);
-      if (entry) entry.playerId = record.id;
+      entry.playerId = record.id;
       this.publishTournamentInfo();
     } else {
       if (!this.state.allowSpectators) throw new ServerError(JoinErrorCode.ROOM_LOCKED, 'Only the two tournament players can join this match.');

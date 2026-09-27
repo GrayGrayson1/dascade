@@ -1,6 +1,7 @@
 /**
  * Hosts the Phaser race view + HUD. The controller and Phaser game live for the
- * lifetime of this component; everything is torn down on unmount.
+ * lifetime of this component; everything is torn down on unmount. Theme and quality
+ * (fx / reduced motion) changes are pushed into the live scene — never a rebuild.
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CircuitPublicState } from '@dascade/shared/games/circuit';
@@ -26,6 +27,10 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
   const [ctrl] = useState(() => new RaceController(new HudBridge()));
   const fx = useApp((s) => s.settings.fx);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
+  /** Latest quality settings (read when the game is created and by theme updates). */
+  const quality = useRef({ fx, reducedMotion });
+  /** The live game + a theme re-apply, while mounted. */
+  const live = useRef<{ rg: RaceGame; applyTheme: () => void } | null>(null);
   const [loading, setLoading] = useState({ progress: 0, ready: false });
   const ui = useSyncExternalStore(ctrl.subscribeUi, ctrl.getUi, ctrl.getUi);
   const boostOn = useRoomSelector((s: CircuitPublicState) => {
@@ -58,13 +63,14 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
     // Theme materials re-present the world; read in scope of the stage (per-game nudges apply).
     const themeLook = () => {
       const t = readThemeTokens(el);
-      return { materials: t.materials, ambientRain: t.effects.ambient === 'rain' && fx !== 'off' && !reducedMotion };
+      const q = quality.current;
+      return { materials: t.materials, ambientRain: t.effects.ambient === 'rain' && q.fx !== 'off' && !q.reducedMotion };
     };
     const look = themeLook();
     const rg = createRaceGame(el, {
       controller: ctrl,
-      fx,
-      reducedMotion,
+      fx: quality.current.fx,
+      reducedMotion: quality.current.reducedMotion,
       mobile,
       materials: look.materials,
       ambientRain: look.ambientRain,
@@ -77,18 +83,33 @@ export function RaceStage({ dimmed }: { dimmed: boolean }) {
     });
     const ro = new ResizeObserver(() => rg.resize(el.clientWidth, el.clientHeight));
     ro.observe(el);
-    const offTheme = subscribeThemeTokens(() => {
+    const applyTheme = () => {
       const next = themeLook();
       rg.scene.setTheme(next.materials, next.ambientRain);
-    });
+    };
+    const offTheme = subscribeThemeTokens(applyTheme);
+    live.current = { rg, applyTheme };
     window.__CIRCUIT__ = { game: rg.game, controller: ctrl };
     return () => {
+      live.current = null;
       offTheme();
       ro.disconnect();
       rg.destroy();
       if (window.__CIRCUIT__?.controller === ctrl) delete window.__CIRCUIT__;
     };
-  }, [ctrl, fx, reducedMotion, fontsReady]);
+  }, [ctrl, fontsReady]);
+
+  // FX level / reduced motion: re-present the running race in place (canvas, effects and
+  // camera keep going), the same way theme changes are applied.
+  useEffect(() => {
+    const prev = quality.current;
+    if (prev.fx === fx && prev.reducedMotion === reducedMotion) return;
+    quality.current = { fx, reducedMotion };
+    const game = live.current;
+    if (!game) return;
+    game.rg.setQuality(fx, reducedMotion);
+    game.applyTheme(); // theme rain is gated by fx / reduced motion
+  }, [fx, reducedMotion]);
 
   return (
     <div className="ci-race" data-part="race" data-dimmed={dimmed ? 'true' : undefined}>

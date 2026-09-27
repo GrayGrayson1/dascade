@@ -12,11 +12,11 @@ import {
   type GameId,
 } from '@dascade/shared';
 import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Tabs, TextInput, Toggle } from '@dascade/ui';
-import { useApp, type FxLevel } from '../app/store.ts';
+import { selectCanPlay, useApp, type FxLevel } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { session } from '../net/session.ts';
 import { AudioSettings } from '../audio/AudioSettings.tsx';
-import { ProfileEditor } from './common.tsx';
+import { ProfileEditor, commitProfileName } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
 import { ProfileTabs } from './profile/ProfileTabs.tsx';
 import { ThemePicker } from '../themes/ThemePicker.tsx';
@@ -304,7 +304,7 @@ function JoinModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const profileConfirmed = useApp((s) => s.profileConfirmed);
+  const canPlay = useApp(selectCanPlay);
   useEffect(() => {
     if (open) {
       setCode('');
@@ -315,6 +315,12 @@ function JoinModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const c = normalizeRoomCode(code);
     if (c.length !== ROOM_CODE_LENGTH) {
       setError('Room codes are 5 characters.');
+      return;
+    }
+    if (busy) return;
+    // Commit the typed name here: tapping "Join game" doesn't blur the name field on iOS.
+    if (!commitProfileName()) {
+      setError('Pick a name first so your team knows who you are.');
       return;
     }
     setBusy(true);
@@ -337,7 +343,7 @@ function JoinModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={busy} icon="play" onClick={submit} disabled={!profileConfirmed}>
+          <Button variant="primary" loading={busy} icon="play" onClick={submit} disabled={!canPlay}>
             Join game
           </Button>
         </>
@@ -370,7 +376,7 @@ function JoinModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           )}
         </Field>
         <ProfileEditor compact />
-        {!profileConfirmed ? (
+        {!canPlay ? (
           <p className="dc-field__hint">
             <PixelIcon name="info" /> Pick a name first so your team knows who you are.
           </p>

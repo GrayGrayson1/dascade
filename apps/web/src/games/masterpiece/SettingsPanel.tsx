@@ -136,22 +136,32 @@ function CustomPrompts({ canEdit, customCount }: { canEdit: boolean; customCount
   const [draft, setDraft] = useState(() => serverList?.prompts.join('\n') ?? '');
   const focused = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Text typed but not sent yet (the debounce is still running). */
+  const pending = useRef<string | null>(null);
 
   useEffect(() => {
     if (!focused.current && serverList) setDraft(serverList.prompts.join('\n'));
   }, [serverList]);
-  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
   const sendNow = useCallback((text: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    pending.current = null;
     const prompts = splitPromptList(text)
       .slice(0, MP_LIMITS.customPromptsMax * 2)
       .map((p) => p.slice(0, MP_LIMITS.customPromptMax * 2));
     session.send(MASTERPIECE_MSG.prompts, { prompts });
   }, []);
+  // Closing the panel (or starting the game) mid-debounce flushes the last edits instead of dropping them.
+  useEffect(
+    () => () => {
+      if (pending.current !== null) sendNow(pending.current);
+    },
+    [sendNow],
+  );
   const onChange = (text: string) => {
     setDraft(text);
+    pending.current = text;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => sendNow(text), 500);
   };

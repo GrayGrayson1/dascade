@@ -244,6 +244,27 @@ describe('showdown reveal with an all-in and a side pot still being bet', () => 
     expect(h.result!.shown.map((s) => s.seat)).toEqual([0]);
     expect(h.result!.mucked).toEqual([1]);
   });
+
+  it('a mucked hand never shows up in the winner’s kicker note', () => {
+    const run = (policy: 'all' | 'winners') => {
+      // Same pair of aces: seat 0's king kicker beats seat 1's queen.
+      const h = rigged({ 0: 5000, 1: 5000 }, 0, { 0: ['Ac', 'Kd'], 1: ['As', 'Qd'] }, ['Ah', '8h', '5c', '9s', '4d']);
+      play(h, 0, 'call');
+      play(h, 1, 'check');
+      while (h.stage !== 'showdown') {
+        if (h.stage === 'street-complete') dealNextStreet(h);
+        else play(h, h.toAct, 'check');
+      }
+      return resolveShowdown(h, policy);
+    };
+    const plain = evaluateBest(['Ac', 'Kd', 'Ah', '8h', '5c', '9s', '4d']).description;
+    // Both hands tabled: the kicker that decided it is public anyway.
+    expect(run('all').winners[0]!.description).toBe(`${plain} (King kicker)`);
+    // The loser mucks: nothing about their hand (not even "it lost on the kicker") may leak.
+    const winnersOnly = run('winners');
+    expect(winnersOnly.mucked).toEqual([1]);
+    expect(winnersOnly.winners[0]!.description).toBe(plain);
+  });
 });
 
 describe('button and blinds across busts', () => {

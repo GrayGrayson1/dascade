@@ -66,6 +66,11 @@ export interface Mixer {
   sfxHolds(): number;
   /** Subscribe to "context created" (fires immediately if it already exists). */
   onContext(cb: (ctx: AudioContext) => void): () => void;
+  /**
+   * Subscribe to the context's state changes (suspended / interrupted by the OS, e.g. iOS
+   * backgrounding or a call, and running again). Read the state with isRunning().
+   */
+  onStateChange(cb: () => void): () => void;
 }
 
 export interface MixerDeps {
@@ -96,6 +101,7 @@ export function createMixer(deps: MixerDeps): Mixer {
   const routed = new WeakSet<HTMLMediaElement>();
   const refused = new WeakSet<HTMLMediaElement>();
   const contextListeners = new Set<(ctx: AudioContext) => void>();
+  const stateListeners = new Set<() => void>();
   const random = deps.random ?? Math.random;
 
   function apply(immediate = false): void {
@@ -120,7 +126,11 @@ export function createMixer(deps: MixerDeps): Mixer {
     const next = jukeboxDuckBase(settings, flags, holds.size > 0);
     if (next === duckBase) return;
     duckBase = next;
-    buses.jukeboxDuck.gain.setTargetAtTime(next, ctx.currentTime, SFX_HOLD_RAMP);
+    // A dip from sfxPriority() queues its release to the OLD resting level at lastDuck + SFX_DUCK_HOLD.
+    // Started any earlier, this change would be overridden by that stale release (the jukebox stuck
+    // at the hold level, or the hold lost), so it starts no earlier than the release and wins.
+    const at = Math.max(ctx.currentTime, lastDuck + SFX_DUCK_HOLD);
+    buses.jukeboxDuck.gain.setTargetAtTime(next, at, SFX_HOLD_RAMP);
   }
 
   const mixer: Mixer = {
@@ -135,6 +145,11 @@ export function createMixer(deps: MixerDeps): Mixer {
         return null;
       }
       ctx = created;
+      if (typeof created.addEventListener === 'function') {
+        created.addEventListener('statechange', () => {
+          for (const cb of [...stateListeners]) cb();
+        });
+      }
       const master = created.createGain();
       const comp = created.createDynamicsCompressor();
       comp.threshold.value = -14;
@@ -224,6 +239,10 @@ export function createMixer(deps: MixerDeps): Mixer {
       contextListeners.add(cb);
       if (ctx) cb(ctx);
       return () => contextListeners.delete(cb);
+    },
+    onStateChange(cb) {
+      stateListeners.add(cb);
+      return () => stateListeners.delete(cb);
     },
   };
   return mixer;

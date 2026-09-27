@@ -638,6 +638,43 @@ describe('DAS Ships room', () => {
     expect(host.privates.at(-1)).toMatchObject({ matchNo: matchNo + 1, vessels: LAYOUT_B });
   });
 
+  it('rematch offers: toggling never floods the chat, and an offline opponent cannot be offered one', async () => {
+    const { host, guest } = await duel();
+    await toBattle(host, guest);
+    host.room.send(SHIPS_MSG.resign, {});
+    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    const announced = () => guest.inbox.filter((m) => m.type === 'chat:msg' && JSON.stringify(m.payload).includes('wants a rematch')).length;
+    for (let i = 0; i < 4; i++) {
+      host.room.send(SHIPS_MSG.rematch, { want: true });
+      await waitFor(() => st(host).rematch.includes(host.me().playerId), 2000, `offer ${i + 1}`);
+      host.room.send(SHIPS_MSG.rematch, { want: false });
+      await waitFor(() => !st(host).rematch.includes(host.me().playerId), 2000, `withdrawn ${i + 1}`);
+    }
+    host.room.send(SHIPS_MSG.rematch, { want: true });
+    await waitFor(() => host.errors.some((e) => e.type === SHIPS_MSG.rematch && e.code === 'rate_limited'), 2000, 'offer cap');
+    expect(lastError(host)!.message).toMatch(/enough rematch offers/);
+    await sleep(100);
+    expect(announced()).toBe(1);
+  });
+
+  it('a rematch needs the opponent connected: an offer from a captain who then drops cannot be accepted', async () => {
+    const { host, guest } = await duel();
+    await toBattle(host, guest);
+    host.room.send(SHIPS_MSG.resign, {});
+    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    const guestId = guest.me().playerId;
+    guest.room.send(SHIPS_MSG.rematch, { want: true });
+    await waitFor(() => st(host).rematch.includes(guestId), 3000, 'guest offer');
+    guest.room.reconnection.enabled = false;
+    (guest.room as any).connection.transport.ws.close(4010);
+    await waitFor(() => st(host).players[guestId]?.connected === false, 3000, 'guest offline (grace)');
+    host.room.send(SHIPS_MSG.rematch, { want: true });
+    await waitFor(() => host.errors.some((e) => e.type === SHIPS_MSG.rematch), 3000, 'accept refused');
+    expect(lastError(host)!.message).toMatch(/not connected/);
+    await sleep(100);
+    expect(st(host).phase).toBe('RESULTS');
+  });
+
   it("tournament matches: the 'first' side fires first, untimed games get a turn clock, no casual rematch", async () => {
     const { host, guest, server } = await duel({ turnSeconds: 0 });
     const info = {

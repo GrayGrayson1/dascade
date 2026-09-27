@@ -50,6 +50,8 @@ export const BjSeat = schema(
     handsWon: t.uint32().default(0),
     blackjacks: t.uint32().default(0),
     biggestWin: t.number().default(0),
+    /** Bumps on every accepted decision (and each new round): actions carry it, so a repeat can't apply twice. */
+    actionSeq: t.uint32().default(0),
   },
   'BjSeat',
 );

@@ -17,6 +17,8 @@ import { ensureIdentityLoaded } from './statsLoader.ts';
 import { statsPersistence } from './statsPersistence.ts';
 
 const limiter = new KeyedRateLimiter(config.relaxedLimits ? { burst: 5000, perSecond: 500 } : { burst: 60, perSecond: 2 });
+/** How long a request waits for the database before answering with what this process holds. */
+const LOAD_WAIT_MS = 3_000;
 
 function bearer(req: express.Request): string | null {
   const raw = req.headers.authorization;
@@ -48,7 +50,13 @@ export function registerStatsRoutes(app: express.Application): void {
       persisted: statsPersistence.enabled,
     };
     if (identity) {
-      await ensureIdentityLoaded(identity);
+      // Hydration may be retrying (database hiccup): don't hold the request for it.
+      const load = ensureIdentityLoaded(identity);
+      if (load) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([load.catch(() => undefined), new Promise<void>((resolve) => (timer = setTimeout(resolve, LOAD_WAIT_MS)))]);
+        clearTimeout(timer);
+      }
       body.games = statsForIdentity(identity);
       body.ratings = ratingsForIdentity(identity);
     }

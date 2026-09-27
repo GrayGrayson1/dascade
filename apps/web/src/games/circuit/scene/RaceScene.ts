@@ -29,7 +29,8 @@ export interface SceneOptions {
 }
 
 export class RaceScene extends Phaser.Scene {
-  private readonly opts: SceneOptions;
+  /** fx / reducedMotion change in place through setQuality(); the rest is fixed. */
+  private opts: SceneOptions;
   private world: World | null = null;
   private worldTrack = '';
   private fx!: Effects;
@@ -59,21 +60,59 @@ export class RaceScene extends Phaser.Scene {
 
   create(): void {
     makeFxTextures(this);
-    const fx = this.opts.fx;
     this.fx = new Effects(this, this.fxQuality());
     this.buildWorld();
     const cam = this.cameras.main;
     cam.setBackgroundColor(this.world?.background ?? '#070814');
-    if (fx === 'high' && this.game.renderer.type === Phaser.WEBGL) {
-      const bloom = Phaser.Actions.AddEffectBloom(cam, { threshold: 0.62, blurRadius: 2, blurSteps: 3, blurQuality: 0, blendAmount: 0.55 });
-      this.bloom = bloom[0]?.parallelFilters ?? null;
-    }
-    if (fx !== 'off' && this.game.renderer.type === Phaser.WEBGL) {
-      this.vignette = cam.filters.external.addVignette(0.5, 0.5, 0.85, 0.42);
-    }
+    this.applyFilters();
     const start = this.opts.controller.track.grid[0]!;
     this.camX = start.x;
     this.camY = start.y;
+  }
+
+  /**
+   * Camera post effects for the FX level: bloom (high) then vignette (high/low), WebGL only.
+   * Created on first need and toggled afterwards; the watchdog's first step turns both off.
+   */
+  private applyFilters(): void {
+    if (this.game.renderer.type !== Phaser.WEBGL) return;
+    const cam = this.cameras.main;
+    const fx = this.opts.fx;
+    if (fx === 'high' && !this.bloom) {
+      // Keep the build order (bloom, then vignette): re-add an existing vignette after the bloom.
+      if (this.vignette) {
+        cam.filters.external.remove(this.vignette, true);
+        this.vignette = null;
+      }
+      const bloom = Phaser.Actions.AddEffectBloom(cam, { threshold: 0.62, blurRadius: 2, blurSteps: 3, blurQuality: 0, blendAmount: 0.55 });
+      this.bloom = bloom[0]?.parallelFilters ?? null;
+    }
+    if (fx !== 'off' && !this.vignette) this.vignette = cam.filters.external.addVignette(0.5, 0.5, 0.85, 0.42);
+    const allowed = this.perf.level < 1;
+    if (this.bloom) this.bloom.active = fx === 'high' && allowed;
+    if (this.vignette) this.vignette.active = fx !== 'off' && allowed;
+  }
+
+  /**
+   * FX level / reduced motion changed: re-present in place like setTheme — no scene restart,
+   * no state reset, no timing change. Effects, world detail/resolution, camera filters and car
+   * glow follow; camera lead, zoom and shake read the options every frame. An explicit change
+   * resets the adaptive-quality watchdog (as rebuilding the game used to). Safe before create().
+   */
+  setQuality(fx: FxLevel, reducedMotion: boolean): void {
+    if (fx === this.opts.fx && reducedMotion === this.opts.reducedMotion) return;
+    this.opts = { ...this.opts, fx, reducedMotion };
+    Object.assign(this.perf, { acc: 0, frames: 0, slow: 0, level: 0, since: performance.now() });
+    if (!this.world) return;
+    this.fx.setQuality(this.fxQuality());
+    this.world.setQuality(this.quality());
+    this.applyFilters();
+    const glow = this.glowAlpha();
+    for (const view of this.cars.values()) view.setGlowAlpha(glow);
+  }
+
+  private glowAlpha(): number {
+    return this.opts.fx === 'high' ? 0.5 : this.opts.fx === 'low' ? 0.34 : 0.2;
   }
 
   private fxQuality() {
@@ -203,7 +242,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private syncCars(frame: RaceFrame, now: number, dt: number): void {
-    const glowAlpha = this.opts.fx === 'high' ? 0.5 : this.opts.fx === 'low' ? 0.34 : 0.2;
+    const glowAlpha = this.glowAlpha();
     const labelScale = Math.max(0.85, Math.min(1.5, 1 / Math.max(0.4, this.camZoom)));
     for (const car of frame.cars) {
       let view = this.cars.get(car.slot);

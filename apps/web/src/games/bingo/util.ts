@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BINGO_LETTERS, type BingoCardPayload, type BingoPlanRound, type BingoPublicState, type BingoSettings } from '@dascade/shared/games/bingo';
 import { columnForNumber, letterForNumber } from '@dascade/game-core/bingo';
 import { useApp } from '../../app/store.ts';
+import { synth } from '../../audio/audio.ts';
 import { useLatestMessage } from '../../net/hooks.ts';
 
 /** Ball / column colors: B sky · I violet · N pink · G green · O amber. */
@@ -150,18 +151,38 @@ export function voiceSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
 }
 
+/** Mixer focus key: the caller's voice is a sustained game sound, so it holds the jukebox dip while it talks. */
+const VOICE_HOLD = 'bingo-voice';
+/** The utterance being spoken (also keeps it referenced: some engines drop `onend` for collected utterances). */
+let speaking: SpeechSynthesisUtterance | null = null;
+
 export function speak(text: string): void {
   if (!voiceSupported()) return;
   const { muted, masterVolume, sfxVolume } = useApp.getState().settings;
-  if (muted || masterVolume <= 0) return;
+  // The voice is a game sound: SFX volume 0 (or mute) silences it like every other effect.
+  if (muted || masterVolume <= 0 || sfxVolume <= 0) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.92;
     u.pitch = 1.05;
     u.volume = Math.min(1, masterVolume * Math.max(0.3, sfxVolume));
+    const done = () => {
+      if (speaking !== u) return; // a newer call took over (it manages the hold now)
+      speaking = null;
+      synth.hold(VOICE_HOLD, false);
+    };
+    u.onstart = () => {
+      if (speaking === u) synth.hold(VOICE_HOLD, true);
+    };
+    u.onend = done;
+    u.onerror = done;
     window.speechSynthesis.cancel();
+    synth.hold(VOICE_HOLD, false); // the cancelled call (if any) is over
+    speaking = u;
     window.speechSynthesis.speak(u);
   } catch {
+    speaking = null;
+    synth.hold(VOICE_HOLD, false);
     /* speech is a nicety */
   }
 }

@@ -715,7 +715,8 @@ function sendSeed(seed: string): void {
 
 /**
  * The fixed card seed is private: it never goes into the (public) settings, because anyone who
- * knows it can work out every card. Only the host who typed it sees it until the results screen.
+ * knows it can work out every card. Only the host who typed it ever sees it: each game deals from
+ * a one-way seed derived from it, and the results screen reveals only that game's seed.
  */
 function SeedField({ canEdit }: { canEdit: boolean }) {
   const isSet = useRoomSelector((st: BingoPublicState) => Boolean(st.customSeed)) ?? false;
@@ -728,7 +729,7 @@ function SeedField({ canEdit }: { canEdit: boolean }) {
       <p className="dc-field__hint">
         <PixelIcon name="lock" />{' '}
         {isSet
-          ? 'The host set a fixed card seed. It stays secret until the results screen, where anyone can verify their card.'
+          ? 'The host set a fixed card seed. It stays secret; each game’s own card seed is revealed on the results screen so anyone can verify their card.'
           : 'Cards come from a fresh secret seed, revealed on the results screen so anyone can verify their card.'}
       </p>
     );
@@ -738,7 +739,7 @@ function SeedField({ canEdit }: { canEdit: boolean }) {
       label="Card seed (private)"
       hint={
         local
-          ? 'Fixed seed: the same seat order gets the same cards every game (great for printed cards). Only you see it until the results screen — anyone who knows it can work out every card.'
+          ? 'Fixed seed: the same seed deals the same series of games — game 1, 2, 3… each get their own cards for the same seat order. Only you ever see it (results show just that game’s card seed); anyone who guesses it can work out every card, so pick something hard to guess.'
           : hiddenSet
             ? 'A fixed seed was set by the previous host. It stays hidden; type a new one or clear it.'
             : 'Blank = a fresh secret seed every game. It is revealed on the results screen so anyone can verify their card.'

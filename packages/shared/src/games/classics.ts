@@ -31,7 +31,7 @@ export const CLASSICS = {
   maxBatchEvents: 240,
   /** Most input events that may share one tick (flood guard). */
   maxEventsPerTick: 8,
-  /** Longest verified run (ticks) — 60 minutes of play. */
+  /** Longest verified run (ticks) — 60 minutes of play; a run that reaches it ends with reason 'time'. */
   maxRunTicks: 60 * 60 * 60,
   /** Most input events a whole run may carry. */
   maxRunEvents: 250_000,
@@ -77,8 +77,12 @@ export const RunInputBatchSchema = z.object({
   runId: z.string().min(1).max(RUN_ID_MAX),
   /** 1-based batch sequence (strictly consecutive; duplicates are ignored). */
   seq: z.number().int().min(1).max(1_000_000),
-  /** The client simulated through this tick (its engine's tick counter after stepping). */
-  upTo: z.number().int().min(0).max(CLASSICS.maxRunTicks),
+  /**
+   * The client simulated through this tick (its engine's tick counter after stepping). Clients stop
+   * at CLASSICS.maxRunTicks; a batch that crosses it (e.g. an older client) still reaches the server,
+   * which ends the run at the cap with a real verdict instead of dropping the batch.
+   */
+  upTo: z.number().int().min(0).max(CLASSICS.maxRunTicks * 2),
   /**
    * Flattened [dt, code, dt, code, …]: dt is the tick delta from the previous event (the first
    * one from the previous batch's `upTo`), code is a game-specific input code.

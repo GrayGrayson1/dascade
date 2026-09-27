@@ -2,6 +2,7 @@
  * Answer input per question type (live) and the revealed answer (after lock-out).
  */
 import { useState, type CSSProperties } from 'react';
+import { SYS } from '@dascade/shared';
 import {
   TRIVIA_LIMITS,
   TRIVIA_MSG,
@@ -13,7 +14,7 @@ import {
 } from '@dascade/shared/games/trivia';
 import { parseNumberAnswer } from '@dascade/game-core/party';
 import { Button, PixelIcon, cx } from '@dascade/ui';
-import { session } from '../../net/hooks.ts';
+import { session, useRoomMessage } from '../../net/hooks.ts';
 import { AnswerGrid, LockNote, TypedAnswer } from '../_party/index.ts';
 
 function send(seq: number, answer: TriviaAnswerInput) {
@@ -36,8 +37,12 @@ export interface LiveAnswerProps {
 }
 
 export function LiveAnswer({ view, priv, canAnswer, blockedText, answeredCount, eligibleCount }: LiveAnswerProps) {
-  // Optimistic pick (until the private echo arrives), keyed by question.
+  // Optimistic pick (until the private echo arrives), keyed by question. A refused answer (e.g. the
+  // host paused the game) is rolled back so it can be sent again.
   const [pending, setPending] = useState<{ seq: number; answer: TriviaAnswerInput } | null>(null);
+  useRoomMessage<{ type?: string }>(SYS.error, (e) => {
+    if (e?.type === TRIVIA_MSG.answer) setPending(null);
+  });
   const locked = priv?.answer ?? (pending?.seq === view.seq ? pending.answer : null);
   const submit = (answer: TriviaAnswerInput) => {
     if (locked || !canAnswer) return;

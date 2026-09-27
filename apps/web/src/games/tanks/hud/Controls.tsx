@@ -58,6 +58,10 @@ function HoldButton({
     onUp();
   };
   useEffect(() => () => end(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A disabled button gets no pointerup/keyup: stop the repeat when it disables mid-hold (limit reached, turn over).
+  useEffect(() => {
+    if (disabled) end();
+  }, [disabled]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <button
       type="button"

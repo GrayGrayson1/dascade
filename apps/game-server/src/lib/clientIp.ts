@@ -6,12 +6,17 @@
  * (so without a proxy every client shared one "unknown" bucket). Instead, the HTTP server
  * stamps every request with the address we actually trust (see server.ts), per TRUST_PROXY:
  *   - auto (default): if the TCP peer is loopback/private (a reverse proxy on the platform's
- *     network: Fly, Render, Railway, k8s, nginx), use the right-most X-Forwarded-For entry — the
- *     one that proxy appended; a public peer is a direct client, so its headers are ignored.
+ *     network: Fly, Render, Railway, k8s, nginx), walk X-Forwarded-For from the right, skipping
+ *     proxy hops (private/loopback addresses and Cloudflare's published edge ranges — Render and
+ *     many hosts sit behind Cloudflare, whose edge IP would otherwise put a whole region in one
+ *     bucket), and use the first remaining address: the one the outermost proxy appended. Entries
+ *     further left are client-supplied and never read. A public peer is a direct client, so its
+ *     headers are ignored.
  *   - 0: always the TCP peer address.
  *   - n: the n-th address from the right of X-Forwarded-For (n trusted proxy hops).
  */
 import type { IncomingMessage } from 'node:http';
+import { BlockList, isIP } from 'node:net';
 import type { AuthContext } from '@colyseus/core';
 
 export const CLIENT_IP_HEADER = 'x-dascade-client-ip';
@@ -47,16 +52,59 @@ export function isPrivateAddress(ip: string): boolean {
   return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
 }
 
+/**
+ * Cloudflare's published edge ranges (https://www.cloudflare.com/ips/, fetched 2026-09-27). Refresh
+ * them if Cloudflare announces changes; a missing range only makes that edge's clients share a bucket.
+ */
+const CLOUDFLARE_V4 = [
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+  '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+  '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+];
+const CLOUDFLARE_V6 = ['2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'];
+
+const cloudflare = new BlockList();
+for (const [ranges, type] of [[CLOUDFLARE_V4, 'ipv4'], [CLOUDFLARE_V6, 'ipv6']] as const) {
+  for (const range of ranges) {
+    const [net = '', prefix = ''] = range.split('/');
+    cloudflare.addSubnet(net, Number(prefix), type);
+  }
+}
+
+/** A Cloudflare edge address (a proxy hop, never a client). */
+export function isCloudflareAddress(ip: string): boolean {
+  const addr = stripMapped(ip);
+  const family = isIP(addr);
+  return family !== 0 && cloudflare.check(addr, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+function forwardedFor(req: IncomingMessage): string[] {
+  const raw = req.headers['x-forwarded-for'];
+  return (Array.isArray(raw) ? raw.join(',') : (raw ?? ''))
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export function resolveClientIp(req: IncomingMessage, mode: TrustProxy = trustProxy): string {
   const peer = stripMapped(req.socket?.remoteAddress ?? '');
-  const hops = mode === 'auto' ? (peer && isPrivateAddress(peer) ? 1 : 0) : mode;
-  if (hops > 0) {
-    const raw = req.headers['x-forwarded-for'];
-    const list = (Array.isArray(raw) ? raw.join(',') : (raw ?? ''))
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (list.length > 0) return stripMapped(list[Math.max(0, list.length - hops)] ?? peer);
+  if (mode === 'auto') {
+    if (!peer || !isPrivateAddress(peer)) return peer;
+    // Behind a proxy: the right-most hop that isn't itself a proxy is the client. Stop at anything
+    // malformed (no trusted proxy wrote it) and fall back to the last proxy hop seen.
+    let candidate = peer;
+    const list = forwardedFor(req);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const addr = stripMapped(list[i]!);
+      if (isIP(addr) === 0) break;
+      candidate = addr;
+      if (!isPrivateAddress(addr) && !isCloudflareAddress(addr)) return addr;
+    }
+    return candidate;
+  }
+  if (mode > 0) {
+    const list = forwardedFor(req);
+    if (list.length > 0) return stripMapped(list[Math.max(0, list.length - mode)] ?? peer);
   }
   return peer;
 }

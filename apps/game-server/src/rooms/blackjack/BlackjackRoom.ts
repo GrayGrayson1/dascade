@@ -66,6 +66,8 @@ const PACE = {
   settle: 5200,
   shuffle: 2000,
   afterDecisions: 450,
+  /** Decision clock of a player who dropped (still in their reconnect grace): capped to this. */
+  disconnectDecision: 8000,
 } as const;
 type PaceKey = keyof typeof PACE;
 
@@ -136,6 +138,8 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
   private pace = 1;
   private rulesDirty = false;
   private readonly decisionTimers = new Set<string>();
+  /** Each deciding seat's full deadline (a dropped player's clock is cut short; coming back restores it). */
+  private readonly decisionDeadlines = new Map<string, number>();
   /** Guest ids of seated players who left while their seat was still being settled. */
   private readonly leftGuests = new Map<string, string>();
   /** Stacks of players who left, restored if the same browser sits down again this game. */
@@ -184,7 +188,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     });
     this.handle(BLACKJACK_MSG.lock, BlackjackLockSchema, (p, { locked }) => this.onLock(p, locked), { phases, playersOnly: true });
     this.handle(BLACKJACK_MSG.sit, BlackjackSitSchema, (p, { seat }) => this.onSit(p, seat), { phases, playersOnly: true });
-    this.handle(BLACKJACK_MSG.action, BlackjackActionSchema, (p, { action, hand }) => this.onAction(p, action, hand), {
+    this.handle(BLACKJACK_MSG.action, BlackjackActionSchema, (p, { action, hand, seq }) => this.onAction(p, action, hand, seq), {
       phases,
       playersOnly: true,
       rate: { burst: 10, perSecond: 6 },
@@ -193,6 +197,34 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     this.handle(BLACKJACK_MSG.refill, BlackjackEmptySchema, (p) => this.onRefill(p), { phases, playersOnly: true, rate: RATE.heavy });
     this.handle(BLACKJACK_MSG.queue, BlackjackEmptySchema, (p) => this.onQueue(p), { phases });
     this.handle(BLACKJACK_MSG.end, BlackjackEmptySchema, () => this.onEndRequest(), { phases, hostOnly: true });
+  }
+
+  /**
+   * The closing leaderboard ranks chips, and a removed player drops to the bottom of it — so while
+   * the table runs, the host can't remove anyone who still has chips at it (e.g. the chip leader
+   * right before closing the table). Moderation works as usual before and after the game.
+   */
+  protected override kickBlocker(target: PlayerRecord): string | null {
+    if (this.phase !== 'PLAYING') return null;
+    const seat = this.state.seats.get(target.id);
+    if (!seat || seat.left) return null;
+    if (seat.balance + seat.bet > 0 || this.round?.seat(target.id)) return 'Players with chips at the table can’t be removed mid-game — end the game first.';
+    return null;
+  }
+
+  /**
+   * "Back to lobby" / "Close room" mid-game closes the table properly first, so the session is still
+   * reported. A round in play is never voided for it: the table closes once that round is settled
+   * (as with "End game"), and the host is told to try again then.
+   */
+  protected override hostEndsMatch(): string | null {
+    if (this.phase !== 'PLAYING') return null;
+    if (this.roundLive()) {
+      this.onEndRequest();
+      return 'A round is in play — the table closes once it’s settled. Try again then.';
+    }
+    this.finishGame();
+    return null;
   }
 
   protected override onPlayerJoined(player: PlayerRecord): void {
@@ -546,6 +578,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
       seat.hands.clear();
       if (playing) {
         seat.lastBet = seat.bet;
+        seat.actionSeq += 1;
         const hand = new BjHand();
         hand.bet = seat.bet;
         seat.hands.push(hand);
@@ -681,14 +714,28 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     this.checkDecisionsComplete();
   }
 
+  /** A fresh decision clock for this seat (the table's full decision time). */
   private armDecisionTimer(id: string): void {
-    const ms = this.tableRules.decisionSeconds * 1000;
+    this.decisionDeadlines.set(id, Date.now() + this.tableRules.decisionSeconds * 1000);
+    this.scheduleDecision(id);
+  }
+
+  /**
+   * (Re)schedules a seat's decision timeout: its full deadline, or — while its player's connection is
+   * down — at most a few seconds, so one dropped player can't hold the whole table for the full clock.
+   */
+  private scheduleDecision(id: string): void {
+    const full = this.decisionDeadlines.get(id);
+    if (full === undefined) return;
+    const now = Date.now();
+    const deadline = this.players.get(id)?.client ? full : Math.min(full, now + this.ms('disconnectDecision'));
     const key = `decide:${id}`;
     const seat = this.state.seats.get(id);
-    if (seat) seat.deadline = Date.now() + ms;
+    if (seat) seat.deadline = deadline;
     this.decisionTimers.add(key);
-    this.schedule(key, ms, () => {
+    this.schedule(key, Math.max(0, deadline - now), () => {
       this.decisionTimers.delete(key);
+      this.decisionDeadlines.delete(id);
       this.timeoutSeat(id, 'Time is up — standing on your remaining hands.');
     });
   }
@@ -697,6 +744,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     const key = `decide:${id}`;
     this.cancel(key);
     this.decisionTimers.delete(key);
+    this.decisionDeadlines.delete(id);
     const seat = this.state.seats.get(id);
     if (seat) seat.deadline = 0;
   }
@@ -708,14 +756,18 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     this.state.phaseEndsAt = latest;
   }
 
-  private onAction(player: PlayerRecord, action: 'hit' | 'stand' | 'double' | 'split' | 'surrender', hand: number): void {
+  private onAction(player: PlayerRecord, action: 'hit' | 'stand' | 'double' | 'split' | 'surrender', hand: number, seq?: number): void {
     const type = BLACKJACK_MSG.action;
     const round = this.round;
     if (this.stage !== 'PLAYING' || !round) return this.reject(player, type, 'wrong_phase', 'It is not time for decisions.');
     const rs = round.seat(player.id);
-    if (!rs) return this.reject(player, type, 'not_your_turn', 'You have no hand in this round.');
+    const seat = this.state.seats.get(player.id);
+    if (!rs || !seat) return this.reject(player, type, 'not_your_turn', 'You have no hand in this round.');
+    // A repeated message (double click, resend) carries the sequence it was sent for: it never applies twice.
+    if (seq !== undefined && seq !== seat.actionSeq) return this.reject(player, type, 'not_allowed', 'That decision already went through.');
     const res = round.act(player.id, hand, action);
     if (!res.ok) return this.reject(player, type, res.code, res.message);
+    seat.actionSeq += 1;
     this.projectSeat(rs);
     this.publishShoe();
     if (rs.done) this.disarmDecisionTimer(player.id);
@@ -731,6 +783,8 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     if (!rs || rs.done) return;
     round.standAll(id);
     this.disarmDecisionTimer(id);
+    const seat = this.state.seats.get(id);
+    if (seat) seat.actionSeq += 1;
     this.projectSeat(rs);
     this.publishShoe();
     if (notice) this.toastPlayer(id, 'warning', notice);
@@ -743,6 +797,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     if (!round || this.stage !== 'PLAYING' || round.stage !== 'dealer') return;
     for (const key of this.decisionTimers) this.cancel(key);
     this.decisionTimers.clear();
+    this.decisionDeadlines.clear();
     for (const seat of this.state.seats.values()) seat.deadline = 0;
     this.state.phaseEndsAt = 0;
     this.state.statusText = 'Dealer’s turn';
@@ -935,8 +990,13 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     else this.toast(player, 'success', 'You will be dealt in from the next round.');
   }
 
+  /** Cards are out and bets are riding: between the deal and the settlement. */
+  private roundLive(): boolean {
+    return !(this.stage === 'BETTING' || this.stage === 'SHUFFLING' || this.stage === 'IDLE' || this.stage === 'SETTLING');
+  }
+
   private onEndRequest(): void {
-    if (this.stage === 'BETTING' || this.stage === 'SHUFFLING' || this.stage === 'IDLE' || this.stage === 'SETTLING') {
+    if (!this.roundLive()) {
       this.finishGame();
       return;
     }
@@ -950,6 +1010,7 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
     this.cancel('stage');
     for (const key of this.decisionTimers) this.cancel(key);
     this.decisionTimers.clear();
+    this.decisionDeadlines.clear();
   }
 
   private finishGame(): void {
@@ -1016,12 +1077,21 @@ export class BlackjackRoom extends BaseGameRoom<BlackjackState, BlackjackSetting
   // Presence
   // ===========================================================================
 
-  protected override onPlayerDisconnected(): void {
+  protected override onPlayerDisconnected(player: PlayerRecord): void {
+    this.rescheduleDecision(player);
     this.checkBettingComplete();
   }
 
-  protected override onPlayerReconnected(): void {
+  protected override onPlayerReconnected(player: PlayerRecord): void {
+    this.rescheduleDecision(player);
     this.checkBettingComplete();
+  }
+
+  /** A deciding seat's clock follows its player's connection (short while dropped, full on return). */
+  private rescheduleDecision(player: PlayerRecord): void {
+    if (this.stage !== 'PLAYING' || !this.decisionDeadlines.has(player.id)) return;
+    this.scheduleDecision(player.id);
+    this.refreshDecisionClock();
   }
 
   protected override onPlayerAway(player: PlayerRecord): void {

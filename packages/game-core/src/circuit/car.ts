@@ -17,7 +17,7 @@
  *    value that travels in snapshots, which keeps client replay bit-identical.
  */
 import type { CarInput, ChassisId } from '@dascade/shared/games/circuit';
-import { clamp, f32, wrapAngle } from './math.ts';
+import { clamp, datan2, dcos, dhypot, dsin, f32, wrapAngle } from './math.ts';
 import { projectOnTrack, type Track } from './track.ts';
 
 export interface CarSpec {
@@ -226,7 +226,7 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
         sliding: false,
         boosting: false,
         wallImpact: 0,
-        headingDot: Math.cos(prev.heading) * here.tx + Math.sin(prev.heading) * here.ty,
+        headingDot: dcos(prev.heading) * here.tx + dsin(prev.heading) * here.ty,
         velDot: 0,
       },
     };
@@ -238,9 +238,9 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
   const surface = surfaceFor(track, here.d);
 
   let { x, y, heading, vx, vy, angVel, boost } = prev;
-  let fx = Math.cos(heading);
-  let fy = Math.sin(heading);
-  let speed = Math.hypot(vx, vy);
+  let fx = dcos(heading);
+  let fy = dsin(heading);
+  let speed = dhypot(vx, vy);
   const vf = vx * fx + vy * fy;
 
   // --- Boost -----------------------------------------------------------------
@@ -270,7 +270,7 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
   vx += fx * thrust * dt;
   vy += fy * thrust * dt;
 
-  speed = Math.hypot(vx, vy);
+  speed = dhypot(vx, vy);
   if (speed > 0) {
     const coasting = throttle === 0 && brake === 0 && !boostOn;
     let decel = PHYS.roll + (coasting ? PHYS.coast : 0);
@@ -290,7 +290,7 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
     // --- Drift (kinematic, controllable) -------------------------------------
     // Steering sets the path curvature (bounded by the tyres) and how far the tail
     // hangs out; the body swings toward that slide angle. Counter-steer flicks it back.
-    const velAngle = Math.atan2(vy, vx);
+    const velAngle = datan2(vy, vx);
     const budget = (spec.grip * SURFACE_GRIP[surface]! * PHYS.driftGrip) / Math.max(speed, 1);
     const turn = clamp(steer * spec.turnRate * authority * PHYS.driftTurn, -budget, budget);
     const newVel = velAngle + turn * dt;
@@ -299,23 +299,23 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
     const swing = clamp(wrapAngle(desired - heading) * PHYS.driftSwing, -PHYS.driftMaxYaw, PHYS.driftMaxYaw);
     angVel += (swing - angVel) * Math.min(1, PHYS.steerResponse * 1.4 * dt);
     heading = wrapAngle(heading + angVel * dt);
-    fx = Math.cos(heading);
-    fy = Math.sin(heading);
+    fx = dcos(heading);
+    fy = dsin(heading);
     slip = wrapAngle(newVel - heading);
     const scrubbed = speed * (1 - Math.min(0.5, Math.abs(slip) * PHYS.driftScrub * dt));
-    vx = Math.cos(newVel) * scrubbed;
-    vy = Math.sin(newVel) * scrubbed;
+    vx = dcos(newVel) * scrubbed;
+    vy = dsin(newVel) * scrubbed;
     speed = scrubbed;
   } else if (speed > 4) {
     const dir = fwd < -5 ? -1 : 1;
     const targetYaw = steer * spec.turnRate * authority * dir;
     angVel += (targetYaw - angVel) * Math.min(1, PHYS.steerResponse * dt);
     heading = wrapAngle(heading + angVel * dt);
-    fx = Math.cos(heading);
-    fy = Math.sin(heading);
+    fx = dcos(heading);
+    fy = dsin(heading);
 
     // --- Grip: rotate velocity toward the heading ------------------------------
-    const velAngle = Math.atan2(vy, vx);
+    const velAngle = datan2(vy, vx);
     const reversing = vx * fx + vy * fy < 0 && speed < spec.reverseMax * 1.5 && Math.abs(wrapAngle(velAngle - heading)) > Math.PI / 2;
     const target = reversing ? wrapAngle(heading + Math.PI) : heading;
     slip = wrapAngle(velAngle - target);
@@ -331,19 +331,19 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
       const cappedTarget = wrapAngle(newAngle - Math.sign(residual) * PHYS.maxSlip);
       heading = wrapAngle(heading + wrapAngle(cappedTarget - target));
       angVel = angVel * 0.6 + (rot / dt) * 0.4;
-      fx = Math.cos(heading);
-      fy = Math.sin(heading);
+      fx = dcos(heading);
+      fy = dsin(heading);
     }
-    vx = Math.cos(newAngle) * scrubbed;
-    vy = Math.sin(newAngle) * scrubbed;
+    vx = dcos(newAngle) * scrubbed;
+    vy = dsin(newAngle) * scrubbed;
     speed = scrubbed;
     slip = wrapAngle(newAngle - (reversing ? wrapAngle(heading + Math.PI) : heading));
   } else if (speed > 0) {
     // Crawling: velocity simply follows the nose (or tail); allow a gentle pivot.
     angVel += (steer * spec.turnRate * authority * (fwd < -1 ? -1 : 1) - angVel) * Math.min(1, PHYS.steerResponse * dt);
     heading = wrapAngle(heading + angVel * dt);
-    fx = Math.cos(heading);
-    fy = Math.sin(heading);
+    fx = dcos(heading);
+    fy = dsin(heading);
     const along = vx * fx + vy * fy >= 0 ? 1 : -1;
     vx = fx * speed * along;
     vy = fy * speed * along;
@@ -378,9 +378,9 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
       vx -= proj.tx * vt * friction;
       vy -= proj.ty * vt * friction;
       // Glancing blows swing the nose toward the wall direction.
-      const along = fx * proj.tx + fy * proj.ty >= 0 ? Math.atan2(proj.ty, proj.tx) : Math.atan2(-proj.ty, -proj.tx);
+      const along = fx * proj.tx + fy * proj.ty >= 0 ? datan2(proj.ty, proj.tx) : datan2(-proj.ty, -proj.tx);
       angVel += wrapAngle(along - heading) * Math.min(1, vn / 500) * 5;
-      speed = Math.hypot(vx, vy);
+      speed = dhypot(vx, vy);
     }
     proj = projectOnTrack(track, x, y, proj.seg);
   }
@@ -409,8 +409,8 @@ export function stepCar(prev: CarState, input: CarInput, spec: CarSpec, track: T
     drift,
     seg: proj.seg,
   };
-  const hx = Math.cos(state.heading);
-  const hy = Math.sin(state.heading);
+  const hx = dcos(state.heading);
+  const hy = dsin(state.heading);
   return {
     state,
     info: {

@@ -3,7 +3,9 @@
  *
  * - Cards are dealt from a per-match seed (reproducible, revealed at the end) and sent
  *   privately; other players' cards stay hidden until a verified win reveals them. A fixed
- *   seed is never part of the (public) settings: only the host who typed it ever sees it.
+ *   seed is never part of the (public) settings: only the host who typed it ever sees it, and
+ *   each game deals from a one-way per-game seed derived from it — the one revealed at the end
+ *   of a game says nothing about the next game's cards.
  * - Calls come only from the server: the automatic caller or the host's manual caller.
  *   Draws use the room's crypto RNG.
  * - Claims carry no data. The server checks the claimant's real card against the real call
@@ -15,6 +17,7 @@
  * - Balls hand-picked by the manual caller are the only ones that can be undone, and whoever
  *   picked a ball in the current call sequence can't win with it (the caller doesn't play).
  */
+import { createHash } from 'node:crypto';
 import { randomId } from '@dascade/shared';
 import {
   BINGO_EXHAUSTED_GRACE_MS,
@@ -90,6 +93,8 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
   private customSeed = '';
   /** Who typed the fixed seed; only they are ever sent its value. */
   private customSeedBy = '';
+  /** Games dealt from the current fixed seed (game N deals from fixedGameSeed(seed, N)). */
+  private customSeedGames = 0;
   private readonly cards = new Map<string, CardRecord>();
   private dealKeys = new Set<string>();
   private serialCounter = 0;
@@ -143,6 +148,7 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
       BINGO_MSG.setSeed,
       BingoSeedSchema,
       (p, { seed }) => {
+        if (seed !== this.customSeed) this.customSeedGames = 0;
         this.customSeed = seed;
         this.customSeedBy = seed ? p.id : '';
         this.state.customSeed = seed !== '';
@@ -229,7 +235,8 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
     this.spec = boardSpec(s);
     this.items = [...s.items];
     this.plan = buildPlan(s, this.spec);
-    this.matchSeed = this.customSeed || randomId(12, this.rng);
+    // A fixed seed is never dealt from (or revealed) directly: each game gets its own one-way seed.
+    this.matchSeed = this.customSeed ? fixedGameSeed(this.customSeed, ++this.customSeedGames) : randomId(12, this.rng);
     this.cards.clear();
     this.everWon.clear();
     this.roundWinnerIds.clear();
@@ -334,8 +341,7 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
       this.callPicker = [];
       this.undoFloor = 0;
       st.lastCallAt = 0;
-      // Late cards kept from the previous round now see every call of the new sequence.
-      if (!freshCards) this.clampLateCards();
+      if (!freshCards) this.restartKeptCards();
     } else {
       // Carried-over calls were already part of an accepted result; they stay put.
       this.undoFloor = st.calls.length;
@@ -483,6 +489,21 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
   private callsFor(card: CardRecord): number[] {
     const calls = [...this.state.calls];
     return card.fromCall > 0 ? calls.slice(card.fromCall) : calls;
+  }
+
+  /**
+   * A new call sequence on the cards players keep: late cards now see every call of it, and the
+   * daubs from the old sequence are wiped (they'd mark squares that aren't called any more — and
+   * tempt a false claim). Every kept card is re-sent.
+   */
+  private restartKeptCards(): void {
+    const n = this.state.calls.length;
+    for (const [id, card] of this.cards) {
+      card.fromCall = Math.min(card.fromCall, n);
+      card.marks.clear();
+      const player = this.players.get(id);
+      if (player) this.sendCard(player);
+    }
   }
 
   /** Keep late cards' starting points inside the call list (after an undo or a cleared sequence). */
@@ -732,4 +753,13 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
   private emitEvent(event: BingoEvent): void {
     this.broadcast(BINGO_MSG.event, event);
   }
+}
+
+/**
+ * The card seed of game `game` dealt from a host's fixed seed. Reproducible (the same fixed seed
+ * deals the same series of games) but one-way: the seed revealed after a game gives away neither
+ * the fixed seed nor any other game's cards (unless the fixed seed itself is easy to guess).
+ */
+export function fixedGameSeed(seed: string, game: number): string {
+  return createHash('sha256').update(`dascade-bingo\u0000${seed}\u0000${game}`).digest('base64url').slice(0, 16);
 }

@@ -242,6 +242,47 @@ describe('double elimination', () => {
     expect(l1.winner).toBe(m2.b);
     expect(invariantViolations(e)).toEqual([]);
   });
+
+  /** 6 players: W1-2 is P4 v P5 (P5 drops into the L1-1 bye); P3 loses W2-2 and meets P5 in L2-1. */
+  function overrideThroughBye() {
+    const h = makeTournament(6, { format: 'double_elimination' });
+    const { engine: e, ids } = h;
+    const winFor = (id: string, pid: string) => {
+      const m = e.match(id)!;
+      winSeries(e, m, m.a === pid ? 'a' : 'b');
+    };
+    winFor('W1-2', ids[3]!);
+    winFor('W1-4', ids[2]!);
+    winFor('W2-2', ids[1]!);
+    expect(e.match('L1-1')).toMatchObject({ resultKind: 'bye', winner: ids[4] });
+    const l21 = e.match('L2-1')!;
+    expect([l21.a, l21.b].sort()).toEqual([ids[4], ids[2]].sort());
+    expect(l21.status).toBe('READY');
+    return { ...h, l21 };
+  }
+
+  it('an override re-derives matches fed through a losers-bracket bye', () => {
+    const { engine: e, ids, l21 } = overrideThroughBye();
+    e.override('W1-2', 'win', ids[4]!, 'wrong result reported');
+    expect(e.match('L1-1')).toMatchObject({ resultKind: 'bye', winner: ids[3] });
+    // The bye's dependent follows: P4 now meets P3; P5 is only in the winners bracket.
+    expect([l21.a, l21.b].sort()).toEqual([ids[3], ids[2]].sort());
+    expect(l21.status).toBe('READY');
+    const w21 = e.match('W2-1')!;
+    expect([w21.a, w21.b].sort()).toEqual([ids[0], ids[4]].sort());
+    expect(invariantViolations(e)).toEqual([]);
+    playout(e, createSeededRng('after-override'), { check: () => expect(invariantViolations(e)).toEqual([]) });
+    expect(e.status).toBe('COMPLETE');
+  });
+
+  it('an override is refused once a match fed through a bye has started', () => {
+    const { engine: e, ids, l21 } = overrideThroughBye();
+    playGame(e, l21, 'draw');
+    expect(l21.status).toBe('IN_PROGRESS');
+    expect(() => e.override('W1-2', 'win', ids[4]!, 'too late')).toThrow(/L2-1|already started/);
+    expect(e.match('W1-2')!.winner).toBe(ids[3]);
+    expect(invariantViolations(e)).toEqual([]);
+  });
 });
 
 describe('series inside a bracket', () => {

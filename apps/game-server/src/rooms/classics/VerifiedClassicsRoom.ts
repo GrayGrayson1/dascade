@@ -39,6 +39,13 @@ export abstract class VerifiedClassicsRoom<S extends ClassicsState = ClassicsSta
   protected abstract readonly maxInputCode: number;
   /** Solo: ms between pressing Start and the run clock starting (READY/GO intro). */
   protected soloLeadMs = 0;
+  /**
+   * Solo: pausing is local (the client simply stops stepping), so a run may fall behind real time —
+   * paused, stalled or in slow motion — by this much in total. Beyond it the run still plays and
+   * verifies, but no longer counts for the high scores (frame-stepping a ranked run gains nothing).
+   * Server-simulated games cap pauses with claimSoloPause() instead.
+   */
+  protected soloLagBudgetMs = 3 * 60_000;
 
   /** Engine options for a run (from settings). Sent to the client in the ticket. */
   protected runOptions(): Record<string, number | string | boolean> {
@@ -154,7 +161,7 @@ export abstract class VerifiedClassicsRoom<S extends ClassicsState = ClassicsSta
       log.warn('classics divergence (server result stands)', { room: this.roomId, game: this.gameId, client: run.clientScore, server: summary.score });
     }
     if (reason === 'quit') return;
-    const info = this.playerFinished(run.playerId, summary, reason, run.sim.tick, run.board);
+    const info = this.playerFinished(run.playerId, summary, reason, run.sim.tick, run.unranked ? '' : run.board);
     const verdict: RunVerdict = {
       ...summary,
       runId: run.runId,
@@ -169,10 +176,11 @@ export abstract class VerifiedClassicsRoom<S extends ClassicsState = ClassicsSta
     this.sendTo(run.playerId, CLASSICS_MSG.verdict, verdict);
   }
 
-  /** Lag cap (untimed multiplayer) and deadline backstop (timed races). */
+  /** Lag cap (untimed multiplayer), deadline backstop (timed races) and the solo behind-real-time budget. */
   private watch(): void {
-    if (this.phase !== 'PLAYING' || this.isSolo) return;
+    if (this.phase !== 'PLAYING') return;
     const now = Date.now();
+    if (this.isSolo) return this.watchSolo(now);
     const endsAt = this.state.classics.endsAt;
     for (const run of this.runs.values()) {
       if (run.ended) continue;
@@ -181,6 +189,16 @@ export abstract class VerifiedClassicsRoom<S extends ClassicsState = ClassicsSta
       } else if (run.wallTicks(now) - run.upTo > (CLASSICS.maxLagMs * CLASSICS.tickHz) / 1000) {
         this.finalize(run, 'lag');
       }
+    }
+  }
+
+  private watchSolo(now: number): void {
+    const budget = (this.soloLagBudgetMs * CLASSICS.tickHz) / 1000;
+    for (const run of this.runs.values()) {
+      if (run.ended || run.unranked || !run.board || run.behindTicks(now) <= budget) continue;
+      run.unranked = true;
+      const player = this.players.get(run.playerId);
+      if (player) this.toast(player, 'info', 'This run was paused or slowed down too long — it no longer counts for the high scores.');
     }
   }
 

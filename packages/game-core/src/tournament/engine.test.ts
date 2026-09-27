@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createSeededRng, defaultTournamentConfig } from '@dascade/shared';
 import { TournamentEngine, autoSwissRounds } from './engine.ts';
-import { live, makeTournament, playGame, winSeries } from './testkit.ts';
-import { TournamentError } from './types.ts';
+import { invariantViolations, live, makeTournament, playGame, winSeries } from './testkit.ts';
+import { TournamentError, type EngineMatch } from './types.ts';
 
 const deps = (seed = 'x') => {
   let t = 1_000;
@@ -256,6 +256,32 @@ describe('results & idempotency', () => {
     expect(m.resultKind).toBe('forfeit');
     expect(e.data.audit.at(-1)).toMatchObject({ actor: 'system', action: 'no_show', matchId: m.id });
     expect(() => e.forfeit(m.id, m.a!, 'again')).toThrow();
+  });
+
+  it('forfeitBoth (nobody showed up): nobody advances, the next opponent gets a walkover', () => {
+    const { engine: e } = makeTournament(4, { format: 'single_elimination' });
+    const [m1, m2] = live(e) as [EngineMatch, EngineMatch];
+    e.forfeitBoth(m1.id, 'neither participant showed up', 'system');
+    expect(m1).toMatchObject({ status: 'FORFEIT', resultKind: 'double_forfeit', winner: null, loser: null });
+    expect(e.data.audit.at(-1)).toMatchObject({ actor: 'system', action: 'no_show', matchId: m1.id });
+    for (const pid of [m1.a!, m1.b!]) expect(e.participant(pid)!.status).toBe('eliminated');
+    expect(() => e.forfeitBoth(m1.id, 'again')).toThrow(TournamentError);
+    winSeries(e, m2, 'a');
+    expect(e.match('W2-1')).toMatchObject({ resultKind: 'bye', winner: m2.a });
+    expect(e.status).toBe('COMPLETE');
+    expect(e.data.championId).toBe(m2.a);
+    expect(invariantViolations(e)).toEqual([]);
+  });
+
+  it('forfeitBoth in Swiss: both score nothing and pairing carries on', () => {
+    const { engine: e } = makeTournament(4, { format: 'swiss', swissRounds: 2 });
+    const [m1, m2] = live(e) as [EngineMatch, EngineMatch];
+    e.forfeitBoth(m1.id, 'no-show', 'system');
+    winSeries(e, m2, 'a');
+    const points = new Map(e.standings().rows.map((r) => [r.participantId, r.points]));
+    expect([points.get(m1.a!), points.get(m1.b!)]).toEqual([0, 0]);
+    expect(live(e)).toHaveLength(2); // round 2 is paired
+    expect(invariantViolations(e)).toEqual([]);
   });
 
   it('override decides a stuck match and writes an audit entry', () => {

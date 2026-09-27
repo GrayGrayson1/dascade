@@ -120,8 +120,16 @@ export function HoldemView() {
           {isHost ? (
             <>
               <IconButton icon="gear" label="Table settings" size="sm" onClick={() => setTableSettings(true)} />
-              <Button size="sm" variant="ghost" icon="flag" onClick={() => setConfirmEnd(true)} className="hd-hud__btn">
-                <span className="hd-hud__btn-text">End game</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="flag"
+                disabled={state.endRequested}
+                aria-label={state.endRequested ? 'Ending after this hand' : 'End game'}
+                onClick={() => setConfirmEnd(true)}
+                className="hd-hud__btn"
+              >
+                <span className="hd-hud__btn-text">{state.endRequested ? 'Final hand' : 'End game'}</span>
               </Button>
             </>
           ) : null}
@@ -182,8 +190,7 @@ export function HoldemView() {
         }
       >
         <p>
-          Everyone goes to the leaderboard. A hand that is still being bet is cancelled and its bets are returned; an all-in hand that is
-          being run out is dealt to the end first.
+          Everyone goes to the leaderboard. A hand in progress is played to the end first — its pot is won at the table, never cancelled.
         </p>
       </Modal>
 

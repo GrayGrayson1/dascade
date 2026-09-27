@@ -38,6 +38,7 @@ import {
 } from '../_classics/index.ts';
 import { BlocksRenderer, WELL_H, WELL_W } from './art.ts';
 import { MiniBoard, PiecePreview } from './Previews.tsx';
+import { idleDrag, steerCodes, type DragSteer } from './dragSteer.ts';
 
 export const BLOCKS_INFO: ClassicsGameInfo = {
   gameId: 'blocks',
@@ -91,7 +92,8 @@ function sampleCodes(input: IntentInput<Intent>, held: Record<'left' | 'right' |
   for (const h of HELD) {
     const down = input.isDown(h.intent);
     if (presses.includes(h.intent)) {
-      if (held[h.intent]) codes.push(h.up);
+      // A fresh press of a direction that still counts as held is just a new "down" (the engine
+      // restarts the shift either way) — no redundant "up" first, so a stalled frame stays small.
       codes.push(h.down);
       held[h.intent] = true;
       if (!down) {
@@ -132,12 +134,14 @@ export function BlocksPlay() {
   const surface = useCanvasSurface(screenRef, canvasRef, WELL_W, WELL_H);
   const [input] = useState(() => new IntentInput<Intent>(SPEC));
   const [hud] = useState(() => createHudStore({ score: 0, level: 1, lines: 0, ticks: 0, hold: '', holdUsed: false, next: '', limit: 0 }));
-  const renderer = useRef<BlocksRenderer>(new BlocksRenderer());
-  useLiveMaterials(screenRef, (m) => renderer.current.setMaterials(m));
+  const [renderer] = useState(() => new BlocksRenderer());
+  useLiveMaterials(screenRef, (m) => renderer.setMaterials(m));
   const held = useRef({ left: false, right: false, soft: false });
+  const drag = useRef<DragSteer>(idleDrag());
   const flow = useVerifiedFlow<BlocksSim>('blocks', (seed, opts) => createBlocksSim(seed, opts, true), () => {
-    renderer.current.reset();
+    renderer.reset();
     held.current = { left: false, right: false, soft: false };
+    drag.current = idleDrag();
     input.clear();
   });
   const { run, runPhase, paused, setPaused, pausedRef, meta, me, mine, rows, phase, isSpectator, solo, best, verdict, improved, status, racing, live } = flow;
@@ -155,12 +159,13 @@ export function BlocksPlay() {
     run.pump();
     if (pausedRef.current) return;
     if (!run.canStep()) return;
-    const codes = sampleCodes(input, held.current);
-    run.step(codes);
+    const sampled = sampleCodes(input, held.current);
+    const steer = steerCodes(drag.current, run.sim);
+    run.step(steer.length ? [...sampled, ...steer] : sampled);
     const sim = run.sim;
     if (!sim) return;
     const events = sim.drainEvents();
-    if (events.length) renderer.current.onEvents(events, sim, sound);
+    if (events.length) renderer.onEvents(events, sim, sound);
     hud.set({
       score: sim.score,
       level: sim.level,
@@ -176,7 +181,7 @@ export function BlocksPlay() {
   const render = (_alpha: number, frameMs: number) => {
     const s = surface.current;
     if (!s) return;
-    renderer.current.draw(s, run.sim, frameMs, { paused: pausedRef.current && run.phase === 'running' });
+    renderer.draw(s, run.sim, frameMs, { paused: pausedRef.current && run.phase === 'running' });
   };
   useFixedLoop(step, render);
 
@@ -186,31 +191,24 @@ export function BlocksPlay() {
     if (sim) hud.set({ score: sim.score, level: sim.level, lines: sim.lines, ticks: sim.tick, hold: sim.hold ?? '', holdUsed: sim.holdUsed, next: sim.queue.join(''), limit: run.ticket?.limitTicks ?? 0 });
   }, [runPhase, run, hud]);
 
-  // Touch gestures on the well: drag to move, tap to rotate, swipe down/up = drop/hold.
-  const drag = useRef({ steps: 0, soft: false });
+  // Touch gestures on the well: drag to move (steered each tick, see steerCodes), tap to rotate,
+  // swipe down/up = drop/hold.
   useGestures(screenRef, {
     onDrag: (dx, dy, ph) => {
       const el = screenRef.current;
       if (!el) return;
       const cell = el.getBoundingClientRect().width / 10;
       if (ph === 'start') {
-        drag.current = { steps: 0, soft: false };
+        drag.current = { ...idleDrag(), active: true };
+        input.lastDevice = 'touch';
         return;
       }
       if (ph === 'end') {
         if (drag.current.soft) input.release('soft');
-        drag.current.soft = false;
+        drag.current = idleDrag();
         return;
       }
-      const want = Math.trunc(dx / (cell * 0.85));
-      while (drag.current.steps < want) {
-        input.tap('right');
-        drag.current.steps++;
-      }
-      while (drag.current.steps > want) {
-        input.tap('left');
-        drag.current.steps--;
-      }
+      drag.current.want = Math.trunc(dx / (cell * 0.85));
       if (!drag.current.soft && dy > cell * 1.4 && Math.abs(dx) < cell) {
         drag.current.soft = true;
         input.press('soft');

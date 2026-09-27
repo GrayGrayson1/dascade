@@ -3,9 +3,10 @@ import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
 import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import { TANKS_MSG, type ShotScript, type TanksEvent } from '@dascade/shared/games/tanks';
-import { cloneTerrain, createTerrain, decodeTerrain, resolveShot, restHeight, type Battle } from '@dascade/game-core/tanks';
+import { cloneTerrain, createTerrain, decodeTerrain, resolveShot, restHeight, settleResult, tankById, type Battle } from '@dascade/game-core/tanks';
 import { bootTestServer, collect, quiet, sleep, waitFor } from './helpers.ts';
 import { onOutcome } from '../src/platform/hub.ts';
+import { getStatLine } from '../src/platform/stats.ts';
 import type { TanksRoom } from '../src/rooms/tanks/TanksRoom.ts';
 
 let colyseus: ColyseusTestServer;
@@ -305,6 +306,8 @@ describe('TanksRoom', () => {
     await waitFor(() => st(other.room).players.get(shooterId)?.connected === false, 3000, 'dropped');
     expect(st(other.room).battle.turnEndsAt - Date.now()).toBeLessThanOrEqual(400);
     await waitFor(() => other.events.some((e) => e.kind === 'skip' && e.playerId === shooterId), 3000, 'skipped while away');
+    // A turn missed while disconnected is not an idle strike (no short turns once they're back).
+    expect((host.server as unknown as { idleStrikes: Map<string, number> }).idleStrikes.has(shooterId)).toBe(false);
     await reconnected;
     await waitFor(() => st(shooter.room).players.get(shooterId)?.connected === true, 3000, 'back');
     expect(st(shooter.room).tanks.size).toBe(2);
@@ -377,6 +380,44 @@ describe('TanksRoom', () => {
     // Picks are lobby-only.
     guest.room.send(TANKS_MSG.team, { team: 1 });
     await waitFor(() => guest.errors.some((e) => e.type === TANKS_MSG.team), 3000, 'team change refused');
+  });
+
+  it('CPU tanks keep their places in the outcome: a player behind a CPU is not a winner', async () => {
+    const host = await createHost('Alice', { guestId: 'g-tanks-cpu-alice' });
+    await settings(host, { cpu: 1 });
+    const guest = await join(host.room.roomId, 'Bob', { guestId: 'g-tanks-cpu-bob' });
+    await start(host);
+    const b = battle(host.server);
+    const cpu = b.tanks.find((t) => t.cpu)!;
+    // Bob goes down first, then Alice: the CPU is the last tank standing.
+    for (const id of [guest.id(), host.id()]) {
+      const t = tankById(b, id)!;
+      t.alive = false;
+      t.hp = 0;
+      b.eliminations.push([id]);
+    }
+    settleResult(b);
+    (host.server as unknown as { finish(): void }).finish();
+    await waitFor(() => outcomes.length === 1, 3000, 'outcome');
+    expect(outcomes[0]!.placements).toEqual([[cpu.id], [host.id()], [guest.id()]]);
+    expect(outcomes[0]!.nonPlayerIds).toEqual([cpu.id]);
+    const alice = getStatLine('g:g-tanks-cpu-alice', 'tanks')!;
+    const bob = getStatLine('g:g-tanks-cpu-bob', 'tanks')!;
+    expect([alice.wins, alice.losses, alice.draws]).toEqual([0, 1, 0]);
+    expect([bob.wins, bob.losses, bob.draws]).toEqual([0, 1, 0]);
+  });
+
+  it('a player leaving during the countdown returns the room to the lobby (no battle is reported)', async () => {
+    const host = await createHost('Alice');
+    const guest = await join(host.room.roomId, 'Bob');
+    host.server.countdownMs = 500;
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host.room).phase === 'COUNTDOWN', 3000, 'countdown');
+    await guest.room.leave(true);
+    await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'back to the lobby');
+    await sleep(150);
+    expect(outcomes).toHaveLength(0);
+    expect(st(host.room).tanks.size).toBe(0);
   });
 
   it('host rematch goes straight into a fresh battle', async () => {

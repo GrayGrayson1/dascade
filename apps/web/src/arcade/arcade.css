@@ -174,6 +174,37 @@
   align-items: center;
   gap: 2px;
 }
+/* The jukebox's quick control (portalled in by the jukebox UI): sized like the HUD's icon buttons.
+   Phones move it to the floor's extras row (.af-floor__jukebox), where there's room. */
+.af-hud__jukebox {
+  display: inline-flex;
+  align-items: center;
+}
+.af-floor__jukebox {
+  display: none;
+}
+@media (max-width: 699px), (max-height: 540px) and (orientation: landscape) {
+  .af-hud__jukebox {
+    display: none;
+  }
+  .af-floor__jukebox {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+  }
+  .af-floor__jukebox .jb-dock .jb-btn--icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+.af-hud__jukebox .jb-dock .jb-btn--icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
 .af-hud__join {
   margin: 3px;
 }
@@ -723,6 +754,28 @@
   width: 18px;
   background: var(--dot);
   box-shadow: 0 0 8px var(--dot);
+}
+
+/* ---------- The jukebox's corner ---------- */
+/* ArcadeFloor lays out the spot (the machine's box + its floor nameplate) on the row's floor line; the
+   jukebox UI portals its physical machine in here (jukebox/FloorJukebox.tsx, styled in jukebox.css). */
+.af-jukebox {
+  position: absolute;
+  z-index: 1100;
+  left: calc(var(--jbx-x, 16px) + var(--safe-left));
+  top: var(--jbx-top, 0px);
+  width: var(--jbx-w, 0px);
+  height: calc(var(--jbx-h, 0px) + var(--jbx-plate, 40px));
+  --jbf-machine-h: var(--jbx-h, 0px);
+  --jbf-plate-h: var(--jbx-plate, 40px);
+}
+.af-lineup[data-jukebox='none'] .af-jukebox,
+.af-lineup:not([data-jukebox]) .af-jukebox {
+  display: none;
+}
+.af-floor--launching .af-jukebox,
+.af-floor--busy .af-jukebox {
+  pointer-events: none;
 }
 
 /* ---------- Marquee logo ---------- */
@@ -1442,7 +1495,9 @@
   }
 }
 
-@media (max-width: 1400px) {
+/* The server status moves to the footer until the header has room for it beside the jukebox button
+   (wide-type themes like Executive would otherwise push the help button off-screen). */
+@media (max-width: 1700px) {
   .af-hud__status {
     display: none;
   }
@@ -1495,10 +1550,13 @@
   }
 }
 
-@media (max-width: 1199px) {
+/* The motion shortcut steps aside for the jukebox button below 1800 px (it's in Settings → Display too). */
+@media (max-width: 1799px) {
   .af-hud__motion {
     display: none !important;
   }
+}
+@media (max-width: 1199px) {
   .af-plaque {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -1595,8 +1653,10 @@
     border-color: transparent;
     background: transparent;
   }
-  .af-hud__icons .dc-btn--icon {
+  .af-hud__icons .dc-btn--icon,
+  .af-hud__jukebox .jb-dock .jb-btn--icon {
     width: 40px;
+    min-width: 40px;
   }
   .af-lineup__arrow {
     top: 44% !important;

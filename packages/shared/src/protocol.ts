@@ -82,6 +82,13 @@ const lazy = <T>(build: () => T): T => build();
 
 export const AvatarSchema = /* @__PURE__ */ lazy(() => z.enum(AVATARS));
 
+/**
+ * Guest ids: letters, digits, '_' and '-' only (the web client makes `g_<hex>` and regenerates anything
+ * else). Server store keys are `<gameId>|<identity>` and profiles are found by key suffix, so a
+ * separator like '|' or ':' in a guest id could alias another player's records.
+ */
+export const GUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export const JoinOptionsSchema = /* @__PURE__ */ lazy(() =>
   z.object({
     name: z.string().max(64),
@@ -89,7 +96,7 @@ export const JoinOptionsSchema = /* @__PURE__ */ lazy(() =>
     /** Secret returned in sys:welcome; lets a player reclaim their seat after a long disconnect/refresh. */
     seatToken: z.string().max(64).optional(),
     /** Stable, non-secret local guest identity (used only for stats/persistence correlation). */
-    guestId: z.string().max(64).optional(),
+    guestId: z.string().min(1).max(64).regex(GUEST_ID_PATTERN).optional(),
     spectator: z.boolean().optional(),
     /** Supabase access token when the user has a persistent account (optional). */
     accessToken: z.string().max(4096).optional(),

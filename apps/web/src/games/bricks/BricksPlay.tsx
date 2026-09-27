@@ -88,11 +88,11 @@ export function BricksPlay() {
   const [hud] = useState(() =>
     createHudStore({ score: 0, level: 1, lives: 3, bricks: 0, ticks: 0, limit: 0, wide: 0, multi: 0, laser: 0, slow: 0, sticky: 0, life: 0, levelName: '', left: 0 }),
   );
-  const renderer = useRef<BricksRenderer>(new BricksRenderer());
-  useLiveMaterials(screenRef, (m) => renderer.current.setMaterials(m));
+  const [renderer] = useState(() => new BricksRenderer());
+  useLiveMaterials(screenRef, (m) => renderer.setMaterials(m));
   const sent = useRef({ target: -1, axis: 0, pointerVersion: 0 });
   const flow = useVerifiedFlow<BricksSim>('bricks', (seed, opts) => createBricksSim(seed, opts, true), () => {
-    renderer.current.reset();
+    renderer.reset();
     sent.current = { target: -1, axis: 0, pointerVersion: input.pointer.version };
     input.clear();
   });
@@ -202,7 +202,7 @@ export function BricksPlay() {
     for (const pr of input.presses()) if (pr === 'fire') codes.push(CODE.action);
     run.step(codes);
     const events = sim.drainEvents();
-    if (events.length) renderer.current.onEvents(events, sound);
+    if (events.length) renderer.onEvents(events, sound);
     pushHud(sim);
   };
 
@@ -211,7 +211,7 @@ export function BricksPlay() {
     if (!s) return;
     const sim = run.sim;
     const touch = input.lastDevice === 'touch';
-    renderer.current.draw(s, sim, run.phase === 'running' && !pausedRef.current ? alpha : 1, frameMs, {
+    renderer.draw(s, sim, run.phase === 'running' && !pausedRef.current ? alpha : 1, frameMs, {
       paused: pausedRef.current && run.phase === 'running',
       hint: run.phase === 'running' ? (touch ? 'TAP TO LAUNCH' : 'SPACE OR CLICK TO LAUNCH') : null,
     });

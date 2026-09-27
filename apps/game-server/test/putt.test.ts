@@ -117,6 +117,20 @@ async function holeOut(c: Client, observer: Client = c): Promise<number> {
   throw new Error('did not hole out');
 }
 
+/** Classic (turns): pick the ball up on the golfer's own turn (the only time the room allows it). */
+async function pickUpOnTurn(c: Client, observer: Client = c): Promise<void> {
+  const me = c.me().playerId;
+  const index = st(observer.room).holeIndex;
+  await waitFor(
+    () => st(observer.room).holeIndex !== index || (st(observer.room).turnId === me && !golfer(observer, me)?.moving) || golfer(observer, me)?.pickedUp,
+    4000,
+    'pickup turn',
+  );
+  if (st(observer.room).holeIndex !== index || golfer(observer, me)?.pickedUp) return;
+  c.room.send(PUTT_MSG.pickup, {});
+  await waitFor(() => golfer(observer, me)?.pickedUp === true || st(observer.room).holeIndex !== index, 3000, 'picked up');
+}
+
 describe('DAS Putt room', () => {
   it('two players complete a hole in turn; scores and the next hole update', async () => {
     const host = await createHost('Ada', { settings: { course: 'front' } });
@@ -336,7 +350,9 @@ describe('DAS Putt room', () => {
     const strokes = await holeOut(solo);
     await waitFor(() => st(solo.room).phase === 'RESULTS', 5000, 'results');
     expect(golfer(solo).card[0]).toBe(strokes);
-    expect(outcomes[0]!.outcome.scores).toEqual({ [solo.me().playerId]: strokes });
+    // One hole isn't a round: no score for the platform's best-score stat (full 9-hole rounds only).
+    expect(outcomes[0]!.outcome.scores).toBeUndefined();
+    expect(outcomes[0]!.outcome.placements).toEqual([[solo.me().playerId]]);
     expect([...st(solo.room).winners]).toEqual([solo.me().playerId]);
   });
 
@@ -387,8 +403,7 @@ describe('DAS Putt room', () => {
     // Both concede every hole → tied after nine → playoff holes.
     for (let h = 0; h < 9; h++) {
       await waitForPlay(host, h);
-      guest.room.send(PUTT_MSG.pickup, {});
-      host.room.send(PUTT_MSG.pickup, {});
+      await Promise.all([pickUpOnTurn(guest, host), pickUpOnTurn(host)]);
     }
     await waitFor(() => host.events.some((e) => e.kind === 'playoff'), 5000, 'playoff');
     await waitForPlay(host, 9);
@@ -404,6 +419,94 @@ describe('DAS Putt room', () => {
     expect(out.placements).toEqual([[hostId], [guestId]]);
     expect(out.reason).toBe('playoff');
     expect(out.scores).toEqual({ [hostId]: out.scores![guestId], [guestId]: out.scores![hostId] });
+  });
+
+  it('classic: a pickup out of turn is refused and an away golfer never steals the turn', async () => {
+    const host = await createHost('Ada', { settings: { course: 'single', hole: 5 } });
+    const guest = await join(host.room.roomId, 'Bo');
+    const third = await join(host.room.roomId, 'Cy');
+    const server = host.server as any;
+    server.reconnectGraceSeconds = 0.2;
+    host.room.send('lobby:start', {});
+    await waitForPlay(host);
+    const hostId = host.me().playerId;
+    const guestId = guest.me().playerId;
+    expect(st(host.room).turnId).toBe(hostId);
+    const deadline = golfer(host, hostId).deadline;
+    // Bo can't pick up on Ada's turn.
+    guest.room.send(PUTT_MSG.pickup, {});
+    await waitFor(() => guest.errors.some((e) => e.type === PUTT_MSG.pickup), 2000, 'pickup refused');
+    expect(guest.errors.find((e) => e.type === PUTT_MSG.pickup)!.code).toBe('not_your_turn');
+    expect(golfer(host, guestId).pickedUp).toBe(false);
+    // Bo drops for good: picked up (away) — but it stays Ada's turn, on the same clock.
+    guest.room.reconnection.enabled = false;
+    (guest.room as any).connection.transport.ws.close(4010);
+    await waitFor(() => host.events.some((e) => e.kind === 'pickup' && e.playerId === guestId && e.reason === 'away'), 4000, 'away pickup');
+    await sleep(50);
+    expect(st(host.room).turnId).toBe(hostId);
+    expect(golfer(host, hostId).deadline).toBe(deadline);
+    // Ada picks up on her turn: now it passes on (to Cy).
+    host.room.send(PUTT_MSG.pickup, {});
+    await waitFor(() => st(host.room).turnId === third.me().playerId, 2000, 'turn passed on');
+  });
+
+  it('leaving in the pause before the results does not rewrite the card', async () => {
+    const host = await createHost('Ada', { settings: { course: 'single', hole: 1 } });
+    const guest = await join(host.room.roomId, 'Bo');
+    (host.server as any).resultsDelayMs = 800;
+    host.room.send('lobby:start', {});
+    await waitForPlay(host);
+    const hostId = host.me().playerId;
+    const guestId = guest.me().playerId;
+    await holeOut(host, guest);
+    await pickUpOnTurn(guest, host);
+    await waitFor(() => st(guest.room).holeStatus === 'done', 2000, 'round over');
+    // The winner leaves while the results are on their way: they still won.
+    await host.room.leave(true);
+    await waitFor(() => st(guest.room).phase === 'RESULTS', 4000, 'results');
+    expect(outcomes[0]!.outcome.placements).toEqual([[hostId], [guestId]]);
+    expect(golfer(guest, hostId).retired).toBe(false);
+  });
+
+  it('tournament: an opponent leaving during the countdown forfeits once the game is live (and it is reported)', async () => {
+    const host = await createHost('Ada');
+    const guest = await join(host.room.roomId, 'Bo');
+    const hostId = host.me().playerId;
+    const guestId = guest.me().playerId;
+    const server = host.server as any;
+    server.tournamentInfo = {
+      tournamentCode: 'TTTTT',
+      tournamentName: 'Cup',
+      matchId: 'm3',
+      roundLabel: 'Round 1',
+      bestOf: 3,
+      gameNumber: 1,
+      seriesScore: {},
+      participants: [
+        { participantId: 'p1', name: 'Ada', seed: 1, playerId: hostId },
+        { participantId: 'p2', name: 'Bo', seed: 2, playerId: guestId },
+      ],
+    };
+    // Game 1 ends (Bo forfeits mid-game), then game 2 starts the way the series does it.
+    host.room.send('lobby:start', {});
+    await waitForPlay(host);
+    await Promise.all([pickUpOnTurn(host), pickUpOnTurn(guest, host)]);
+    await waitForPlay(host, 1);
+    server.finishMatch('completed');
+    await waitFor(() => outcomes.length === 1 && st(host.room).phase === 'RESULTS', 3000, 'game 1 reported');
+    server.countdownMs = 600;
+    server.returnToLobby();
+    server.startMatch();
+    await waitFor(() => st(host.room).phase === 'COUNTDOWN', 2000, 'game 2 countdown');
+    await guest.room.leave(true);
+    // Nothing is decided during the countdown (that game hasn't started)…
+    await sleep(100);
+    expect(st(host.room).phase).toBe('COUNTDOWN');
+    // …it is forfeited — and reported — as soon as it is live.
+    await waitFor(() => outcomes.length === 2, 3000, 'game 2 reported');
+    expect(outcomes[1]!.outcome.placements).toEqual([[hostId]]);
+    expect(outcomes[1]!.outcome.reason).toBe('forfeit');
+    expect(st(host.room).phase).toBe('RESULTS');
   });
 
   it('tournament forfeit: the remaining golfer wins when the opponent leaves', async () => {

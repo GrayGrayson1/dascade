@@ -289,6 +289,7 @@ export class MasterpieceRoom extends PartyRoom<MasterpieceState, MasterpieceSett
     const draft = this.drafts.find((d) => d.id === showdownId);
     if (!draft) return this.rejectReason(player, type, 'stale');
     if (!draft.authors.includes(player.id)) return this.rejectReason(player, type, 'not_eligible');
+    if (this.refuseWhilePaused(player, type)) return;
     const clean = sanitizeAnswer(text, draft.type);
     if (!clean) return this.reject(player, type, 'invalid_payload', 'Write something first!');
     const result = desk.submit(player.id, showdownId, clean, Date.now());
@@ -402,6 +403,7 @@ export class MasterpieceRoom extends PartyRoom<MasterpieceState, MasterpieceSett
     const ballots = this.ballots;
     if (this.mpStage !== 'vote' || !ballots || !ballots.isOpen) return this.rejectReason(player, type, 'closed');
     if (showdownId !== this.state.showdownId) return this.rejectReason(player, type, 'stale');
+    if (this.refuseWhilePaused(player, type)) return;
     const audience = player.state.spectator;
     if (audience && !this.getSettings().audienceVote) return this.reject(player, type, 'not_allowed', 'Audience voting is off in this room.');
     if (audience && this.audienceDeviceTaken(player, ballots)) {
@@ -422,6 +424,7 @@ export class MasterpieceRoom extends PartyRoom<MasterpieceState, MasterpieceSett
     const ballots = this.ballots;
     if (this.mpStage !== 'vote' || !ballots || !ballots.isOpen) return this.rejectReason(player, type, 'closed');
     if (showdownId !== this.state.showdownId) return this.rejectReason(player, type, 'stale');
+    if (this.refuseWhilePaused(player, type)) return;
     const result = ballots.lock(player.id, player.state.spectator);
     if (!result.ok) return this.rejectBallot(player, type, result.error, 1);
     this.sendView(player);
@@ -452,6 +455,13 @@ export class MasterpieceRoom extends PartyRoom<MasterpieceState, MasterpieceSett
   }
 
   /** Ends voting early once every present eligible player has locked a ballot. */
+  /** Ballots aren't a kit collector: a vote completed during a pause (by leavers) ends on resume. */
+  protected override resumeStage(): boolean {
+    const resumed = super.resumeStage();
+    if (resumed) this.checkVotesDone();
+    return resumed;
+  }
+
   private checkVotesDone(): void {
     const ballots = this.ballots;
     if (this.mpStage !== 'vote' || !ballots || !ballots.isOpen) return;

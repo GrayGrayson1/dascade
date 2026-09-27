@@ -126,6 +126,7 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
     if (!book || this.stage !== 'answer')
       return this.reject(player, SURVEY_MSG.answer, 'wrong_phase', 'Answers are closed for this question.');
     if (payload.q !== book.serial) return this.reject(player, SURVEY_MSG.answer, 'wrong_phase', PARTY_REASON_TEXT.stale);
+    if (this.refuseWhilePaused(player, SURVEY_MSG.answer)) return;
     const result = book.answer(player.id, 'skip' in payload ? null : payload.option);
     if (!result.ok) return this.rejectBook(player, SURVEY_MSG.answer, result.reason);
     this.progressOf(player.id).answered = true;
@@ -141,6 +142,7 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
       return this.reject(player, SURVEY_MSG.predict, 'wrong_phase', 'Predictions are closed for this question.');
     }
     if (payload.q !== book.serial) return this.reject(player, SURVEY_MSG.predict, 'wrong_phase', PARTY_REASON_TEXT.stale);
+    if (this.refuseWhilePaused(player, SURVEY_MSG.predict)) return;
     const result = book.predict(player.id, toPrediction(payload));
     if (!result.ok) return this.rejectBook(player, SURVEY_MSG.predict, result.reason);
     this.progressOf(player.id).predicted = true;

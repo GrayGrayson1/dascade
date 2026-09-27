@@ -5,6 +5,7 @@
  * is hidden, never inside a game, absent under reduced motion). Everything else is static CSS.
  */
 import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { addFrameJob } from '../../arcade/scheduler.ts';
 import type { SkinRenderContext } from '../types.ts';
 
 function subscribeVisibility(cb: () => void): () => void {
@@ -70,12 +71,10 @@ function Dust() {
         p: rnd() * 6.28,
       });
     }
-    let raf = 0;
     let last = 0;
+    // On the shared frame clock at ~15 fps (plenty for drifting dust); t is in seconds.
     const frame = (t: number) => {
-      raf = requestAnimationFrame(frame);
-      if (t - last < 66) return; // ~15 fps is plenty for drifting dust
-      const dt = last ? Math.min(0.2, (t - last) / 1000) : 0.066;
+      const dt = last ? Math.min(0.2, t - last) : 1 / 15;
       last = t;
       ctx.clearRect(0, 0, w, h);
       for (const m of motes) {
@@ -96,10 +95,10 @@ function Dust() {
       }
       ctx.globalAlpha = 1;
     };
-    raf = requestAnimationFrame(frame);
+    const stop = addFrameJob(frame, { fps: 15 });
     window.addEventListener('resize', resize);
     return () => {
-      cancelAnimationFrame(raf);
+      stop();
       window.removeEventListener('resize', resize);
     };
   }, []);

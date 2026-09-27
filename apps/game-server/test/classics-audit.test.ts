@@ -169,6 +169,46 @@ describe('Classics — dropping the connection is not an unlimited pause button'
   });
 });
 
+describe('Classics — a solo verified run can only fall so far behind real time', () => {
+  it('blocks: a run paused past the budget still verifies, but never reaches the board', async () => {
+    const c = await solo('blocks');
+    c.server.soloLeadMs = 0;
+    c.server.soloLagBudgetMs = 400;
+    c.room.send(CLASSICS_MSG.start, {});
+    await waitFor(() => c.tickets.length > 0, 3000, 'ticket');
+    const ticket = c.tickets[c.tickets.length - 1]!;
+    const sim = createBlocksSim(ticket.seed, ticket.options, false);
+    const rec = new InputRecorder();
+    const playTo = (tick: number) => {
+      while (!sim.over && sim.tick < tick) {
+        if (sim.tick % 10 === 0 && sim.input(BLOCK.hardDrop)) rec.record(sim.tick, BLOCK.hardDrop);
+        sim.step();
+      }
+    };
+    const flush = (final: boolean) => {
+      for (let b = rec.take(sim.tick); b; b = rec.take(sim.tick)) {
+        c.room.send(CLASSICS_MSG.input, { runId: ticket.runId, ...b, ...(final && b.upTo >= sim.tick ? { final: true } : {}) });
+      }
+    };
+    // Plays in real time for a moment…
+    await sleep(400);
+    playTo(20);
+    flush(false);
+    await waitFor(() => c.server.runs.get(c.me).ackSeq === 1, 2000, 'first batch');
+    expect(c.server.runs.get(c.me).unranked).toBe(false);
+    // …then stops stepping (a local pause / frame-stepping) well past the budget.
+    await waitFor(() => c.server.runs.get(c.me).unranked === true, 4000, 'unranked');
+    playTo(60);
+    flush(true);
+    await waitFor(() => c.verdicts.length > 0, 3000, 'verdict');
+    expect(c.verdicts[0]!.reason).toBe('over');
+    expect(c.verdicts[0]!.score).toBeGreaterThan(0);
+    expect(c.verdicts[0]!.board).toBe('');
+    expect(c.verdicts[0]!.rank).toBeNull();
+    expect(highScores.top('blocks', 'marathon').entries).toHaveLength(0);
+  });
+});
+
 describe('Classics — tampered verified-run logs (Block Drop)', () => {
   /** Starts a solo run and lets the test client run up to 30 min ahead of real time. */
   async function run() {

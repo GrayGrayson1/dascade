@@ -575,6 +575,20 @@ export class TournamentEngine {
     this.refresh();
   }
 
+  /**
+   * Both participants forfeit (e.g. neither showed up): nobody advances — the next match's other
+   * participant gets a walkover, and both count a loss (elimination: both are out).
+   */
+  forfeitBoth(matchId: string, reason: string, actor: TournamentAuditActor = 'organizer'): void {
+    this.requireStatus(['IN_PROGRESS'], 'The tournament is not running.');
+    const m = this.requireMatch(matchId);
+    if (isFinished(m) || !m.a || !m.b) throw new TournamentError('not_allowed', 'That match is not waiting to be played.');
+    const [a, b] = [this.participant(m.a)!, this.participant(m.b)!];
+    this.finish(m, null, 'double_forfeit', `Double forfeit — ${reason}`);
+    this.audit(actor, actor === 'system' ? 'no_show' : 'forfeit', `${a.name} and ${b.name} both forfeit ${m.label}.`, { matchId, reason });
+    this.refresh();
+  }
+
   disqualify(pid: string, reason: string): void {
     const p = this.requireParticipant(pid);
     if (TERMINAL.includes(this.data.status)) throw new TournamentError('wrong_status', 'The tournament is over.');
@@ -967,14 +981,31 @@ export class TournamentEngine {
     m.completedAt = 0;
   }
 
-  /** Matches whose slots come from `m` (winner/loser), incl. the conditional reset after the grand final. */
+  /**
+   * Matches whose slots come from `m` (winner/loser), incl. the conditional reset after the grand final.
+   * Transitive through byes and void matches: those settled automatically from `m`'s result, so
+   * whatever they fed was derived from it too (e.g. a losers-bracket bye whose winner already sits in
+   * the next losers round) and must be checked and re-derived with it.
+   */
   private dependents(m: EngineMatch): EngineMatch[] {
     if (this.data.config.format === 'swiss') {
       // Later Swiss rounds were paired from this result.
       return m.round < this.data.roundsPaired ? this.data.matches.filter((x) => x.round > m.round) : [];
     }
     if (this.data.config.format === 'round_robin') return [];
-    return this.data.matches.filter((x) => x.sources.some((s) => s && s.kind !== 'seed' && s.matchId === m.id));
+    const out: EngineMatch[] = [];
+    const seen = new Set([m.id]);
+    const queue = [m];
+    for (let from = queue.shift(); from; from = queue.shift()) {
+      const feeder = from;
+      for (const x of this.data.matches) {
+        if (seen.has(x.id) || !x.sources.some((s) => s && s.kind !== 'seed' && s.matchId === feeder.id)) continue;
+        seen.add(x.id);
+        out.push(x);
+        if (x.resultKind === 'bye' || x.resultKind === 'void') queue.push(x);
+      }
+    }
+    return out;
   }
 
   /** Forfeit a removed participant's live (or pending, fully known) matches. */

@@ -83,7 +83,10 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
   private identities: Partial<Record<BoardSide, SeatIdentity>> = {};
   private ownMoves: Record<BoardSide, number> = { first: 0, second: 0 };
   private drawOfferedAt: Record<BoardSide, number> = { first: -1, second: -1 };
+  /** Position serial (see `position`) at each side's last take-back request. */
   private undoRequestedAt: Record<BoardSide, number> = { first: -1, second: -1 };
+  /** Bumps on every move and every accepted take-back (ply goes down after one, so it can't key this). */
+  private position = 0;
   private rematchOffers: Record<BoardSide, number> = { first: 0, second: 0 };
 
   // ===========================================================================
@@ -202,6 +205,7 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
     this.boardClock.switchAfterMove(mover);
     this.ownMoves[mover]++;
     this.state.ply++;
+    this.position++;
     this.state.turn = otherSide(mover);
     this.beginTurn();
     const offers = this.state.offers;
@@ -407,7 +411,8 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
 
   protected override onPlayerDisconnected(player: PlayerRecord): void {
     const side = this.sideOf(player);
-    if (!side || !this.boardLive) return;
+    // Seats are assigned at the countdown: a player dropping then shows their reconnect timer too.
+    if (!side || !(this.boardLive || this.phase === 'COUNTDOWN')) return;
     this.seatFor(side).awayDeadline = Date.now() + this.reconnectGraceSeconds * 1000;
   }
 
@@ -475,6 +480,7 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
     this.ownMoves = { first: 0, second: 0 };
     this.drawOfferedAt = { first: -1, second: -1 };
     this.undoRequestedAt = { first: -1, second: -1 };
+    this.position = 0;
     this.rematchOffers = { first: 0, second: 0 };
     for (const seat of this.state.seats) {
       seat.ratingDelta = 0;
@@ -688,10 +694,10 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
         const plies = this.turn === side ? 2 : 1;
         const myMoves = side === 'first' ? Math.ceil(this.state.ply / 2) : Math.floor(this.state.ply / 2);
         if (myMoves < 1 || this.state.ply < plies) return this.reject(player, type, 'not_allowed', 'You have no move to take back.');
-        if (this.undoRequestedAt[side] === this.state.ply) {
+        if (this.undoRequestedAt[side] === this.position) {
           return this.reject(player, type, 'not_allowed', 'You already asked to take back this move.');
         }
-        this.undoRequestedAt[side] = this.state.ply;
+        this.undoRequestedAt[side] = this.position;
         offers.undoBy = side;
         offers.undoPlies = plies;
         this.boardEvent({ type: 'offer', kind: 'undo', side, action: 'offer' });
@@ -706,6 +712,7 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
           return this.reject(player, type, 'not_allowed', 'That move can no longer be taken back.');
         }
         this.state.ply -= plies;
+        this.position++;
         if (plies % 2 === 1) this.state.turn = otherSide(this.turn);
         this.clearOffers();
         this.boardClock.handTo(this.turn);

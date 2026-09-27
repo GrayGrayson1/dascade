@@ -9,19 +9,22 @@ import { GAME_CATALOG, isGameId, isValidRoomCode, normalizeRoomCode, type GameId
 import { Button, GameTheme, Panel, Spinner, type IconName } from '@dascade/ui';
 import { session, useSessionStore } from '../net/session.ts';
 import { useCountdown, useRoomSelector } from '../net/hooks.ts';
-import { useApp } from '../app/store.ts';
+import { selectCanPlay, useApp } from '../app/store.ts';
 import { friendly, type FriendlyError } from '../net/errors.ts';
 import { loadGameModule } from '../games/registry.ts';
 import type { GameClientModule } from '../games/types.ts';
 import { music, sfx } from '../audio/audio.ts';
 import { Lobby } from './Lobby.tsx';
 import { ShellMenu, TopBar } from './TopBar.tsx';
-import { NoticeCard, ProfileEditor } from './common.tsx';
+import { NoticeCard, ProfileEditor, commitProfileName } from './common.tsx';
 import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './Reconnect.tsx';
 import { crumbCabinet } from './crumbs.ts';
+import { shouldLeaveBeforeResolving, shouldLeaveOnExit } from './roomPath.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
+import { leaveRoomTo, useTournamentExit } from '../tournament/exit.ts';
 import { reportRoomPlace } from '../themes/place.ts';
 import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
+import { isChunkLoadError, reloadForNewDeploy } from '../app/chunkReload.ts';
 
 export function RoomScreen() {
   const params = useParams();
@@ -40,12 +43,19 @@ export function RoomScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!isValidRoomCode(code)) {
+      let s = useSessionStore.getState();
+      if (s.room && s.code === code) {
         setResolving(false);
         return;
       }
-      const s = useSessionStore.getState();
-      if (s.room && s.code === code) {
+      // Opened another room's link (or went Back to one) while still in a room: leave that one first,
+      // whether or not there's a seat to resume here (or the code is even valid).
+      if (shouldLeaveBeforeResolving(code, { code: s.code, hasRoom: Boolean(s.room), status: s.status })) {
+        await session.leaveRoom();
+        if (cancelled) return;
+        s = useSessionStore.getState();
+      }
+      if (!isValidRoomCode(code)) {
         setResolving(false);
         return;
       }
@@ -60,6 +70,23 @@ export function RoomScreen() {
       cancelled = true;
     };
   }, [code]);
+
+  // Leaving the room screens leaves the room — browser / Android Back, a link, an error screen's "Back
+  // to arcade" — or the open socket keeps a ghost seat (the host never migrates, the lobby stalls on
+  // "Waiting for host") and the Room DJ keeps driving the jukebox on the floor. Deferred a tick so
+  // StrictMode's dev remount settles before deciding; the explicit Leave buttons have already left by
+  // then, and a switch to another room's screen is handled by the resolve effect above.
+  useEffect(
+    () => () => {
+      setTimeout(() => {
+        const s = useSessionStore.getState();
+        if (shouldLeaveOnExit(code, window.location.pathname, { code: s.code, hasRoom: Boolean(s.room), status: s.status })) {
+          void session.leaveRoom();
+        }
+      }, 0);
+    },
+    [code],
+  );
 
   if (!isValidRoomCode(code)) {
     return <ErrorScreen error={friendly('invalid_code')} onBack={() => navigate('/')} />;
@@ -106,7 +133,9 @@ export function RoomScreen() {
         error={err}
         onBack={() => {
           session.clearNotices();
-          navigate('/');
+          // A restarted (usually redeployed) server: a full load also picks up the new client build.
+          if (err.kind === 'server_restarted') location.assign('/');
+          else navigate('/');
         }}
         onRetry={
           err.retryable
@@ -129,6 +158,8 @@ export function RoomScreen() {
 }
 
 function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
+  const navigate = useNavigate();
+  const tournamentExit = useTournamentExit();
   const phase = useRoomSelector((s) => s.phase);
   const [module, setModule] = useState<GameClientModule | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -137,7 +168,11 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
     let alive = true;
     loadGameModule(gameId)
       .then((m) => alive && setModule(m))
-      .catch(() => alive && setLoadError(true));
+      .catch((err: unknown) => {
+        // The game's chunk is from an older deploy: reload once (the seat is resumed after the reload).
+        if (isChunkLoadError(err) && reloadForNewDeploy()) return;
+        if (alive) setLoadError(true);
+      });
     return () => {
       alive = false;
     };
@@ -181,6 +216,7 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
         <ErrorScreen
           error={friendly('unknown', 'This cabinet failed to load. Check your connection and try again.')}
           onRetry={() => location.reload()}
+          onBack={() => void leaveRoomTo(navigate, tournamentExit)}
         />
       ) : inLobby ? (
         <Lobby gameId={gameId} module={module} />
@@ -198,7 +234,8 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
 
 function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) {
   const [busy, setBusy] = useState(false);
-  const profileConfirmed = useApp((s) => s.profileConfirmed);
+  // Enabled from the typed name (not only once it's committed on blur: a tap on iOS doesn't blur).
+  const canPlay = useApp(selectCanPlay);
   const [lookup, setLookup] = useState<{ gameId?: string; roomName?: string; exists: boolean } | null>(null);
   useEffect(() => {
     session
@@ -210,6 +247,7 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
   const game = gameId ? GAME_CATALOG[gameId] : null;
   const cabinet = gameId ? crumbCabinet(gameId) : null;
   const join = async () => {
+    if (busy || lookup?.exists === false || !commitProfileName()) return;
     setBusy(true);
     await session.joinRoom(code);
     setBusy(false);
@@ -247,7 +285,7 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
             {lookup?.roomName ? <p className="join-prompt__room">{lookup.roomName}</p> : null}
             {lookup && !lookup.exists ? <p className="dc-field__error">No room is using this code right now.</p> : null}
           </div>
-          <ProfileEditor compact onSubmit={() => profileConfirmed && void join()} />
+          <ProfileEditor compact onSubmit={() => void join()} />
           <div className="dc-row dc-row--wrap">
             <Button variant="ghost" onClick={onCancel} icon="arrow-left">
               Arcade
@@ -258,7 +296,7 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
               size="lg"
               icon="play"
               loading={busy}
-              disabled={!profileConfirmed || lookup?.exists === false}
+              disabled={!canPlay || lookup?.exists === false}
               onClick={join}
             >
               Join game
@@ -381,9 +419,11 @@ function CountdownOverlay() {
   const endsAt = useRoomSelector((s) => s.phaseEndsAt);
   const remaining = useCountdown(endsAt ?? 0);
   const n = Math.max(1, Math.ceil(remaining / 1000));
+  // One beep per displayed second (`remaining` itself ticks every 250 ms).
+  const live = remaining > 0;
   useEffect(() => {
-    if (remaining > 0) sfx('countdown');
-  }, [n, remaining]);
+    if (live) sfx('countdown');
+  }, [n, live]);
   return (
     <div className="countdown-overlay" role="status" aria-live="assertive" aria-label={`Starting in ${n}`}>
       <span key={n} className="countdown-overlay__num">

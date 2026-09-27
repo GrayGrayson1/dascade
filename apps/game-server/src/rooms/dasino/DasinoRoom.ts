@@ -186,7 +186,27 @@ export class DasinoRoom extends BaseGameRoom<DasinoState, DasinoSettings> {
 
     this.handle(DASINO_MSG.refill, DasinoEmptySchema, (p) => this.refill(p), { phases: playing, playersOnly: true, rate: RATE.action });
 
+    this.handle(DASINO_MSG.sit, DasinoEmptySchema, (p) => this.takeSeat(p), { phases: playing, rate: TABLE_RATE });
+
     this.handle(DASINO_MSG.endSession, DasinoEmptySchema, () => this.endSession(), { phases: playing, hostOnly: true });
+  }
+
+  /**
+   * The closing leaderboard ranks net chips, and a removed player drops to the bottom of it — so
+   * while the floor is open, the host can't remove anyone who still has chips (e.g. the leader right
+   * before closing the floor). Moderation works as usual before and after the session.
+   */
+  protected override kickBlocker(target: PlayerRecord): string | null {
+    if (this.phase !== 'PLAYING') return null;
+    const seat = this.state.seats.get(target.id);
+    if (seat && seat.balance + seat.inPlay > 0) return 'Players with chips on the floor can’t be removed mid-session — close the floor first.';
+    return null;
+  }
+
+  /** "Back to lobby" / "Close room" mid-session closes the floor properly first, so the session is reported. */
+  protected override hostEndsMatch(): string | null {
+    if (this.phase === 'PLAYING') this.endSession();
+    return null;
   }
 
   protected onGameStart(): void {
@@ -357,6 +377,20 @@ export class DasinoRoom extends BaseGameRoom<DasinoState, DasinoSettings> {
   private wakeTables(): void {
     if (this.state.roulette.phase === 'IDLE') this.startRouletteRound();
     if (this.state.dice.phase === 'IDLE') this.startDiceRound();
+  }
+
+  /** A spectator takes a free seat mid-session (a returning guest gets back the chips they left with). */
+  private takeSeat(p: PlayerRecord): void {
+    const type = DASINO_MSG.sit;
+    if (!p.state.spectator) return this.reject(p, type, 'not_allowed', 'You already have a seat.');
+    if (this.seatedPlayers().length >= this.state.maxPlayers) return this.reject(p, type, 'not_allowed', 'Every seat is taken right now.');
+    p.state.spectator = false;
+    p.state.queued = false;
+    this.markMetadataDirty();
+    this.ensureSeat(p);
+    this.wakeTables();
+    this.syncPrivate(p);
+    this.systemChat(`${p.state.name} took a seat.`);
   }
 
   private refill(p: PlayerRecord): void {

@@ -2,13 +2,18 @@
  * Where the collapsed jukebox lives.
  *
  * 1. SLOT — a shell toolbar hosts it, so it can never cover anything:
- *      [data-jukebox-slot]           explicit host (any page may add one)
+ *      [data-jukebox-slot]           explicit host (any page may add one; the arcade floor has one in its
+ *                                  HUD / phone extras row, data-jukebox-variant="compact" = button only)
  *      .topbar__right                room top bar (inserted just before the Mute button)
  *      .shell-menu__actions          immersive games: an entry inside the floating shell menu
- * 2. FLOAT — pages without a shell toolbar (arcade floor, cabinet picker, title screen, tournaments):
+ * 2. FLOAT — pages without a shell toolbar (cabinet picker, title screen, tournaments):
  *    try a few corner/edge candidates and take the first whose box overlaps no visible content
  *    (controls, text, boards, canvases). Evaluated on navigation/resize only — never while scrolling —
  *    so it doesn't jump around.
+ *
+ * Separately, [data-jukebox-slot="floor"] is the arcade floor's corner, where the physical jukebox
+ * stands (FloorJukebox.tsx) alongside the compact control — see findMachineHost (ignored while the
+ * floor hides it, e.g. on phones).
  *
  * The geometry is pure (unit-tested in placement.test.ts); the DOM scan is a thin wrapper.
  */
@@ -149,7 +154,8 @@ const BLOCK_SELECTOR = '[data-part], .dc-panel, .dc-card, section, aside, nav, h
 const TEXT_SELECTOR = 'span, div, small, strong, em, b, i, td, th, dd, dt, figcaption, time, output, blockquote';
 
 function isDecorative(el: Element): boolean {
-  if (el.closest('[aria-hidden="true"], [data-jukebox], .dc-toasts, [inert]')) return true;
+  // The jukebox's own UI never counts — except the machine standing on the floor, which is a real object.
+  if (el.closest('[aria-hidden="true"], [data-jukebox]:not([data-dock="floor"]), .dc-toasts, [inert]')) return true;
   return false;
 }
 
@@ -228,9 +234,17 @@ export function readSafeArea(): Required<Viewport>['safe'] {
 
 export type DockSlot = { kind: 'slot' | 'topbar' | 'menu'; host: HTMLElement } | { kind: 'hidden'; host: null };
 
+/** The arcade floor's corner where the physical jukebox stands, while the floor shows it. */
+export function findMachineHost(doc: Document): HTMLElement | null {
+  const floor = doc.querySelector<HTMLElement>('[data-jukebox-slot="floor"]');
+  return floor && floor.getClientRects().length > 0 ? floor : null;
+}
+
 /** Finds (or creates) the toolbar host for the dock; `hidden` = stay out of the way; null = float. */
 export function findSlotHost(doc: Document, current: HTMLElement | null): DockSlot | null {
-  const explicit = doc.querySelector<HTMLElement>('[data-jukebox-slot]');
+  const explicit = Array.from(doc.querySelectorAll<HTMLElement>('[data-jukebox-slot]:not([data-jukebox-slot="floor"])')).find(
+    (el) => el.getClientRects().length > 0,
+  );
   if (explicit) return { kind: 'slot', host: explicit };
   const topbar = doc.querySelector<HTMLElement>('.topbar__right');
   if (topbar) return { kind: 'topbar', host: ensureHost(topbar, current, topbarAnchor(topbar)) };

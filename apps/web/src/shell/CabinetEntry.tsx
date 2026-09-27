@@ -16,7 +16,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { CABINETS, GAME_CATALOG, cabinetForGame, isGameId, normalizeRoomCode, type CabinetGame, type GameId } from '@dascade/shared';
 import { Badge, Button, GameTheme, PixelIcon, TextInput } from '@dascade/ui';
 import { session, useSessionStore } from '../net/session.ts';
-import { useApp } from '../app/store.ts';
+import { selectCanPlay, useApp } from '../app/store.ts';
 import { loadGameModule } from '../games/registry.ts';
 import { sfx } from '../audio/audio.ts';
 import { AttractCanvas } from '../arcade/AttractCanvas.tsx';
@@ -28,7 +28,7 @@ import { gameKeyFor, rememberGame, runViewTransition } from '../arcade/transitio
 import { requestVariant } from '../arcade/variantRequest.ts';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
 import { UnknownPlace } from './cabinet/UnknownPlace.tsx';
-import { ProfileEditor } from './common.tsx';
+import { ProfileEditor, commitProfileName } from './common.tsx';
 import '../arcade/entry.css';
 
 /** Longer copy for the DASino floor tables (they share one catalog entry). */
@@ -53,7 +53,9 @@ export function CabinetEntry() {
   const { gameId } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const profileConfirmed = useApp((s) => s.profileConfirmed);
+  // Enabled from the typed name — not only once it's committed on blur (a tap on iOS doesn't blur the
+  // field, so a first-time player could never get past a disabled "Create game").
+  const canPlay = useApp(selectCanPlay);
   const openModal = useApp((s) => s.openModal);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
   const error = useSessionStore((s) => s.error);
@@ -84,6 +86,7 @@ export function CabinetEntry() {
   const badges = gameBadges(game);
 
   const create = async (solo: boolean) => {
+    if (busy !== null || !commitProfileName()) return;
     setBusy(solo ? 'solo' : 'create');
     sfx('coin');
     const roomCode = await session.createRoom(gameId, solo ? { solo: true } : {});
@@ -95,6 +98,7 @@ export function CabinetEntry() {
   };
   const join = async () => {
     const c = normalizeRoomCode(code);
+    if (busy !== null || c.length !== 5 || !commitProfileName()) return;
     setBusy('join');
     const res = await session.joinRoom(c);
     setBusy(null);
@@ -212,7 +216,7 @@ export function CabinetEntry() {
                 block
                 icon="plus"
                 loading={busy === 'create'}
-                disabled={!profileConfirmed || busy !== null}
+                disabled={!canPlay || busy !== null}
                 onClick={() => create(false)}
               >
                 Create game
@@ -224,7 +228,7 @@ export function CabinetEntry() {
                   block
                   icon="user"
                   loading={busy === 'solo'}
-                  disabled={!profileConfirmed || busy !== null}
+                  disabled={!canPlay || busy !== null}
                   onClick={() => create(true)}
                 >
                   {gameId === 'circuit' ? 'Solo time trial' : 'Play solo'}
@@ -255,7 +259,7 @@ export function CabinetEntry() {
                     variant="primary"
                     size="lg"
                     loading={busy === 'join'}
-                    disabled={!profileConfirmed || code.length !== 5 || busy !== null}
+                    disabled={!canPlay || code.length !== 5 || busy !== null}
                   >
                     Join
                   </Button>
@@ -268,7 +272,7 @@ export function CabinetEntry() {
               {game.tournament ? (
                 <TournamentButton gameId={gameId} variant="ghost" size="md" label="Tournament Center" className="af-entry__tourney" />
               ) : null}
-              {!profileConfirmed ? (
+              {!canPlay ? (
                 <p className="af-entry__hint">
                   <PixelIcon name="info" /> Enter a nickname to play.
                 </p>

@@ -1048,7 +1048,8 @@
   border-radius: 12px;
 }
 :root[data-theme='space-casino-2088'] [data-jukebox] [data-part='track'][data-current] {
-  background: linear-gradient(90deg, rgba(79, 240, 255, 0.18), rgba(255, 92, 200, 0.1));
+  /* The playing title strip glows holo-cyan (its ink stays dark on the paper strip). */
+  --jb-strip-lit: #d2fbff;
   box-shadow: inset 0 0 0 1px rgba(79, 240, 255, 0.5);
 }
 :root[data-theme='space-casino-2088'] [data-jukebox] [data-part='library'],

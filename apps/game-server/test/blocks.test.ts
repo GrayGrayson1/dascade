@@ -244,6 +244,25 @@ describe('Block Drop — solo verified runs', () => {
     expect(verdict.score).toBe(sim.score);
     expect(highScores.top('blocks', 'blitz-2').entries[0]?.score).toBe(sim.score);
   });
+
+  it('a higher start level (it multiplies scores) files runs on its own board', async () => {
+    const host = await create({ solo: true });
+    const me = host.me().playerId;
+    await waitFor(() => st(host).standings.get(me)?.status === 'ready', 3000, 'ready');
+    host.room.send('lobby:settings', { settings: { startLevel: 5 } });
+    await waitFor(() => st(host).classics.board === 'marathon-l5', 2000, 'level board');
+    host.room.send(CLASSICS_MSG.start, {});
+    const ticket = await nextTicket(host);
+    expect(ticket.board).toBe('marathon-l5');
+    expect(ticket.options).toMatchObject({ startLevel: 5 });
+    unthrottle(host.server, me);
+    const { sim } = await playRun(host, ticket, createBlocksSim, { policy: dropper('lvl5') });
+    const verdict = await waitVerdict(host, ticket.runId);
+    expect(verdict.board).toBe('marathon-l5');
+    expect(verdict.score).toBe(sim.score);
+    expect(highScores.top('blocks', 'marathon').entries).toHaveLength(0);
+    expect(highScores.top('blocks', 'marathon-l5').entries[0]?.score).toBe(sim.score);
+  });
 });
 
 describe('Block Drop — multiplayer score race', () => {

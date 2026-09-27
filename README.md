@@ -83,7 +83,7 @@ Games read materials with an exact fallback (`var(--mat-board-light, <original c
 | DAS Putt | same | 1, 3 | up to 32 |
 
 - **Lifecycle:** draft, registration, optional check-in, seeding (random, manual or by DASCADE rating), live rounds, then champion. Double elimination has an optional grand-final reset. Swiss pairs players on the same score and avoids rematches. Round robin uses Berger tables. Byes are handled automatically.
-- **Matches run themselves.** When a match is ready, the server creates the game room and gives each participant a private ticket. **Play match** seats you, and anyone can **Spectate**. Games start automatically once both players are present. Series continue with sides swapped after a short intermission. No-shows forfeit after the configured time.
+- **Matches run themselves.** When a match is ready, the server creates the game room and gives each participant a private ticket. **Play match** seats you, and anyone can **Spectate**. Games start automatically once both players are present. Series continue with sides swapped after a short intermission. No-shows forfeit after the configured time, counted from when the match room opens (if neither player turns up, both forfeit so the bracket keeps moving).
 - **Organizer console:** open or close registration and check-in, seed, begin, pause or resume, forfeit, disqualify, override a result, relaunch a match room, end or cancel. Every action is written to a public audit log with its reason.
 - Brackets render as a tree on desktop and as a round strip on phones. Round robin shows a crosstable and Swiss shows standings with explained tiebreaks.
 - Public tournaments are listed at `GET /api/tournaments`. Unlisted ones are joined by code.
@@ -107,7 +107,7 @@ Then open http://localhost:5173. `pnpm dev` runs the Colyseus game server on :25
 |---|---|
 | `pnpm dev` | Game server + web client with hot reload |
 | `pnpm build` | Production build: `apps/web/dist` and the bundled server `apps/game-server/dist` (including `dist/words-data/`, the DASwords dictionary) |
-| `pnpm start` | Runs the built server. With `NODE_ENV=production` it also serves the built client on one port. |
+| `pnpm start` | Runs the built server in production mode (it sets `NODE_ENV=production`), serving the built client on the same port. |
 | `pnpm lint` / `pnpm format` | ESLint / Prettier |
 | `pnpm typecheck` | `tsc --noEmit` in every package |
 | `pnpm test` | Vitest: engine unit tests, kit and platform tests, server integration tests |
@@ -200,7 +200,7 @@ Everything is optional. Copy `.env.example` to `.env` at the repo root (both app
 | `PORT`, `HOST` | server | Listen address (default `0.0.0.0:2567`) |
 | `NODE_ENV=production` | server | Serve the built client from the game server |
 | `LOG_LEVEL` | server | `debug`, `info`, `warn` or `error` |
-| `TRUST_PROXY` | server | How per-IP throttles read the client address: `auto` (default), `0` (TCP peer) or the number of trusted proxy hops |
+| `TRUST_PROXY` | server | How per-IP throttles read the client address: `auto` (default: behind a private-network proxy, the right-most `X-Forwarded-For` hop that isn't a private or Cloudflare address), `0` (TCP peer) or the number of trusted proxy hops |
 | `DASCADE_SAVE_SECRET` | server | HMAC key (32+ chars) for DASQuest save files. Production disables saves when it is unset. |
 | `DASCADE_WORDS_DICT` | server | Absolute path to an alternative DASwords dictionary file |
 | `DASCADE_LATENCY_MS` | server | Simulated round-trip latency for netcode testing |
@@ -233,7 +233,10 @@ Players can upgrade their anonymous account to a permanent one from **Settings �
 
 ## Jukebox and audio
 
-The **jukebox** is a global feature that lives in its own corner of the arcade, not a cabinet. Collapsed, it is a small button (in a room it sits in the top bar; in full-screen games it moves into the menu; on the floor it finds a free corner). Expanded, it is a player with transport controls, seek, volume and mute, shuffle, repeat off/all/one, a searchable and sortable library, a reorderable queue ("play next" / "add to queue"), a visualizer and the Room DJ tab. Music keeps playing through every route change (floor, cabinet, lobby, match, results, tournament) and through theme switches. After a reload it restores the track and position, and resumes on your next click. Every theme dresses the same player differently (a CD utility, a mixtape deck, a brass executive stereo…).
+The **jukebox** is a global feature, not a cabinet, and it is a real machine: on the arcade floor it **stands in the room's left corner** (arched crown, bubble-tube arch, a record turning behind the dome glass, lit title strips and grille) and lights up while music plays. Click it to walk up to it. There is also a **quick jukebox button** everywhere: in the floor's header (on phones, next to "Join with code", since a phone floor has no free corner), in a room's top bar, and in the menu of full-screen games. Either one opens the **machine up close**: the record on its turntable under an arched dome, the now-playing screen, chrome push buttons (shuffle, previous, play/pause, next, repeat off/all/one), seek, volume and mute, a visualizer, and three selector keys:
+- **Selections**: the library as jukebox title strips. Every song keeps a selection code from the catalogue order (A1–A8, B1…, no I or O). The letter keys flip the rack, typing a code such as "B3" finds that strip, and the magnifier searches.
+- **Up next**: the reorderable queue ("play next" / "add to queue" on each strip).
+- **Room DJ**. Music keeps playing through every route change (floor, cabinet, lobby, match, results, tournament) and through theme switches. After a reload it restores the track and position, and resumes on your next click. Every theme dresses the same machine differently (a CD utility, a mixtape deck, a brass executive stereo…), and the one on the floor takes the theme's cabinet finish and accent lights.
 
 - **One engine** (`apps/web/src/audio/`): a single `AudioContext` created on the first user gesture, and a mixer with separate buses for **sound effects**, **game music** (the procedural soundtrack) and the **jukebox** (one `<audio>` element → one shared analyser). Settings → Sound has master, effects, game-music and jukebox volumes.
 - **Mixing policy** (`mixPolicy.ts`): the jukebox never turns effects down. Audible effects briefly dip the music, and sustained sounds (the DASh Circuit engine) hold it lower. While the jukebox plays, game music is muted by default (Settings: *duck*, *mute* or *keep*). All gain changes are smooth ramps.
@@ -273,7 +276,7 @@ The Vite plugin (`apps/web/vite/jukebox-plugin.ts`, indexer in `apps/web/vite/ju
 
 Sidecar values beat tags, and tags beat `defaults`. `cover` is a JPEG, PNG, GIF or WebP inside the folder, and it replaces the embedded art. `hidden` keeps a file out of the manifest and out of `dist/`.
 
-**Deploy size:** the repo carries the audio itself, about 19 MB today (8 files, of which 17.1 MB is published after dedupe), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB to every clone and deploy.
+**Deploy size:** the repo carries the audio itself, about 17 MB today (7 files), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB to every clone and deploy.
 
 ### Room DJ
 
@@ -336,6 +339,11 @@ Adventures are typed, schema-validated data packs in `packages/game-core/src/que
 plan (sleeps after ~15 idle minutes; the first visit then takes ~30–60 s and live rooms end); change `plan`
 to `starter` for an always-on server. `DASCADE_SAVE_SECRET` is generated automatically; Supabase variables are
 optional. Every push to `main` redeploys.
+
+**On the free plan, unless Supabase is configured, ratings, player stats, Classics high scores and live
+tournaments are in server memory only and reset on every deploy and every sleep** (any restart, on any plan).
+With Supabase (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`, migrations 0001–0004) ratings, stats, high scores and
+tournament history are kept; rooms and tournaments in progress still end when the server restarts.
 
 ## Deployment recommendations
 

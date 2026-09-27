@@ -2,9 +2,10 @@
  * Final-round wager: category reveal + a private wager (game points only).
  */
 import { useState } from 'react';
+import { SYS } from '@dascade/shared';
 import { TRIVIA_CATEGORIES, TRIVIA_MSG, type TriviaAnyCategoryId, type TriviaPrivate } from '@dascade/shared/games/trivia';
 import { Button, NumberInput, Slider } from '@dascade/ui';
-import { session } from '../../net/hooks.ts';
+import { session, useRoomMessage } from '../../net/hooks.ts';
 import { ArtIcon, LockNote } from '../_party/index.ts';
 
 export function WagerPanel({
@@ -23,6 +24,10 @@ export function WagerPanel({
   const max = wager?.max ?? 0;
   const [amount, setAmount] = useState(() => Math.round(max / 2));
   const [sent, setSent] = useState<number | null>(null);
+  // A refused wager (e.g. the host paused the game) is rolled back so it can be placed again.
+  useRoomMessage<{ type?: string }>(SYS.error, (e) => {
+    if (e?.type === TRIVIA_MSG.wager) setSent(null);
+  });
   const locked = Boolean(wager?.locked) || sent !== null;
   const clamp = (n: number) => Math.max(0, Math.min(max, Math.round(Number.isFinite(n) ? n : 0)));
   const lock = () => {

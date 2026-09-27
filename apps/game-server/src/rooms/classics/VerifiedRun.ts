@@ -8,8 +8,12 @@
  *  - wall-clock cap: a client can't be further ahead than the real time since `startAt`
  *    (+ a little slack), so a sped-up client gains nothing,
  *  - structural validation of every event (tick range, code range, per-tick flood cap),
- *  - per-run caps on events and length (CLASSICS.maxRunEvents / maxRunTicks),
+ *  - per-run caps: events (CLASSICS.maxRunEvents → rejected) and length — a run ends ('time', a
+ *    real, recordable result) when it reaches CLASSICS.maxRunTicks; inputs past it are ignored,
  *  - any code the engine refuses = tampered log → the run is rejected.
+ *
+ * It also tracks how far the run fell behind real time since its best (least-behind) accepted
+ * batch — the room's solo budget for local pauses / slow motion (see VerifiedClassicsRoom).
  */
 import { CLASSICS, type RunEndReason, type RunInputBatch, type RunTicket, type RunVerdict } from '@dascade/shared/games/classics';
 import { advanceSim, decodeEvents, encodeEvents, type ClassicsSim, type InputEvent } from '@dascade/game-core/classics/shared';
@@ -55,6 +59,10 @@ export class VerifiedRun {
   endReason: RunEndReason | null = null;
   /** Client-reported score of the final batch (diagnostics). */
   clientScore: number | null = null;
+  /** The run fell too far behind real time (solo pause budget): it still verifies, but isn't ranked. */
+  unranked = false;
+  /** Smallest lag (wall ticks − verified ticks) seen at an accepted batch; null before the first. */
+  private minLag: number | null = null;
 
   constructor(init: VerifiedRunInit) {
     this.runId = init.runId;
@@ -79,16 +87,25 @@ export class VerifiedRun {
     return Math.floor((now - this.startAt) / this.tickMs);
   }
 
+  /**
+   * Ticks this run is behind real time beyond its best accepted position — time spent paused,
+   * stalled or in slow motion since then (network latency is part of the baseline, so it doesn't count).
+   */
+  behindTicks(now: number): number {
+    if (this.minLag === null) return 0;
+    return Math.max(0, this.wallTicks(now) - this.upTo - this.minLag);
+  }
+
   ingest(batch: RunInputBatch, now: number): IngestResult {
     if (this.ended || batch.seq <= this.ackSeq) return { status: 'dup' };
     if (batch.seq !== this.ackSeq + 1) return { status: 'resync', why: 'gap' };
     if (batch.upTo < this.upTo) return { status: 'resync', why: 'gap' };
     if (batch.upTo > this.wallTicks(now) + CLASSICS.aheadSlackTicks) return { status: 'resync', why: 'ahead' };
-    if (batch.upTo > CLASSICS.maxRunTicks) return { status: 'rejected', why: 'too-long' };
     const decoded = decodeEvents(batch.events, this.upTo, batch.upTo, this.maxCode);
     if (!decoded.ok) return { status: 'rejected', why: `events:${decoded.reason}` };
     if (this.log.length + decoded.events.length > CLASSICS.maxRunEvents) return { status: 'rejected', why: 'too-many-events' };
-    const limit = this.limitTicks > 0 ? this.limitTicks : Infinity;
+    // Timed races stop at their limit; every run stops at the length cap (inputs past it are ignored).
+    const limit = Math.min(this.limitTicks > 0 ? this.limitTicks : Infinity, CLASSICS.maxRunTicks);
     const res = advanceSim(this.sim, decoded.events, batch.upTo, limit);
     if (!res.ok) return { status: 'rejected', why: res.reason };
     for (const ev of decoded.events) {
@@ -96,9 +113,11 @@ export class VerifiedRun {
     }
     this.ackSeq = batch.seq;
     this.upTo = this.sim.tick;
+    const lag = this.wallTicks(now) - this.upTo;
+    if (this.minLag === null || lag < this.minLag) this.minLag = lag;
     if (batch.clientScore !== undefined) this.clientScore = batch.clientScore;
     if (this.sim.over) return { status: 'ok', ended: true, reason: 'over' };
-    if (this.limitTicks > 0 && this.sim.tick >= this.limitTicks) return { status: 'ok', ended: true, reason: 'time' };
+    if (this.sim.tick >= limit) return { status: 'ok', ended: true, reason: 'time' };
     // The client says its engine ended but ours didn't (a divergence): the server's state stands.
     if (batch.final) return { status: 'ok', ended: true, reason: 'over' };
     return { status: 'ok', ended: false };
@@ -117,7 +136,7 @@ export class VerifiedRun {
       startAt: this.startAt,
       limitTicks: this.limitTicks,
       options: this.options,
-      board: this.board,
+      board: this.unranked ? '' : this.board,
     };
     if (this.ackSeq > 0 || this.upTo > 0) ticket.resume = { events: encodeEvents(this.log, 0), upTo: this.upTo, ackSeq: this.ackSeq };
     if (this.ended) ticket.ended = true;

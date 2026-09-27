@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_THEME_PREF, SETTINGS_VERSION, migrateSettings, peekStoredTheme, type AppSettings } from './settings.ts';
+import {
+  DEFAULT_THEME_PREF,
+  MOTION_CHOSEN_KEY,
+  SETTINGS_VERSION,
+  migrateSettings,
+  motionChoice,
+  peekStoredSettings,
+  peekStoredTheme,
+  reconcileSettings,
+  type AppSettings,
+} from './settings.ts';
 
 const DEFAULTS: AppSettings = {
   masterVolume: 0.8,
@@ -122,5 +132,64 @@ describe('peekStoredTheme', () => {
         },
       }),
     ).toBeNull();
+  });
+});
+
+describe('peekStoredSettings', () => {
+  const storage = (value: string | null) => ({ getItem: () => value });
+  it('reads the whole local blob synchronously (mute, volumes, fx… apply to the first render)', () => {
+    const stored = { muted: true, masterVolume: 0.2, fx: 'off', reducedMotion: true, theme: 'delta-neon', settingsVersion: 3 };
+    const out = migrateSettings(peekStoredSettings(storage(JSON.stringify(stored))), DEFAULTS);
+    expect(out).toMatchObject({ muted: true, masterVolume: 0.2, fx: 'off', reducedMotion: true });
+  });
+  it('is null for missing / corrupt storage and never throws', () => {
+    expect(peekStoredSettings(storage(null))).toBeNull();
+    expect(peekStoredSettings(storage('{nope'))).toBeNull();
+    expect(peekStoredSettings(null)).toBeNull();
+    expect(
+      peekStoredSettings({
+        getItem: () => {
+          throw new Error('SecurityError');
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('motionChoice', () => {
+  it('follows the OS preference until the player chooses', () => {
+    expect(motionChoice(null, true)).toEqual({ chosen: false, reducedMotion: true });
+    expect(motionChoice(null, false)).toEqual({ chosen: false, reducedMotion: false });
+    // Saved by this build without a choice: the stored value is only the OS default of that moment.
+    expect(motionChoice({ reducedMotion: true, [MOTION_CHOSEN_KEY]: false }, false)).toEqual({ chosen: false, reducedMotion: false });
+  });
+
+  it('keeps the player’s own choice, even against the OS preference (turning animations back on persists)', () => {
+    expect(motionChoice({ reducedMotion: false, [MOTION_CHOSEN_KEY]: true }, true)).toEqual({ chosen: true, reducedMotion: false });
+    expect(motionChoice({ reducedMotion: true, [MOTION_CHOSEN_KEY]: true }, false)).toEqual({ chosen: true, reducedMotion: true });
+  });
+
+  it('reads blobs from before the flag the way the old build behaved', () => {
+    // OS asks for reduced motion: it wins, as before.
+    expect(motionChoice({ reducedMotion: false }, true)).toEqual({ chosen: false, reducedMotion: true });
+    // "Reduce" stored on a device whose OS doesn't ask for it: the player turned it on.
+    expect(motionChoice({ reducedMotion: true }, false)).toEqual({ chosen: true, reducedMotion: true });
+    expect(motionChoice({ reducedMotion: false }, false)).toEqual({ chosen: false, reducedMotion: false });
+  });
+
+  it('is fail-safe for junk', () => {
+    for (const junk of [undefined, 'x', 3, [], { reducedMotion: 'yes', [MOTION_CHOSEN_KEY]: true }]) {
+      expect(motionChoice(junk, true)).toEqual({ chosen: false, reducedMotion: true });
+    }
+  });
+});
+
+describe('reconcileSettings', () => {
+  it('takes loaded values except the keys changed on screen since boot', () => {
+    const current: AppSettings = { ...DEFAULTS, muted: true, masterVolume: 0.1, fx: 'off' };
+    const loaded: AppSettings = { ...DEFAULTS, muted: false, masterVolume: 0.9, fx: 'low', theme: 'shareware-97' };
+    const out = reconcileSettings(loaded, current, new Set<keyof AppSettings>(['muted', 'masterVolume']));
+    expect(out).toEqual({ ...loaded, muted: true, masterVolume: 0.1 });
+    expect(reconcileSettings(loaded, current, new Set())).toEqual(loaded);
   });
 });

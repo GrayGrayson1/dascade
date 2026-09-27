@@ -9,7 +9,7 @@ services:
     # pnpm is pinned to package.json "packageManager". NODE_ENV is NOT set at build time (dev
     # dependencies are needed to build); the start command sets production itself.
     buildCommand: npx --yes pnpm@11.27.1 install --frozen-lockfile && npx --yes pnpm@11.27.1 build
-    startCommand: cd apps/game-server && NODE_ENV=production node dist/index.js
+    startCommand: cd apps/game-server && NODE_ENV=production node --enable-source-maps dist/index.js
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:

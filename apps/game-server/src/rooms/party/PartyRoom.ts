@@ -18,7 +18,11 @@
  *    (sum / average), deltas and ranks published in `teams`.
  *  - Scores: addPoints() accumulates deltas, commitScores() applies them at the reveal and
  *    publishes delta / rank / prevRank (+ `scoreSeq` for the client's animated score reveal).
- *  - finishParty(): podium JSON, endMatch() summary and reportOutcome() placements in one call.
+ *  - finishParty(): podium JSON, endMatch() summary and reportOutcome() placements in one call
+ *    (players who left mid-match are placed last, so leaving never dodges a result).
+ *  - Host pause freezes the prompt too: submitAnswer()/submitVote()/lock*() refuse while paused
+ *    (games with their own collectors call refuseWhilePaused()), and resuming re-checks "everyone
+ *    answered" so a prompt completed during the pause ends right away.
  *
  * Overriding lifecycle hooks: PartyRoom implements onPlayerJoined / onPlayerDisconnected /
  * onPlayerReconnected / onPlayerAway / onPlayerRemoved / onReturnToLobby / syncPrivate.
@@ -50,6 +54,7 @@ import {
   type VoteBoxOptions,
 } from '@dascade/game-core/party';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
+import { withLeaversLast } from '../outcomePlacements.ts';
 import { PartySeatState, PartyTeamState, type PartyRoomState } from './schema.ts';
 
 const STAGE_TIMER = 'party:stage';
@@ -242,6 +247,20 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
     s.pausedMs = 0;
     this.setTimer(left);
     if (this.stageDone) this.schedule(STAGE_TIMER, left, () => this.finishStage());
+    // Players who dropped (or left) during the pause may have completed the prompt meanwhile: the
+    // early end endStageSoon() skipped while paused happens now.
+    this.checkAllAnswered();
+    return true;
+  }
+
+  /**
+   * While the host has the game paused nothing locks in (the clock is frozen, so neither may the
+   * answers be). Replies with a friendly rejection and returns true when paused. The kit's
+   * submit/lock helpers call it; games with their own collectors call it in their handlers.
+   */
+  protected refuseWhilePaused(player: PlayerRecord, type: string): boolean {
+    if (!this.state.paused) return false;
+    this.reject(player, type, 'wrong_phase', 'The game is paused.');
     return true;
   }
 
@@ -379,6 +398,7 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
       this.reject(player, type, 'not_allowed', 'Spectators can’t answer.');
       return false;
     }
+    if (this.refuseWhilePaused(player, type)) return false;
     const result = box.submit(player.id, value);
     if (!result.ok) {
       this.rejectReason(player, type, result.reason);
@@ -391,6 +411,7 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
 
   /** Explicit lock-in for change-until-lock boxes. */
   protected lockAnswer<T>(player: PlayerRecord, box: AnswerBox<T>, type: string): boolean {
+    if (this.refuseWhilePaused(player, type)) return false;
     if (!box.lock(player.id)) {
       this.rejectReason(player, type, box.isOpen ? (box.has(player.id) ? 'already_locked' : 'invalid') : 'closed');
       return false;
@@ -411,6 +432,7 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
       this.reject(player, type, 'not_allowed', 'Spectators can’t vote.');
       return false;
     }
+    if (this.refuseWhilePaused(player, type)) return false;
     const result = box.cast(player.id, choice);
     if (!result.ok) {
       this.rejectReason(player, type, result.reason);
@@ -422,6 +444,7 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
   }
 
   protected lockVote(player: PlayerRecord, box: VoteBox, type: string): boolean {
+    if (this.refuseWhilePaused(player, type)) return false;
     if (!box.lock(player.id)) {
       this.rejectReason(player, type, box.isOpen ? 'already_locked' : 'closed');
       return false;
@@ -711,6 +734,8 @@ export abstract class PartyRoom<S extends PartyRoomState, Settings extends objec
       for (const p of players) p.place = explicitPlace.get(p.id) ?? p.place;
       players.sort((a, b) => a.place - b.place || b.score - a.score);
     }
+    // Players who left mid-match are placed last (the podium only shows who's still here).
+    placements = withLeaversLast(placements, this.matchLeaverIds());
     const podiumData: PartyPodium = { players, teams, winnerIds, winningTeamIds, ...(opts.extras ? { extras: opts.extras } : {}) };
     this.state.podiumJson = JSON.stringify(podiumData);
     this.state.stage = 'final';

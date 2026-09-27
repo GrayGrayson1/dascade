@@ -676,7 +676,8 @@
   border-radius: 10px;
 }
 :root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='track'][data-current] {
-  background: linear-gradient(90deg, rgba(62, 224, 255, 0.22), rgba(62, 224, 255, 0.04));
+  /* The playing title strip lights up ice-blue (its ink stays dark on the paper strip). */
+  --jb-strip-lit: #cdf6ff;
   box-shadow: inset 0 0 0 1px rgba(62, 224, 255, 0.45);
 }
 :root[data-theme='cyber-cafe-01'] [data-jukebox] [data-part='mini'] {

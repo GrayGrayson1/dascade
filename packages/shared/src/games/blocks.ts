@@ -20,9 +20,14 @@ export type BlocksSettings = z.infer<typeof BlocksSettingsSchema>;
 
 export const DEFAULT_BLOCKS_SETTINGS: BlocksSettings = { mode: 'marathon', blitzSeconds: 180, startLevel: 1 };
 
-/** High-score board for a settings combination. */
-export function blocksBoardKey(s: Pick<BlocksSettings, 'mode' | 'blitzSeconds'>): string {
-  return s.mode === 'blitz' ? `blitz-${Math.round(s.blitzSeconds / 60)}` : 'marathon';
+/**
+ * High-score board for a settings combination. The start level multiplies every score, so a run
+ * started above level 1 has its own board (e.g. `marathon-l5`, `blitz-3-l10`).
+ */
+export function blocksBoardKey(s: Pick<BlocksSettings, 'mode' | 'blitzSeconds'> & { startLevel?: number }): string {
+  const base = s.mode === 'blitz' ? `blitz-${Math.round(s.blitzSeconds / 60)}` : 'marathon';
+  const level = Math.max(1, Math.min(10, Math.floor(s.startLevel ?? 1)));
+  return level > 1 ? `${base}-l${level}` : base;
 }
 
 export function blocksModeLabel(s: Pick<BlocksSettings, 'mode' | 'blitzSeconds'>): string {

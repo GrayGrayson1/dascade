@@ -18,6 +18,21 @@ export interface FxQuality {
   reducedMotion: boolean;
 }
 
+/** Live-particle caps per emitter for a quality (see Effects.setQuality). */
+function particleCaps(q: FxQuality) {
+  const a = q.amount;
+  return {
+    smoke: Math.round(320 * a) + 10,
+    dust: Math.round(160 * a) + 6,
+    exhaust: Math.round(120 * a) + 4,
+    flames: Math.round(260 * a) + 10,
+    driftSparks: Math.round(200 * a) + 6,
+    sparks: Math.round(260 * a) + 20,
+    fireworks: q.reducedMotion ? 120 : 600,
+    confetti: q.reducedMotion ? 80 : 400,
+  };
+}
+
 interface TrailState {
   pts: Array<[number, number]>;
   color: number;
@@ -25,6 +40,7 @@ interface TrailState {
 }
 
 export class Effects {
+  private readonly scene: Phaser.Scene;
   private q: FxQuality;
   private smoke: Phaser.GameObjects.Particles.ParticleEmitter;
   private dust: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -45,15 +61,16 @@ export class Effects {
   private frameCount = 0;
 
   constructor(scene: Phaser.Scene, q: FxQuality) {
+    this.scene = scene;
     this.q = { ...q };
-    const a = q.amount;
+    const cap = particleCaps(q);
     this.smoke = scene.add.particles(0, 0, 'ci-puff', {
       lifespan: { min: 900, max: 1500 },
       speed: { min: 8, max: 34 },
       scale: { start: 0.45, end: 2.6 },
       alpha: { start: 0.5, end: 0 },
       tint: [0xe6e9ff, 0xd0d6f2, 0xf4f5ff],
-      maxAliveParticles: Math.round(320 * a) + 10,
+      maxAliveParticles: cap.smoke,
       emitting: false,
     });
     this.smoke.setDepth(DEPTH.smoke);
@@ -63,7 +80,7 @@ export class Effects {
       scale: { start: 0.3, end: 1.3 },
       alpha: { start: 0.3, end: 0 },
       tint: [0x6a6070, 0x7c7188, 0x5b5263],
-      maxAliveParticles: Math.round(160 * a) + 6,
+      maxAliveParticles: cap.dust,
       emitting: false,
     });
     this.dust.setDepth(DEPTH.dust);
@@ -73,7 +90,7 @@ export class Effects {
       scale: { start: 0.12, end: 0.45 },
       alpha: { start: 0.25, end: 0 },
       tint: 0x9aa4c8,
-      maxAliveParticles: Math.round(120 * a) + 4,
+      maxAliveParticles: cap.exhaust,
       emitting: false,
     });
     this.exhaust.setDepth(DEPTH.smoke);
@@ -84,7 +101,7 @@ export class Effects {
       alpha: { start: 0.95, end: 0 },
       tint: [0xffd23f, 0xf97316, 0x22d3ee, 0xffffff],
       blendMode: Phaser.BlendModes.ADD,
-      maxAliveParticles: Math.round(260 * a) + 10,
+      maxAliveParticles: cap.flames,
       emitting: false,
     });
     this.flames.setDepth(DEPTH.flame);
@@ -95,7 +112,7 @@ export class Effects {
       alpha: { start: 1, end: 0 },
       tint: [0x22d3ee, 0x9ff3ff, 0xf97316],
       blendMode: Phaser.BlendModes.ADD,
-      maxAliveParticles: Math.round(200 * a) + 6,
+      maxAliveParticles: cap.driftSparks,
       emitting: false,
     });
     this.driftSparks.setDepth(DEPTH.flame);
@@ -107,7 +124,7 @@ export class Effects {
       rotate: { onEmit: () => 0, onUpdate: (p) => (Math.atan2(p.velocityY, p.velocityX) * 180) / Math.PI },
       tint: [0xffd23f, 0xffb347, 0xffffff],
       blendMode: Phaser.BlendModes.ADD,
-      maxAliveParticles: Math.round(260 * a) + 20,
+      maxAliveParticles: cap.sparks,
       emitting: false,
     });
     this.sparks.setDepth(DEPTH.sparks);
@@ -127,7 +144,7 @@ export class Effects {
       scale: { start: 0.9, end: 0 },
       alpha: { start: 1, end: 0 },
       blendMode: Phaser.BlendModes.ADD,
-      maxAliveParticles: q.reducedMotion ? 120 : 600,
+      maxAliveParticles: cap.fireworks,
       emitting: false,
     });
     this.fireworks.setDepth(DEPTH.celebrate);
@@ -139,14 +156,43 @@ export class Effects {
       scale: { min: 0.6, max: 1.1 },
       alpha: { start: 1, end: 0.2 },
       tint: [0x22d3ee, 0xf97316, 0xff4fd8, 0xffd23f, 0x2de38f, 0xf8f6ff],
-      maxAliveParticles: q.reducedMotion ? 80 : 400,
+      maxAliveParticles: cap.confetti,
       emitting: false,
     });
     this.confetti.setDepth(DEPTH.celebrate);
     this.trailG = scene.add.graphics().setDepth(DEPTH.trail).setBlendMode(Phaser.BlendModes.ADD);
-    for (let i = 0; i < q.skidMarks; i++) {
-      this.skids.push(scene.add.image(-9999, -9999, 'ci-skid').setDepth(DEPTH.skid).setAlpha(0).setOrigin(0.5));
+    this.sizeSkidPool(q.skidMarks);
+  }
+
+  private sizeSkidPool(count: number): void {
+    while (this.skids.length > count) this.skids.pop()!.destroy();
+    while (this.skids.length < count) {
+      this.skids.push(this.scene.add.image(-9999, -9999, 'ci-skid').setDepth(DEPTH.skid).setAlpha(0).setOrigin(0.5));
     }
+    this.skidIdx = this.skids.length ? this.skidIdx % this.skids.length : 0;
+  }
+
+  /**
+   * FX level / reduced motion changed: apply in place (no emitter or scene rebuild). Particle
+   * caps, emission amount, light trails and the skid-mark pool follow; live particles and the
+   * newest skid marks stay. Also lifts a watchdog degrade (as a rebuild did).
+   */
+  setQuality(q: FxQuality): void {
+    this.q = { ...q };
+    const cap = particleCaps(q);
+    this.smoke.maxAliveParticles = cap.smoke;
+    this.dust.maxAliveParticles = cap.dust;
+    this.exhaust.maxAliveParticles = cap.exhaust;
+    this.flames.maxAliveParticles = cap.flames;
+    this.driftSparks.maxAliveParticles = cap.driftSparks;
+    this.sparks.maxAliveParticles = cap.sparks;
+    this.fireworks.maxAliveParticles = cap.fireworks;
+    this.confetti.maxAliveParticles = cap.confetti;
+    if (!q.trails) {
+      this.trails.clear();
+      this.trailG.clear();
+    }
+    this.sizeSkidPool(q.skidMarks);
   }
 
   /** Weak hardware: halve particle emission and drop the light trails. */

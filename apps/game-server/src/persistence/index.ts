@@ -5,6 +5,7 @@
  */
 import { config, supabaseEnabled } from '../config.ts';
 import { log } from '../lib/log.ts';
+import { trackWrite } from '../lib/pendingWrites.ts';
 
 export interface MatchPlayerSummary {
   playerId: string;
@@ -50,7 +51,12 @@ class SupabaseSink implements MatchResultSink {
     return this.clientPromise;
   }
 
-  async record(summary: MatchSummary): Promise<void> {
+  /** Tracked so a clean shutdown waits for it (pendingWrites.ts). */
+  record(summary: MatchSummary): Promise<void> {
+    return trackWrite(this.write(summary));
+  }
+
+  private async write(summary: MatchSummary): Promise<void> {
     try {
       const sb = await this.client();
       const { error } = await sb.from('match_results').insert({

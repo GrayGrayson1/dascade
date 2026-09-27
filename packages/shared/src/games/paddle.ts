@@ -79,7 +79,10 @@ export const PaddleInputSchema = z.object({
   y: z.number().finite().min(0).max(PADDLE_Y_MAX),
   /** Launch the ball when you hold serve. */
   serve: z.boolean().optional(),
-  /** Client's measured round-trip time (ms). Only used, capped, to be fair about hits near the paddle edge. */
+  /**
+   * Client's measured round-trip time (ms). Only a hint for hit forgiveness near the paddle edge: the
+   * server caps it by its own measurement (WebSocket ping frames), so claiming more gains nothing.
+   */
   rtt: z.number().finite().min(0).max(2_000).optional(),
 });
 export type PaddleInput = z.infer<typeof PaddleInputSchema>;

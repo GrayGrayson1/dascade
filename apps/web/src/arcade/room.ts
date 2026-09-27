@@ -17,6 +17,10 @@ export interface RoomHints {
   rowBottom: number;
   rowLeft: number;
   rowRight: number;
+  /** The jukebox stands in the left corner (the floor reserves it): no change machine there. */
+  jukebox?: boolean;
+  /** Room for the claw machine at the right end (wide floors only; default true). */
+  claw?: boolean;
 }
 
 export interface RoomGeometry {
@@ -161,7 +165,19 @@ export class RoomRenderer {
 
     const sign = this.layoutSign(W, L(hints.headerBottom) + 3, rowTop - 5);
     this.signL = sign;
-    this.props = this.layoutProps(W, H, sign, L(hints.headerBottom) + 3, rowTop - 5, floorY, L(hints.rowLeft), L(hints.rowRight), rowTop);
+    this.props = this.layoutProps(
+      W,
+      H,
+      sign,
+      L(hints.headerBottom) + 3,
+      rowTop - 5,
+      floorY,
+      L(hints.rowLeft),
+      L(hints.rowRight),
+      rowTop,
+      !hints.jukebox,
+      hints.claw !== false,
+    );
 
     for (const c of [this.canvas, this.base]) {
       c.width = W;
@@ -216,6 +232,8 @@ export class RoomRenderer {
     rowLeft: number,
     rowRight: number,
     rowTop: number,
+    changeMachine: boolean,
+    clawMachine: boolean,
   ): Prop[] {
     const props: Prop[] = [];
     const zone = bottom - top;
@@ -228,11 +246,11 @@ export class RoomRenderer {
     const sideR = W - rowRight - 3;
     const machineH = Math.round(clamp((floorY - rowTop) * 0.95, 24, 90));
     const baseY = Math.round(floorY + Math.min(10, (H - floorY) * 0.2));
-    if (sideR >= 16) {
+    if (clawMachine && sideR >= 16) {
       const w = Math.round(clamp(sideR - 2, 16, 34));
       props.push({ kind: 'claw', x: W - w - 2, y: baseY - machineH, w, h: machineH });
     }
-    if (sideL >= 14) {
+    if (changeMachine && sideL >= 14) {
       const w = Math.round(clamp(sideL - 3, 13, 22));
       const h = Math.round(machineH * 0.82);
       props.push({ kind: 'change', x: 2, y: baseY - h, w, h });

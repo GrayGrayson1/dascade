@@ -166,6 +166,63 @@ describe('party kit — PartyRoom', () => {
     expect(t.server.state.stage).toBe('answer');
   });
 
+  it('nothing locks in while paused, and a prompt completed during the pause ends as soon as it resumes', async () => {
+    const t = await setup(3, { answerMs: 8000, rounds: 1 });
+    await start(t);
+    const [host, b, c] = t.clients as [Client, Client, Client];
+    host.room.send('kit:answer', { seq: 1, text: 'before' });
+    await waitFor(() => t.server.state.answeredCount === 1, 2000, 'one answer');
+    host.room.send('party:host', { action: 'pause' });
+    await waitFor(() => t.server.state.paused, 2000, 'paused');
+    // Answers wait for the clock: refused while paused (and nothing is recorded).
+    b.room.send('kit:answer', { seq: 1, text: 'during' });
+    await waitFor(() => b.errors.some((e) => e.type === 'kit:answer'), 2000, 'refused');
+    expect(b.errors.find((e) => e.type === 'kit:answer')).toMatchObject({ code: 'wrong_phase', message: 'The game is paused.' });
+    expect(t.server.box!.has(b.id())).toBe(false);
+    expect(t.server.state.answeredCount).toBe(1);
+    b.room.send('kit:answer', { seq: 1, text: 'b' });
+    await waitFor(() => b.errors.filter((e) => e.type === 'kit:answer').length === 2, 2000, 'refused again');
+    // The last two leave while paused: everyone still here has answered, but the frozen stage waits…
+    await b.room.leave(true);
+    await c.room.leave(true);
+    await sleep(120);
+    expect(t.server.state.stage).toBe('answer');
+    expect(t.server.state.paused).toBe(true);
+    // …and ends right after the resume instead of running out the remaining ~8 s.
+    host.room.send('party:host', { action: 'resume' });
+    await waitFor(() => t.server.state.stage !== 'answer', 1500, 'stage ended after resume');
+  });
+
+  it('players who left mid-match are placed last in the reported outcome', async () => {
+    const t = await setup(3, { answerMs: 6000, rounds: 1 });
+    await start(t);
+    const [a, b, c] = t.clients as [Client, Client, Client];
+    // c scores first, then leaves before the end: it must not dodge the result (nor keep its lead).
+    c.room.send('kit:answer', { seq: 1, text: 'c' });
+    a.room.send('kit:answer', { seq: 1, text: 'a' });
+    await waitFor(() => t.server.state.answeredCount === 2, 2000, 'answers');
+    await c.room.leave(true);
+    await waitFor(() => json(a).players[c.id()] === undefined, 2000, 'c left');
+    t.host.room.send('party:host', { action: 'skip' });
+    await waitFor(() => json(a).phase === 'RESULTS' && json(a).podiumJson !== '', 4000, 'results');
+    await waitFor(() => outcomes.length === 1, 2000, 'outcome');
+    expect(outcomes[0]!.placements).toEqual([[a.id()], [b.id()], [c.id()]]);
+    // The podium only lists who is still here.
+    const podium = JSON.parse(json(a).podiumJson) as PartyPodium;
+    expect(podium.players.map((p) => p.id)).toEqual([a.id(), b.id()]);
+
+    // Explicit placements (hidden-team games) list leavers last too.
+    const t2 = await setup(3, { answerMs: 6000 });
+    await start(t2);
+    const [x, y, z] = t2.clients as [Client, Client, Client];
+    await z.room.leave(true);
+    await waitFor(() => json(x).players[z.id()] === undefined, 2000, 'z left');
+    outcomes.length = 0;
+    t2.server.finishWith([[z.id(), y.id()], [x.id()]]);
+    await waitFor(() => outcomes.length === 1, 2000, 'outcome 2');
+    expect(outcomes[0]!.placements).toEqual([[y.id()], [x.id()], [z.id()]]);
+  });
+
   it('team mode: balanced teams, late joiner joins the smallest team, team totals + podium + outcome', async () => {
     const t = await setup(4, { teams: 2, rounds: 1, answerMs: 6000 });
     await start(t);

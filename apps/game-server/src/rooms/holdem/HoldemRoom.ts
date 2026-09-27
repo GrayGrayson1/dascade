@@ -141,7 +141,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     });
     this.handle(HOLDEM_MSG.rebuy, HoldemEmptySchema, (p) => this.onRebuy(p), { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true });
     this.handle(HOLDEM_MSG.show, HoldemEmptySchema, (p) => this.onShow(p), { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true });
-    this.handle(HOLDEM_MSG.end, HoldemEmptySchema, () => this.finishGame('host_ended'), { phases: ['PLAYING', 'INTERMISSION'], hostOnly: true });
+    this.handle(HOLDEM_MSG.end, HoldemEmptySchema, () => this.requestEnd(), { phases: ['PLAYING', 'INTERMISSION'], hostOnly: true });
 
     // Housekeeping: keep lobby seats consistent with spectate toggles / table size,
     // and make sure the hand loop can never stall.
@@ -154,6 +154,39 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   protected override validateStart(): string | null {
     const seated = this.seatedPlayers().length;
     if (seated > HOLDEM_MAX_SEATS) return `DAS Hold'em seats at most ${HOLDEM_MAX_SEATS} players.`;
+    return null;
+  }
+
+  /**
+   * The leaderboard is decided by chips, and a removed player drops to the bottom of it — so while a
+   * game runs, the host can't remove anyone who still has chips at the table (e.g. the chip leader
+   * right before ending the game). Busted players and the rail can still be removed; everyone can
+   * again once the game is over.
+   */
+  protected override kickBlocker(target: PlayerRecord): string | null {
+    if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return null;
+    const index = this.seatOf(target.id);
+    if (index < 0) return null;
+    const seat = this.state.seats[index]!;
+    if (seat.left) return null;
+    const h = this.hand;
+    const hp = h && h.stage !== 'complete' ? playerAt(h, index) : undefined;
+    if (seat.stack > 0 || (hp && hp.id === target.id)) return 'Players with chips on the table can’t be removed mid-game — end the game first.';
+    return null;
+  }
+
+  /**
+   * "Back to lobby" / "Close room" mid-game settles the game first, so the session is still
+   * reported. A hand whose betting is still open is never cancelled for it (that would refund a pot
+   * someone is losing): the game ends after that hand instead, and the host is told to try again.
+   */
+  protected override hostEndsMatch(): string | null {
+    if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return null;
+    if (this.handUndecided()) {
+      this.requestEnd();
+      return 'A hand is still being played — the game ends when it’s over. Try again then.';
+    }
+    this.finishGame('host_ended');
     return null;
   }
 
@@ -181,6 +214,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     this.consecutiveTimeouts.clear();
     this.stats.clear();
     this.bankrolls.clear();
+    this.state.endRequested = false;
     this.state.handNumber = 0;
     this.state.log.clear();
     this.state.standings.clear();
@@ -199,6 +233,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     this.consecutiveTimeouts.clear();
     this.bankrolls.clear();
     this.clearHandView();
+    this.state.endRequested = false;
     this.state.handNumber = 0;
     this.state.log.clear();
     this.state.standings.clear();
@@ -513,6 +548,10 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   private startNextHand(): void {
     if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return;
     if (this.hand) return;
+    if (this.state.endRequested) {
+      this.finishGame('host_ended');
+      return;
+    }
     const settings = this.settings;
 
     // Seats freed by players who left during the last hand.
@@ -769,10 +808,11 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
 
     const occupied = this.state.seats.filter((s) => s.playerId && !s.left && s.index < this.state.tableSize);
     const gameOver = !this.settings.allowRebuys && bustedNow > 0 && occupied.filter((s) => s.stack > 0).length <= 1;
+    const hostEnded = this.state.endRequested;
     const pause = result.uncontested ? this.timing.intermissionUncontested : this.timing.intermission;
     this.setPhase('INTERMISSION', pause);
-    this.state.tableMessage = gameOver ? 'Final hand — last player standing!' : '';
-    this.schedule('hand', pause, () => (gameOver ? this.finishGame() : this.startNextHand()));
+    this.state.tableMessage = gameOver ? 'Final hand — last player standing!' : hostEnded ? 'That was the final hand.' : '';
+    this.schedule('hand', pause, () => (gameOver ? this.finishGame() : hostEnded ? this.finishGame('host_ended') : this.startNextHand()));
   }
 
   /** Chips won per seat in a finished hand; also updates the leaderboard stats. */
@@ -956,8 +996,33 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   // End of game
   // ===========================================================================
 
+  /** A hand is in progress and its betting is still open (nothing about the pot is settled yet). */
+  private handUndecided(): boolean {
+    const h = this.hand;
+    if (!h || h.stage === 'complete') return false;
+    return h.stage === 'betting' || (!h.runout && h.stage !== 'showdown');
+  }
+
+  /**
+   * Host "End game". An undecided hand is played to its end first — ending mid-bet would hand every
+   * bet back, so a host facing a bet they'd lose could erase it. A decided hand (all-in runout,
+   * showdown) or no hand at all ends the game now.
+   */
+  private requestEnd(): void {
+    if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return;
+    if (!this.handUndecided()) {
+      this.finishGame('host_ended');
+      return;
+    }
+    if (this.state.endRequested) return;
+    this.state.endRequested = true;
+    this.pushLog({ kind: 'info', text: 'The host is ending the game after this hand' });
+    this.toast('all', 'info', 'The host is ending the game after this hand.');
+  }
+
   private finishGame(reason: 'last_standing' | 'host_ended' = 'last_standing'): void {
     if (this.phase !== 'PLAYING' && this.phase !== 'INTERMISSION') return;
+    this.state.endRequested = false;
     const h = this.hand;
     if (h && h.stage !== 'complete') {
       if (h.stage !== 'betting' && (h.runout || h.stage === 'showdown')) {
@@ -967,7 +1032,8 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
         if (h.stage === 'showdown') resolveShowdown(h, this.settings.showdownReveal);
         this.tallyWins(h);
       } else {
-        // Betting is still open: nothing is decided yet, so every bet goes back.
+        // Betting is still open. Host controls never get here (they wait for the hand to finish:
+        // requestEnd / hostEndsMatch); as a last resort nothing is decided yet, so every bet goes back.
         cancelHand(h);
       }
       this.syncLog(h);

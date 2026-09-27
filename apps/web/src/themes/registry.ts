@@ -32,6 +32,11 @@ const BUILT_IN_LOADERS: Record<string, Loader> = {
 const LOADERS: Record<string, Loader> = { ...BUILT_IN_LOADERS };
 const cache = new Map<string, ThemeSkin>();
 const pending = new Map<string, Promise<ThemeSkin>>();
+/** When a skin chunk last failed (ms): renders don't hammer a failing network; explicit loads always retry. */
+const failedAt = new Map<string, number>();
+/** Minimum gap between render-driven retries of a failed skin (useSkin). */
+export const SKIN_RETRY_MS = 5000;
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -55,7 +60,12 @@ export function loadedSkin(id: string | null | undefined): ThemeSkin | null {
   return cache.get(skinKey(id)) ?? null;
 }
 
-/** Loads (once) the skin for a theme id; unknown ids resolve to Delta Neon's skin. Never rejects. */
+/**
+ * Loads (once) the skin for a theme id; unknown ids resolve to Delta Neon's skin. Never rejects.
+ * A failed chunk (offline, a deploy mid-session) resolves to a token-only skin for this call but is
+ * NOT cached: one network blip mustn't leave the theme unskinned until a reload, so the next load
+ * (the next switch, or a later render via useSkin) tries again.
+ */
 export function loadThemeSkin(id: string | null | undefined): Promise<ThemeSkin> {
   const key = skinKey(id);
   const hit = cache.get(key);
@@ -66,14 +76,21 @@ export function loadThemeSkin(id: string | null | undefined): Promise<ThemeSkin>
     p = Promise.resolve()
       .then(loader)
       .then((m) => (m && typeof m.default === 'object' && m.default ? m.default : ({ id: key } satisfies ThemeSkin)))
-      // A failed chunk (offline, deploy mid-session) degrades to a token-only theme: never breaks the app.
-      .catch(() => ({ id: key }) satisfies ThemeSkin)
-      .then((skin) => {
-        cache.set(key, skin);
-        pending.delete(key);
-        notify();
-        return skin;
-      });
+      .then(
+        (skin) => {
+          cache.set(key, skin);
+          failedAt.delete(key);
+          pending.delete(key);
+          notify();
+          return skin;
+        },
+        () => {
+          // Token-only for now (never breaks the app); no notify — nothing new to render.
+          failedAt.set(key, nowMs());
+          pending.delete(key);
+          return { id: key } satisfies ThemeSkin;
+        },
+      );
     pending.set(key, p);
   }
   return p;
@@ -111,7 +128,10 @@ export function useSkin(id: string): ThemeSkin | null {
     () => version,
   );
   const skin = loadedSkin(id);
-  if (!skin) void loadThemeSkin(id);
+  if (!skin) {
+    const failed = failedAt.get(skinKey(id));
+    if (failed === undefined || nowMs() - failed >= SKIN_RETRY_MS) void loadThemeSkin(id);
+  }
   return skin;
 }
 
@@ -120,12 +140,14 @@ export function registerSkinLoader(id: string, loader: Loader): void {
   if (BUILT_IN_LOADERS[id]) throw new Error(`Skin "${id}" is built in`);
   LOADERS[id] = loader;
   cache.delete(id);
+  failedAt.delete(id);
 }
 
 /** Test-only: forget every loaded skin. */
 export function __resetSkinCacheForTests(): void {
   cache.clear();
   pending.clear();
+  failedAt.clear();
   for (const id of Object.keys(LOADERS)) if (!BUILT_IN_LOADERS[id]) delete LOADERS[id];
   notify();
 }

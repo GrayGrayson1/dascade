@@ -121,10 +121,14 @@ export type BlackjackAction = (typeof BLACKJACK_ACTIONS)[number];
 export const BlackjackBetSchema = z.strictObject({ amount: z.number().int().min(0).max(BLACKJACK_LIMITS.maxBet) });
 export const BlackjackLockSchema = z.strictObject({ locked: z.boolean() });
 export const BlackjackSitSchema = z.strictObject({ seat: z.number().int().min(0).max(BLACKJACK_LIMITS.seats - 1) });
-/** `hand` is the index of the hand you believe is active; stale or double-clicked actions are rejected. */
+/**
+ * `hand` is the index of the hand you believe is active and `seq` your seat's `actionSeq` as you saw
+ * it: a stale, replayed or double-clicked action (e.g. a second "hit" on the same hand) is rejected.
+ */
 export const BlackjackActionSchema = z.strictObject({
   action: z.enum(BLACKJACK_ACTIONS),
   hand: z.number().int().min(0).max(BLACKJACK_LIMITS.maxHands - 1),
+  seq: z.number().int().min(0).optional(),
 });
 export const BlackjackInsuranceSchema = z.strictObject({ take: z.boolean() });
 export const BlackjackEmptySchema = z.strictObject({}).optional();
@@ -197,6 +201,8 @@ export interface BlackjackSeatView {
   handsWon: number;
   blackjacks: number;
   biggestWin: number;
+  /** Bumps on every accepted decision and each new round; send it with `action` (stale ones are rejected). */
+  actionSeq: number;
 }
 
 export interface BlackjackDealerView {

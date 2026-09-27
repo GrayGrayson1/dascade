@@ -154,13 +154,23 @@ export class DeceptionGame {
     return this.sudoSpent.has(id);
   }
 
+  /** This player's ballot in the open vote — null when none, or when it was voided (see eliminate()). */
   voteOf(id: string): CastVote | null {
     const v = this.votes.get(id);
-    return v ? { ...v } : null;
+    return v && !this.isVoid(v) ? { ...v } : null;
   }
 
+  /**
+   * Whether this player has cast a ballot in the open vote — including one voided since because its
+   * target left. "Has voted" is public; un-marking those voters would reveal whom they voted for.
+   */
   hasVoted(id: string): boolean {
     return this.votes.has(id);
+  }
+
+  /** A ballot for a player who is no longer a candidate (they left mid-vote): an abstention unless recast. */
+  private isVoid(vote: CastVote): boolean {
+    return vote.target !== 'skip' && !this.voteCandidates().includes(vote.target);
   }
 
   intelOf(id: string): DeceptionIntel[] {
@@ -337,7 +347,9 @@ export class DeceptionGame {
     const voter = this.seats.get(voterId);
     if (!voter) return fail('not_allowed', 'You are not playing in this match.');
     if (!voter.alive) return fail('not_allowed', 'You are offline — you can no longer vote.');
-    if (this.votes.has(voterId)) return fail('already_voted', 'Your vote is already locked in.');
+    const previous = this.votes.get(voterId);
+    // A void ballot (its target left) may be recast; a live one is final.
+    if (previous && !this.isVoid(previous)) return fail('already_voted', 'Your vote is already locked in.');
     const sudo = Boolean(opts.sudo);
     if (target === 'skip') {
       if (!opts.allowSkip) return fail('not_allowed', 'Skipping is turned off in this game — pick a player.');
@@ -411,14 +423,16 @@ export class DeceptionGame {
         if (pick?.target === id) p[kind] = { target: null, locked: false };
       }
     }
-    // While a vote is open, the leaver's own vote is void, and so are votes for them: those
-    // voters may vote again (a spent Sudo vote is refunded).
+    // While a vote is open, the leaver's own vote is void, and so are votes for them. Those ballots
+    // stay cast — who has voted is public, so dropping them would reveal who voted for the leaver —
+    // but the tally counts them as abstentions unless the voter recasts (castVote/voteOf treat them
+    // as void). A Sudo vote spent on the leaver is refunded.
     if (this.voteOpen) {
       this.votes.delete(id);
       for (const [voter, vote] of this.votes) {
-        if (vote.target !== id) continue;
-        this.votes.delete(voter);
-        if (vote.sudo) this.sudoSpent.delete(voter);
+        if (vote.target !== id || !vote.sudo) continue;
+        vote.sudo = false;
+        this.sudoSpent.delete(voter);
       }
     }
     return true;

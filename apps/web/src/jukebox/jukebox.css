@@ -3,7 +3,9 @@
  *
  * Every rule is wrapped in :where() (specificity 0,0,0) so theme skins restyle it with plain
  * `:root[data-theme='x'] [data-jukebox] [data-part='…']` selectors — no !important, no fights.
- * Tokens only (no literal colours). Key metrics are variables; see .scratch/THEMES/NOTES.md.
+ * Tokens only — except the machine's physical materials (chrome, black vinyl, cream title-strip paper
+ * and its ink, the dark grille), which keep their own colours in every theme like the playing cards in
+ * the cabinet art; they're variables (--jb-chrome-*, --jb-vinyl, --jb-strip-*) a skin can still tune.
  */
 
 /* ------------------------------------------------------------------ variables */
@@ -308,6 +310,417 @@
   position: relative;
 }
 
+/* ------------------------------------------------------------------ floor: the physical jukebox */
+/*
+ * The machine standing in the arcade room's corner (FloorJukebox.tsx). The floor lays out the spot
+ * ([data-jukebox-slot='floor'], sized by ArcadeFloor); the machine fills it and stands on the row's
+ * floor line with its nameplate underneath, like a cabinet's. Colours: cabinet tokens for the body,
+ * the jukebox accents for the lights, so a theme's skin restyles it with the usual --jb-* variables.
+ */
+:where(.jb-dock[data-dock='floor']) {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+:where(.jb-floor) {
+  --jbf-body: var(--cabinet-body);
+  --jbf-body-2: var(--cabinet-body-2);
+  --jbf-edge: var(--cabinet-edge);
+  --jbf-glass: var(--cabinet-screen-bg);
+  --jbf-chrome-hi: var(--jb-chrome-hi);
+  --jbf-chrome-lo: var(--jb-chrome-lo);
+  --jbf-paper: var(--jb-strip-bg);
+  --jbf-ink: var(--jb-strip-fg);
+  --jbf-lit: 0.5;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--af-ink-0, var(--text-0));
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+:where(.jb-dock[data-playing='true']) :where(.jb-floor) {
+  --jbf-lit: 1;
+}
+:where(.jb-floor) :where(.jb-floor__machine) {
+  position: relative;
+  flex: none;
+  width: 100%;
+  height: var(--jbf-machine-h, 100%);
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    filter var(--dur-2) var(--ease-out);
+}
+:where(.jb-floor) :where(.jbf) {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Light the machine throws on the wall behind it and pools on the carpet in front. */
+:where(.jb-floor) :where(.jb-floor__halo) {
+  position: absolute;
+  left: -30%;
+  right: -30%;
+  top: -8%;
+  bottom: 10%;
+  z-index: 0;
+  background: radial-gradient(50% 46% at 50% 40%, color-mix(in srgb, var(--jb-accent) 26%, transparent), transparent 70%);
+  opacity: calc(0.35 + var(--jbf-lit) * 0.65);
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+:where(.jb-floor) :where(.jb-floor__pool) {
+  position: absolute;
+  left: -24%;
+  right: -24%;
+  bottom: -5%;
+  height: 16%;
+  z-index: 0;
+  background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--jb-accent-2) 36%, transparent), transparent 72%);
+  opacity: calc(0.25 + var(--jbf-lit) * 0.75);
+  pointer-events: none;
+}
+:where(:root[data-fx='off']) :where(.jb-floor) :where(.jb-floor__halo, .jb-floor__pool) {
+  display: none;
+}
+
+/* Nameplate on the floor under the machine (matches the cabinets' plates). */
+:where(.jb-floor) :where(.jb-floor__plate) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100% + 40px);
+  min-height: var(--jbf-plate-h, 40px);
+  padding: 0 4px;
+}
+:where(.jb-floor) :where(.jb-floor__name) {
+  color: var(--af-ink-0, var(--text-0));
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--jb-accent) 70%, transparent);
+}
+:where(.jb-floor) :where(.jb-floor__now) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--af-ink-2, var(--text-2));
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+:where(.jb-floor) :where(.jb-floor__now-text) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:where(.jb-dock[data-playing='true']) :where(.jb-floor__now) {
+  color: var(--af-ink-1, var(--text-1));
+}
+
+/* Hover / press / focus: the machine leans into the light. */
+@media (hover: hover) {
+  :where(.jb-floor:hover) :where(.jb-floor__machine) {
+    transform: translateY(-3px);
+    filter: brightness(1.12) saturate(1.1);
+  }
+}
+:where(.jb-floor:active) :where(.jb-floor__machine) {
+  transform: translateY(0) scale(0.985);
+}
+:where(.jb-floor:focus-visible) {
+  outline: none;
+}
+:where(.jb-floor:focus-visible) :where(.jb-floor__machine)::after {
+  content: '';
+  position: absolute;
+  inset: -6px -6px -2px;
+  z-index: 2;
+  border: 2px solid var(--focus-ring);
+  border-radius: 46% 46% 6px 6px / 30% 30% 6px 6px;
+  pointer-events: none;
+}
+:where(.jb-dock[data-state='expanded']) :where(.jb-floor__machine) {
+  filter: brightness(1.15);
+}
+/* After a reload the browser wants a tap before audio resumes: the machine asks for it. */
+:where(.jb-floor[data-needs-gesture='true']) :where(.jb-floor__machine) {
+  animation: jbf-nudge 2.6s var(--ease-in-out) infinite;
+}
+@keyframes jbf-nudge {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.28);
+  }
+}
+
+/* --- the art (SVG classes; colours only from tokens) --- */
+:where(.jbf) :where(.jbf-stop-body) {
+  stop-color: var(--jbf-body);
+}
+:where(.jbf) :where(.jbf-stop-body2) {
+  stop-color: var(--jbf-body-2);
+}
+:where(.jbf) :where(.jbf-stop-a) {
+  stop-color: var(--jb-accent);
+}
+:where(.jbf) :where(.jbf-stop-b) {
+  stop-color: var(--jb-accent-2);
+}
+:where(.jbf) :where(.jbf-stop-glow) {
+  stop-color: color-mix(in srgb, var(--jb-accent) 34%, var(--jbf-glass));
+}
+:where(.jbf) :where(.jbf-stop-glass) {
+  stop-color: var(--jbf-glass);
+}
+:where(.jbf) :where(.jbf-stop-chrome-hi) {
+  stop-color: var(--jbf-chrome-hi);
+}
+:where(.jbf) :where(.jbf-stop-chrome-lo) {
+  stop-color: var(--jbf-chrome-lo);
+}
+:where(.jbf) :where(.jbf-body) {
+  stroke: var(--jbf-edge);
+  stroke-width: 1.2;
+}
+:where(.jbf) :where(.jbf-trim) {
+  fill: none;
+  stroke: var(--jbf-chrome-lo);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+:where(.jbf) :where(.jbf-tube__glow) {
+  fill: none;
+  stroke: var(--jb-accent);
+  stroke-width: 15;
+  stroke-linecap: round;
+  opacity: calc(var(--jbf-lit) * 0.22);
+}
+:where(.jbf) :where(.jbf-tube__glass) {
+  fill: none;
+  stroke-width: 8.5;
+  stroke-linecap: round;
+  opacity: calc(0.5 + var(--jbf-lit) * 0.5);
+}
+:where(.jbf) :where(.jbf-tube__bubbles) {
+  fill: none;
+  stroke: var(--light);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 10;
+  opacity: 0;
+}
+:where(.jbf) :where(.jbf-tube__shine) {
+  fill: none;
+  stroke: var(--light);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.3;
+}
+:where(.jbf) :where(.jbf-finial) {
+  stroke: var(--jbf-edge);
+  stroke-width: 0.8;
+}
+:where(.jbf) :where(.jbf-dome-rim) {
+  fill: none;
+  stroke: var(--jbf-chrome-hi);
+  stroke-width: 2;
+}
+:where(.jbf) :where(.jbf-dome-glare) {
+  fill: var(--light);
+  opacity: 0.13;
+}
+:where(.jbf) :where(.jbf-platter) {
+  fill: var(--jbf-chrome-lo);
+  opacity: 0.55;
+}
+:where(.jbf) :where(.jbf-vinyl) {
+  fill: var(--jb-vinyl);
+  stroke: color-mix(in srgb, #fff 22%, transparent);
+  stroke-width: 0.6;
+}
+:where(.jbf) :where(.jbf-groove) {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.1;
+  stroke-width: 0.8;
+}
+:where(.jbf) :where(.jbf-label) {
+  fill: var(--jb-accent-2);
+}
+:where(.jbf) :where(.jbf-label-mark) {
+  fill: var(--light);
+  opacity: 0.6;
+}
+:where(.jbf) :where(.jbf-spindle) {
+  fill: var(--jbf-chrome-hi);
+}
+:where(.jbf) :where(.jbf-vinyl-sheen) {
+  fill: var(--light);
+  opacity: 0.1;
+}
+:where(.jbf) :where(.jbf-record) {
+  transform-box: view-box;
+  transform-origin: 80px 98px;
+}
+:where(.jbf) :where(.jbf-arm) {
+  transform-box: view-box;
+  transform-origin: 110px 76px;
+  transform: rotate(-20deg);
+  transition: transform 900ms var(--ease-in-out);
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-arm) {
+  transform: rotate(0deg);
+}
+:where(.jbf) :where(.jbf-arm__rod) {
+  fill: none;
+  stroke: var(--jbf-chrome-hi);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+:where(.jbf) :where(.jbf-arm__head) {
+  fill: var(--jbf-chrome-lo);
+}
+:where(.jbf) :where(.jbf-window) {
+  fill: color-mix(in srgb, var(--jb-accent-2) 16%, var(--jbf-glass));
+  stroke: var(--jbf-chrome-lo);
+  stroke-width: 1;
+}
+:where(.jbf) :where(.jbf-strip > rect:first-child) {
+  fill: var(--jbf-paper);
+  opacity: calc(0.6 + var(--jbf-lit) * 0.4);
+}
+:where(.jbf) :where(.jbf-strip__band) {
+  fill: var(--jb-accent);
+}
+:where(.jbf) :where(.jbf-strip__band--b) {
+  fill: var(--jb-accent-2);
+}
+:where(.jbf) :where(.jbf-strip__ink) {
+  fill: var(--jbf-ink);
+  opacity: 0.5;
+}
+:where(.jbf) :where(.jbf-keybed) {
+  fill: var(--jbf-body-2);
+  stroke: var(--jbf-chrome-lo);
+  stroke-width: 0.8;
+}
+:where(.jbf) :where(.jbf-key) {
+  fill: var(--jbf-chrome-hi);
+}
+:where(.jbf) :where(.jbf-key--lit) {
+  fill: var(--jb-accent);
+}
+:where(.jbf) :where(.jbf-grille) {
+  fill: color-mix(in srgb, #0c0a12 88%, var(--jb-accent));
+}
+:where(.jbf) :where(.jbf-bar) {
+  opacity: calc(0.2 + var(--jbf-lit) * 0.55);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0.3);
+}
+:where(.jbf) :where(.jbf-slat) {
+  stroke: var(--jbf-chrome-hi);
+  stroke-width: 1.6;
+  opacity: 0.5;
+}
+:where(.jbf) :where(.jbf-badge) {
+  stroke: var(--jbf-edge);
+  stroke-width: 0.8;
+}
+:where(.jbf) :where(.jbf-badge__star) {
+  fill: var(--jb-accent-2);
+}
+:where(.jbf) :where(.jbf-grille-rim) {
+  fill: none;
+  stroke: var(--jbf-chrome-hi);
+  stroke-width: 1.4;
+  opacity: 0.8;
+}
+:where(.jbf) :where(.jbf-plinth) {
+  stroke: var(--jbf-edge);
+  stroke-width: 0.8;
+}
+:where(.jbf) :where(.jbf-led) {
+  fill: var(--jb-accent);
+  opacity: calc(0.35 + var(--jbf-lit) * 0.65);
+}
+
+/* Motion: only while playing; the record turns at 33⅓, bubbles rise, the grille lights dance. */
+:where(.jb-dock[data-playing='true']) :where(.jbf-record) {
+  animation: jbf-spin 1.8s linear infinite;
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-tube__bubbles) {
+  opacity: 0.7;
+  animation: jbf-bubbles 2.8s linear infinite;
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-bar) {
+  animation: jbf-bar 0.9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -0.31s);
+}
+:where(.jb-dock[data-playing='true']) :where(.jbf-bar:nth-child(even)) {
+  animation-duration: 1.3s;
+}
+@keyframes jbf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes jbf-bubbles {
+  to {
+    stroke-dashoffset: -20.1;
+  }
+}
+@keyframes jbf-bar {
+  from {
+    transform: scaleY(0.18);
+  }
+  to {
+    transform: scaleY(0.92);
+  }
+}
+/* Lower effects: no bubbles or dancing lights (the record still turns). Off / reduced motion: still. */
+:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-tube__bubbles, .jbf-bar) {
+  animation: none;
+}
+:where(:root[data-fx='low']) :where(.jbf) :where(.jbf-tube__bubbles) {
+  opacity: 0;
+}
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-record, .jbf-tube__bubbles, .jbf-bar) {
+  animation: none;
+}
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jbf) :where(.jbf-tube__bubbles) {
+  opacity: 0;
+}
+:where(:root[data-reduced-motion='true']) :where(.jb-floor, .jb-floor *) {
+  transition: none;
+}
+:where(:root[data-reduced-motion='true']) :where(.jb-floor[data-needs-gesture='true']) :where(.jb-floor__machine) {
+  animation: none;
+}
+
 /* ------------------------------------------------------------------ dock: in the room top bar */
 :where(.jb-host) {
   display: contents;
@@ -443,9 +856,9 @@
 }
 /* Desktop popover, anchored next to where the dock lives. */
 :where(.jb-player[data-layout='popover'][data-anchor='top-right']) :where(.jb-panel) {
-  top: calc(var(--topbar-h) + var(--safe-top) + 8px);
-  right: calc(12px + var(--safe-right));
-  max-height: min(720px, calc(100dvh - var(--topbar-h) - var(--safe-top) - 20px));
+  top: var(--jb-anchor-top, calc(var(--topbar-h) + var(--safe-top) + 8px));
+  right: max(calc(12px + var(--safe-right)), min(var(--jb-anchor-right, 12px), calc(100vw - min(var(--jb-panel-w), 100vw - 24px) - 12px)));
+  max-height: min(820px, calc(100dvh - var(--jb-anchor-top, calc(var(--topbar-h) + var(--safe-top) + 8px)) - 12px));
   transform-origin: top right;
 }
 :where(.jb-player[data-layout='popover'][data-anchor='bottom-left']) :where(.jb-panel) {
@@ -1350,6 +1763,602 @@
   font-size: var(--fs-xs);
 }
 
+/* ------------------------------------------------------------------ player: the machine */
+/*
+ * The expanded jukebox is the machine up close. The panel is its cabinet (skins restyle it through the
+ * usual parts); on top of that: an arched dome over the turning record, bubble-tube pillars down both
+ * sides, chrome push buttons, the title-strip rack and a lit chrome plinth. Pillars, dome ring and
+ * plinth are decoration (aria-hidden); a skin that reinterprets the jukebox can restyle or drop them
+ * ([data-part='dome'], .jb-pillar, [data-part='plinth']) and tune --jb-arch / --jb-strip-* below.
+ */
+:where([data-jukebox]) {
+  --jb-panel-w: 420px;
+  --jb-record: 118px;
+  --jb-arch: 64px;
+  --jb-tube: 6px;
+  --jb-chrome-hi: color-mix(in srgb, #f4f5fa 90%, var(--jb-accent));
+  --jb-chrome-lo: #737891;
+  --jb-chrome-ink: #1d1f29;
+  --jb-vinyl: #111016;
+  --jb-strip-bg: #f7f0dc;
+  --jb-strip-fg: #1c1530;
+  --jb-strip-muted: #5d5470;
+  --jb-strip-band: var(--jb-accent);
+  --jb-strip-band-2: var(--jb-accent-2);
+  --jb-strip-lit: #ffe79a;
+}
+:where(.jb-player) :where(.jb-panel) {
+  isolation: isolate;
+}
+:where(.jb-player) :where(.jb-body) {
+  position: relative;
+  z-index: 1;
+  padding-inline: calc(var(--jb-gap) + var(--jb-tube) + 4px);
+}
+
+/* Bubble-tube pillars down both sides of the cabinet. */
+:where(.jb-player) :where(.jb-pillar) {
+  position: absolute;
+  z-index: 0;
+  top: 56px;
+  bottom: 18px;
+  width: var(--jb-tube);
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--jb-accent), var(--jb-accent-2) 55%, var(--jb-accent));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--jb-accent) 50%, transparent),
+    inset 1px 0 0 color-mix(in srgb, var(--light) 50%, transparent);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+:where(.jb-player) :where(.jb-pillar[data-side='l']) {
+  left: 6px;
+}
+:where(.jb-player) :where(.jb-pillar[data-side='r']) {
+  right: 6px;
+}
+:where(.jb-player) :where(.jb-pillar)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--light) 80%, transparent) 0 1.4px, transparent 1.9px) 50% 0 / 100% 14px;
+  opacity: 0;
+}
+:where(.jb-player[data-playing='true']) :where(.jb-pillar) {
+  opacity: 0.95;
+}
+:where(.jb-player[data-playing='true']) :where(.jb-pillar)::after {
+  opacity: 0.75;
+  animation: jb-bubbles 2.2s linear infinite;
+}
+@keyframes jb-bubbles {
+  to {
+    background-position: 50% -28px;
+  }
+}
+
+/* The dome: arched glass on top of the machine (a bubble-tube rim, the record turning behind it), set on
+   the now-playing screen below — which keeps whatever shape the theme gives it. */
+:where(.jb-player) :where(.jb-dome) {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+:where(.jb-player) :where(.jb-dome__glass) {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  place-items: end center;
+  height: calc(var(--jb-record) + 26px);
+  margin: 0 12px -2px;
+  padding-bottom: 4px;
+  border: var(--jb-tube) solid transparent;
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / var(--jb-arch) var(--jb-arch) 0 0;
+  background:
+    radial-gradient(90% 80% at 50% 100%, color-mix(in srgb, var(--jb-accent) 26%, transparent), transparent 70%) padding-box,
+    linear-gradient(180deg, color-mix(in srgb, var(--jb-screen) 70%, var(--jb-accent)), var(--jb-screen)) padding-box,
+    linear-gradient(90deg, var(--jb-accent), var(--jb-accent-2) 50%, var(--jb-accent)) border-box;
+  box-shadow: 0 -4px 22px color-mix(in srgb, var(--jb-accent) 30%, transparent);
+  overflow: hidden;
+}
+/* Glass glare (static: it's the glass, not the record). */
+:where(.jb-player) :where(.jb-dome__glass)::after {
+  content: '';
+  position: absolute;
+  left: 9%;
+  top: 10%;
+  width: 26%;
+  height: 58%;
+  border-radius: 50% 0 0 0 / 80% 0 0 0;
+  border-left: 3px solid color-mix(in srgb, var(--light) 22%, transparent);
+  border-top: 3px solid color-mix(in srgb, var(--light) 14%, transparent);
+  pointer-events: none;
+}
+:where(.jb-player) :where(.jb-dome > .jb-display) {
+  position: relative;
+  z-index: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'now' 'vis';
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 14px 10px;
+  text-align: center;
+}
+:where(.jb-player) :where(.jb-dome .jb-now) {
+  width: 100%;
+}
+:where(.jb-player) :where(.jb-dome .jb-now__title) {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  margin-top: 4px;
+}
+:where(.jb-player) :where(.jb-dome .jb-vis-wrap) {
+  width: 100%;
+  height: calc(var(--jb-vis-h) * 0.62);
+}
+:where(.jb-player) :where(.jb-now__label) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+:where(.jb-player) :where(.jb-now__code) {
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 3px;
+  color: inherit;
+  font-family: var(--jb-font-label);
+  letter-spacing: 0.06em;
+}
+
+/* The record on its turntable. */
+:where([data-jukebox]) :where(.jb-record) {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: calc(var(--jb-record) * 1.3);
+  height: var(--jb-record);
+  flex: none;
+}
+:where([data-jukebox]) :where(.jb-record__platter) {
+  position: absolute;
+  left: -4%;
+  width: 84%;
+  bottom: -8%;
+  height: 18%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--jb-accent) 30%, transparent), transparent);
+}
+:where([data-jukebox]) :where(.jb-record__disc) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--jb-record);
+  height: var(--jb-record);
+  border-radius: 50%;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shade) 55%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record__vinyl) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+:where([data-jukebox]) :where(.jb-record__body) {
+  fill: var(--jb-vinyl);
+  stroke: color-mix(in srgb, #fff 24%, transparent);
+  stroke-width: 0.8;
+}
+:where([data-jukebox]) :where(.jb-record__groove) {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.09;
+  stroke-width: 0.9;
+}
+:where([data-jukebox]) :where(.jb-record__label) {
+  position: absolute;
+  inset: 31%;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--shade) 50%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record__label .jb-art) {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+:where([data-jukebox]) :where(.jb-record__label .jb-art svg) {
+  width: 64%;
+  height: 64%;
+}
+:where([data-jukebox]) :where(.jb-record__spindle) {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--jb-chrome-hi);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--shade) 60%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record__over) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+:where([data-jukebox]) :where(.jb-record__sheen) {
+  fill: var(--light);
+  opacity: 0.1;
+}
+:where([data-jukebox]) :where(.jb-record__chrome-hi) {
+  stop-color: var(--jb-chrome-hi);
+}
+:where([data-jukebox]) :where(.jb-record__chrome-lo) {
+  stop-color: var(--jb-chrome-lo);
+}
+:where([data-jukebox]) :where(.jb-record__arm) {
+  transform-box: view-box;
+  transform-origin: 118px 12px;
+  transform: rotate(-24deg);
+  transition: transform 900ms var(--ease-in-out);
+}
+:where([data-jukebox]) :where(.jb-record[data-playing='true'] .jb-record__arm) {
+  transform: rotate(0deg);
+}
+:where([data-jukebox]) :where(.jb-record__rod) {
+  fill: none;
+  stroke: var(--jb-chrome-hi);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+:where([data-jukebox]) :where(.jb-record__head) {
+  fill: var(--jb-chrome-lo);
+  stroke: var(--jb-chrome-hi);
+  stroke-width: 0.8;
+}
+:where([data-jukebox]) :where(.jb-record__pivot-cap) {
+  fill: var(--jb-accent);
+}
+:where([data-jukebox]) :where(.jb-record[data-playing='true'] .jb-record__disc) {
+  animation: jb-spin 1.8s linear infinite;
+}
+@keyframes jb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Chrome push buttons. */
+:where(.jb-player) :where(.jb-transport .jb-btn--icon, .jb-volume-row .jb-btn--icon) {
+  border: 1px solid color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, var(--jb-chrome-hi), var(--jb-chrome-lo) 78%);
+  color: var(--jb-chrome-ink);
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--shade) 30%, transparent),
+    0 2px 0 color-mix(in srgb, var(--shade) 45%, transparent);
+}
+:where(.jb-player) :where(.jb-transport .jb-btn--icon:hover:not(:disabled), .jb-volume-row .jb-btn--icon:hover:not(:disabled)) {
+  background: radial-gradient(circle at 50% 30%, var(--light), var(--jb-chrome-hi) 78%);
+  color: var(--jb-chrome-ink);
+  border-color: color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+}
+:where(.jb-player) :where(.jb-transport .jb-btn--icon:active:not(:disabled), .jb-volume-row .jb-btn--icon:active:not(:disabled)) {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent);
+}
+:where(.jb-player) :where(.jb-transport .jb-btn--toggle[aria-pressed='true'], .jb-volume-row .jb-btn--toggle[aria-pressed='true']) {
+  color: var(--jb-chrome-ink);
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--jb-accent) 40%, var(--light)), var(--jb-accent) 80%);
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--shade) 30%, transparent),
+    0 0 12px color-mix(in srgb, var(--jb-accent) 60%, transparent);
+}
+:where(.jb-player) :where(.jb-transport .jb-btn--toggle[aria-pressed='true'])::after {
+  display: none;
+}
+:where(.jb-player) :where(.jb-btn--play) {
+  border-radius: 50%;
+}
+
+/* Section keys: Selections / Up next / Room DJ as physical keys that stay down when chosen. */
+:where(.jb-player) :where(.jb-tabs) {
+  gap: 6px;
+  padding-block: 6px;
+  border-bottom: 0;
+}
+:where(.jb-player) :where(.jb-tab) {
+  flex: 1;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--jb-chrome-hi), var(--jb-chrome-lo));
+  color: var(--jb-chrome-ink);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 -3px 0 color-mix(in srgb, var(--shade) 28%, transparent),
+    0 2px 0 color-mix(in srgb, var(--shade) 40%, transparent);
+}
+:where(.jb-player) :where(.jb-tab:hover) {
+  color: var(--jb-chrome-ink);
+  filter: brightness(1.06);
+}
+:where(.jb-player) :where(.jb-tab[aria-selected='true']) {
+  color: var(--jb-chrome-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jb-accent) 55%, var(--light)), var(--jb-accent));
+  box-shadow:
+    inset 0 2px 3px color-mix(in srgb, var(--shade) 30%, transparent),
+    0 0 12px color-mix(in srgb, var(--jb-accent) 50%, transparent);
+  transform: translateY(1px);
+}
+:where(.jb-player) :where(.jb-tab[aria-selected='true'])::after {
+  display: none;
+}
+
+/* The title-strip rack. */
+:where([data-jukebox]) :where(.jb-rack) {
+  container-type: inline-size;
+}
+:where([data-jukebox]) :where(.jb-rack__head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+}
+:where([data-jukebox]) :where(.jb-rack__head .jb-search) {
+  flex: 1;
+}
+:where([data-jukebox]) :where(.jb-rack__keys) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+:where([data-jukebox]) :where(.jb-rack__caption) {
+  color: var(--jb-muted);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+:where([data-jukebox]) :where(.jb-key) {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  width: auto;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--jb-chrome-hi), var(--jb-chrome-lo));
+  color: var(--jb-chrome-ink);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--shade) 28%, transparent),
+    0 2px 0 color-mix(in srgb, var(--shade) 40%, transparent);
+}
+:where([data-jukebox]) :where(.jb-key:hover:not(:disabled)) {
+  color: var(--jb-chrome-ink);
+  background: linear-gradient(180deg, var(--light), var(--jb-chrome-hi));
+}
+:where([data-jukebox]) :where(.jb-key[aria-pressed='true']) {
+  color: var(--jb-chrome-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jb-accent) 55%, var(--light)), var(--jb-accent));
+  box-shadow:
+    inset 0 2px 3px color-mix(in srgb, var(--shade) 30%, transparent),
+    0 0 10px color-mix(in srgb, var(--jb-accent) 50%, transparent);
+}
+:where([data-jukebox]) :where(.jb-key:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+:where([data-jukebox]) :where(.jb-strips) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--jb-accent-2) 14%, transparent), transparent 70%), var(--jb-screen);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--shade) 55%, transparent);
+}
+@container (max-width: 330px) {
+  :where([data-jukebox]) :where(.jb-strips) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+:where([data-jukebox]) :where(.jb-strip) {
+  min-height: 48px;
+  gap: 0;
+  border-radius: 3px;
+  background: var(--jb-strip-bg);
+  color: var(--jb-strip-fg);
+  box-shadow:
+    inset 0 3px 0 var(--jb-strip-band),
+    0 1px 0 color-mix(in srgb, var(--shade) 45%, transparent);
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+:where([data-jukebox]) :where(.jb-strip:nth-child(4n + 2), .jb-strip:nth-child(4n + 3)) {
+  box-shadow:
+    inset 0 3px 0 var(--jb-strip-band-2),
+    0 1px 0 color-mix(in srgb, var(--shade) 45%, transparent);
+}
+:where([data-jukebox]) :where(.jb-strip:hover) {
+  background: var(--jb-strip-bg);
+  transform: translateY(-1px);
+}
+:where([data-jukebox]) :where(.jb-strip[data-current='true']) {
+  background: var(--jb-strip-lit);
+  box-shadow:
+    inset 0 3px 0 var(--jb-strip-band),
+    0 0 14px color-mix(in srgb, var(--jb-accent) 55%, transparent);
+}
+:where([data-jukebox]) :where(.jb-strip[data-current='true'])::before {
+  display: none;
+}
+:where([data-jukebox]) :where(.jb-strip .jb-track__main) {
+  gap: 8px;
+  min-height: 48px;
+  padding: 7px 8px 5px 6px;
+  color: inherit;
+}
+:where([data-jukebox]) :where(.jb-strip__code) {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 3px;
+  border: 1px solid color-mix(in srgb, var(--jb-strip-fg) 30%, transparent);
+  border-radius: 3px;
+  color: var(--jb-strip-fg);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+}
+:where([data-jukebox]) :where(.jb-strip .jb-track__title) {
+  color: var(--jb-strip-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+:where([data-jukebox]) :where(.jb-strip[data-current='true'] .jb-track__title) {
+  color: var(--jb-strip-fg);
+}
+:where([data-jukebox]) :where(.jb-strip .jb-track__artist) {
+  color: var(--jb-strip-muted);
+  font-size: var(--fs-2xs);
+}
+:where([data-jukebox]) :where(.jb-strip .jb-eq i) {
+  background: var(--jb-strip-fg);
+  box-shadow: none;
+}
+:where([data-jukebox]) :where(.jb-strip__actions) {
+  display: flex;
+  flex: none;
+}
+:where([data-jukebox]) :where(.jb-strip .jb-btn--row) {
+  color: var(--jb-strip-muted);
+}
+:where([data-jukebox]) :where(.jb-strip .jb-btn--row:hover:not(:disabled)) {
+  background: color-mix(in srgb, var(--jb-strip-fg) 10%, transparent);
+  color: var(--jb-strip-fg);
+  border-color: transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  /* Row actions slide over the strip's right end on hover/focus (the strip keeps its full width for the title). */
+  :where([data-jukebox]) :where(.jb-strip__actions) {
+    position: absolute;
+    top: 3px;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    padding-left: 14px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(90deg, transparent, var(--jb-strip-bg) 14px);
+    opacity: 0;
+    transition: opacity var(--dur-1) var(--ease-out);
+  }
+  :where([data-jukebox]) :where(.jb-strip[data-current='true'] .jb-strip__actions) {
+    background: linear-gradient(90deg, transparent, var(--jb-strip-lit) 14px);
+  }
+  :where([data-jukebox]) :where(.jb-strip:hover .jb-strip__actions, .jb-strip:has(:focus-visible) .jb-strip__actions) {
+    opacity: 1;
+  }
+  :where([data-jukebox]) :where(.jb-strip .jb-btn--row) {
+    opacity: 1;
+    width: 32px;
+    min-width: 32px;
+  }
+}
+@media (pointer: coarse) {
+  :where([data-jukebox]) :where(.jb-strips) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :where([data-jukebox]) :where(.jb-key) {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+/* The plinth: chrome kick plate with an LED strip, under the cabinet. */
+:where(.jb-player) :where(.jb-plinth) {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  height: 12px;
+  background: linear-gradient(180deg, var(--jb-chrome-hi), var(--jb-chrome-lo) 60%, var(--jb-chrome-hi));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--light) 60%, transparent);
+}
+:where(.jb-player) :where(.jb-plinth)::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--jb-accent);
+  box-shadow: 0 0 8px var(--jb-accent);
+  opacity: 0.5;
+}
+:where(.jb-player[data-playing='true']) :where(.jb-plinth)::after {
+  opacity: 1;
+}
+
+/* Opened from the jukebox on the floor: the machine rises from where it stands (JS sets the origin). */
+:where(.jb-player[data-layout='popover'][data-anchor='floor']) :where(.jb-panel) {
+  left: clamp(calc(12px + var(--safe-left)), var(--jb-floor-left, 12px), calc(100vw - min(var(--jb-panel-w), 100vw - 24px) - 12px));
+  bottom: calc(12px + var(--safe-bottom));
+  max-height: min(880px, calc(100dvh - 24px - var(--safe-bottom) - var(--safe-top)));
+  animation-name: jb-walkup;
+  animation-duration: var(--dur-3);
+}
+@keyframes jb-walkup {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* Motion + effects settings for the machine. */
+:where(:root[data-fx='low']) :where(.jb-player) :where(.jb-pillar)::after {
+  animation: none;
+  opacity: 0;
+}
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where([data-jukebox]) :where(.jb-record__disc, .jb-pillar::after) {
+  animation: none;
+}
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where(.jb-player) :where(.jb-pillar)::after {
+  opacity: 0;
+}
+:where(:root[data-reduced-motion='true']) :where([data-jukebox]) :where(.jb-record__arm, .jb-strip, .jb-pillar) {
+  transition: none;
+}
+
 /* ------------------------------------------------------------------ compact heights */
 @media (max-height: 820px) {
   :where([data-jukebox]) {
@@ -1372,6 +2381,42 @@
 :where(.jb-player[data-layout='sheet']) {
   --jb-art-size: 72px;
   --jb-vis-h: 52px;
+  --jb-record: 96px;
+  --jb-arch: 52px;
+}
+@media (max-height: 820px) {
+  :where([data-jukebox]) {
+    --jb-record: 92px;
+    --jb-arch: 50px;
+  }
+}
+/* Landscape phones: the record sits beside the now-playing text under a low arch. */
+:where(.jb-player[data-layout='side']) {
+  --jb-record: 52px;
+  --jb-arch: 22px;
+}
+:where(.jb-player[data-layout='side']) :where(.jb-dome) {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+}
+:where(.jb-player[data-layout='side']) :where(.jb-dome__glass) {
+  flex: none;
+  width: calc(var(--jb-record) * 1.3 + 20px);
+  height: auto;
+  margin: 0;
+  border-bottom: var(--jb-tube) solid transparent;
+  border-radius: 50% 50% var(--radius-sm) var(--radius-sm) / 24px 24px var(--radius-sm) var(--radius-sm);
+  place-items: center;
+  padding: 6px 0;
+}
+:where(.jb-player[data-layout='side']) :where(.jb-dome > .jb-display) {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+}
+:where(.jb-player[data-layout='side']) :where(.jb-pillar) {
+  top: 48px;
 }
 
 /* ------------------------------------------------------------------ motion + effects settings */

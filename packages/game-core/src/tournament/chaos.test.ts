@@ -3,6 +3,7 @@ import { createSeededRng, TOURNAMENT_FORMATS, type TournamentFormat } from '@das
 import { isFinished, isOut } from './standings.ts';
 import { invariantViolations, live, makeTournament, playGame } from './testkit.ts';
 import type { TournamentEngine } from './engine.ts';
+import { TournamentError } from './types.ts';
 
 /**
  * Chaos playouts: organizer actions and removals interleaved with games. The event must never get
@@ -37,6 +38,18 @@ function chaos(engine: TournamentEngine, seed: string): void {
         if (r === 0) engine.override(m.id, 'double_forfeit', null, 'chaos');
         else if (r === 1 && !m.requireWinner) engine.override(m.id, 'draw', null, 'chaos');
         else engine.override(m.id, 'win', rng.int(2) === 0 ? m.a : m.b, 'chaos');
+      }
+    } else if (roll < 0.15) {
+      // Amend a finished result: allowed only while nothing derived from it (directly or through byes) has started.
+      const done = engine.data.matches.filter((m) => isFinished(m) && m.a && m.b && m.status !== 'VOID' && m.resultKind !== 'bye');
+      if (done.length) {
+        const m = done[rng.int(done.length)]!;
+        try {
+          if (m.requireWinner || rng.int(2) === 0) engine.override(m.id, 'win', m.winner === m.a ? m.b : m.a, 'chaos');
+          else engine.override(m.id, 'draw', null, 'chaos');
+        } catch (err) {
+          if (!(err instanceof TournamentError) || err.code !== 'not_allowed') throw err;
+        }
       }
     } else {
       const ms = live(engine);

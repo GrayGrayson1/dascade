@@ -6,7 +6,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 - `pnpm install` — install (Node ≥ 22.12, pnpm via corepack)
 - `pnpm dev` — game server (:2567) + Vite (:5173)
 - `pnpm build` — web build + bundled server (`apps/game-server/dist`, incl. `dist/words-data/`)
-- `pnpm start` — production server (serves the built client when NODE_ENV=production)
+- `pnpm start` — production server (sets NODE_ENV=production and serves the built client on the same port)
 - `pnpm lint` · `pnpm typecheck` · `pnpm test` (Vitest: unit + server integration) · `pnpm test:e2e` (Playwright: chromium, firefox, webkit, mobile, mobile-safari)
 - `pnpm load` — 30-client load simulation against a running server (`LOAD_URL=http://localhost:2567`, server started with `DASCADE_RELAXED_LIMITS=1`). Party games aren't in the default set: `LOAD_SCENARIOS=trivia,deception,masterpiece,words,words-chain,survey`.
 - Focused: `pnpm vitest run packages/game-core/src/<id> apps/game-server/test/<id>.test.ts` · `DASCADE_ONLY_GAMES=<id> pnpm --filter @dascade/game-server dev` · `E2E_BASE_URL=http://localhost:<web> pnpm exec playwright test e2e/<id>.spec.ts --project=chromium`
@@ -16,7 +16,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 - `packages/game-core` — pure deterministic engines; take an injected `Rng`; never `Math.random()`; no Colyseus/DOM. Also party and classics helpers, the tournament engine and Elo rating.
 - `packages/ui` — design system and theme tokens/API (`src/styles/tokens.css`, `src/theme/`): 11 theme definitions (tokens + materials + effects + copy). No app/network code.
 - `apps/game-server` — every game room extends `rooms/BaseGameRoom.ts` directly or through a kit room; register client messages only via `this.handle()` (validated + rate limited). Server decides every outcome with `this.rng` (crypto). Platform services (ratings, stats, tournaments) live in `src/platform/`.
-- `apps/web` — `net/session.ts` is the single Colyseus client; UIs use `net/hooks.ts`. Games live in `src/games/<id>/` (lazy loaded); shared shell in `src/shell/`; arcade floor in `src/arcade/`; Tournament Center in `src/tournament/`; theme skins + engine in `src/themes/`; audio mixer + jukebox engine in `src/audio/`; jukebox UI in `src/jukebox/`; music manifest Vite plugin in `vite/`.
+- `apps/web` — `net/session.ts` is the single Colyseus client; UIs use `net/hooks.ts`. Games live in `src/games/<id>/` (lazy loaded); shared shell in `src/shell/`; arcade floor in `src/arcade/`; Tournament Center in `src/tournament/`; theme skins + engine in `src/themes/`; audio mixer + jukebox engine in `src/audio/`; jukebox UI (the floor machine, the quick control, the player) in `src/jukebox/`; music manifest Vite plugin in `vite/`.
 
 ## Kits (build on them; extend additively, don't copy)
 - Party (DAStravaganza): `rooms/party/PartyRoom.ts`, `games/_party/`, `@dascade/shared/party`, `@dascade/game-core/party`.

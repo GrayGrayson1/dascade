@@ -11,6 +11,8 @@ process.env.DASCADE_TOURNAMENT_INTERMISSION_MS = '150';
 process.env.DASCADE_TOURNAMENT_CLOSE_DELAY_MS = '80';
 process.env.DASCADE_TOURNAMENT_NOSHOW_MS = '600';
 process.env.DASCADE_TOURNAMENT_IDLE_MS = '1200';
+process.env.DASCADE_TOURNAMENT_DRAFT_IDLE_MS = '1200';
+process.env.DASCADE_TOURNAMENT_UNCLAIMED_IDLE_MS = '1500';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
@@ -19,6 +21,7 @@ import type { Room } from '@colyseus/core';
 import { TOURNAMENT_MSG, type TournamentListResponse } from '@dascade/shared';
 import { createDascadeServer } from '../src/server.ts';
 import { MATCH_BINDING_OPTION } from '../src/platform/tournaments.ts';
+import { setTournamentCaps } from '../src/rooms/tournament/TournamentRoom.ts';
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import { SidelessDuelRoom, TournamentDuelRoom } from './fixtures/TournamentDuelRoom.ts';
 import {
@@ -332,6 +335,52 @@ describe('Tournament Center — matches', () => {
     expect(org.view().championId).toBe(participantOf(b));
   });
 
+  it('no-show: when neither participant ever arrives, both forfeit (the bracket never stalls)', async () => {
+    const { org, players } = await setupField(2, { noShowMinutes: 1 });
+    await admin(org, 'begin');
+    // The clock runs from the moment the room opens, with nobody there.
+    await waitFor(() => org.view().matches[0]!.noShowAt > 0, 3000, 'no-show clock');
+    await waitFor(() => org.view().status === 'COMPLETE', 4000, 'double forfeit');
+    const m = org.view().matches[0]!;
+    expect(m).toMatchObject({ status: 'FORFEIT', resultKind: 'double_forfeit', winnerId: '' });
+    expect(org.view().championId).toBeNull();
+    expect(org.view().audit.some((e) => e.action === 'no_show' && e.actor === 'system' && e.matchId === m.id)).toBe(true);
+    expect(players.every((p) => p.me().activeMatch === null)).toBe(true);
+  });
+
+  it('after an override re-pairs a match, a displaced participant’s old ticket no longer seats them', async () => {
+    const { org, players } = await setupField(4, { format: 'single_elimination', bestOf: 1 });
+    await admin(org, 'seed', { method: 'manual', order: players.map(participantOf) });
+    await admin(org, 'begin');
+    const [p1, p2, p3, p4] = players as [Viewer, Viewer, Viewer, Viewer];
+    const semis = org.view().matches.filter((m) => m.round === 1);
+    const semiOf = (v: Viewer) => semis.find((m) => m.aId === participantOf(v) || m.bId === participantOf(v))!;
+    const decide = (matchId: string, winner: Viewer) =>
+      admin(org, 'override', { matchId, outcome: 'win', winnerId: participantOf(winner), reason: 'reported result', confirm: true });
+    expect((await decide(semiOf(p1).id, p1)).ok).toBe(true);
+    expect((await decide(semiOf(p2).id, p2)).ok).toBe(true);
+    await waitFor(() => Boolean(p1.me().activeMatch?.roomCode), 3000, 'final room');
+    const stale = p1.me().activeMatch!;
+    // Scoring error: seed 4 actually won semifinal 1 — the (unstarted) final is re-paired and relaunched.
+    expect((await decide(semiOf(p1).id, p4)).ok).toBe(true);
+    await waitFor(() => Boolean(p4.me().activeMatch?.roomCode) && p4.me().activeMatch!.roomCode !== stale.roomCode, 4000, 'relaunched final');
+    expect(p1.me().activeMatch).toBeNull();
+    const final = p4.me().activeMatch!;
+    expect(final.matchId).toBe(stale.matchId);
+    const sneaky = await colyseus.sdk.joinById(final.roomCode, { name: 'Player1', guestId: 'guest-Player1', ticket: stale.ticket });
+    const toasts = collect<{ text: string }>(sneaky, 'sys:toast');
+    quiet(sneaky);
+    await sneaky.waitForInitialState();
+    const seats = () => Object.values((sneaky.state as unknown as { toJSON(): { players: Record<string, { spectator: boolean }> } }).toJSON().players);
+    await waitFor(() => seats().length === 1, 3000, 'joined');
+    expect(seats().every((p) => p.spectator)).toBe(true);
+    await waitFor(() => toasts.some((t) => /not valid here/.test(t.text)), 3000, 'invalid ticket notice');
+    // The current pair still takes their seats with their own tickets.
+    const s4 = await takeSeat(p4, 'Player4');
+    expect(s4.info().participants.map((p) => p.participantId).sort()).toEqual([participantOf(p4), participantOf(p2)].sort());
+    expect(p3.me().activeMatch).toBeNull();
+  });
+
   it('no-show: a participant absent past the window forfeits', async () => {
     const { org, players } = await setupField(2, { noShowMinutes: 1 });
     await admin(org, 'begin');
@@ -526,6 +575,42 @@ describe('Tournament Center — lifecycle cleanup', () => {
     expect(colyseus.getRoomById(code)).toBeDefined(); // viewers are still here
     await Promise.all([org, ...players].map((v) => v.room.leave()));
     await waitFor(() => colyseus.getRoomById(code) === undefined, 5000, 'kiosk disposed');
+  });
+
+  it('a tournament created without ever connecting disappears (no organizer, no trace)', async () => {
+    const res = await fetch(`http://localhost:${port}/matchmake/create/tournament`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Script', settings: { name: 'Ghost Cup' } }),
+    });
+    expect(res.status).toBe(200);
+    const { roomId } = (await res.json()) as { roomId: string };
+    expect(kioskServer(roomId).autoDispose).toBe(true); // Colyseus drops it when the seat reservation expires
+    await waitFor(() => colyseus.getRoomById(roomId) === undefined, 5000, 'unclaimed kiosk disposed');
+  });
+
+  it('the organizer joining keeps the room; a DRAFT nobody watches is discarded after a while', async () => {
+    const org = await createKiosk();
+    const code = org.room.roomId;
+    expect(kioskServer(code).autoDispose).toBe(false);
+    await org.room.leave();
+    await waitFor(() => colyseus.getRoomById(code) === undefined, 5000, 'idle draft disposed');
+  });
+
+  it('concurrent tournaments are capped per address and per process, with a clear error', async () => {
+    try {
+      setTournamentCaps({ perIp: 2, perProcess: 50 });
+      const first = await createKiosk({}, 'Org1');
+      await createKiosk({}, 'Org2');
+      await expect(createKiosk({}, 'Org3')).rejects.toThrow(/already running 2 tournaments/);
+      setTournamentCaps({ perIp: 50, perProcess: 2 });
+      await expect(createKiosk({}, 'Org4')).rejects.toThrow(/Tournament Center is full/);
+      // Viewers can still join an existing tournament.
+      const viewer = await joinKiosk(first.room.roomId, 'Viewer');
+      expect(viewer.view().status).toBe('DRAFT');
+    } finally {
+      setTournamentCaps({ perIp: 500, perProcess: 2000 });
+    }
   });
 
   it('an active tournament never auto-disposes when everyone leaves', async () => {

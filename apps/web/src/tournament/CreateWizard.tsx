@@ -23,10 +23,10 @@ import {
 } from '@dascade/shared';
 import { TOURNAMENT_GAME_SETTINGS } from '@dascade/shared/tournamentGames';
 import { Button, Field, NumberInput, PixelIcon, Segmented, Select, TextInput, Toggle, cx } from '@dascade/ui';
-import { useApp } from '../app/store.ts';
+import { selectCanPlay, useApp } from '../app/store.ts';
 import { session, useSessionStore } from '../net/session.ts';
 import { sfx } from '../audio/audio.ts';
-import { ProfileEditor } from '../shell/common.tsx';
+import { ProfileEditor, commitProfileName } from '../shell/common.tsx';
 
 type Step = 'game' | 'format' | 'field' | 'finish';
 const STEPS: Array<{ id: Step; label: string }> = [
@@ -65,6 +65,8 @@ function toSettings(config: TournamentConfig): Record<string, unknown> {
 export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | null; onCancel: () => void }) {
   const navigate = useNavigate();
   const profileConfirmed = useApp((s) => s.profileConfirmed);
+  // "Create" enables from the typed name (a tap on iOS doesn't blur the field to commit it).
+  const canPlay = useApp(selectCanPlay);
   const profileName = useApp((s) => s.profile.name);
   const [step, setStep] = useState<Step>(initialGame ? 'format' : 'game');
   const [config, setConfig] = useState<TournamentConfig>(() => defaultTournamentConfig(initialGame ?? 'chess'));
@@ -119,7 +121,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
       setError(parsed.error.issues[0]?.message ?? 'Check the settings and try again.');
       return;
     }
-    if (!profileConfirmed) {
+    if (!commitProfileName()) {
       setError('Pick your organizer name first.');
       return;
     }
@@ -463,7 +465,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
             size="lg"
             icon="trophy"
             loading={busy}
-            disabled={Boolean(problem) || !profileConfirmed}
+            disabled={Boolean(problem) || !canPlay}
             onClick={create}
             title={problem ?? undefined}
           >

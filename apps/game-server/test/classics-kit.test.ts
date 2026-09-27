@@ -41,6 +41,7 @@ describe('HighScoreService persistence mirror', () => {
         saved.push({ board, score: entry.score });
       },
     });
+    hs.setStatLabel('bricks', 'arcade', 'Bricks'); // a room opened on this board
     expect(hs.top('bricks', 'arcade').entries).toHaveLength(0); // first access starts the load
     await new Promise((r) => setTimeout(r, 0));
     expect(hs.top('bricks', 'arcade').entries[0]).toMatchObject({ name: 'Legend', score: 5000 });
@@ -50,6 +51,27 @@ describe('HighScoreService persistence mirror', () => {
     expect(saved).toEqual([{ board: 'arcade', score: 1200 }]);
     hs.top('bricks', 'arcade');
     expect(loads).toBe(1);
+  });
+
+  it('public reads of boards nobody uses never allocate a board or query the mirror', async () => {
+    let loads = 0;
+    const hs = new HighScoreService();
+    hs.setPersistence({
+      async load() {
+        loads++;
+        return [];
+      },
+      async save() {},
+    });
+    for (let i = 0; i < 50; i++) expect(hs.top('bricks', `made-up-${i}`).entries).toEqual([]);
+    expect(hs.boardCount).toBe(0);
+    expect(loads).toBe(0);
+    // A board becomes readable once a room uses it (or a score lands on it).
+    hs.setStatLabel('bricks', 'blitz-3', 'Bricks');
+    hs.top('bricks', 'blitz-3');
+    hs.record('snake', 'solo-fast', { identity: 'g:a', name: 'Ada', score: 10, level: 1, stat: 1 });
+    expect(hs.boardCount).toBe(2);
+    expect(loads).toBe(2);
   });
 });
 

@@ -73,11 +73,19 @@ function Play({ game }: { game: Game }) {
   // ---- marks -------------------------------------------------------------
   const [manualMarks, setManualMarks] = useState<Set<number>>(() => new Set(card?.marks ?? []));
   const cardIdentity = card ? `${card.matchId}:${card.deal}:${card.serial}` : '';
+  // Daubs belong to one card AND one call sequence: a round that starts fresh calls on a kept card
+  // starts with a clean card (the server wipes its copy too). With carried calls they stay.
+  const markEpoch = settings.continueCalls ? 0 : state.round;
+  const markScope = useRef({ card: cardIdentity, epoch: markEpoch });
   useEffect(() => {
-    setManualMarks(new Set(card?.marks ?? []));
-    // Only reset when a different card arrives (not on every re-send).
+    const prev = markScope.current;
+    markScope.current = { card: cardIdentity, epoch: markEpoch };
+    // Same card and sequence (first render, or a re-send of the same card): keep what's shown.
+    if (prev.card === cardIdentity && prev.epoch === markEpoch) return;
+    // A new card starts from the server's copy of its daubs; a new sequence on the same card is clean.
+    setManualMarks(prev.card === cardIdentity ? new Set() : new Set(card?.marks ?? []));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardIdentity]);
+  }, [cardIdentity, markEpoch]);
   const marks = useMemo(() => {
     if (!card) return new Set<number>();
     if (!state.autoMark) return manualMarks;

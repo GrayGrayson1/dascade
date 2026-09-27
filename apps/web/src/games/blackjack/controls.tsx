@@ -246,9 +246,10 @@ function ActionControls({ seat, rules, round, send }: { seat: BlackjackSeatView;
       if (busy || !seat.actions.includes(action)) return;
       setSentFor(stateKey);
       sfx(action === 'hit' || action === 'double' ? 'click' : 'select');
-      send(BLACKJACK_MSG.action, { action, hand });
+      // The seat's action sequence makes a repeat of this message (resend, double tap) a no-op on the server.
+      send(BLACKJACK_MSG.action, { action, hand, seq: seat.actionSeq });
     },
-    [busy, hand, seat.actions, send, stateKey],
+    [busy, hand, seat.actions, seat.actionSeq, send, stateKey],
   );
   useHotkeys(Object.fromEntries(seat.actions.map((a) => [ACTION_KEY[a].toLowerCase(), () => act(a)])), true);
   const extra = (a: BlackjackAction) =>

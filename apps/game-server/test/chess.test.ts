@@ -431,6 +431,22 @@ describe('DAS Chess room — premoves, take-backs, ratings', () => {
     await waitFor(() => black.errors.some((e) => /no move to take back/.test(e.message)));
     // The position after a take-back plays on normally.
     await move(white, 'd2d4');
+    // Back at the same ply as the accepted request (ply went down): a new position, so a new request is fine.
+    await move(black, 'd7d5');
+    white.room.send('chess:undo', { action: 'offer' });
+    await waitFor(() => st(black).offers.undoBy === 'first' && st(black).offers.undoPlies === 2, 3000, 'second request');
+  });
+
+  it('a player dropping during the countdown shows their reconnect deadline', async () => {
+    const { host, server } = await createRoom({ sides: 'host_first' });
+    const guest = await join(host.room.roomId, 'Gus');
+    (server as any).countdownMs = 900;
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host).phase === 'COUNTDOWN', 3000, 'countdown');
+    guest.room.reconnection.enabled = false;
+    (guest.room as any).connection.transport.ws.close(4010);
+    await waitFor(() => st(host).seats[1]!.awayDeadline > 0, 2000, 'away deadline');
+    expect(st(host).seats[1]!.awayDeadline).toBeGreaterThan(Date.now());
   });
 
   it('rated games: no take-backs, ratings change; casual games leave ratings untouched', async () => {

@@ -64,7 +64,7 @@ export function TopBar({ gameId, code }: { gameId: GameId; code: string }) {
   return (
     <header className="topbar" data-part="top-bar" style={{ '--accent': game.accent.primary } as React.CSSProperties}>
       <div className="topbar__left" data-part="top-bar-left">
-        <LeaveButton size="sm" compact />
+        <LeaveButton size="sm" compact popover="below" />
         <span
           className="topbar__title dc-pixel"
           data-part="top-bar-title"

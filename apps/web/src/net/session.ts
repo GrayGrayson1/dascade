@@ -258,6 +258,20 @@ function stopClockSync(): void {
 let client: Client | null = null;
 let leavingIntentionally = false;
 let attachGeneration = 0;
+/**
+ * Bumped by every create / join / resume / leave. A connection that completes after a newer intent
+ * (e.g. the player left the room screen while it was still connecting) is left at once instead of
+ * becoming a ghost seat.
+ */
+let intent = 0;
+
+/** The player moved on while `room` was connecting: leave it quietly and report whether that happened. */
+function superseded(my: number, room: Room): boolean {
+  if (my === intent) return false;
+  room.reconnection.maxRetries = 0;
+  void room.leave(true).catch(() => undefined);
+  return true;
+}
 
 function getClient(): Client {
   client ??= new Client(serverUrl());
@@ -445,16 +459,23 @@ async function resumeOnce(code: string): Promise<boolean> {
   if (!seat) return false;
   const current = useSessionStore.getState();
   if (current.room && current.code === code) return true;
+  const my = ++intent;
+  // Switching rooms: leave the current one first — resetting the store below would otherwise drop
+  // the only reference to its socket (and a later join's leaveCurrent() would find nothing to leave).
+  await leaveCurrent();
+  if (my !== intent) return false;
   useSessionStore.setState({ ...initial, status: 'connecting', code });
   if (seat.reconnectionToken) {
     try {
       const room = await getClient().reconnect(seat.reconnectionToken);
+      if (superseded(my, room)) return false;
       attach(room, seat.gameId as GameId);
       return true;
     } catch {
       /* fall through to seat-token rejoin */
     }
   }
+  if (my !== intent) return false;
   const result = await session.joinRoom(code);
   return result.ok;
 }
@@ -495,15 +516,18 @@ export const session = {
   lookup,
 
   async createRoom(gameId: GameId, extra: { solo?: boolean; settings?: Record<string, unknown>; roomName?: string } = {}): Promise<string | null> {
+    const my = ++intent;
     await leaveCurrent();
+    if (my !== intent) return null;
     useSessionStore.setState({ ...initial, status: 'connecting', gameId });
     try {
       const room = await getClient().create(gameId, await joinOptions(extra));
+      if (superseded(my, room)) return null;
       attach(room, gameId);
       sfx('join');
       return room.roomId;
     } catch (err) {
-      useSessionStore.setState({ status: 'idle', error: toFriendlyError(err) });
+      if (my === intent) useSessionStore.setState({ status: 'idle', error: toFriendlyError(err) });
       return null;
     }
   },
@@ -520,7 +544,9 @@ export const session = {
     if (current.room && current.code === code && current.status === 'connected' && current.gameId) {
       return { ok: true, gameId: current.gameId };
     }
+    const my = ++intent;
     await leaveCurrent();
+    if (my !== intent) return { ok: false, error: friendly('unknown', 'The join was cancelled.') };
     useSessionStore.setState({ ...initial, status: 'connecting', code });
     try {
       const info = await lookup(code);
@@ -533,12 +559,14 @@ export const session = {
         code,
         await joinOptions({ ...extra, ...(ticket ? { ticket } : {}), ...(seat ? { seatToken: seat.seatToken } : {}) }),
       );
+      if (superseded(my, room)) return { ok: false, error: friendly('unknown', 'The join was cancelled.') };
       attach(room, info.gameId as GameId, ticket);
       sfx('join');
       return { ok: true, gameId: info.gameId as GameId };
     } catch (err) {
       const error = toFriendlyError(err);
-      useSessionStore.setState({ status: 'idle', error, code });
+      // A newer create/join/leave owns the store now: don't paint this failure over it.
+      if (my === intent) useSessionStore.setState({ status: 'idle', error, code });
       return { ok: false, error };
     }
   },
@@ -559,7 +587,10 @@ export const session = {
   },
 
   async leaveRoom(): Promise<void> {
+    const my = ++intent;
     await leaveCurrent();
+    // Another create/join started while we were leaving: it owns the store now.
+    if (my !== intent) return;
     sfx('back');
     useSessionStore.setState({ ...initial });
     resetBus();

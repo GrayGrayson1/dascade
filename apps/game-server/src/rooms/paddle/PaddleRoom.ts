@@ -53,12 +53,18 @@ import {
 import type { PlayerRecord, RemovalReason } from '../BaseGameRoom.ts';
 import { ClassicsRoom } from '../classics/ClassicsRoom.ts';
 import { PaddleState, type PaddleSide } from './PaddleState.ts';
+import { RttProbe } from './rttProbe.ts';
 
 /** Lead-in after resuming a paused solo game or a reconnect. */
 const RESUME_LEAD_MS = 900;
 
 /** The house paddle's colour: the first of these that no human on court is wearing. */
 const HOUSE_COLORS = ['#ff4fd8', '#ffd23f', '#7cf5ff', '#a78bfa'] as const;
+
+/** RTT a client may claim before the server has measured its own (≈ 2 ticks of lag compensation). */
+const DEFAULT_RTT_MS = 34;
+/** Headroom over the server's measurement (about a frame of client-side processing). */
+const RTT_SLACK_MS = 16;
 
 /** Score multiplier per house level for the solo high-score boards. */
 const LEVEL_MULT: Record<PaddleSettings['ai'], number> = { rookie: 1, pro: 2, ace: 3, legend: 5 };
@@ -88,6 +94,10 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
   private finished = true;
   private forfeitSide: Side | -1 = -1;
   private readonly verdicts = new Map<string, RunVerdict>();
+  /** Server-measured round trips (ping frames) — caps the RTT clients claim for hit forgiveness. */
+  private readonly rttProbe = new RttProbe();
+  private probeTimer: { clear(): void } | null = null;
+  private probeRounds = 0;
 
   protected defaultSettings(): PaddleSettings {
     return structuredClone(DEFAULT_PADDLE_SETTINGS);
@@ -114,6 +124,30 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
     });
     this.syncMeta();
     this.setFixedTimestep(() => this.tick(), PADDLE.tickRate);
+    this.probeTimer = this.clock.setInterval(() => this.probeRtt(), 250);
+  }
+
+  /** Ping the humans on court: every 250 ms until measured, then once a second. */
+  private probeRtt(): void {
+    if (this.phase !== 'COUNTDOWN' && this.phase !== 'PLAYING') return;
+    this.probeRounds++;
+    for (const id of this.sideIds) {
+      const rec = id ? this.players.get(id) : undefined;
+      if (!id || !rec?.client) continue;
+      if (this.rttProbe.rtt(id) === null || this.probeRounds % 4 === 0) this.rttProbe.probe(id, rec.client);
+    }
+  }
+
+  /**
+   * One-way latency in ticks (+1 for the input interval) for hit forgiveness near the paddle edge.
+   * The client's RTT is only a hint: it is capped by the server's own measurement (plus a frame), and
+   * by a small default until that exists — a modified client can't buy a longer paddle history.
+   */
+  private lagTicks(playerId: string, clientRtt: number | undefined): number {
+    const measured = this.rttProbe.rtt(playerId);
+    const ceiling = measured === null ? DEFAULT_RTT_MS : measured + RTT_SLACK_MS;
+    const rtt = Math.min(clientRtt ?? ceiling, ceiling);
+    return Math.round(rtt / 2 / (1000 / PADDLE.tickRate)) + 1;
   }
 
   /** Solo only: freeze the game; resuming gives a short lead-in before play continues. */
@@ -226,8 +260,7 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
   private onInput(player: PlayerRecord, input: PaddleInput): void {
     if (this.sideIds.indexOf(player.id) < 0) return;
     const prev = this.sideInputs.get(player.id);
-    // One-way latency in ticks (+1 for the input interval), capped by the engine.
-    const lag = input.rtt !== undefined ? Math.round(input.rtt / 2 / (1000 / PADDLE.tickRate)) + 1 : (prev?.lag ?? 2);
+    const lag = this.lagTicks(player.id, input.rtt);
     this.sideInputs.set(player.id, { y: input.y, serve: Boolean(input.serve) || Boolean(prev?.serve), lag });
   }
 
@@ -262,6 +295,8 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
 
   protected override onPlayerReconnected(player: PlayerRecord): void {
     super.onPlayerReconnected(player);
+    // A new connection: measure its round trip afresh.
+    this.rttProbe.forget(player.id);
     const side = this.sideIds.indexOf(player.id);
     if (side < 0 || !this.match || this.finished) return;
     this.sideInputs.delete(player.id);
@@ -278,6 +313,7 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
   protected override onPlayerRemoved(player: PlayerRecord, reason: RemovalReason): void {
     super.onPlayerRemoved(player, reason);
     this.sideInputs.delete(player.id);
+    this.rttProbe.forget(player.id);
   }
 
   protected override syncPrivate(player: PlayerRecord): void {
@@ -471,6 +507,8 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
 
   protected override onRoomDisposed(): void {
     this.match = null;
+    this.probeTimer?.clear();
+    this.rttProbe.clear();
   }
 }
 

@@ -122,6 +122,8 @@ function isTypingTarget(t: EventTarget | null): boolean {
 export class PuttController {
   private anims = new Map<string, Anim>();
   private holeIndex = -1;
+  /** state.holeStartedAt of the hole on screen: a rematch / Retry replays the same holeIndex. */
+  private holeStartedAt = -1;
   private holeKey = '';
   private ui: PuttUi = { canAim: false, myTurn: false, aiming: false, angle: 0, power: 350, spectator: false, rolling: false, callouts: [], cancelZone: false };
   private readonly uiListeners = new Set<() => void>();
@@ -227,7 +229,7 @@ export class PuttController {
   private syncUi(): void {
     const s = this.state();
     const me = this.me();
-    if (s && s.holeIndex !== this.holeIndex) this.resetHole(s);
+    if (s && this.isNewHole(s)) this.resetHole(s);
     const g = this.myGolfer(s);
     const spectator = Boolean(me && s?.players?.[me]?.spectator) || !g;
     const anim = me ? this.anims.get(me) : undefined;
@@ -253,8 +255,18 @@ export class PuttController {
     this.setUi({ canAim, myTurn, spectator, rolling, aiming: canAim ? this.ui.aiming : false, cancelZone: canAim ? this.ui.cancelZone : false });
   }
 
+  /**
+   * A different hole is on screen. `holeStartedAt` also changes when the same hole index starts again
+   * (rematch, solo Retry on a one-hole course) — the server's shot sequence restarts at 1 then.
+   */
+  private isNewHole(s: PuttPublicState): boolean {
+    return s.holeIndex !== this.holeIndex || s.holeStartedAt !== this.holeStartedAt;
+  }
+
   private resetHole(s: PuttPublicState): void {
     this.holeIndex = s.holeIndex;
+    this.holeStartedAt = s.holeStartedAt;
+    this.holeKey = '';
     this.anims.clear();
     this.previewCache = null;
     this.remoteAim = null;
@@ -308,9 +320,10 @@ export class PuttController {
 
   private addShot(shot: PuttShotView): void {
     if (!shot || typeof shot.seq !== 'number') return;
+    const s = this.state();
+    if (s && this.isNewHole(s)) this.resetHole(s);
     const existing = this.anims.get(shot.playerId);
     if (existing && existing.shot.seq >= shot.seq) return;
-    const s = this.state();
     if (s && shot.holeIndex !== s.holeIndex) return;
     const me = this.me();
     const mine = shot.playerId === me;
@@ -517,7 +530,7 @@ export class PuttController {
   frame(): Frame {
     const s = this.state();
     const now = serverNow();
-    if (s && s.holeIndex !== this.holeIndex) this.resetHole(s);
+    if (s && this.isNewHole(s)) this.resetHole(s);
     const hole = this.holeFor(s);
     const obstacleMs = s ? Math.max(0, now - s.holeStartedAt) : 0;
     const balls: BallDraw[] = [];

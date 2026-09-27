@@ -114,6 +114,8 @@ export const DASINO_MSG = {
   spin: 'dasino:spin',
   /** client → server: free virtual top-up (only when below the min bet). */
   refill: 'dasino:refill',
+  /** client → server: a spectator takes a free seat mid-session (a returning guest keeps their chips). */
+  sit: 'dasino:sit',
   /** client → server (host): close the floor and show the leaderboard. */
   endSession: 'dasino:endSession',
 

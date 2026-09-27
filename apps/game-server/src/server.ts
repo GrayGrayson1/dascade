@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import express from 'express';
-import { defineServer, defineRoom, type Room } from '@colyseus/core';
+import { defineServer, defineRoom, matchMaker, type Room } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { isGameId, type GameId } from '@dascade/shared';
 import { loadRoomClasses } from './rooms/registry.ts';
@@ -45,7 +45,15 @@ function securityHeaders(req: express.Request, res: express.Response, next: expr
   next();
 }
 
+/**
+ * HTTP matchmaking methods clients may call (POST /matchmake/<method>/<room>). The web client only
+ * creates rooms, joins by code and reconnects; `join` / `joinOrCreate` would seat a stranger in ANY
+ * open room of a game without its code (bypassing room codes and the /api/rooms lookup throttle).
+ */
+export const EXPOSED_MATCHMAKE_METHODS = ['create', 'joinById', 'reconnect'];
+
 export async function createDascadeServer(options: CreateServerOptions = {}) {
+  matchMaker.controller.exposedMethods = [...EXPOSED_MATCHMAKE_METHODS];
   installPlatformServices();
   const rooms: Record<string, ReturnType<typeof defineRoom>> = {};
   const classes = await loadRoomClasses(options.games ?? envGames(), config.isProduction, (id, err) =>

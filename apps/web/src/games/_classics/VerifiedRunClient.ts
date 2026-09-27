@@ -13,10 +13,14 @@
  *   (further ahead) local sim and resend from the server's position, or — after a page reload —
  *   rebuild the sim by replaying the server's log and continue from there.
  * - The server's verdict is final. If it ends the run first (divergence), the local sim stops.
+ * - At most CLASSICS.maxEventsPerTick codes are applied per tick (the server's flood guard); after a
+ *   main-thread stall the rest carry over to the next ticks instead of getting the run rejected.
+ * - Every run ends at CLASSICS.maxRunTicks (the server's length cap) like a timed race.
  */
 import { CLASSICS, CLASSICS_MSG, type RunAck, type RunInputBatch, type RunTicket, type RunVerdict } from '@dascade/shared/games/classics';
 import { InputRecorder, advanceSim, decodeEvents, type ClassicsSim, type SimFactory } from '@dascade/game-core/classics/shared';
 import { getLastMessage, getStateSnapshot, serverNow, session, subscribeMessage, subscribeState, useSessionStore } from '../../net/session.ts';
+import { takeTick } from './tickQueue.ts';
 import type { ClassicsPublicState } from '@dascade/shared/games/classics';
 
 export type RunPhase = 'none' | 'waiting' | 'running' | 'ended' | 'verified';
@@ -34,6 +38,8 @@ export class VerifiedRunClient<S extends ClassicsSim = ClassicsSim> {
   private readonly listeners = new Set<() => void>();
   private sinceFlush = 0;
   private finalSent = false;
+  /** Codes that didn't fit in their tick (flood guard), applied first on the next ticks. */
+  private carry: number[] = [];
   private lastStatus = useSessionStore.getState().status;
 
   constructor(private readonly factory: SimFactory<S>) {}
@@ -106,6 +112,7 @@ export class VerifiedRunClient<S extends ClassicsSim = ClassicsSim> {
     this.ticket = t;
     this.verdict = null;
     this.finalSent = false;
+    this.carry = [];
     this.sinceFlush = 0;
     this.resumed = false;
     const sim = this.factory(t.seed, t.options);
@@ -157,9 +164,14 @@ export class VerifiedRunClient<S extends ClassicsSim = ClassicsSim> {
     const sim = this.sim;
     const t = this.ticket;
     if (!sim || !t || this.phase !== 'running') return;
-    for (const code of codes) if (sim.input(code)) this.recorder.record(sim.tick, code);
+    const queue = this.carry.length ? [...this.carry, ...codes] : codes;
+    this.carry = takeTick(queue, (code) => {
+      if (!sim.input(code)) return false;
+      this.recorder.record(sim.tick, code);
+      return true;
+    });
     sim.step();
-    const limitHit = t.limitTicks > 0 && sim.tick >= t.limitTicks;
+    const limitHit = (t.limitTicks > 0 && sim.tick >= t.limitTicks) || sim.tick >= CLASSICS.maxRunTicks;
     if (sim.over || limitHit) {
       this.phase = 'ended';
       this.flush(true);

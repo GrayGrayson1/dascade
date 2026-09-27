@@ -142,7 +142,16 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
 
   protected onGameStart(): void {
     if (!this.match) this.setupMatch();
+    // A tournament opponent left during the countdown (see onPlayerRemoved): now that the game is
+    // live it can be forfeited — and reported — like any other game.
+    if (this.state.tournament && this.match && this.activeGolfers() <= 1) return this.finishMatch('forfeit');
     this.startHole();
+  }
+
+  private activeGolfers(): number {
+    let n = 0;
+    for (const g of this.match?.golfers.values() ?? []) if (!g.retired) n++;
+    return n;
   }
 
   private setupMatch(): void {
@@ -271,7 +280,12 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     if (match.holeComplete() && ![...this.state.golfers.values()].some((g) => g.moving)) return this.endHole();
     if (match.mode === 'turns') {
       if ([...this.state.golfers.values()].some((g) => g.moving)) return;
-      this.startTurn(match.nextTurn(afterId));
+      // Only the golfer holding the turn moves it on: someone else being picked up (away) never
+      // steals it. With no holder (or a holder who is done) play continues after the holder.
+      const holder = match.turnId;
+      const held = holder ? match.golfers.get(holder) : undefined;
+      if (holder && holder !== afterId && held && !match.isDone(held)) return;
+      this.startTurn(match.nextTurn(holder ?? afterId));
     } else {
       const g = match.golfers.get(afterId);
       if (g && !match.isDone(g)) this.startClock(afterId);
@@ -392,6 +406,8 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     if (g.moving) return this.reject(player, PUTT_MSG.pickup, 'not_allowed', 'Wait for your ball to stop.');
     const gm = match.golfers.get(player.id);
     if (!gm || match.isDone(gm)) return;
+    // Classic (turns): you pick up on your own turn, like you'd putt.
+    if (match.mode === 'turns' && match.turnId !== player.id) return this.reject(player, PUTT_MSG.pickup, 'not_your_turn', BLOCK_TEXT.not_your_turn!);
     this.pickUp(player.id, 'conceded');
     this.progress(player.id);
   }
@@ -461,6 +477,9 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     }
     const full = match.regulation === 9;
     const playerStats: Record<string, Record<string, number>> = {};
+    // Platform stats compare scores across games (best / average): only full 9-hole rounds finished
+    // without retiring are comparable, so shorter courses and retirements report no score.
+    const roundScores: Record<string, number> = {};
     for (const g of match.golfers.values()) {
       let birdies = 0;
       for (let i = 0; i < match.regulation; i++) {
@@ -468,7 +487,10 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
         if (s > 0 && s < getHole(match.route[i]!).par) birdies++;
       }
       const stats: Record<string, number> = { holesInOne: g.holesInOne, birdies };
-      if (full && !g.retired && g.card.slice(0, 9).every((s) => s > 0)) stats.minCourseStrokes = scores[g.id] ?? 0;
+      if (full && !g.retired && g.card.slice(0, 9).every((s) => s > 0)) {
+        stats.minCourseStrokes = scores[g.id] ?? 0;
+        roundScores[g.id] = scores[g.id] ?? 0;
+      }
       playerStats[g.id] = stats;
     }
     const players = [...match.golfers.values()].map((g) => {
@@ -495,7 +517,7 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     this.endMatch({ players, details });
     this.reportOutcome({
       placements,
-      scores,
+      ...(Object.keys(roundScores).length ? { scores: roundScores } : {}),
       lowerIsBetter: true,
       reason: reason === 'forfeit' ? 'forfeit' : match.playoffResult && match.playoffResult.length > 1 ? 'playoff' : 'completed',
       details,
@@ -533,16 +555,19 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     this.lastAimAt.delete(player.id);
     if (!match || !g || !match.golfers.has(player.id)) return;
     if (this.phase === 'LOBBY' || this.phase === 'RESULTS' || this.phase === 'ENDED') return;
+    // The round is decided (the results screen is on its way): leaving now doesn't rewrite the card.
+    if (match.finished) return;
     const wasTurn = match.turnId === player.id;
     match.retire(player.id);
     this.cancel(`clock:${player.id}`);
     g.retired = true;
     g.deadline = 0;
     this.publishGolfer(player.id);
-    const active = [...match.golfers.values()].filter((x) => !x.retired);
-    if (this.state.tournament && active.length <= 1) {
-      // Head-to-head forfeit: the remaining golfer wins now instead of playing on alone.
-      this.finishMatch('forfeit');
+    if (this.state.tournament && this.activeGolfers() <= 1) {
+      // Head-to-head forfeit: the remaining golfer wins now instead of playing on alone. Not during
+      // the countdown — that game hasn't started, so no outcome could be reported for it (the
+      // series would freeze): onGameStart forfeits it as soon as it is live.
+      if (this.phase !== 'COUNTDOWN') this.finishMatch('forfeit');
       return;
     }
     if (this.phase !== 'PLAYING' || this.state.holeStatus !== 'play' || g.moving) return;

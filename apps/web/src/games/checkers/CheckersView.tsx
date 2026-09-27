@@ -160,7 +160,7 @@ export function CheckersView() {
         swatch={swatch(side)}
         active={playing && !over && state.turn === side}
         isYou={mySide === side}
-        connected={player?.connected ?? true}
+        connected={seat?.playerId ? Boolean(player?.connected) : true}
         showDelta={over}
         captured={captured(side)}
         clock={<BoardClock clock={state.clock} side={side} owner={sideLabel(side)} size={narrow ? 'md' : 'lg'} />}

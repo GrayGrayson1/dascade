@@ -55,7 +55,8 @@ export function ratingsForIdentity(identity: string): RatingLine[] {
  * `placements` of one group = draw; otherwise the first group won.
  */
 export function applyRatedOutcome(outcome: GameOutcome, ctx: OutcomeContext): void {
-  if (!ctx.rated) return;
+  // Games against CPU placeholders never move ratings.
+  if (!ctx.rated || outcome.nonPlayerIds?.length) return;
   const ids = outcome.placements.flat();
   if (ids.length !== 2) return;
   const [aId, bId] = ids as [string, string];

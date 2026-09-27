@@ -143,8 +143,12 @@ describe('SnakeRoom — solo score attack', () => {
     host.room.send(SNAKE_MSG.pause, { paused: true });
     await waitFor(() => st(host.room).match.paused === true, 2000, 'paused');
     const t = game(host.server).tick;
+    // Turns sent while frozen are ignored (no planning moves during a pause).
+    const snake = game(host.server).snakes[0]!;
+    host.room.send(SNAKE_MSG.turn, { dir: snake.dir === 0 || snake.dir === 2 ? 1 : 0 });
     await sleep(400);
     expect(game(host.server).tick).toBe(t);
+    expect(snake.queue).toEqual([]);
     host.room.send(SNAKE_MSG.pause, { paused: false });
     await waitFor(() => game(host.server).tick > t, 3000, 'resumed');
   });

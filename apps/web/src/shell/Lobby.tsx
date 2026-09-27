@@ -2,7 +2,7 @@
  * The shared lobby used by every cabinet. Games plug in their own SettingsPanel
  * and PlayerSetup via their GameClientModule.
  */
-import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { GAME_CATALOG, LIMITS, cabinetForGame, type GameId, type PlayerView } from '@dascade/shared';
 import {
   Badge,
@@ -54,7 +54,10 @@ function useLobbyGame() {
   const seated = useMemo(() => players.filter((p) => !p.spectator), [players]);
   if (!state) return null;
   const me = playerId ? state.players[playerId] : undefined;
-  return { state, settings, playerId, me, players, seated, isHost: Boolean(playerId && state.hostId === playerId) };
+  // Tournament Center match room: seats, settings and the start are run by the tournament — the server
+  // refuses lock / spectators / player limit / rename / kick / host / spectate / ready / start here.
+  const tournamentMatch = Boolean(state.tournamentJson);
+  return { state, settings, playerId, me, players, seated, tournamentMatch, isHost: Boolean(playerId && state.hostId === playerId) };
 }
 
 export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientModule | null }) {
@@ -64,13 +67,19 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   const [confirmStart, setConfirmStart] = useState(false);
   const openModal = useApp((s) => s.openModal);
 
-  const joinSound = game?.players.length ?? 0;
+  // Someone joined (not left, not the first state arriving, not returning from a game).
+  const playerCount = game?.players.length ?? 0;
+  const prevCount = useRef(playerCount);
   useEffect(() => {
-    if (joinSound > 1) sfx('join');
-  }, [joinSound]);
+    const prev = prevCount.current;
+    prevCount.current = playerCount;
+    if (prev > 0 && playerCount > prev) sfx('join');
+  }, [playerCount]);
 
   if (!game) return null;
-  const { state, me, isHost, seated, players } = game;
+  const { state, me, isHost, seated, players, tournamentMatch } = game;
+  /** Host controls the server honours in this room. */
+  const canManage = isHost && !tournamentMatch;
   const activeConnected = seated.filter((p) => p.connected);
   const notReady = seated.filter((p) => !p.ready && !p.isHost && p.connected);
   const minPlayers = catalog.capacity.minPlayers;
@@ -108,7 +117,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           gameId={gameId}
           roomName={state.roomName}
           code={state.code}
-          canEdit={isHost}
+          canEdit={canManage}
           seated={seated.length}
           maxPlayers={state.maxPlayers}
           locked={state.locked}
@@ -131,8 +140,15 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
             brackets
           >
             <SeatMeter seated={seated.length} max={state.maxPlayers} min={minPlayers} />
-            <PlayerList players={players} meId={game.playerId} hostView={isHost} maxPlayers={state.maxPlayers} locked={state.locked} />
-            {me?.spectator && !me.queued ? (
+            <PlayerList
+              players={players}
+              meId={game.playerId}
+              hostView={canManage}
+              showReady={!tournamentMatch}
+              maxPlayers={state.maxPlayers}
+              locked={state.locked && !tournamentMatch}
+            />
+            {me?.spectator && !me.queued && !tournamentMatch ? (
               <p className="dc-field__hint" style={{ marginTop: 12 }}>
                 You’re spectating. {seated.length < state.maxPlayers ? 'Grab a seat to play.' : 'All seats are taken.'}
               </p>
@@ -141,8 +157,10 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
 
           <div className="lobby__settings" data-part="lobby-settings" data-section="settings">
             {SettingsPanel ? (
-              <Panel title={isHost ? 'Game settings' : 'Game settings (host controls these)'}>
-                <SettingsPanel settings={game.settings} canEdit={isHost} update={updateSettings} />
+              <Panel
+                title={tournamentMatch ? 'Game settings (set by the organizer)' : isHost ? 'Game settings' : 'Game settings (host controls these)'}
+              >
+                <SettingsPanel settings={game.settings} canEdit={canManage} update={updateSettings} />
               </Panel>
             ) : null}
             <RoomSettings gameId={gameId} />
@@ -176,9 +194,9 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           and the waiting note becomes a caption (see app.css). */}
       <footer className="lobby__actions" data-part="lobby-actions">
         <div className="lobby__actions-inner">
-          <LeaveButton size="md" className="lobby__leave" collapseLabel />
+          <LeaveButton size="md" className="lobby__leave" collapseLabel popover="above" />
           <span className="dc-spacer" />
-          {me && !me.spectator && !isHost ? (
+          {me && !me.spectator && !isHost && !tournamentMatch ? (
             <Button
               className="lobby__ready"
               data-part="ready-button"
@@ -193,7 +211,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
               {me.ready ? 'Ready!' : 'Ready up'}
             </Button>
           ) : null}
-          {state.allowSpectators && me ? (
+          {state.allowSpectators && me && !tournamentMatch ? (
             <Button
               className="lobby__spectate"
               variant="ghost"
@@ -204,7 +222,11 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
               <span className="dc-collapse-label">{me.spectator ? 'Take a seat' : 'Spectate'}</span>
             </Button>
           ) : null}
-          {isHost ? (
+          {tournamentMatch ? (
+            <span className="lobby__waiting">
+              <PixelIcon name="clock" /> Starts automatically when both players are here
+            </span>
+          ) : isHost ? (
             <Button
               className="lobby__start"
               data-part="start-button"
@@ -402,12 +424,15 @@ function PlayerList({
   players,
   meId,
   hostView,
+  showReady = true,
   maxPlayers,
   locked,
 }: {
   players: PlayerView[];
   meId: string | null;
   hostView: boolean;
+  /** Ready pills (hidden where there is no ready-up, e.g. tournament matches start on their own). */
+  showReady?: boolean;
   maxPlayers: number;
   locked: boolean;
 }) {
@@ -432,13 +457,13 @@ function PlayerList({
         meta={p.queued ? <Badge color="var(--warning)">Next round</Badge> : null}
       />
       <span className="dc-spacer" />
-      {p.isHost && !p.spectator ? (
+      {!showReady || p.spectator ? null : p.isHost ? (
         <span className="ready-pill ready-pill--host">Host</span>
-      ) : !p.spectator ? (
+      ) : (
         <span className={cx('ready-pill', p.ready && 'ready-pill--on')}>
           <PixelIcon name={p.ready ? 'check' : 'clock'} /> {p.ready ? 'Ready' : 'Not ready'}
         </span>
-      ) : null}
+      )}
       {hostView && p.id !== meId ? (
         menuFor === p.id ? (
           <span className="player-list__manage">
@@ -499,8 +524,17 @@ function PlayerList({
 function RoomSettings({ gameId }: { gameId: GameId }) {
   const game = useLobbyGame();
   if (!game) return null;
-  const { state, isHost } = game;
+  const { state, isHost, tournamentMatch } = game;
   const cap = GAME_CATALOG[gameId].capacity;
+  if (tournamentMatch) {
+    return (
+      <Panel title="Room">
+        <p className="dc-field__hint">
+          <PixelIcon name="trophy" /> This match room is run by the Tournament Center: seats, spectators and settings are fixed.
+        </p>
+      </Panel>
+    );
+  }
   return (
     <Panel title="Room">
       <div className="dc-col" style={{ gap: 14 }}>

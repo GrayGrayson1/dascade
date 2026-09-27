@@ -633,7 +633,7 @@ describe('DASception: resilience', () => {
     expect(outcomes[0]!.placements[1]).toEqual([g.id()]);
   });
 
-  it('votes for a leaver are voided and those voters can vote again', async () => {
+  it('votes for a leaver are voided privately — the public "voted" flag never flips — and those voters can vote again', async () => {
     const t = await setup(6);
     await start(t);
     await toNight(t);
@@ -641,13 +641,32 @@ describe('DASception: resilience', () => {
     await toVote(t);
     const [s1, s2] = t.by('sysop') as [Client, Client];
     const sc = t.one('scanner');
+    const watcher = t.others(sc, s2)[0]!;
     vote(sc, s2);
-    await waitFor(() => json(sc).seats[sc.id()].answered === true, 2000, 'voted');
+    await waitFor(() => json(watcher).seats[sc.id()]?.answered === true, 2000, 'voted');
+    // Everything anyone else can see about sc: it must keep saying "voted".
+    const seen: boolean[] = [];
+    watcher.room.onStateChange(() => seen.push(Boolean(json(watcher).seats[sc.id()]?.answered)));
+    const answeredBefore = json(watcher).answeredCount;
     await s2.room.leave(true);
-    await waitFor(() => json(sc).seats[sc.id()]?.answered === false, 2000, 'vote voided');
     await waitFor(() => sc.priv()!.vote === null, 2000, 'private vote cleared');
+    await waitFor(() => t.server.state.nodes.get(s2.id())?.fate === 'left', 2000, 'left');
+    expect(json(watcher).seats[sc.id()]!.answered).toBe(true);
+    expect(json(watcher).answeredCount).toBe(answeredBefore);
+    expect(seen.every(Boolean)).toBe(true);
+    // Only sc is told (privately) that the vote no longer counts.
+    await waitFor(
+      () => sc.all.some((m) => m.type === 'sys:toast' && /no longer counts/.test(String((m.payload as { text?: string }).text))),
+      2000,
+      'toast',
+    );
+    expect(watcher.all.some((m) => m.type === 'sys:toast' && /no longer counts/.test(String((m.payload as { text?: string }).text)))).toBe(
+      false,
+    );
     vote(sc, s1);
-    await waitFor(() => json(sc).seats[sc.id()].answered === true, 2000, 'voted again');
+    await waitFor(() => sc.priv()?.vote?.target === s1.id(), 2000, 'voted again');
+    expect(json(watcher).seats[sc.id()]!.answered).toBe(true);
+    expect(seen.every(Boolean)).toBe(true);
   });
 
   it('the host cannot kick a seated player mid-match (no parity swings), but can in the lobby', async () => {

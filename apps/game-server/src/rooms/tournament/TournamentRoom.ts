@@ -11,12 +11,16 @@
  * - Match rooms are created server-side with an in-process binding (see platform/tournaments.ts);
  *   participants join them with a per-match ticket. Game results arrive through the outcome hub and
  *   are recorded idempotently by (matchId, gameNumber); the bracket advances automatically.
- * - The room never auto-disposes while the tournament is active; after COMPLETE/CANCELLED it closes
- *   once nobody has been watching for a while.
+ * - Lifecycle: the room auto-disposes like any room until its organizer (the creator) has joined, so
+ *   scripted creates without a connection vanish with their seat reservation. After that it never
+ *   auto-disposes while the tournament is active: a DRAFT nobody is looking at closes after a few
+ *   minutes, an abandoned running one after hours, a finished one once nobody has watched for a while.
+ *   Live tournaments are capped per creating address and per process.
  */
 import { timingSafeEqual } from 'node:crypto';
-import { matchMaker, type Delayed } from '@colyseus/core';
+import { ServerError, matchMaker, type AuthContext, type Delayed } from '@colyseus/core';
 import {
+  JoinErrorCode,
   LIMITS,
   RATE,
   TOURNAMENT_LIMITS,
@@ -42,11 +46,14 @@ import {
 } from '@dascade/shared';
 import { isProvisional } from '@dascade/game-core/rating';
 import { TournamentEngine, TournamentError, isFinished, type EngineMatch, type SlotSource } from '@dascade/game-core/tournament';
+import { config } from '../../config.ts';
+import { clientIpFromAuth, ipRateKey } from '../../lib/clientIp.ts';
 import { log } from '../../lib/log.ts';
 import { getRating, ratingIdentity } from '../../platform/ratings.ts';
 import { tournamentStore } from '../../platform/tournamentStore.ts';
 import {
   MATCH_BINDING_OPTION,
+  countTournaments,
   createMatchBinding,
   getBoundRoom,
   registerTournament,
@@ -63,10 +70,28 @@ const MATCH_RECONNECT_GRACE_S = 180;
 const TERMINAL_IDLE_MS = 15 * 60_000;
 /** An unfinished tournament nobody has looked at (and with nobody playing) for this long is cancelled. */
 const ABANDONED_IDLE_MS = 6 * 60 * 60_000;
+/** A DRAFT (never opened) closes after this long without viewers. */
+const DRAFT_IDLE_MS = 10 * 60_000;
+/** A room whose organizer never connected (normally gone when the seat reservation expires). */
+const UNCLAIMED_IDLE_MS = 2 * 60_000;
 /** Minimum spacing between persistence snapshots. */
 const PERSIST_EVERY_MS = 5_000;
 /** Back-off after a match room failed to open. */
 const LAUNCH_RETRY_MS = [2_000, 5_000, 15_000, 30_000];
+
+export interface TournamentCaps {
+  /** Live tournaments created from one address (ipRateKey). */
+  perIp: number;
+  /** Live tournaments on this process (each holds a kiosk plus its match rooms in memory). */
+  perProcess: number;
+}
+
+let caps: TournamentCaps = config.relaxedLimits ? { perIp: 500, perProcess: 2000 } : { perIp: 6, perProcess: 100 };
+
+/** Override the concurrent-tournament caps (tests). */
+export function setTournamentCaps(next: TournamentCaps): void {
+  caps = next;
+}
 
 interface MatchRoomEntry {
   attempt: number;
@@ -76,7 +101,10 @@ interface MatchRoomEntry {
   b: string;
   present: Set<string>;
   waiting: boolean;
-  /** When exactly one participant started waiting for the other (no-show clock), 0 = not running. */
+  /**
+   * No-show clock: when the room started waiting with fewer than two participants present (from the
+   * moment it opened), 0 = not running. At the deadline the absent side forfeits — both, if neither came.
+   */
   waitingSince: number;
 }
 
@@ -109,9 +137,30 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
   private persistTimer: Delayed | null = null;
   private lastPersistAt = 0;
   private disposing = false;
+  /** ipRateKey of the creating address (recorded when the organizer joins; see onAuth). */
+  creatorKey: string | null = null;
 
   get code(): string {
     return this.roomId;
+  }
+
+  /** Matchmaking checks, plus the concurrent-tournament caps for creates. The address rides along as auth data. */
+  static override async onAuth(token: string, options: unknown, context: AuthContext): Promise<{ ip: string }> {
+    await super.onAuth(token, options, context);
+    const ip = ipRateKey(clientIpFromAuth(context));
+    const url = String((context.req as { url?: string } | undefined)?.url ?? '');
+    if (url.includes('/create/')) {
+      if (countTournaments() >= caps.perProcess) {
+        throw new ServerError(JoinErrorCode.RATE_LIMITED, 'The Tournament Center is full right now — please try again in a few minutes.');
+      }
+      if (countTournaments((host) => host.creatorKey === ip) >= caps.perIp) {
+        throw new ServerError(
+          JoinErrorCode.RATE_LIMITED,
+          `Your network is already running ${caps.perIp} tournaments — finish or close one before starting another.`,
+        );
+      }
+    }
+    return { ip };
   }
 
   protected defaultSettings(): TournamentConfig {
@@ -140,7 +189,7 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
   // ===========================================================================
 
   protected override onRoomCreated(): void {
-    this.autoDispose = false;
+    // autoDispose stays on until the organizer has joined (onPlayerJoined).
     this.tournamentId = randomId(24, this.rng);
     this.organizerToken = randomId(32, this.rng);
     const name = cleanName(this.settings.name);
@@ -155,8 +204,12 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
 
   protected override onPlayerJoined(player: PlayerRecord): void {
     if (!this.organizerAssigned) {
-      // The creator is the first player to join a fresh tournament room.
+      // The creator is the first player to join a fresh tournament room. From now on the room outlives
+      // its viewers (checkIdle decides when it closes).
       this.organizerAssigned = true;
+      this.autoDispose = false;
+      const auth = player.client?.auth as { ip?: unknown } | undefined;
+      this.creatorKey = typeof auth?.ip === 'string' ? auth.ip : null;
       this.setOrganizer(player);
     }
     this.idleSince = 0;
@@ -205,7 +258,8 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
     }
     this.rooms.clear();
     this.persistTimer?.clear();
-    void tournamentStore.save(this.tournamentId, this.roomId, this.engine.data);
+    // A room nobody ever claimed (e.g. a scripted create) leaves no trace.
+    if (this.organizerAssigned) void tournamentStore.save(this.tournamentId, this.roomId, this.engine.data);
   }
 
   // ===========================================================================
@@ -431,9 +485,9 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
     if (!entry || entry.roomCode !== roomCode) return;
     entry.present = new Set(status.present.filter((pid) => pid === entry.a || pid === entry.b));
     entry.waiting = status.waiting;
-    const oneWaiting = status.waiting && entry.present.size === 1;
-    if (oneWaiting && !entry.waitingSince) entry.waitingSince = Date.now();
-    if (!oneWaiting) entry.waitingSince = 0;
+    const shortHanded = status.waiting && entry.present.size < 2;
+    if (shortHanded && !entry.waitingSince) entry.waitingSince = Date.now();
+    if (!shortHanded) entry.waitingSince = 0;
     this.syncState();
   }
 
@@ -535,6 +589,8 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
           return;
         }
         entry.roomCode = cache.roomId;
+        // The no-show clock runs from the moment the room opens, even if nobody ever arrives.
+        entry.waitingSince = Date.now();
         this.launchFailures.delete(m.id);
         this.afterChange();
       })
@@ -563,13 +619,18 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
     }
   }
 
-  /** Tickets are per match and participant, and survive room relaunches. */
+  /**
+   * Tickets are per match and participant, and survive room relaunches. Only the current pair holds
+   * one: after an override re-derives the bracket (or Swiss re-pairs), a displaced participant's
+   * ticket dies with the old pairing.
+   */
   private ticketsFor(m: EngineMatch): Map<string, string> {
     let map = this.tickets.get(m.id);
     if (!map) {
       map = new Map();
       this.tickets.set(m.id, map);
     }
+    for (const pid of [...map.keys()]) if (pid !== m.a && pid !== m.b) map.delete(pid);
     for (const pid of [m.a, m.b]) if (pid && !map.has(pid)) map.set(pid, randomId(32, this.rng));
     return map;
   }
@@ -618,10 +679,15 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
     if (noShowMs > 0 && this.engine.status === 'IN_PROGRESS') {
       for (const [matchId, entry] of [...this.rooms]) {
         if (!entry.waitingSince || now - entry.waitingSince < noShowMs) continue;
-        const absent = [entry.a, entry.b].find((pid) => !entry.present.has(pid));
-        if (!absent) continue;
+        const absent = [entry.a, entry.b].filter((pid) => !entry.present.has(pid));
+        if (absent.length === 0) {
+          entry.waitingSince = 0;
+          continue;
+        }
         try {
-          this.engine.forfeit(matchId, absent, 'did not show up', 'system');
+          // Nobody came at all: both forfeit (the bracket moves on instead of waiting forever).
+          if (absent.length === 1) this.engine.forfeit(matchId, absent[0]!, 'did not show up', 'system');
+          else this.engine.forfeitBoth(matchId, 'neither participant showed up', 'system');
           changed = true;
         } catch (err) {
           log.warn('no-show forfeit failed', { code: this.roomId, match: matchId, err: err as Error });
@@ -641,6 +707,18 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
     }
     if (!this.idleSince) this.idleSince = now;
     const idle = now - this.idleSince;
+    if (!this.organizerAssigned) {
+      if (idle >= envMs('DASCADE_TOURNAMENT_UNCLAIMED_IDLE_MS', UNCLAIMED_IDLE_MS)) void this.disconnect();
+      return;
+    }
+    if (this.engine.status === 'DRAFT') {
+      if (idle >= envMs('DASCADE_TOURNAMENT_DRAFT_IDLE_MS', DRAFT_IDLE_MS)) {
+        this.engine.cancel('Nobody opened it — the draft was discarded.');
+        this.afterChange();
+        void this.disconnect();
+      }
+      return;
+    }
     if (this.isTerminal()) {
       if (idle >= terminalIdleMs()) void this.disconnect();
       return;
@@ -894,9 +972,14 @@ export class TournamentRoom extends BaseGameRoom<TournamentState, TournamentConf
 
 /** Non-production environments may shorten the finished-tournament idle window (tests) with DASCADE_TOURNAMENT_IDLE_MS. */
 function terminalIdleMs(): number {
-  const raw = process.env.DASCADE_TOURNAMENT_IDLE_MS;
+  return envMs('DASCADE_TOURNAMENT_IDLE_MS', TERMINAL_IDLE_MS);
+}
+
+/** A duration that non-production environments (tests) may shorten with an environment variable. */
+function envMs(name: string, fallback: number): number {
+  const raw = process.env[name];
   if (process.env.NODE_ENV !== 'production' && raw !== undefined && Number(raw) > 0) return Number(raw);
-  return TERMINAL_IDLE_MS;
+  return fallback;
 }
 
 function cleanName(raw: string): string {

@@ -561,12 +561,15 @@ export class DeceptionRoom extends PartyRoom<DeceptionState, DeceptionSettings> 
 
   /**
    * A participant left for good (or was kicked): they go offline with fate 'left'.
-   * The engine update runs BEFORE the kit's bookkeeping so the kit's "everyone done?" check sees
-   * the voided ballots (votes for the leaver are void and those voters may vote again).
+   * The engine update runs BEFORE the kit's bookkeeping so the kit's "everyone done?" check sees the
+   * new roster. Votes for the leaver are void, but their voters keep their public "voted" flag (and
+   * still count as done): flipping it back would tell everyone who voted for the leaver. Only the
+   * voters themselves learn, privately, that they may vote again.
    */
   protected override onPlayerRemoved(player: PlayerRecord, reason: RemovalReason): void {
     const game = this.game;
     const live = game && game.has(player.id) && this.phase === 'PLAYING' && this.dstage !== 'final';
+    const voided = live && game.isVoting ? game.alive().filter((id) => id !== player.id && game.voteOf(id)?.target === player.id) : [];
     if (live && game.eliminate(player.id, 'left')) {
       const role = this.getSettings().revealRoles ? (game.roleOf(player.id) ?? '') : '';
       this.syncNode(player.id);
@@ -577,8 +580,11 @@ export class DeceptionRoom extends PartyRoom<DeceptionState, DeceptionSettings> 
           ? `${player.state.name} left the network. They were a ${DECEPTION_ROLE_INFO[role].name}.`
           : `${player.state.name} left the network.`,
       );
-      if (game.isVoting) for (const id of game.alive()) this.markAnswered(id, game.hasVoted(id));
       this.pushAllPrivate();
+      for (const id of voided) {
+        const voter = this.players.get(id);
+        if (voter) this.toast(voter, 'info', `${player.state.name} left — your vote no longer counts. You can vote again.`);
+      }
       const win = game.winner();
       if (win) {
         // Mid-reveal the winner is applied when the reveal ends; otherwise end right away.

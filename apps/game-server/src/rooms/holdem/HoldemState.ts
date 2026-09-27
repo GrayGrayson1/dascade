@@ -123,6 +123,8 @@ export const HoldemState = BaseRoomState.extend(
     log: t.array(HoldemLogEntry),
     runout: t.boolean().default(false),
     tableMessage: t.string().default(''),
+    /** The host asked to end the game: it ends once the hand in progress is finished. */
+    endRequested: t.boolean().default(false),
     standings: t.array(HoldemStanding),
   },
   'HoldemState',

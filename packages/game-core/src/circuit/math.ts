@@ -1,4 +1,11 @@
-/** Small, allocation-free math helpers shared by the circuit engine. */
+/**
+ * Small, allocation-free math helpers shared by the circuit engine.
+ *
+ * The engine runs on the server and in client prediction, so it must be bit-identical
+ * across JS engines: trigonometry and lengths come from the deterministic `detmath`
+ * helpers below — never Math.sin/cos/atan2/hypot/pow (guarded by determinism.test.ts).
+ */
+export { datan2, dcos, dhypot, dsin } from '../detmath/index.ts';
 
 export const TAU = Math.PI * 2;
 

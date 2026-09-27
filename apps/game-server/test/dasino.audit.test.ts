@@ -6,11 +6,12 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
-import { createSeededRng, type Rng, type WelcomePayload } from '@dascade/shared';
+import { createSeededRng, type GameOutcome, type Rng, type WelcomePayload } from '@dascade/shared';
 import { DASINO_MSG, type DasinoPublicState } from '@dascade/shared/games/dasino';
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import { createDascadeServer } from '../src/server.ts';
 import type { DasinoRoom } from '../src/rooms/dasino/DasinoRoom.ts';
+import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
 
@@ -207,5 +208,71 @@ describe('DASino audit', () => {
       const seat = view(host).seats[r.playerId]!;
       expect(r.net).toBe(seat.balance - seat.credited);
     }
+  });
+  it('the host cannot remove a player who still has chips mid-session (it would rewrite the leaderboard)', async () => {
+    const { host, guest } = await startSession();
+    host.room.send('lobby:kick', { playerId: guest.me().playerId });
+    await errorFor(host, 'lobby:kick', 'not_allowed');
+    expect(view(host).players[guest.me().playerId]).toBeDefined();
+    expect(view(host).seats[guest.me().playerId]).toBeDefined();
+    host.room.send(DASINO_MSG.endSession, {});
+    await waitFor(() => view(host).phase === 'RESULTS', 3000, 'results');
+    host.room.send('lobby:kick', { playerId: guest.me().playerId });
+    await waitFor(() => view(host).players[guest.me().playerId] === undefined, 3000, 'kicked after the session');
+  });
+
+  it('"Back to lobby" mid-session settles the felt and reports the session before the lobby', async () => {
+    const outcomes: GameOutcome[] = [];
+    const stop = onOutcome((o, ctx: OutcomeContext) => void (ctx.gameId === 'dasino' && outcomes.push(o)));
+    try {
+      const { host, guest } = await startSession();
+      // A settled slot spin, then chips left in an open roulette window.
+      guest.room.send(DASINO_MSG.spin, { lineBet: 5, lines: 5 });
+      await waitFor(() => seatOf(guest).spins === 1, 3000, 'spin settled');
+      guest.room.send(DASINO_MSG.rouletteBet, { spot: 'red', amount: 100 });
+      await waitFor(() => seatOf(guest).inPlay === 100, 3000, 'bet placed');
+      const expected = seatOf(guest).balance + 100;
+      const hostBalance = seatOf(host).balance;
+      host.room.send('lobby:toLobby', {});
+      await waitFor(() => view(host).phase === 'LOBBY', 3000, 'lobby');
+      await waitFor(() => outcomes.length === 1, 2000, 'outcome');
+      expect(outcomes[0]!.placements.flat().sort()).toEqual([host.me().playerId, guest.me().playerId].sort());
+      // The open window was handed back before the session was reported.
+      expect(outcomes[0]!.scores).toEqual({ [host.me().playerId]: hostBalance, [guest.me().playerId]: expected });
+      expect(outcomes[0]!.reason).toBe('session_closed');
+    } finally {
+      stop();
+    }
+  });
+
+  it('a spectator can take a free seat mid-session (a returning guest keeps their chips)', async () => {
+    const { host, guest, server } = await startSession();
+    const rail = await ready(wire(await colyseus.sdk.joinById(host.room.roomId, { name: 'Rail', guestId: 'guest-rail', spectator: true })));
+    expect(view(host).seats[rail.me().playerId]).toBeUndefined();
+    rail.room.send(DASINO_MSG.rouletteBet, { spot: 'red', amount: 10 });
+    await errorFor(rail, DASINO_MSG.rouletteBet, 'not_allowed');
+    rail.room.send(DASINO_MSG.sit, {});
+    await waitFor(() => Boolean(view(host).seats[rail.me().playerId]), 3000, 'rail seated');
+    expect(view(host).players[rail.me().playerId]!.spectator).toBe(false);
+    expect(view(host).seats[rail.me().playerId]!.balance).toBe(server.state.seats.get(host.me().playerId)!.credited);
+    rail.room.send(DASINO_MSG.rouletteBet, { spot: 'red', amount: 10 });
+    await waitFor(() => view(rail).seats[rail.me().playerId]!.inPlay === 10, 3000, 'rail bets');
+    // Already seated: refused.
+    guest.room.send(DASINO_MSG.sit, {});
+    await errorFor(guest, DASINO_MSG.sit, 'not_allowed');
+
+    // A full floor: the seat has to be free.
+    host.room.send(DASINO_MSG.endSession, {});
+    await waitFor(() => view(host).phase === 'RESULTS', 3000, 'results');
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => view(host).phase === 'LOBBY', 3000, 'lobby');
+    host.room.send('lobby:room', { maxPlayers: 3 });
+    await waitFor(() => view(host).maxPlayers === 3, 3000, 'max 3');
+    host.room.send('lobby:start', {});
+    await waitFor(() => view(host).phase === 'PLAYING', 3000, 'playing again');
+    const late = await ready(wire(await colyseus.sdk.joinById(host.room.roomId, { name: 'Late', guestId: 'guest-late', spectator: true })));
+    late.room.send(DASINO_MSG.sit, {});
+    await errorFor(late, DASINO_MSG.sit, 'not_allowed');
+    expect(view(host).seats[late.me().playerId]).toBeUndefined();
   });
 });

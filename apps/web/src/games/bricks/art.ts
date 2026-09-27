@@ -112,11 +112,14 @@ export class BricksRenderer {
         case 'launch':
           sound('launch');
           break;
-        case 'miss':
-          this.flash = 1;
+        case 'miss': {
+          // The red life-lost flash tints the whole field: none with effects off or reduced motion.
+          const fx = fxSettings();
+          this.flash = fx.reducedMotion || fx.fx === 'off' ? 0 : fx.fx === 'low' ? 0.5 : 1;
           this.shake.kick(6);
           sound('lifelost');
           break;
+        }
         case 'life':
           this.popups.add(FIELD_W / 2, FIELD_H / 2, '+1 LIFE', '#ffd23f', 18, 1.2);
           sound('record');

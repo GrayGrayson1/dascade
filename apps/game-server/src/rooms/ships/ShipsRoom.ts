@@ -73,6 +73,9 @@ import {
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
 import { ShipsLogEntry, ShipsShot, ShipsSide, ShipsState, ShipsVessel } from './ShipsState.ts';
 
+/** Max rematch offers per captain per results screen (anti-spam on top of the rate limit). */
+const MAX_REMATCH_OFFERS = 4;
+
 /** Pacing (ms). Instance-level so integration tests can speed the room up. */
 export interface ShipsTiming {
   /** Pause on the final volley (fleets revealed) before the results screen. */
@@ -113,6 +116,8 @@ export class ShipsRoom extends BaseGameRoom<ShipsState, ShipsSettings> {
   private boards = new Map<string, Board>();
   /** Captain who fired first last game (rematches alternate). */
   private lastFirst = '';
+  /** Rematch offers per captain on this results screen (anti-spam, like the Boardroom kit). */
+  private rematchOffers = new Map<string, number>();
   private setupDone = false;
 
   protected defaultSettings(): ShipsSettings {
@@ -213,6 +218,7 @@ export class ShipsRoom extends BaseGameRoom<ShipsState, ShipsSettings> {
     st.endReason = '';
     st.log.clear();
     st.rematch.clear();
+    this.rematchOffers.clear();
   }
 
   private setupMatch(): void {
@@ -596,11 +602,19 @@ export class ShipsRoom extends BaseGameRoom<ShipsState, ShipsSettings> {
     const opp = this.opponentOf(p.id);
     const oppRec = opp ? this.getPlayer(opp) : undefined;
     if (want && (!oppRec || oppRec.state.spectator)) return this.reject(p, SHIPS_MSG.rematch, 'not_allowed', 'Your opponent has left.');
+    if (want && !oppRec?.client) return this.reject(p, SHIPS_MSG.rematch, 'not_allowed', 'Your opponent is not connected right now.');
     const list = this.state.rematch;
     const idx = list.indexOf(p.id);
-    if (want && idx < 0) list.push(p.id);
-    if (!want && idx >= 0) list.splice(idx, 1);
-    if (want && idx < 0 && list.length < 2) this.systemChat(`${p.state.name} wants a rematch.`);
+    if (want && idx >= 0) return;
+    if (want) {
+      // Toggling the offer on and off must not flood the chat: a few offers per results screen,
+      // and only the first one is announced.
+      const offers = this.rematchOffers.get(p.id) ?? 0;
+      if (offers >= MAX_REMATCH_OFFERS) return this.reject(p, SHIPS_MSG.rematch, 'rate_limited', 'That is enough rematch offers for now.');
+      this.rematchOffers.set(p.id, offers + 1);
+      list.push(p.id);
+      if (offers === 0 && list.length < 2) this.systemChat(`${p.state.name} wants a rematch.`);
+    } else if (idx >= 0) list.splice(idx, 1);
     if (list.length === 2 && this.duel.every((id) => list.includes(id))) {
       this.systemChat('Rematch! Same waters, fresh fleets.');
       this.returnToLobby();

@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type HTMLAttributes,
@@ -13,6 +14,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { AVATAR_ART, ICONS, PALETTE, artToRects, type IconName } from '../icons.ts';
+import { clampNumber, resolveNumberDraft } from './numberDraft.ts';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -278,27 +280,84 @@ export interface NumberInputProps extends Omit<InputHTMLAttributes<HTMLInputElem
   step?: number;
 }
 
-/** Numeric input that clamps on blur and never emits NaN. */
-export function NumberInput({ value, onChange, min, max, step = 1, className, ...rest }: NumberInputProps) {
-  const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
+/**
+ * Numeric input that never emits NaN. While the player types it shows their draft — the `value`
+ * prop (often server state echoing every change back, clamped) must not rewrite a half-typed number
+ * ("1" on the way to "12") — and commits the clamped value on blur, Enter, or a tap anywhere else
+ * (iOS doesn't blur the field when a button is tapped). Arrow keys and the spinner commit each step
+ * right away; Escape discards the draft.
+ */
+export function NumberInput({ value, onChange, min, max, step = 1, className, onBlur, onKeyDown, ...rest }: NumberInputProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const draftRef = useRef<string | null>(null);
+  const stepping = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const setText = (text: string | null) => {
+    draftRef.current = text;
+    setDraft(text);
+  };
+  const emit = (n: number) => {
+    const next = clampNumber(n, min, max);
+    if (next !== value) onChange(next);
+  };
+  // Latest-render commit for the document listener below.
+  const commitRef = useRef<() => void>(() => undefined);
+  commitRef.current = () => {
+    const text = draftRef.current;
+    if (text === null) return;
+    setText(null);
+    const next = resolveNumberDraft(text, min, max);
+    if (next !== null && next !== value) onChange(next);
+  };
+  const editing = draft !== null;
+  useEffect(() => {
+    if (!editing) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && inputRef.current?.contains(e.target)) return;
+      commitRef.current();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [editing]);
+
   return (
     <input
       type="number"
       inputMode="numeric"
+      {...rest}
+      ref={inputRef}
       className={cx('dc-input', 'dc-num', className)}
-      value={Number.isFinite(value) ? value : ''}
+      value={draft ?? (Number.isFinite(value) ? value : '')}
       min={min}
       max={max}
       step={step}
       onChange={(e) => {
-        const n = e.currentTarget.valueAsNumber;
-        if (Number.isFinite(n)) onChange(n);
+        const el = e.currentTarget;
+        const inputType = (e.nativeEvent as Partial<InputEvent>).inputType;
+        const typed = !stepping.current && typeof inputType === 'string' && inputType !== '';
+        stepping.current = false;
+        if (typed) {
+          setText(el.value);
+          return;
+        }
+        // Arrow key / spinner step: a complete value.
+        setText(null);
+        const n = el.valueAsNumber;
+        if (Number.isFinite(n)) emit(n);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          // The browser steps (and fires `input`) as this key's default action, in this same task.
+          stepping.current = true;
+          setTimeout(() => (stepping.current = false), 0);
+        } else if (e.key === 'Enter') commitRef.current();
+        else if (e.key === 'Escape' && draftRef.current !== null) setText(null);
+        onKeyDown?.(e);
       }}
       onBlur={(e) => {
-        const n = e.currentTarget.valueAsNumber;
-        onChange(clamp(Number.isFinite(n) ? n : (min ?? 0)));
+        commitRef.current();
+        onBlur?.(e);
       }}
-      {...rest}
     />
   );
 }

@@ -242,7 +242,7 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
         swatch={<ChessPiece kind="k" color={sideColor(side)} />}
         active={live && state.turn === side}
         isYou={mySide === side}
-        connected={player ? player.connected : true}
+        connected={seat?.playerId ? Boolean(player?.connected) : true}
         showDelta={state.result.over && state.rated}
         captured={<Captured fen={ctl.fen} color={sideColor(side)} />}
         clock={<BoardClock clock={state.clock} side={side} owner={SIDE_LABEL(side)} size={compact ? 'md' : 'lg'} />}

@@ -9,14 +9,20 @@ import '@dascade/ui/styles.css';
 import './styles/app.css';
 import { activeThemeId, listThemes, readThemeTokens, registerTheme, type ThemeDefinition, type ThemeTokens } from '@dascade/ui';
 import { App } from './app/App.tsx';
+import { installChunkReload } from './app/chunkReload.ts';
 import { applyDocumentSettings, useApp } from './app/store.ts';
 import { initPersistence } from './persistence/index.ts';
 import { installAudio } from './audio/audio.ts';
 import { loadThemeSkinWithin, loadedSkin } from './themes/registry.ts';
 import { switchTheme } from './themes/controller.ts';
 
-// Theme + fx + reduced motion on <html> before the first render (the stored theme id is read
-// synchronously, so a non-default theme never flashes Delta Neon first).
+// A tab left open across a deploy asks for chunk hashes that no longer exist: reload once to pick
+// up the new build instead of crashing on the next lazy screen (see app/chunkReload.ts).
+installChunkReload();
+
+// Theme + fx + reduced motion on <html> before the first render (locally stored settings are read
+// synchronously, so a non-default theme never flashes Delta Neon first and mute / fx / reduced motion
+// apply from the first frame — hydrate() only reconciles with the remote copy later).
 applyDocumentSettings(useApp.getState().settings);
 installAudio();
 

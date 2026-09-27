@@ -1,13 +1,14 @@
 /**
  * DASCADE Jukebox UI root — mounted once in App.tsx (inside the router, outside <Routes>), lazily.
  * The engine (apps/web/src/audio/jukebox) owns playback and outlives every route; this is only the
- * face: the dock (collapsed mini player), the expanded player and a polite live region.
+ * face: the dock (the physical jukebox on the arcade floor, a compact control elsewhere), the
+ * expanded player (the machine up close) and a polite live region.
  * A crash anywhere in here renders nothing — the arcade never depends on the jukebox.
  */
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { installJukebox, jukebox, useJukebox } from '../audio/jukebox/index.ts';
-import { Dock, type DockInfo } from './Dock.tsx';
+import { Dock, type DockInfo, type DockOpener } from './Dock.tsx';
 import { Player, type PlayerAnchor } from './Player.tsx';
 import './jukebox.css';
 
@@ -60,6 +61,8 @@ function JukeboxUi() {
   const { pathname } = useLocation();
   const [everOpened, setEverOpened] = useState(expanded);
   const [dock, setDock] = useState<DockInfo>({ kind: 'float', corner: 'br' });
+  /** The player rises from the floor machine when that's what opened it, else it anchors to the control. */
+  const [openedFrom, setOpenedFrom] = useState<DockOpener>('control');
   const [message, setMessage] = useState('');
   const returnFocus = useRef<HTMLElement | null>(null);
   const inRoom = pathname.startsWith('/room/') || room !== null;
@@ -94,17 +97,32 @@ function JukeboxUi() {
     // Back to where the user came from, else the dock's open button (if it's visible).
     const target = returnFocus.current?.isConnected
       ? returnFocus.current
-      : document.querySelector<HTMLElement>('[data-jukebox] [data-part="mini-open"]');
+      : document.querySelector<HTMLElement>('[data-jukebox] :is([data-part="mini-open"], [data-part="machine-open"])');
     returnFocus.current = null;
     target?.focus({ preventScroll: true });
   }, []);
 
-  const toggle = useCallback(() => (useJukebox.getState().expanded ? close() : open()), [open, close]);
+  const toggle = useCallback(
+    (from: DockOpener) => {
+      if (useJukebox.getState().expanded) return close();
+      setOpenedFrom(from);
+      open();
+    },
+    [open, close],
+  );
 
   return (
     <>
       <Dock expanded={expanded} onToggleOpen={toggle} onDock={setDock} />
-      {everOpened ? <Player open={expanded} anchor={anchorFor(dock)} inRoom={inRoom} onClose={close} announce={announce} /> : null}
+      {everOpened ? (
+        <Player
+          open={expanded}
+          anchor={openedFrom === 'machine' ? 'floor' : anchorFor(dock)}
+          inRoom={inRoom}
+          onClose={close}
+          announce={announce}
+        />
+      ) : null}
       <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-jukebox-live="">
         {message}
       </div>

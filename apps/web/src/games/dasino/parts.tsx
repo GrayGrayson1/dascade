@@ -95,7 +95,20 @@ export function TableNav({ state, seated }: { state: DasinoPublicState; seated: 
 // ---------------------------------------------------------------------------
 // HUD: balance + net + refill + close floor
 // ---------------------------------------------------------------------------
-export function BalanceHud({ seat, settings, isHost, spectator }: { seat: DasinoSeatView | undefined; settings: DasinoSettings; isHost: boolean; spectator: boolean }) {
+export function BalanceHud({
+  seat,
+  settings,
+  isHost,
+  spectator,
+  canSit = false,
+}: {
+  seat: DasinoSeatView | undefined;
+  settings: DasinoSettings;
+  isHost: boolean;
+  spectator: boolean;
+  /** A seat is free for this spectator to take. */
+  canSit?: boolean;
+}) {
   const freeze = useDasinoUi((s) => s.freeze);
   const balance = seat ? (freeze ?? seat.balance) : settings.startingBalance;
   const shown = useTween(balance);
@@ -105,9 +118,24 @@ export function BalanceHud({ seat, settings, isHost, spectator }: { seat: Dasino
   return (
     <div className="dn-hud__right">
       {spectator ? (
-        <Badge icon="eye" color="var(--purple)">
-          Spectating
-        </Badge>
+        <>
+          <Badge icon="eye" color="var(--purple)">
+            Spectating
+          </Badge>
+          {canSit ? (
+            <Button
+              size="sm"
+              variant="gold"
+              icon="chip"
+              onClick={() => {
+                play('coin');
+                session.send(DASINO_MSG.sit, {});
+              }}
+            >
+              Take a seat
+            </Button>
+          ) : null}
+        </>
       ) : (
         <>
           <div className="dn-balance" aria-live="polite" aria-label={`Balance ${fmt(balance)} virtual chips`}>

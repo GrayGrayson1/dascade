@@ -45,21 +45,46 @@ function canEditRoomProfile(): boolean {
   return phase === 'LOBBY' || phase === 'RESULTS';
 }
 
+/** Tournament players keep their registered names (the server refuses renames in match rooms). */
+function canRenameInRoom(): boolean {
+  return canEditRoomProfile() && !getStateSnapshot()?.tournamentJson;
+}
+
+/**
+ * Commits the nickname being typed (if any) and passes it on to the current room where the server
+ * allows. Create / join call this before connecting: on iOS a tap on a button doesn't blur the field,
+ * so the blur commit never ran. Returns whether the profile now has a name.
+ */
+export function commitProfileName(): boolean {
+  const app = useApp.getState();
+  const before = app.profile.name;
+  const confirmed = app.commitNameDraft();
+  const after = useApp.getState().profile.name;
+  if (after !== before && canRenameInRoom()) session.lobby.profile({ name: after });
+  return confirmed;
+}
+
 // ---------------------------------------------------------------------------
 export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean; onSubmit?: () => void }) {
   const profile = useApp((s) => s.profile);
+  const draft = useApp((s) => s.nameDraft);
+  const setNameDraft = useApp((s) => s.setNameDraft);
   const updateProfile = useApp((s) => s.updateProfile);
-  const [name, setName] = useState(profile.name);
+  // The typed name lives in the store (shared by every editor on screen) so Create / Join can enable
+  // from it and commit it themselves.
+  const name = draft ?? profile.name;
   // Unique ids: the editor can be on screen twice (entry card + settings modal).
   const hintId = useId();
   const avatarLabelId = useId();
-  useEffect(() => setName(profile.name), [profile.name]);
-  const commit = () => {
-    if (name.trim() && name.trim() !== profile.name) {
-      updateProfile({ name });
-      if (canEditRoomProfile()) session.lobby.profile({ name });
-    }
-  };
+  const commit = () => void commitProfileName();
+  // An edit still pending when the editor goes away (e.g. a modal closed with a tap, which doesn't
+  // blur on iOS) is kept rather than silently dropped.
+  useEffect(
+    () => () => {
+      if (useApp.getState().nameDraft !== null) commitProfileName();
+    },
+    [],
+  );
   return (
     <div className="profile-editor" data-part="profile-editor">
       {!compact ? (
@@ -75,7 +100,7 @@ export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean
           maxLength={LIMITS.nickname}
           placeholder="Pick a nickname"
           autoComplete="nickname"
-          onChange={(e) => setName(e.currentTarget.value)}
+          onChange={(e) => setNameDraft(e.currentTarget.value)}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -354,37 +379,117 @@ export function LeaveButton({
   compact,
   className,
   collapseLabel,
+  popover,
 }: {
   size?: 'sm' | 'md' | 'lg';
   compact?: boolean;
   className?: string;
   /** Wrap the label so a layout can hide it visually (it stays the accessible name). */
   collapseLabel?: boolean;
+  /**
+   * Confirm in a small popover anchored below / above the button instead of swapping it for two
+   * buttons inline — for tight bars (the top bar, the lobby's sticky action bar on phones).
+   */
+  popover?: 'below' | 'above';
 }) {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const stayRef = useRef<HTMLButtonElement>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
   // Tournament match rooms lead back to the kiosk (the kiosk itself to the Tournament Center landing).
   const tournament = useTournamentExit();
   const label = tournament ? 'Leave match' : 'Leave room';
   const leave = () => leaveRoomTo(navigate, tournament);
-  if (confirming) {
+  const stay = () => {
+    setConfirming(false);
+    // Back to the trigger (inline confirms replace it, so it's focused once it's rendered again).
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!confirming) return;
+    // Focus the safe choice (the trigger just unmounted / the popover just opened: never leave focus on <body>).
+    stayRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setConfirming(false);
+      requestAnimationFrame(() => triggerRef.current?.focus());
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (wrapRef.current && e.target instanceof Node && !wrapRef.current.contains(e.target)) setConfirming(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer, true);
+    };
+  }, [confirming]);
+
+  const confirmButtons = (
+    <>
+      <Button size={size === 'lg' ? 'md' : 'sm'} variant="danger" onClick={leave}>
+        {label}
+      </Button>
+      <Button ref={stayRef} size={size === 'lg' ? 'md' : 'sm'} variant="ghost" onClick={stay}>
+        Stay
+      </Button>
+    </>
+  );
+
+  if (confirming && !popover) {
     return (
-      <span className={cx('dc-row', className)} role="group" aria-label="Confirm leave">
-        <Button size={size === 'lg' ? 'md' : 'sm'} variant="danger" onClick={leave}>
-          {label}
-        </Button>
-        <Button size={size === 'lg' ? 'md' : 'sm'} variant="ghost" onClick={() => setConfirming(false)}>
-          Stay
-        </Button>
+      <span ref={wrapRef} className={cx('dc-row', className)} role="group" aria-label="Confirm leave">
+        {confirmButtons}
       </span>
     );
   }
-  return compact ? (
-    <IconButton icon="leave" label={label} className={className} onClick={() => setConfirming(true)} />
+  const trigger = compact ? (
+    <IconButton
+      ref={triggerRef}
+      icon="leave"
+      label={label}
+      className={popover ? undefined : className}
+      onClick={() => setConfirming(true)}
+    />
   ) : (
-    <Button size={size} variant="ghost" icon="leave" className={className} onClick={() => setConfirming(true)}>
+    <Button
+      ref={triggerRef}
+      size={size}
+      variant="ghost"
+      icon="leave"
+      className={popover ? undefined : className}
+      onClick={() => setConfirming(true)}
+    >
       {collapseLabel ? <span className="dc-collapse-label">Leave</span> : 'Leave'}
     </Button>
+  );
+  if (!popover) return trigger;
+  // While the popover is open the trigger steps aside for a look-alike placeholder (so the bar keeps its
+  // layout and there is exactly one "Leave room" button — the confirming one); tapping it cancels.
+  const placeholder = (
+    <span
+      className={cx('dc-btn', 'dc-btn--ghost', compact ? 'dc-btn--icon' : size !== 'md' && `dc-btn--${size}`, 'leave-confirm__trigger')}
+      data-active="true"
+      aria-hidden
+      onClick={stay}
+    >
+      <PixelIcon name="leave" size={compact ? 20 : undefined} />
+      {compact ? null : collapseLabel ? <span className="dc-collapse-label">Leave</span> : 'Leave'}
+    </span>
+  );
+  return (
+    <span ref={wrapRef} className={cx('leave-confirm', className)} data-part="leave-confirm" data-placement={popover}>
+      {confirming ? placeholder : trigger}
+      {confirming ? (
+        <span className="leave-confirm__pop dc-panel" role="group" aria-label="Confirm leave" data-part="leave-confirm-popover">
+          <span className="leave-confirm__text">{tournament ? 'Leave this match?' : 'Leave this room?'}</span>
+          <span className="leave-confirm__actions">{confirmButtons}</span>
+        </span>
+      ) : null}
+    </span>
   );
 }
 

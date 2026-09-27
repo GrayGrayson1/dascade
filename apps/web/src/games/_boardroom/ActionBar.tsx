@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { boardMsg, otherSide, type BoardRoomView, type BoardSide } from '@dascade/shared/games/boardroom';
 import { Button, IconButton, PixelIcon, cx, type IconName } from '@dascade/ui';
 import { useCountdown } from '../../net/hooks.ts';
+import { serverNow } from '../../net/session.ts';
 import type { Boardroom } from './useBoardroom.ts';
 
 export interface BoardActionBarProps<S extends BoardRoomView> {
@@ -55,7 +56,9 @@ export function BoardActionBar<S extends BoardRoomView>({
   // Untimed games: once the side to move has been idle long enough, the waiting player may claim the win.
   const idleWatch = live && mySide !== null && !state.clock.enabled && state.idleClaimAt > 0;
   const claimIn = useCountdown(idleWatch ? state.idleClaimAt : 0);
-  const claimable = idleWatch && claimIn === 0;
+  // The countdown's state lags one render behind a new idleClaimAt (it reads 0 until its effect runs),
+  // so also check the deadline itself — otherwise "Claim win" flashes at the start of every turn.
+  const claimable = idleWatch && claimIn === 0 && serverNow() >= state.idleClaimAt;
   const canClaim = claimable && state.turn !== mySide && waitingFrom !== state.idleClaimAt;
   const beingClaimed = claimable && state.turn === mySide;
 

@@ -39,6 +39,10 @@ apps/web/src/app/settings.ts             settings.theme + versioned, fail-safe m
 
 ### Boot and switching
 
+0. `index.html` loads `/boot-theme.js` (a tiny classic script in `apps/web/public/`) before the app:
+   it reads the stored theme id and sets `data-theme`, the page background and `theme-color`, so even
+   the very first paint (and a phone's browser chrome) is in the right colours. Its small id → colours
+   map must match the theme definitions (`themes/boot-theme.test.ts` fails until it does).
 1. `main.tsx` calls `applyDocumentSettings()` before React renders: the stored theme id is read
    synchronously (`peekStoredTheme`) and `applyTheme()` injects its token CSS, so tokens never flash.
 2. It then waits for the stored theme's **skin** chunk — at most **800 ms** (`loadThemeSkinWithin`) —
@@ -181,7 +185,18 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   `pointer-events: none` + `aria-hidden`. Pause when the tab is hidden (reuse `addFrameJob` from
   `apps/web/src/arcade/scheduler.ts`), static at fx MINIMAL / reduced motion, subtle in games.
 - **FloorDecor**: rendered in the floor's `[data-part=floor-decor]` slot (over the room, under the
-  carousel). **JukeboxDecor**: inside the expanded jukebox.
+  carousel). **JukeboxDecor**: inside the expanded jukebox's now-playing screen.
+- **The jukebox is a physical machine in every theme.** On the floor it stands in the corner
+  (`[data-dock=floor]`, `[data-part=machine-open]`, art classes `.jbf-*`): its body uses the theme's
+  `--cabinet-*` tokens and its lights `--jb-accent` / `--jb-accent-2`. Up close (the expanded player),
+  the arched dome glass with the record (`[data-part=dome-glass]`, `[data-part=record]`) sits on top of
+  the now-playing screen (`[data-part=display]`, which keeps whatever shape the skin gives it), with
+  bubble-tube pillars (`.jb-pillar`), selector keys and title strips (`[data-part=track]`, one per
+  song with its `data-code`) and a plinth (`[data-part=plinth]`). Its physical materials keep their own
+  colours in every theme (chrome, black vinyl, cream strip paper and ink, the dark grille); tune them
+  with `--jb-chrome-hi/-lo/-ink`, `--jb-vinyl`, `--jb-strip-bg/-fg/-muted/-lit/-band/-band-2` and the
+  dome's `--jb-arch` rather than overriding colours on the parts. The quick control (`[data-part=mini-open]`,
+  `[data-part=mini]`) is the small button in the floor HUD, top bar or shell menu.
 - Decor components are wrapped in an error boundary: a crash renders nothing instead of breaking the app.
 
 ## Adding a theme end to end
@@ -191,7 +206,8 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
    `materials` set, optional `gameMaterials`, `effects`, `copy`, `overrides`, `renderer`. Add it to
    `BUILT_IN_THEMES`.
 2. **Skin**: `apps/web/src/themes/<id>/{index.ts,skin.css}` and register the loader in
-   `apps/web/src/themes/registry.ts`; add its keyframe alias to `KEYFRAME_ALIASES`.
+   `apps/web/src/themes/registry.ts`; add its keyframe alias to `KEYFRAME_ALIASES`. Add its page
+   background / `theme-color` to the map in `apps/web/public/boot-theme.js`.
 3. **Test**: `pnpm vitest run packages/ui/src/theme apps/web/src/themes` (validation, materials, effects,
    copy keys, scoping lint, loader, switcher) and `e2e/theme.spec.ts` (iterates every theme id).
 4. **Look at it** at 1920×1080, 1440×900, 1024×768, 768×1024, 390×844 and 844×390, with fx

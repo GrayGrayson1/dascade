@@ -323,18 +323,34 @@ describe('day vote', () => {
     expect(g.runoff).toBeNull();
   });
 
-  it('voids votes for a player who leaves mid-vote (and refunds a Sudo vote)', () => {
+  it('voids votes for a player who leaves mid-vote without un-marking their voters (and refunds a Sudo vote)', () => {
     const g = fresh();
     g.beginVote();
     g.castVote('su', 's3', { ...VOTE, sudo: true });
     g.castVote('s1', 's3', VOTE);
+    g.castVote('s2', 'g1', VOTE);
     g.castVote('s3', 'g1', VOTE);
     g.eliminate('s3', 'left');
-    expect(g.hasVoted('su')).toBe(false);
-    expect(g.sudoUsed('su')).toBe(false);
-    expect(g.hasVoted('s1')).toBe(false);
+    // Who has voted is public: voters for the leaver still count as having voted…
+    expect(g.hasVoted('su')).toBe(true);
+    expect(g.hasVoted('s1')).toBe(true);
     expect(g.hasVoted('s3')).toBe(false);
+    // …but privately their ballot is void: the Sudo is refunded and they may vote again.
+    expect(g.voteOf('s1')).toBeNull();
+    expect(g.voteOf('su')).toBeNull();
+    expect(g.sudoUsed('su')).toBe(false);
+    expect(g.voteOf('s2')).toEqual({ target: 'g1', sudo: false });
+    expect(g.castVote('s2', 'g2', VOTE)).toMatchObject({ ok: false, code: 'already_voted' });
     expect(g.castVote('s1', 'g1', VOTE)).toEqual({ ok: true });
+    expect(g.castVote('s1', 'g2', VOTE)).toMatchObject({ ok: false, code: 'already_voted' });
+    // A void ballot left as it is counts as an abstention.
+    const voters = g.alive().length;
+    const out = g.resolveVote(RULES);
+    expect(out.lines.map((l) => l.voterId).sort()).toEqual(['s1', 's2']);
+    expect(out.tally).toEqual([{ target: 'g1', votes: 2 }]);
+    expect(out.abstained).toBe(voters - 2);
+    expect(out.outcome).toBe('disconnected');
+    expect(out.playerId).toBe('g1');
   });
 });
 

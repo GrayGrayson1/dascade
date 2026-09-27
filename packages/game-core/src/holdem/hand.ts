@@ -574,7 +574,10 @@ export function resolveShowdown(h: HandState, policy: RevealPolicy = 'all'): Han
   awards.forEach((award, i) => {
     const potName = awards.length === 1 ? 'the pot' : i === 0 ? 'the main pot' : `side pot ${i}`;
     const contenders = award.eligible.filter((s) => evals.has(s));
-    const losers = contenders.filter((s) => !award.winners.includes(s)).sort((a, b) => evals.get(b)!.score - evals.get(a)!.score);
+    // Only tabled hands may explain a win: a kicker note measured against a mucked hand would leak it.
+    const losers = contenders
+      .filter((s) => !award.winners.includes(s) && mustShow(s))
+      .sort((a, b) => evals.get(b)!.score - evals.get(a)!.score);
     const bestLoser = losers.length ? evals.get(losers[0]!)! : null;
     for (const share of award.shares) {
       const hand = evals.get(share.seat)!;

@@ -184,6 +184,48 @@ describe('mixer', () => {
     expect(jukeboxDuckBase(S({ muted: true }), PLAYING, true)).toBe(1);
   });
 
+  it("a hold that starts or ends inside a dip's release window wins over the dip's stale release", () => {
+    const m = make();
+    const ctx = m.ensureContext() as unknown as FakeAudioContext;
+    const duck = gainOf(m.buses()!.jukeboxDuck);
+    // The level the stage settles on: the setTargetAtTime event that starts last (ties: inserted last).
+    const resting = () => {
+      let best: [string, number, number, number?] | null = null;
+      for (const c of duck.calls) if (c[0] === 'target' && (!best || c[2] >= best[2])) best = c;
+      return best?.[1];
+    };
+    m.setSettings(S());
+    m.setJukeboxFlags(PLAYING);
+    ctx.currentTime = 1;
+    m.sfxPriority(); // dip now, release to 1 at 1.12
+    ctx.currentTime = 1.05;
+    m.sfxHold('engine', true);
+    expect(resting()).toBe(SFX_HOLD_LEVEL); // not the stale release to 1
+    ctx.currentTime = 2;
+    m.sfxPriority(); // dip, release to the hold level at 2.12
+    ctx.currentTime = 2.05;
+    m.sfxHold('engine', false);
+    expect(resting()).toBe(1); // not stuck at the hold level (≈ −5 dB)
+    // Outside any release window the change starts right away.
+    ctx.currentTime = 5;
+    m.sfxHold('engine', true);
+    expect(duck.calls.at(-1)).toEqual(['target', SFX_HOLD_LEVEL, 5, expect.any(Number)]);
+  });
+
+  it('reports context state changes (suspended by the OS, running again)', async () => {
+    const m = make();
+    const seen: boolean[] = [];
+    const off = m.onStateChange(() => seen.push(m.isRunning()));
+    const ctx = m.ensureContext() as unknown as FakeAudioContext;
+    await m.resume();
+    ctx.setState('suspended');
+    await m.resume();
+    expect(seen).toEqual([true, false, true]);
+    off();
+    ctx.setState('suspended');
+    expect(seen).toHaveLength(3);
+  });
+
   it('routes a media element once (idempotent), only when running, and remembers refusals', async () => {
     const m = make();
     const el = {} as HTMLMediaElement;

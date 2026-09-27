@@ -3,7 +3,7 @@
  * radius of half its width). Equal masses, positional separation split evenly, and
  * an impulse with restitution + a touch of spin for off-centre hits.
  */
-import { closestSegSeg, f32 } from './math.ts';
+import { closestSegSeg, dcos, dhypot, dsin, f32 } from './math.ts';
 import type { CarSpec, CarState } from './car.ts';
 
 export const COLLISION = {
@@ -27,8 +27,8 @@ export interface CollisionResult {
 function capsule(state: CarState, spec: CarSpec): { px: number; py: number; qx: number; qy: number; r: number } {
   const r = spec.width / 2;
   const half = Math.max(0, spec.length / 2 - r);
-  const fx = Math.cos(state.heading);
-  const fy = Math.sin(state.heading);
+  const fx = dcos(state.heading);
+  const fy = dsin(state.heading);
   return { px: state.x - fx * half, py: state.y - fy * half, qx: state.x + fx * half, qy: state.y + fy * half, r };
 }
 
@@ -48,17 +48,17 @@ export function collideCars(a: CarState, sa: CarSpec, b: CarState, sb: CarSpec):
   const pby = cb.py + (cb.qy - cb.py) * t;
   let nx = pbx - pax;
   let ny = pby - pay;
-  let dist = Math.hypot(nx, ny);
+  let dist = dhypot(nx, ny);
   const radii = ca.r + cb.r;
   if (dist >= radii) return null;
   if (dist < 1e-6) {
     // Perfectly overlapping axes: push apart along the line between centres (or sideways).
     nx = dx0;
     ny = dy0;
-    dist = Math.hypot(nx, ny);
+    dist = dhypot(nx, ny);
     if (dist < 1e-6) {
-      nx = -Math.sin(a.heading);
-      ny = Math.cos(a.heading);
+      nx = -dsin(a.heading);
+      ny = dcos(a.heading);
       dist = 1;
     }
     nx /= dist;

@@ -14,6 +14,10 @@
  *  - Reduced motion: no 3D sweep — moves are instant.
  * Motion is driven by a spring written straight to the DOM (no React renders
  * per frame). No game module or engine is imported here.
+ *
+ * The jukebox has its own corner: on wider floors the lineup keeps clear of the
+ * left end, where [data-jukebox-slot="floor"] is laid out on the row's floor line
+ * and the jukebox UI stands its physical machine (jukebox/FloorJukebox.tsx).
  */
 import {
   useCallback,
@@ -35,6 +39,7 @@ import { ArcadeFooter, ArcadeHeader, useServerStatus } from './ArcadeHud.tsx';
 import { ArcadeRoom, type RoomSize } from './ArcadeRoom.tsx';
 import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
+import { JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
   WheelStepper,
   clampIndex,
@@ -500,8 +505,15 @@ export function ArcadeFloor() {
       const faceW = Math.max(56, Math.min(byHeight, W * (phone ? 0.46 : 0.27), 340));
       const cabW = (faceW * CAB_W) / FACE_W;
       const cabH = (cabW * CAB_H) / CAB_W;
-      // Wide stages keep a margin at each end for the room's claw machine and change machine (and the arrows).
-      const margin = W >= 1600 ? Math.min(200, W * 0.1) : 0;
+      // The jukebox stands in the room's left corner, on the row's floor line (a little shorter than a
+      // cabinet); phones and short floors have no free corner, so it stays a compact control there.
+      const jukebox = !phone && W >= 900 && H >= 420;
+      const jbH = jukebox ? Math.round(Math.min(cabH * 0.66, H - plateH - bottomPad - 24)) : 0;
+      const jbW = Math.round((jbH * JUKEBOX_W) / JUKEBOX_H);
+      const jbGap = Math.round(Math.max(14, W * 0.012));
+      // Wide stages keep a margin at each end for the room's claw machine and change machine (and the
+      // arrows); the jukebox's corner widens it where the machine needs more room.
+      const margin = Math.max(W >= 1600 ? Math.min(200, W * 0.1) : 0, jukebox ? jbW + jbGap * 2 : 0);
       const fit = lineupFit((W / 2 - margin) / faceW, COUNT);
       const m: Metrics = {
         W,
@@ -533,12 +545,25 @@ export function ArcadeFloor() {
       setVar(stage, '--arrow-inset', `${Math.round(margin ? Math.max(10, W / 2 - reach - 58) : 10)}px`);
       // With the room's floor props showing, the arrows float higher (level with the marquees) to stay clear of them.
       setVar(stage, '--arrow-top', margin ? `${Math.round(m.baseY - cabH * 0.86)}px` : '46%');
+      // The jukebox's corner: centred in the free floor left of the lineup, standing on the row's floor line.
+      stage.dataset.jukebox = jukebox ? 'floor' : 'none';
+      if (jukebox) {
+        const free = W / 2 - reach;
+        setVar(stage, '--jbx-x', `${Math.round(Math.max(jbGap, (free - jbW) / 2))}px`);
+        setVar(stage, '--jbx-top', `${Math.round(m.baseY - jbH)}px`);
+        setVar(stage, '--jbx-w', `${jbW}px`);
+        setVar(stage, '--jbx-h', `${jbH}px`);
+        setVar(stage, '--jbx-plate', `${Math.max(plateH, 36)}px`);
+      }
       const hints = {
         headerBottom: header ? header.getBoundingClientRect().bottom - mr.top : 64,
         rowTop: sr.top - mr.top + m.baseY - cabH,
         rowBottom: sr.top - mr.top + m.baseY,
         rowLeft: Math.max(0, sr.left - mr.left + m.cx - reach),
         rowRight: Math.min(mr.width, sr.left - mr.left + m.cx + reach),
+        jukebox,
+        // Below 1600 px the margin is only the jukebox's corner: the right end stays open for the arrow.
+        claw: W >= 1600,
       };
       const next: RoomSize = { w: Math.round(mr.width), h: Math.round(Math.max(main.scrollHeight, mr.height)), hints };
       setRoomSize((prev) => {
@@ -549,7 +574,9 @@ export function ArcadeFloor() {
           Math.abs(prev.hints.rowTop - next.hints.rowTop) < 2 &&
           Math.abs(prev.hints.rowBottom - next.hints.rowBottom) < 2 &&
           Math.abs(prev.hints.rowLeft - next.hints.rowLeft) < 2 &&
-          Math.abs(prev.hints.headerBottom - next.hints.headerBottom) < 2
+          Math.abs(prev.hints.headerBottom - next.hints.headerBottom) < 2 &&
+          prev.hints.jukebox === next.hints.jukebox &&
+          prev.hints.claw === next.hints.claw
         )
           return prev;
         return next;
@@ -651,12 +678,16 @@ export function ArcadeFloor() {
             <i key={c.id} data-on={i === index ? 'true' : undefined} style={{ '--dot': c.accent.primary } as CSSProperties} />
           ))}
         </div>
+        {/* The jukebox's corner (the jukebox UI portals its machine in here). */}
+        <div className="af-jukebox" data-jukebox-slot="floor" data-part="floor-jukebox" />
       </section>
 
       <div className="af-floor__plaque-wrap" data-part="plaque-wrap">
         <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} />
         <div className="af-floor__extras" data-part="floor-extras">
           {wide ? null : <TournamentKiosk variant="strip" />}
+          {/* Phones: the jukebox's quick control lives here (the HUD has no room; the floor no corner). */}
+          <span className="af-floor__jukebox" data-jukebox-slot="extras" data-jukebox-variant="compact" />
           <Button
             variant="ghost"
             icon="users"

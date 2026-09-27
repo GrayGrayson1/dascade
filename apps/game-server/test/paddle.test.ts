@@ -232,6 +232,26 @@ describe('PaddleRoom — network duel', () => {
     expect(guest.room.connection.isOpen).toBe(true);
   });
 
+  it('caps the round trip a client claims by the server’s own measurement (ping frames)', async () => {
+    const host = await create('Host');
+    const guest = await join(host.room.roomId, 'Laggy');
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'playing');
+    const server = host.server as any;
+    const id = guest.me().playerId;
+    await waitFor(() => server.rttProbe.rtt(id) !== null, 3000, 'server-measured rtt');
+    const measured = server.rttProbe.rtt(id) as number;
+    expect(measured).toBeLessThan(200);
+    // A modified client claims 2 s of latency to get the longest paddle history: it gets what the server measured.
+    guest.room.send(PADDLE_MSG.input, { y: 450, rtt: 2000 });
+    await waitFor(() => server.sideInputs.get(id) !== undefined, 2000, 'input');
+    // (Uncapped, 2000 ms would be 61 ticks — the engine's 7-tick maximum.)
+    expect(server.sideInputs.get(id).lag).toBeLessThanOrEqual(3);
+    // A lower honest estimate is kept as is.
+    guest.room.send(PADDLE_MSG.input, { y: 450, rtt: 0 });
+    await waitFor(() => server.sideInputs.get(id).lag === 1, 2000, 'honest estimate');
+  });
+
   it('covers a dropped player with the house paddle, and hands control back on reconnect', async () => {
     const host = await create('Host');
     const guest = await join(host.room.roomId, 'Flaky');

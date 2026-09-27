@@ -289,8 +289,11 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
     for (const t of b.tanks) {
       if (!t.cpu && !this.players.has(t.id)) abandon(b, t.id);
     }
-    if (b.result || this.checkForfeitNow()) {
-      this.finish();
+    // Someone left (or dropped) during the countdown and the battle is already decided: nobody fired
+    // a shot, so there is nothing to report — back to the lobby instead.
+    if (b.result || checkForfeit(b, (id) => this.present(id))) {
+      this.systemChat('Not enough tanks left before the first shot — back to the lobby.');
+      this.returnToLobby();
       return;
     }
     this.beginNextTurn();
@@ -373,7 +376,8 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
       this.finish();
       return;
     }
-    const r = nextTurn(b, this.rng);
+    const present = (id: string) => this.present(id);
+    const r = nextTurn(b, this.rng, present);
     if (r.kind === 'round_limit') {
       endByRounds(b);
       this.finish();
@@ -391,7 +395,7 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
     meta.turnId = r.turnId;
     meta.wind = r.wind;
     meta.resolveEndsAt = 0;
-    meta.queue = upcoming(b, 4).join(',');
+    meta.queue = upcoming(b, 4, present).join(',');
     this.syncTank(tank);
     this.broadcast(TANKS_MSG.event, { kind: 'turn', turnId: r.turnId, playerId: r.activeId, round: r.round, wind: r.wind } satisfies TanksEvent);
 
@@ -433,10 +437,11 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
     this.setTimer(0);
     this.broadcast(TANKS_MSG.event, { kind: 'skip', turnId: meta.turnId, playerId: id, reason } satisfies TanksEvent);
     const p = this.players.get(id);
-    if (p && reason === 'timeout') {
+    // Turns that ran out while the player was disconnected aren't idling (they get short turns anyway).
+    if (p?.client && reason === 'timeout') {
       const strikes = (this.idleStrikes.get(id) ?? 0) + 1;
       this.idleStrikes.set(id, strikes);
-      const idle = strikes >= this.timing.idleStrikes && p.client;
+      const idle = strikes >= this.timing.idleStrikes;
       this.toast(p, 'warning', idle ? 'Out of time again — your turns are short until you aim or fire.' : 'Out of time — your turn was skipped.');
     }
     this.schedule('next', this.timing.afterSkipMs, () => this.beginNextTurn());
@@ -580,9 +585,12 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
       const p = this.players.get(t.id);
       if (p) p.state.score = t.damage;
     }
-    const cpuCount = b.tanks.filter((t) => t.cpu).length;
+    const cpuIds = b.tanks.filter((t) => t.cpu).map((t) => t.id);
+    const cpuCount = cpuIds.length;
     this.reportOutcome({
+      // CPU tanks keep their places (a human behind a CPU didn't win) but are never credited.
       placements: result.placements,
+      nonPlayerIds: cpuIds,
       scores,
       reason: result.reason,
       details: {

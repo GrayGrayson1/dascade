@@ -9,6 +9,7 @@
 import type { TournamentData } from '@dascade/game-core/tournament';
 import { config, supabaseEnabled } from '../config.ts';
 import { log } from '../lib/log.ts';
+import { trackWrite } from '../lib/pendingWrites.ts';
 
 export interface TournamentStore {
   /** Upsert the tournament snapshot. `id` is unique per tournament (room codes are reused). */
@@ -33,7 +34,12 @@ class SupabaseTournamentStore implements TournamentStore {
     return this.clientPromise;
   }
 
-  async save(id: string, code: string, data: TournamentData): Promise<void> {
+  /** Tracked so a clean shutdown waits for it (pendingWrites.ts). */
+  save(id: string, code: string, data: TournamentData): Promise<void> {
+    return trackWrite(this.write(id, code, data));
+  }
+
+  private async write(id: string, code: string, data: TournamentData): Promise<void> {
     try {
       const sb = await this.client();
       const champion = data.championId ? data.participants.find((p) => p.id === data.championId) : undefined;

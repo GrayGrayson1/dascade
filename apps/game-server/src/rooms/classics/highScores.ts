@@ -9,6 +9,7 @@
 import { randomId, type GameId } from '@dascade/shared';
 import { CLASSICS, type HighScoreBoardView, type HighScoreEntry } from '@dascade/shared/games/classics';
 import { log } from '../../lib/log.ts';
+import { trackWrite } from '../../lib/pendingWrites.ts';
 
 /** Kept per board (the API returns the top CLASSICS.boardSize). */
 const KEEP = 100;
@@ -109,7 +110,7 @@ export class HighScoreService {
     const index = this.insert(entries, entry);
     if (index === null) return { rank: null, entryId: null, improved: false };
     if (this.persistence) {
-      void this.persistence.save(gameId, board, entry).catch((err: unknown) => log.warn('high score save failed', { gameId, board, err: err as Error }));
+      void trackWrite(this.persistence.save(gameId, board, entry)).catch((err: unknown) => log.warn('high score save failed', { gameId, board, err: err as Error }));
     }
     return { rank: index + 1, entryId: entry.id, improved: true };
   }
@@ -119,11 +120,27 @@ export class HighScoreService {
     return this.list(gameId, board).find((e) => e.identity === identity)?.score ?? 0;
   }
 
+  /**
+   * A board in use on this process: a room has played or shown it (setStatLabel on create/settings
+   * change) or a score was recorded. Public reads of any other key never allocate a board or query
+   * the database (board keys come from the URL).
+   */
+  private known(gameId: GameId, board: string): boolean {
+    const k = this.key(gameId, board);
+    return this.boards.has(k) || this.labels.has(k);
+  }
+
   top(gameId: GameId, board: string, n: number = CLASSICS.boardSize): HighScoreBoardView {
-    const entries = this.list(gameId, board)
+    const stored = this.known(gameId, board) ? this.list(gameId, board) : [];
+    const entries = stored
       .slice(0, Math.max(0, Math.min(n, KEEP)))
       .map(({ identity: _identity, ...rest }) => rest);
     return { gameId, board, statLabel: this.labels.get(this.key(gameId, board)) ?? '', entries };
+  }
+
+  /** Boards held in memory (tests). */
+  get boardCount(): number {
+    return this.boards.size;
   }
 
   /** Tests only. */

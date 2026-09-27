@@ -10,6 +10,8 @@
  *  - The element is routed through the shared mixer (analyser → jukebox bus) once the context
  *    runs; if the browser refuses, music still plays via element.volume (visualizer off).
  *  - Local mute / volume / pause / room opt-out always win over the Room DJ.
+ *  - A pause the engine didn't cause (audio focus lost, headphones unplugged, an iOS interruption)
+ *    counts as the user pausing: the transport stops claiming "playing" and no later tap restarts it.
  */
 import type { StoreApi, UseBoundStore } from 'zustand';
 import {
@@ -62,7 +64,7 @@ export interface DjTransport {
   serverNow(): number;
 }
 
-export type JukeboxMixer = Pick<Mixer, 'ensureContext' | 'resume' | 'isRunning' | 'routeElement' | 'isRouted' | 'analyser' | 'setJukeboxFlags'>;
+export type JukeboxMixer = Pick<Mixer, 'ensureContext' | 'resume' | 'isRunning' | 'routeElement' | 'isRouted' | 'analyser' | 'setJukeboxFlags' | 'onStateChange'>;
 
 export interface JukeboxEngineDeps {
   store: UseBoundStore<StoreApi<JukeboxState>>;
@@ -178,6 +180,17 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
   let persistTimer: unknown = null;
   let persistReady = false;
   let libraryGeneration = 0;
+  /** Bumped by every loadTrack(): a play() rejection or element error from an earlier load is stale. */
+  let loadSeq = 0;
+  /** The load already reported broken (its 'error' event AND its rejected play() report one failure). */
+  let brokenSeq = -1;
+  /** Set when the engine pauses a playing element itself: the (async) 'pause' event it causes isn't an interruption. */
+  let selfPause = false;
+  /**
+   * The user paused the music (this session, or a restored paused session) — also set by pauses the
+   * browser/OS made. Decides whether joining a Room DJ starts the room's music (see evaluateRoom).
+   */
+  let userPaused = false;
   // Room DJ
   let transport: DjTransport | null = null;
   let lastRoomVersion = -1;
@@ -287,7 +300,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       updatePositionState();
     });
     on('ended', onEnded);
-    on('error', onBroken);
+    on('error', onElementError);
     el = a;
     applyElementVolume();
     return a;
@@ -305,7 +318,10 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     const prevId = get().currentId;
     if (opts.pushHistory && prevId && prevId !== id) history = [...history.slice(-49), prevId];
     loadedId = id;
+    loadSeq++;
     pendingSeek = position > 0 ? position : null;
+    // Some engines fire 'pause' when a playing element's source changes: that one is ours.
+    if (!a.paused) selfPause = true;
     try {
       a.playbackRate = 1;
     } catch {
@@ -362,6 +378,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
 
   function onPlaying(): void {
     brokenStreak = 0;
+    selfPause = false; // any pause we caused was dispatched before this
     set({ playing: true, buffering: false, needsGesture: false });
     pushMixFlags();
     if (deps.mediaSession) deps.mediaSession.playbackState = 'playing';
@@ -369,10 +386,22 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
   }
 
   function onPause(): void {
+    const ours = selfPause;
+    selfPause = false;
     set({ playing: false });
     pushMixFlags();
     if (deps.mediaSession) deps.mediaSession.playbackState = get().currentId ? 'paused' : 'none';
     updateDjTimer();
+    // Neither ours nor the end of the track (that pause comes with `ended`): the browser/OS paused it
+    // (audio focus lost, headphones unplugged, an iOS interruption). Treat it as a pause — otherwise
+    // the transport keeps showing "playing" while silent and unlock() restarts the music on the next
+    // unrelated tap.
+    if (!ours && !disposed && el && el.paused && !el.ended && shouldBePlaying()) {
+      pending = { kind: 'none' };
+      userPaused = true;
+      set({ wantPlaying: false, needsGesture: false, buffering: false });
+      schedulePersist();
+    }
   }
 
   function onEnded(): void {
@@ -387,7 +416,18 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     advance(true);
   }
 
-  function onBroken(): void {
+  function onElementError(): void {
+    // A newer load clears the element's error: an error still dispatching for an earlier source is stale.
+    if (el && el.error === null) return;
+    onBroken(loadSeq);
+  }
+
+  /** `seq` = the load that failed. One failure is reported at most once, and only for the current load. */
+  function onBroken(seq: number): void {
+    // Per spec a failed load fires 'error' first (whose handler already skips to the next track) and
+    // then rejects the ORIGINAL play() promise with NotSupportedError: that must not break the next track.
+    if (seq !== loadSeq || seq === brokenSeq) return;
+    brokenSeq = seq;
     const id = get().currentId;
     if (!id || !el || !el.getAttribute('src')) return;
     const t = byId.get(id);
@@ -433,21 +473,25 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     void mixer.resume().then((ok) => {
       if (ok && !disposed) routeIfPossible();
     });
+    const seq = loadSeq;
+    const rejected = (err: unknown) => onPlayRejected(err, seq);
     let p: Promise<void> | undefined;
     try {
       p = el.play();
     } catch (err) {
-      onPlayRejected(err);
+      rejected(err);
       return;
     }
-    if (p && typeof p.catch === 'function') p.catch(onPlayRejected);
+    if (p && typeof p.catch === 'function') p.catch(rejected);
   }
 
-  function onPlayRejected(err: unknown): void {
+  /** `seq` = the load this play() was for. */
+  function onPlayRejected(err: unknown, seq: number): void {
+    if (seq !== loadSeq) return; // an earlier track's play(): superseded (or its failure already handled)
     const name = (err as { name?: string } | null)?.name;
     if (name === 'AbortError') return; // superseded by a newer load/pause
     if (name === 'NotSupportedError') {
-      onBroken();
+      onBroken(seq);
       return;
     }
     // NotAllowedError (autoplay policy) or anything else: keep the intent, ask for a gesture.
@@ -520,6 +564,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
         return;
       }
       if (!byId.has(trackId)) return; // invalid ids are ignored
+      userPaused = false;
       if (get().source === 'room') setRoomOptOut(true);
       broken.delete(trackId);
       set({ error: null, wantPlaying: true });
@@ -537,6 +582,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       }
       return;
     }
+    userPaused = false;
     set({ wantPlaying: true });
     if (get().source === 'room') {
       syncRoom();
@@ -555,6 +601,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
   }
 
   function halt(): void {
+    if (el && !el.paused) selfPause = true;
     el?.pause();
     // A loading element is already paused (no 'pause' event): reflect it explicitly.
     if (get().playing || get().buffering) set({ playing: false, buffering: false });
@@ -563,6 +610,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
 
   function pause(): void {
     pending = { kind: 'none' };
+    userPaused = true;
     set({ wantPlaying: false, needsGesture: false });
     halt();
     schedulePersist();
@@ -577,10 +625,24 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       mixer.ensureContext();
       routeIfPossible();
       void mixer.resume().then((ok) => {
-        if (ok && !disposed) routeIfPossible();
+        if (!ok || disposed) return;
+        routeIfPossible();
+        onContextState();
       });
     }
     if (shouldBePlaying() && el?.paused) attemptPlay();
+  }
+
+  /**
+   * The shared AudioContext was suspended/interrupted (iOS backgrounding, a call…) or runs again. A
+   * routed element is silent while the context is down even though it still "plays": ask for a tap
+   * (unlock() resumes the context inside the gesture) and drop the prompt once it runs.
+   */
+  function onContextState(): void {
+    if (disposed || !el || !mixer.isRouted(el)) return; // an unrouted element doesn't depend on the context
+    if (mixer.isRunning()) {
+      if (get().needsGesture && !el.paused) set({ needsGesture: false });
+    } else if (shouldBePlaying() && !get().needsGesture) set({ needsGesture: true });
   }
 
   // ---------------------------------------------------------------------------
@@ -722,8 +784,11 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     if (follow && s.source === 'personal') {
       personal = { currentId: s.currentId, position: currentTime(), wantPlaying: s.wantPlaying };
       pending = { kind: 'none' };
-      // Joining a room with music on means "listen" (local pause/mute still win afterwards).
-      set({ source: 'room', wantPlaying: true, error: null });
+      // Following the room means listening — unless the user had paused the music themselves (this
+      // session, or a restored paused session): then the room's track is cued silently and their play
+      // button joins in. Anyone with music on, and a visitor who never touched the jukebox, hear the
+      // room straight away. Local pause/mute still win afterwards.
+      set({ source: 'room', wantPlaying: s.wantPlaying || !userPaused, error: null });
       missingNotified = null;
       syncRoom();
     } else if (!follow && s.source === 'room') {
@@ -848,6 +913,11 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     transport?.send(DJ.command, cmd);
   }
 
+  /** The host starting the room's music is an explicit "play": they hear it too (even after a local pause). */
+  function listenToRoom(): void {
+    if (get().source === 'room' && !get().wantPlaying) play();
+  }
+
   function trackRef(id: string): { trackId: string; duration: number } | null {
     if (!byId.has(id)) return null;
     const d = durationOf(id);
@@ -870,12 +940,15 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       const ref = trackRef(id);
       if (!ref) return;
       sendCommand(pos !== undefined ? { op: 'play', track: ref, position: clampPos(pos) } : { op: 'play', track: ref });
+      listenToRoom();
     },
     pause() {
       if (djPermissions().control && get().room?.enabled) sendCommand({ op: 'pause' });
     },
     resume() {
-      if (djPermissions().control && get().room?.enabled) sendCommand({ op: 'resume' });
+      if (!djPermissions().control || !get().room?.enabled) return;
+      sendCommand({ op: 'resume' });
+      listenToRoom();
     },
     seek(s) {
       if (!djPermissions().control || !get().room?.enabled) return;
@@ -950,6 +1023,8 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       ensureElement();
       const p = loadPersisted(deps.storage);
       optOutRoom = p.optOutRoom;
+      // A restored session that was left paused counts as the user's pause (see evaluateRoom).
+      userPaused = !p.wantPlaying && p.currentId !== null;
       set({
         currentId: p.currentId,
         position: p.position,
@@ -965,6 +1040,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       if (p.shuffle) shuffleOrderIds = null;
       installMediaSession();
       unsubs.push(
+        mixer.onStateChange(onContextState),
         deps.settings.subscribe(() => applyElementVolume()),
         store.subscribe((s, prev) => {
           if (s.jukeboxMuted !== prev.jukeboxMuted) {

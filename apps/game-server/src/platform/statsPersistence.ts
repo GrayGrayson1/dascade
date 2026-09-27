@@ -4,7 +4,11 @@
  *
  * - The in-memory stores (ratings.ts, stats.ts) are always the source of truth for this process;
  *   this adapter only hydrates an identity the first time it is seen and writes rows back.
- * - Writes are coalesced per row and flushed in the background — gameplay never waits on them.
+ * - Writes are coalesced per row and flushed in the background — gameplay never waits on them. A
+ *   failed flush puts its rows back (unless a newer row for the same key is already queued) and
+ *   retries with back-off, so a database hiccup never loses an update.
+ * - A failed identity load REJECTS (statsLoader retries and holds that identity's updates): an
+ *   update applied to default numbers would overwrite the stored ratings/stats.
  * - With Supabase unconfigured (local dev, tests) every call is a cheap no-op.
  * - Identity keys: `u:<auth user id>` for verified accounts, `g:<guest id>` for guests.
  */
@@ -22,7 +26,7 @@ export interface IdentitySnapshot {
 
 export interface StatsPersistence {
   readonly enabled: boolean;
-  /** Everything stored for one identity (empty when disabled or on error). */
+  /** Everything stored for one identity (empty when disabled or nothing is stored). Rejects when the database can't be read. */
   loadIdentity(identity: string): Promise<IdentitySnapshot>;
   /** Recently active ratings (startup warm-up so rating-based seeding works after a restart). */
   loadRecentRatings(limit: number): Promise<Array<{ identity: string; gameId: GameId; rating: Rating }>>;
@@ -33,6 +37,8 @@ export interface StatsPersistence {
 }
 
 const FLUSH_DELAY_MS = 1500;
+/** Longest wait between flush retries while the database keeps failing. */
+const MAX_FLUSH_DELAY_MS = 60_000;
 
 function userIdOf(identity: string): string | null {
   return identity.startsWith('u:') ? identity.slice(2) : null;
@@ -87,40 +93,42 @@ interface StatsRow {
   updated_at: string;
 }
 
-class SupabaseStatsPersistence implements StatsPersistence {
+export class SupabaseStatsPersistence implements StatsPersistence {
   readonly enabled = true;
   private clientPromise: Promise<SupabaseClient> | null = null;
   private pendingRatings = new Map<string, RatingRow>();
   private pendingStats = new Map<string, StatsRow>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private flushing: Promise<void> | null = null;
+  /** Consecutive failed flushes (back-off). */
+  private failures = 0;
+
+  /** `connect` supplies the client (tests pass a fake). */
+  constructor(private readonly connect?: () => Promise<SupabaseClient>) {}
 
   private client(): Promise<SupabaseClient> {
-    this.clientPromise ??= import('@supabase/supabase-js').then(({ createClient }) =>
-      createClient(config.supabase.url, config.supabase.secretKey, { auth: { persistSession: false, autoRefreshToken: false } }),
-    );
+    this.clientPromise ??=
+      this.connect?.() ??
+      import('@supabase/supabase-js').then(({ createClient }) =>
+        createClient(config.supabase.url, config.supabase.secretKey, { auth: { persistSession: false, autoRefreshToken: false } }),
+      );
     return this.clientPromise;
   }
 
   async loadIdentity(identity: string): Promise<IdentitySnapshot> {
-    try {
-      const sb = await this.client();
-      const [ratings, stats] = await Promise.all([
-        sb.from('player_ratings').select('*').eq('identity', identity).limit(100),
-        sb.from('player_game_stats').select('*').eq('identity', identity).limit(100),
-      ]);
-      if (ratings.error) throw ratings.error;
-      if (stats.error) throw stats.error;
-      return {
-        ratings: ((ratings.data ?? []) as RatingRow[])
-          .filter((r) => isGameId(r.game_id))
-          .map((r) => ({ gameId: r.game_id as GameId, rating: rowToRating(r) })),
-        stats: ((stats.data ?? []) as StatsRow[]).filter((r) => isGameId(r.game_id)).map(rowToStats),
-      };
-    } catch (err) {
-      log.warn('stats load failed', { err: err as Error });
-      return { ratings: [], stats: [] };
-    }
+    const sb = await this.client();
+    const [ratings, stats] = await Promise.all([
+      sb.from('player_ratings').select('*').eq('identity', identity).limit(100),
+      sb.from('player_game_stats').select('*').eq('identity', identity).limit(100),
+    ]);
+    if (ratings.error) throw ratings.error;
+    if (stats.error) throw stats.error;
+    return {
+      ratings: ((ratings.data ?? []) as RatingRow[])
+        .filter((r) => isGameId(r.game_id))
+        .map((r) => ({ gameId: r.game_id as GameId, rating: rowToRating(r) })),
+      stats: ((stats.data ?? []) as StatsRow[]).filter((r) => isGameId(r.game_id)).map(rowToStats),
+    };
   }
 
   async loadRecentRatings(limit: number): Promise<Array<{ identity: string; gameId: GameId; rating: Rating }>> {
@@ -174,22 +182,29 @@ class SupabaseStatsPersistence implements StatsPersistence {
     this.scheduleFlush();
   }
 
-  private scheduleFlush(): void {
+  private scheduleFlush(delayMs = FLUSH_DELAY_MS): void {
     if (this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.flush();
-    }, FLUSH_DELAY_MS);
+    }, delayMs);
     this.timer.unref?.();
+  }
+
+  /** Rows waiting to be written (tests). */
+  get pendingCount(): number {
+    return this.pendingRatings.size + this.pendingStats.size;
   }
 
   async flush(): Promise<void> {
     if (this.flushing) await this.flushing;
     if (this.pendingRatings.size === 0 && this.pendingStats.size === 0) return;
-    const ratings = [...this.pendingRatings.values()];
-    const stats = [...this.pendingStats.values()];
+    const ratingBatch = new Map(this.pendingRatings);
+    const statsBatch = new Map(this.pendingStats);
     this.pendingRatings.clear();
     this.pendingStats.clear();
+    const ratings = [...ratingBatch.values()];
+    const stats = [...statsBatch.values()];
     this.flushing = (async () => {
       try {
         const sb = await this.client();
@@ -201,8 +216,19 @@ class SupabaseStatsPersistence implements StatsPersistence {
           const { error } = await sb.from('player_game_stats').upsert(stats, { onConflict: 'identity,game_id' });
           if (error) throw error;
         }
+        this.failures = 0;
       } catch (err) {
-        log.warn('stats persistence failed', { err: err as Error, ratings: ratings.length, stats: stats.length });
+        // Rows are full snapshots: put the batch back unless a newer row for the same key arrived meanwhile.
+        for (const [k, row] of ratingBatch) if (!this.pendingRatings.has(k)) this.pendingRatings.set(k, row);
+        for (const [k, row] of statsBatch) if (!this.pendingStats.has(k)) this.pendingStats.set(k, row);
+        this.failures++;
+        log.warn('stats persistence failed — will retry', {
+          err: err as Error,
+          ratings: ratings.length,
+          stats: stats.length,
+          attempt: this.failures,
+        });
+        this.scheduleFlush(Math.min(MAX_FLUSH_DELAY_MS, FLUSH_DELAY_MS * 2 ** this.failures));
       }
     })();
     try {
@@ -239,4 +265,11 @@ function rowToStats(r: StatsRow): GameStatLine {
   };
 }
 
-export const statsPersistence: StatsPersistence = supabaseEnabled ? new SupabaseStatsPersistence() : new NoopStatsPersistence();
+export let statsPersistence: StatsPersistence = supabaseEnabled ? new SupabaseStatsPersistence() : new NoopStatsPersistence();
+
+/** Swap the adapter (tests). Returns the previous one. */
+export function setStatsPersistence(next: StatsPersistence): StatsPersistence {
+  const prev = statsPersistence;
+  statsPersistence = next;
+  return prev;
+}

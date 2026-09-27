@@ -89,3 +89,49 @@ export function peekStoredTheme(storage: Pick<Storage, 'getItem'> | null | undef
     return null;
   }
 }
+
+/** localStorage key of the settings blob (LocalPersistence namespaces keys with `dascade:v1:`). */
+export const LOCAL_SETTINGS_KEY = 'dascade:v1:settings';
+
+/**
+ * Synchronous read of the whole locally stored settings blob (raw — run it through
+ * migrateSettings), so the first render already honours mute, volumes, fx and reduced motion
+ * instead of waiting for persistence to initialise (with Supabase that's seconds).
+ */
+export function peekStoredSettings(storage: Pick<Storage, 'getItem'> | null | undefined, key = LOCAL_SETTINGS_KEY): unknown {
+  try {
+    const raw = storage?.getItem(key);
+    return raw ? (JSON.parse(raw) as unknown) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stored alongside the settings: true once the player set "Reduce motion" themselves. Until then
+ * the OS preference decides (and follows OS changes); afterwards their choice sticks either way.
+ */
+export const MOTION_CHOSEN_KEY = 'reducedMotionChosen';
+
+/**
+ * Effective reduced-motion setting for a stored blob. Blobs written before the flag existed are read
+ * as the old build behaved: "reduce" when the OS asks for it, and an in-app "reduce" (stored true on a
+ * device whose OS doesn't ask) counts as the player's own choice.
+ */
+export function motionChoice(stored: unknown, osPrefersReduced: boolean): { chosen: boolean; reducedMotion: boolean } {
+  const raw = stored && typeof stored === 'object' && !Array.isArray(stored) ? (stored as Record<string, unknown>) : {};
+  const value = typeof raw.reducedMotion === 'boolean' ? raw.reducedMotion : null;
+  const flag = raw[MOTION_CHOSEN_KEY];
+  const chosen = value !== null && (typeof flag === 'boolean' ? flag : value && !osPrefersReduced);
+  return { chosen, reducedMotion: chosen && value !== null ? value : osPrefersReduced };
+}
+
+/**
+ * Merge freshly loaded (e.g. remote) settings into the ones on screen: keys the player changed since
+ * boot keep their on-screen value, everything else takes the loaded one.
+ */
+export function reconcileSettings(loaded: AppSettings, current: AppSettings, changedSinceBoot: ReadonlySet<keyof AppSettings>): AppSettings {
+  const out = { ...loaded };
+  for (const key of changedSinceBoot) (out as Record<string, unknown>)[key] = current[key];
+  return out;
+}

@@ -212,6 +212,8 @@ export class SnakeRoom extends ClassicsRoom<SnakeState, SnakeSettings> {
     const g = this.game;
     const slot = this.slotOf.get(player.id);
     if (!g || this.finished || slot === undefined) return;
+    // A paused solo game takes no input: planning turns while frozen would make pause a free step.
+    if (this.state.match.paused) return;
     queueTurn(g, slot, dir);
   }
 

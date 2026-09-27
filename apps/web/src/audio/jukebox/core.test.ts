@@ -341,6 +341,37 @@ describe('errors', () => {
     expect(h.el().playCalls).toBeLessThanOrEqual(5);
   });
 
+  it("a failed load's late NotSupportedError rejection never breaks the track the error handler moved on to", async () => {
+    // Per spec (Firefox/WebKit): 'error' fires first — the engine skips A → B — and only then is the
+    // ORIGINAL play() promise for A rejected with NotSupportedError.
+    const h = await setup();
+    h.el().playBehavior = 'defer';
+    h.engine.play('a');
+    h.el().playBehavior = 'resolve';
+    h.el().fail();
+    expect(h.state()).toMatchObject({ currentId: 'b', playing: true });
+    h.el().deferred[0]!.reject(Object.assign(new Error('bad'), { name: 'NotSupportedError' }));
+    await flushMicrotasks();
+    expect(h.state()).toMatchObject({ currentId: 'b', playing: true, wantPlaying: true });
+    expect(h.notes).toHaveLength(1);
+    expect(h.notes[0]).toMatch(/A/);
+    // B is not marked broken: it's still reachable later.
+    h.engine.play('a');
+    h.engine.next();
+    expect(h.state().currentId).toBe('b');
+  });
+
+  it('a stale play() rejection from an earlier track is ignored (no gesture prompt, no skip)', async () => {
+    const h = await setup();
+    h.el().playBehavior = 'defer';
+    h.engine.play('a');
+    h.el().playBehavior = 'resolve';
+    h.engine.play('c');
+    h.el().deferred[0]!.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' }));
+    await flushMicrotasks();
+    expect(h.state()).toMatchObject({ currentId: 'c', playing: true, needsGesture: false, error: null });
+  });
+
   it('NotSupportedError from play() is treated as a broken track', async () => {
     const h = await setup();
     h.el().playBehavior = 'notSupported';
@@ -373,6 +404,52 @@ describe('autoplay / gestures', () => {
     h.el().playBehavior = 'resolve';
     h.engine.unlock();
     expect(h.state()).toMatchObject({ needsGesture: false, playing: true });
+  });
+
+  it('a pause the engine did not cause (audio focus, headphones, iOS) clears the intent; the next tap does not restart', async () => {
+    const h = await setup();
+    h.engine.play('a');
+    h.el().loadMeta(100);
+    expect(h.state()).toMatchObject({ playing: true, wantPlaying: true });
+    h.el().externalPause();
+    expect(h.state()).toMatchObject({ playing: false, wantPlaying: false, needsGesture: false });
+    expect(h.mediaSession.playbackState).toBe('paused');
+    const calls = h.el().playCalls;
+    h.engine.unlock(); // an unrelated tap somewhere in the app
+    expect(h.el().playCalls).toBe(calls);
+    expect(h.state().playing).toBe(false);
+    // Play resumes normally.
+    h.engine.toggle();
+    expect(h.state()).toMatchObject({ playing: true, wantPlaying: true });
+  });
+
+  it("the engine's own pauses and track ends are not mistaken for interruptions", async () => {
+    const h = await setup();
+    h.engine.setRepeat('all');
+    h.engine.play('a');
+    h.el().loadMeta(100);
+    h.el().end(); // 'pause' then 'ended'
+    expect(h.state()).toMatchObject({ currentId: 'b', wantPlaying: true, playing: true });
+    h.engine.next(); // switching tracks while playing
+    expect(h.state()).toMatchObject({ currentId: 'c', wantPlaying: true, playing: true });
+  });
+
+  it('a suspended/interrupted context (iOS backgrounding) raises the tap prompt; resuming clears it', async () => {
+    const h = await setup();
+    h.engine.play('a');
+    await flushMicrotasks();
+    expect(h.mixer.isRouted(h.el() as unknown as HTMLMediaElement)).toBe(true);
+    h.ctx()!.setState('suspended');
+    expect(h.state()).toMatchObject({ needsGesture: true, wantPlaying: true });
+    // The next tap resumes the context (the element never stopped): the prompt goes away.
+    h.engine.unlock();
+    await flushMicrotasks();
+    expect(h.ctx()!.state).toBe('running');
+    expect(h.state()).toMatchObject({ needsGesture: false, wantPlaying: true, playing: true });
+    // A paused jukebox isn't prompted.
+    h.engine.pause();
+    h.ctx()!.setState('suspended');
+    expect(h.state().needsGesture).toBe(false);
   });
 
   it('pausing clears a pending gesture prompt', async () => {

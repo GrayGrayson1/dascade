@@ -436,6 +436,62 @@ describe('DASjack 21 room', () => {
     await nextRound(host, 1);
   }, 15_000);
 
+  it('a dropped player only gets a short decision clock, not the table’s full one', async () => {
+    const host = await createTable({ settings: { decisionSeconds: 60 } });
+    const bob = await joinTable(host.room.roomId, 'Bob');
+    await start(host);
+    host.server.testStacks = [['9s', '5c', '7h', '8s', '6c', 'Th']];
+    await bet(host, 10);
+    await bet(bob, 10);
+    await waitStage(host, 'PLAYING');
+    expect(seatOf(host, bob.id())!.deadline).toBeGreaterThan(Date.now() + 50_000);
+    bob.room.reconnection.enabled = false;
+    (bob.room as any).connection.transport.ws.close(4010);
+    await waitFor(() => host.state().players[bob.id()]?.connected === false, 3000, 'drop');
+    // Still in the reconnect grace (seat kept), but the clock is capped (8 s × the test pace), not 60 s.
+    await waitFor(() => seatOf(host, bob.id())!.done, 3000, 'dropped player stands');
+    expect(seatOf(host, bob.id())!.hands[0]!.status).toBe('stood');
+    expect(host.state().players[bob.id()]).toBeDefined();
+    expect(seatOf(host)!.deadline).toBeGreaterThan(Date.now() + 50_000);
+    await act(host, 'stand');
+    await nextRound(host, 1);
+  });
+
+  it('a repeated decision (same action sequence) never applies twice', async () => {
+    const solo = await createTable({ solo: true });
+    await waitStage(solo, 'BETTING');
+    // 2 3 (5) v dealer 7 / T: hit, hit.
+    solo.server.testStacks = [['2s', '7h', '3d', 'Tc', '4c', '5d', '9s']];
+    await bet(solo, 10);
+    await waitStage(solo, 'PLAYING');
+    const seq = seatOf(solo)!.actionSeq;
+    solo.room.send(BLACKJACK_MSG.action, { action: 'hit', hand: 0, seq });
+    solo.room.send(BLACKJACK_MSG.action, { action: 'hit', hand: 0, seq });
+    expect(await nextError(solo)).toMatchObject({ code: 'not_allowed' });
+    await waitFor(() => seatOf(solo)!.hands[0]!.cards.length === 3, 3000, 'one hit');
+    await sleep(60);
+    expect(seatOf(solo)!.hands[0]!.cards).toEqual(['2s', '3d', '4c']);
+    expect(seatOf(solo)!.actionSeq).toBe(seq + 1);
+    // The next decision, sent with the new sequence, goes through.
+    solo.room.send(BLACKJACK_MSG.action, { action: 'hit', hand: 0, seq: seq + 1 });
+    await waitFor(() => seatOf(solo)!.hands[0]!.cards.length === 4, 3000, 'second hit');
+    expect(seatOf(solo)!.hands[0]!.cards).toEqual(['2s', '3d', '4c', '5d']);
+  });
+
+  it('the host cannot remove a seated player who has chips while the table runs', async () => {
+    const host = await createTable();
+    const bob = await joinTable(host.room.roomId, 'Bob');
+    await start(host);
+    host.room.send('lobby:kick', { playerId: bob.id() });
+    expect(await nextError(host)).toMatchObject({ type: 'lobby:kick', code: 'not_allowed' });
+    expect(host.state().players[bob.id()]).toBeDefined();
+    expect(seatOf(host, bob.id())).toBeDefined();
+    host.room.send(BLACKJACK_MSG.end, {});
+    await waitFor(() => host.state().phase === 'RESULTS', 3000, 'results');
+    host.room.send('lobby:kick', { playerId: bob.id() });
+    await waitFor(() => host.state().players[bob.id()] === undefined, 3000, 'kicked after the game');
+  });
+
   it('seats late joiners next round and settles then removes players who leave mid-round', async () => {
     const host = await createTable();
     const bob = await joinTable(host.room.roomId, 'Bob');
@@ -686,7 +742,7 @@ describe('DASjack 21 room: DASCADE outcomes', () => {
     expect(mine[0]!.outcome.scores).toEqual({ [solo.id()]: seatOf(solo)!.balance });
   });
 
-  it('reports nothing for a table closed before the first deal or sent back to the lobby', async () => {
+  it('reports nothing for a table closed (or sent back to the lobby) before the first deal', async () => {
     const early = await createTable();
     await joinTable(early.room.roomId, 'Bob');
     await start(early);
@@ -694,16 +750,50 @@ describe('DASjack 21 room: DASCADE outcomes', () => {
     await waitFor(() => early.state().phase === 'RESULTS', 3000, 'results');
 
     const lobby = await createTable();
-    const bob = await joinTable(lobby.room.roomId, 'Bob');
+    await joinTable(lobby.room.roomId, 'Bob');
     await start(lobby);
-    lobby.server.testStacks = [['9s', 'Ts', '7h', '9c', '6d', 'Th']];
-    await bet(lobby, 10);
-    await bet(bob, 10);
-    await waitStage(lobby, 'PLAYING');
     lobby.room.send('lobby:toLobby', {});
     await waitFor(() => lobby.state().phase === 'LOBBY', 3000, 'lobby');
     await sleep(80);
     expect(forRoom(early.room.roomId)).toHaveLength(0);
     expect(forRoom(lobby.room.roomId)).toHaveLength(0);
+  });
+
+  it('"Back to lobby" mid-session closes the table with a result — after the round in play, never voiding it', async () => {
+    const host = await createTable();
+    const bob = await joinTable(host.room.roomId, 'Bob');
+    await start(host);
+    // Bob 9 9 (18) beats dealer 17; Alice T 6 (16) loses.
+    host.server.testStacks = [['9s', 'Ts', '7h', '9c', '6d', 'Th']];
+    await bet(host, 10);
+    await bet(bob, 10);
+    await waitStage(host, 'PLAYING');
+    host.room.send('lobby:toLobby', {});
+    expect(await nextError(host)).toMatchObject({ type: 'lobby:toLobby', code: 'not_allowed' });
+    await waitFor(() => host.state().endRequested, 3000, 'end requested');
+    await act(host, 'stand');
+    await act(bob, 'stand');
+    await waitFor(() => host.state().phase === 'RESULTS', 5000, 'results');
+    expect(forRoom(host.room.roomId)).toHaveLength(1);
+    expect(forRoom(host.room.roomId)[0]!.outcome.placements).toEqual([[bob.id()], [host.id()]]);
+
+    // Between rounds it settles right away: the session is reported, then the lobby.
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => host.state().phase === 'LOBBY', 3000, 'lobby');
+    await start(host);
+    host.server.testStacks = [['9s', 'Ts', '7h', '9c', '6d', 'Th']];
+    await bet(host, 10);
+    await bet(bob, 10);
+    await waitStage(host, 'PLAYING');
+    await act(host, 'stand');
+    await act(bob, 'stand');
+    await nextRound(host, 1);
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => host.state().phase === 'LOBBY', 3000, 'lobby again');
+    await sleep(50);
+    const mine = forRoom(host.room.roomId);
+    expect(mine).toHaveLength(2);
+    expect(mine[1]!.outcome.placements).toEqual([[bob.id()], [host.id()]]);
+    expect(mine[1]!.outcome.scores).toEqual({ [bob.id()]: 1010, [host.id()]: 990 });
   });
 });

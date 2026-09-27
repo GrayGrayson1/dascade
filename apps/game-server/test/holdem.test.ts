@@ -4,6 +4,7 @@ import type { Room as SdkRoom } from '@colyseus/sdk';
 import type { GameOutcome, WelcomePayload } from '@dascade/shared';
 import type { HoldemPrivatePayload, HoldemPublicState, HoldemEvent } from '@dascade/shared/games/holdem';
 import type { HandState } from '@dascade/game-core/holdem';
+import { cardToCode, createDeck } from '@dascade/game-core/cards';
 import { createDascadeServer } from '../src/server.ts';
 import { collect, freePort, quiet, sleep, waitFor } from './helpers.ts';
 import type { HoldemRoom } from '../src/rooms/holdem/HoldemRoom.ts';
@@ -100,6 +101,17 @@ async function act(c: Client, action: string, amount?: number) {
 }
 
 const chips = (s: HoldemPublicState) => s.seats.reduce((sum, seat) => sum + seat.stack + seat.committed, 0);
+
+/** Stacks the rest of the current hand's deck so `board` comes out (server-side test hook; nothing is re-sent). */
+function rigBoard(server: HoldemRoom, board: string[]) {
+  const h = engine(server)!;
+  const used = new Set(board);
+  const spare = createDeck()
+    .map(cardToCode)
+    .filter((c) => !used.has(c));
+  for (const p of h.players) p.hole = [spare.shift()!, spare.shift()!];
+  h.deck = [spare.shift()!, board[0]!, board[1]!, board[2]!, spare.shift()!, board[3]!, spare.shift()!, board[4]!, ...spare];
+}
 
 // ---------------------------------------------------------------------------
 
@@ -437,7 +449,7 @@ describe("DAS Hold'em room", () => {
     expect(standings[1]!.net).toBe(-1000);
   });
 
-  it('host can end the game mid-hand: the hand is cancelled, bets returned, leaderboard shown', async () => {
+  it('host can end the game mid-hand: the hand is played out first (never refunded), then the leaderboard', async () => {
     const { host } = await createTable();
     const guest = await join(host.room.roomId, 'Villain');
     await start(host);
@@ -446,10 +458,15 @@ describe("DAS Hold'em room", () => {
     guest.room.send('holdem:end', {});
     await waitFor(() => guest.errors.some((e) => e.code === 'not_host'), 3000, 'guest cannot end');
     host.room.send('holdem:end', {});
+    await waitFor(() => st(host).endRequested, 3000, 'end requested');
+    expect(st(host).phase).toBe('PLAYING');
+    // Heads-up the first to act is the small blind: the big blind folds to the raise and loses it.
+    await act(c === host ? guest : host, 'fold');
     await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
     const s = st(host);
-    expect(s.standings.map((r) => r.stack)).toEqual([10_000, 10_000]);
-    expect(s.standings.every((r) => r.net === 0 && r.rank === 1)).toBe(true);
+    expect(s.standings.map((r) => r.stack)).toEqual([10_100, 9_900]);
+    expect(s.standings.map((r) => r.rank)).toEqual([1, 2]);
+    expect(s.standings[0]!.playerId).toBe(c.me().playerId);
     expect(host.privates.at(-1)!.cards).toEqual([]);
 
     host.room.send('lobby:toLobby', {});
@@ -530,10 +547,18 @@ describe("DAS Hold'em room: DASCADE outcomes", () => {
     const leaver = await join(host.room.roomId, 'Leaver');
     const leaverId = leaver.me().playerId;
     await start(host);
+    // A royal flush on the board: whoever stays in splits the pot.
+    rigBoard(server, ['As', 'Ks', 'Qs', 'Js', 'Ts']);
     await leaver.room.leave(true);
     await waitFor(() => !(server as any).players.has(leaverId), 3000, 'leaver gone');
     host.room.send('holdem:end', {});
-    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    // The hand in progress is played out first.
+    for (let i = 0; i < 20 && st(host).phase !== 'RESULTS'; i++) {
+      const who = await actor([host, guest]).catch(() => null);
+      if (!who || st(host).phase === 'RESULTS') break;
+      await act(who, st(who).legal.canCall ? 'call' : 'check').catch(() => undefined);
+    }
+    await waitFor(() => st(host).phase === 'RESULTS', 5000, 'results');
     const mine = forRoom(host.room.roomId);
     expect(mine).toHaveLength(1);
     const { outcome } = mine[0]!;
@@ -547,7 +572,7 @@ describe("DAS Hold'em room: DASCADE outcomes", () => {
     expect(Object.keys(outcome.scores ?? {}).sort()).toEqual([host.me().playerId, guest.me().playerId].sort());
   });
 
-  it('reports nothing when the game ends before a hand is dealt or goes back to the lobby', async () => {
+  it('reports nothing when the game ends (or goes back to the lobby) before a hand is dealt', async () => {
     const early = await createTable();
     early.server.timing = { ...FAST, firstHand: 5000 };
     await join(early.host.room.roomId, 'Villain');
@@ -557,8 +582,10 @@ describe("DAS Hold'em room: DASCADE outcomes", () => {
     await waitFor(() => st(early.host).phase === 'RESULTS', 3000, 'results');
 
     const lobby = await createTable();
+    lobby.server.timing = { ...FAST, firstHand: 5000 };
     await join(lobby.host.room.roomId, 'Villain');
-    await start(lobby.host);
+    lobby.host.room.send('lobby:start', {});
+    await waitFor(() => st(lobby.host).phase === 'PLAYING', 3000, 'playing');
     lobby.host.room.send('lobby:toLobby', {});
     await waitFor(() => st(lobby.host).phase === 'LOBBY', 3000, 'lobby');
     await sleep(80);

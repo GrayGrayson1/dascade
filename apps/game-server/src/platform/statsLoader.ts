@@ -5,31 +5,66 @@
  * With persistence disabled (local dev, tests) everything runs synchronously. With it enabled, an
  * update for identities that are still loading is queued behind their load; loads for the same
  * identity are shared, so updates for one player are applied in the order they were reported.
+ *
+ * A failed load is retried with back-off and the identity is NOT marked loaded meanwhile: its
+ * updates stay queued (applying them to default numbers would overwrite the stored ones). If the
+ * database stays unreachable through every retry, those queued updates are dropped (logged) and the
+ * next update starts a fresh load.
+ *
+ * The set of hydrated identities is bounded (GET /api/stats/me accepts any well-formed guest id):
+ * the oldest are forgotten first, which is harmless — hydration never overwrites numbers this
+ * process already holds, so re-loading one later is just a redundant read.
  */
 import { log } from '../lib/log.ts';
 import { hydrateRating } from './ratings.ts';
 import { hydrateStatLine } from './stats.ts';
-import { statsPersistence } from './statsPersistence.ts';
+import { statsPersistence, type IdentitySnapshot } from './statsPersistence.ts';
 
 const loaded = new Set<string>();
 const loading = new Map<string, Promise<void>>();
+let maxLoaded = 20_000;
+/** Waits between hydration attempts for one identity (a load is tried once more than this has entries). */
+let retryDelaysMs = [2_000, 10_000, 30_000, 60_000, 120_000];
 
-/** Resolves once `identity` has been hydrated (immediately when persistence is off or it already is). */
+function markLoaded(identity: string): void {
+  loaded.delete(identity);
+  loaded.add(identity);
+  while (loaded.size > maxLoaded) {
+    const oldest = loaded.values().next().value;
+    if (oldest === undefined) break;
+    loaded.delete(oldest);
+  }
+}
+
+async function loadWithRetry(identity: string): Promise<IdentitySnapshot> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await statsPersistence.loadIdentity(identity);
+    } catch (err) {
+      const wait = retryDelaysMs[attempt];
+      if (wait === undefined) throw err;
+      log.warn('identity hydration failed — retrying', { attempt: attempt + 1, err: err as Error });
+      await new Promise<void>((resolve) => setTimeout(resolve, wait).unref?.());
+    }
+  }
+}
+
+/**
+ * Resolves once `identity` has been hydrated (null = nothing to wait for: persistence is off or it
+ * already is). Rejects when the database stayed unreachable through every retry.
+ */
 export function ensureIdentityLoaded(identity: string): Promise<void> | null {
   if (!statsPersistence.enabled || loaded.has(identity)) return null;
   const inflight = loading.get(identity);
   if (inflight) return inflight;
-  const p = statsPersistence
-    .loadIdentity(identity)
+  const p = loadWithRetry(identity)
     .then((snap) => {
       for (const r of snap.ratings) hydrateRating(identity, r.gameId, r.rating);
       for (const line of snap.stats) hydrateStatLine(identity, line);
+      markLoaded(identity);
     })
-    .catch((err: unknown) => log.warn('identity hydration failed', { err: err as Error }))
-    .finally(() => {
-      loaded.add(identity);
-      loading.delete(identity);
-    });
+    .finally(() => loading.delete(identity));
+  p.catch(() => undefined); // callers handle the rejection; never an unhandled one
   loading.set(identity, p);
   return p;
 }
@@ -48,13 +83,16 @@ export function withIdentitiesLoaded(identities: Iterable<string>, fn: () => voi
     fn();
     return;
   }
-  void Promise.all(pending).then(() => {
-    try {
-      fn();
-    } catch (err) {
-      log.error('deferred stats update failed', { err: err as Error });
-    }
-  });
+  void Promise.all(pending).then(
+    () => {
+      try {
+        fn();
+      } catch (err) {
+        log.error('deferred stats update failed', { err: err as Error });
+      }
+    },
+    (err: unknown) => log.error('stats update dropped — stored ratings/stats could not be loaded', { err: err as Error }),
+  );
 }
 
 let warmed = false;
@@ -70,7 +108,14 @@ export function warmRatings(limit = 5000): void {
 }
 
 /** Tests only. */
-export function resetIdentityLoads(): void {
+export function resetIdentityLoads(options: { retryDelaysMs?: number[]; maxLoaded?: number } = {}): void {
   loaded.clear();
   loading.clear();
+  if (options.retryDelaysMs) retryDelaysMs = options.retryDelaysMs;
+  if (options.maxLoaded) maxLoaded = options.maxLoaded;
+}
+
+/** Tests only. */
+export function loadedIdentityCount(): number {
+  return loaded.size;
 }

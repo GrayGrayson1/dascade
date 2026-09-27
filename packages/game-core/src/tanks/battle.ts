@@ -266,8 +266,23 @@ function isAlive(b: Battle, id: string): boolean {
   return Boolean(t && t.alive);
 }
 
-/** Find the next (side, member) after the current turn without committing. */
-function peekNext(b: Battle, sideIdx: number, cursors: number[], round: number): { sideIdx: number; member: number; round: number } | null {
+/** Whether a tank's crew is at the controls (the room passes presence; CPU tanks always are). */
+export type PresentFn = (id: string) => boolean;
+
+const EVERYONE: PresentFn = () => true;
+
+/**
+ * Find the next (side, member) after the current turn without committing. Within a side the next
+ * living tank whose crew is present is preferred, so an absent teammate never burns the team's
+ * turn; a side with nobody present still gets its turn (the room skips it quickly).
+ */
+function peekNext(
+  b: Battle,
+  sideIdx: number,
+  cursors: number[],
+  round: number,
+  present: PresentFn = EVERYONE,
+): { sideIdx: number; member: number; round: number } | null {
   let idx = sideIdx;
   let r = round;
   for (let n = 0; n < b.sides.length; n++) {
@@ -278,22 +293,28 @@ function peekNext(b: Battle, sideIdx: number, cursors: number[], round: number):
     }
     const side = b.sides[idx]!;
     const m = side.members.length;
+    let fallback = -1;
     for (let k = 1; k <= m; k++) {
       const mi = (cursors[idx]! + k + m) % m;
-      if (isAlive(b, side.members[mi]!)) return { sideIdx: idx, member: mi, round: r };
+      const id = side.members[mi]!;
+      if (!isAlive(b, id)) continue;
+      if (present(id)) return { sideIdx: idx, member: mi, round: r };
+      if (fallback < 0) fallback = mi;
     }
+    if (fallback >= 0) return { sideIdx: idx, member: fallback, round: r };
   }
   return null;
 }
 
-/** Advance to the next turn: next side with a living tank, new wind, refuelled tank. */
-export function nextTurn(b: Battle, rng: Rng): TurnResult {
+/** Advance to the next turn: next side with a living tank (present crews first), new wind, refuelled tank. */
+export function nextTurn(b: Battle, rng: Rng, present: PresentFn = EVERYONE): TurnResult {
   if (b.result) return { kind: 'over' };
   const next = peekNext(
     b,
     b.sideIdx,
     b.sides.map((s) => s.cursor),
     b.round,
+    present,
   );
   if (!next) return { kind: 'over' };
   if (next.round > b.config.maxRounds) return { kind: 'round_limit' };
@@ -310,13 +331,13 @@ export function nextTurn(b: Battle, rng: Rng): TurnResult {
 }
 
 /** The next `n` tanks to play after the current one (for the HUD). */
-export function upcoming(b: Battle, n: number): string[] {
+export function upcoming(b: Battle, n: number, present: PresentFn = EVERYONE): string[] {
   const out: string[] = [];
   let sideIdx = b.sideIdx;
   const cursors = b.sides.map((s) => s.cursor);
   let round = b.round;
   for (let i = 0; i < n; i++) {
-    const next = peekNext(b, sideIdx, cursors, round);
+    const next = peekNext(b, sideIdx, cursors, round, present);
     if (!next) break;
     const id = b.sides[next.sideIdx]!.members[next.member]!;
     if (out.length && id === out[0]) break;

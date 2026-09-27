@@ -13,7 +13,7 @@ import {
 } from '@dascade/shared/games/bingo';
 import { boardSpec, cardKey, dealCards, isValidCard, verifyCard } from '@dascade/game-core/bingo';
 import { bootTestServer, collect, sleep, waitFor, quiet } from './helpers.ts';
-import type { BingoRoom } from '../src/rooms/bingo/BingoRoom.ts';
+import { fixedGameSeed, type BingoRoom } from '../src/rooms/bingo/BingoRoom.ts';
 import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 
 let colyseus: ColyseusTestServer;
@@ -341,7 +341,7 @@ describe('DAS Bingo room', () => {
     expect(cardKey(host.card().cells)).not.toBe(cardKey(first.cells));
   });
 
-  it('host can end the game early; results reveal the seed', async () => {
+  it('host can end the game early; results reveal the game’s card seed (never the fixed seed itself)', async () => {
     const host = await create({ ...MANUAL });
     host.room.send(BINGO_MSG.setSeed, { seed: 'PARTY-2026' });
     await waitFor(() => st(host.room).customSeed === true, 3000, 'seed set');
@@ -349,9 +349,11 @@ describe('DAS Bingo room', () => {
     await hostCall(host);
     host.room.send(BINGO_MSG.endGame, {});
     await waitFor(() => st(host.room).phase === 'RESULTS', 3000, 'RESULTS');
-    expect(st(host.room).seed).toBe('PARTY-2026');
+    const revealed = st(host.room).seed as string;
+    expect(revealed).toBe(fixedGameSeed('PARTY-2026', 1));
+    expect(revealed).not.toContain('PARTY-2026');
     const spec = boardSpec({ mode: 'numbers', size: 5, freeCenter: true, items: [] });
-    expect(verifyCard(spec, 'PARTY-2026', 1, host.card().serial, host.card().cells)).toBe(true);
+    expect(verifyCard(spec, revealed, 1, host.card().serial, host.card().cells)).toBe(true);
     host.room.send('lobby:toLobby', {});
     await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'LOBBY');
     expect(st(host.room).calls.length).toBe(0);
@@ -380,16 +382,33 @@ describe('DAS Bingo room', () => {
     const spec = boardSpec({ mode: 'numbers', size: 5, freeCenter: true, items: [] });
     const published = String(JSON.parse(st(guest.room).settingsJson).seed ?? '');
     if (published) expect(dealCards(spec, published, 1, 2).map(cardKey)).not.toContain(cardKey(host.card().cells));
-    // Reproducibility still holds: the fixed seed deals the same cards, and results reveal it.
-    expect(dealCards(spec, 'PARTY-2026', 1, 2).map(cardKey)).toEqual([cardKey(host.card().cells), cardKey(guest.card().cells)]);
+    // Reproducibility still holds: the fixed seed deals the same series of games, and results reveal
+    // only that game's derived seed.
+    expect(dealCards(spec, fixedGameSeed('PARTY-2026', 1), 1, 2).map(cardKey)).toEqual([cardKey(host.card().cells), cardKey(guest.card().cells)]);
     host.room.send(BINGO_MSG.endGame, {});
     await waitFor(() => st(guest.room).phase === 'RESULTS', 3000, 'RESULTS');
-    expect(st(guest.room).seed).toBe('PARTY-2026');
+    const firstSeed = st(guest.room).seed as string;
+    expect(firstSeed).toBe(fixedGameSeed('PARTY-2026', 1));
     // Back in the lobby the host keeps the seed (private) for the next game, and can clear it.
     host.room.send('lobby:toLobby', {});
     await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'LOBBY');
     expect(st(guest.room).seed).toBe('');
     expect(st(guest.room).customSeed).toBe(true);
+    // Play again: the next game deals from a fresh derived seed — the one the snoop saw revealed
+    // doesn't reproduce anyone's new card.
+    const cardsBefore = guest.cards.length;
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host.room).phase === 'PLAYING' && guest.cards.length > cardsBefore, 3000, 'game 2');
+    const game2 = [cardKey(host.card().cells), cardKey(guest.card().cells)];
+    expect(dealCards(spec, firstSeed, 1, 4).map(cardKey)).not.toContain(game2[0]);
+    expect(dealCards(spec, firstSeed, 1, 4).map(cardKey)).not.toContain(game2[1]);
+    expect(dealCards(spec, fixedGameSeed('PARTY-2026', 2), 1, 2).map(cardKey)).toEqual(game2);
+    host.room.send(BINGO_MSG.endGame, {});
+    await waitFor(() => st(guest.room).phase === 'RESULTS', 3000, 'RESULTS 2');
+    expect(st(guest.room).seed).toBe(fixedGameSeed('PARTY-2026', 2));
+    expect(st(guest.room).seed).not.toBe(firstSeed);
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => st(host.room).phase === 'LOBBY', 3000, 'LOBBY 2');
     host.room.send(BINGO_MSG.setSeed, { seed: '' });
     await waitFor(() => st(guest.room).customSeed === false, 3000, 'seed cleared');
     expect(seeds).toHaveLength(0);
@@ -538,6 +557,27 @@ describe('DAS Bingo room', () => {
     await waitFor(() => calls(host.room).length === 2, 3000, 'undone');
     // The next ball is called after the late player joined, so it must count on their card.
     await waitFor(() => late.card().fromCall === 2, 3000, 'fromCall clamped');
+  });
+
+  it('a new round with fresh calls wipes the daubs on cards players keep (no stale marks)', async () => {
+    const host = await create({ ...MANUAL, format: 'progressive', intermissionSec: 3, rounds: [...fourCorners, ...fourCorners] });
+    const guest = await join(host.room.roomId, 'Guest');
+    await start(host, [guest]);
+    const need = corners(guest.card().cells, 5);
+    for (const n of need) await hostCall(host, n);
+    // The guest daubs the corners (cells 0, 4, 20, 24) and wins round 1.
+    for (const cell of [0, 4, 20, 24]) guest.room.send(BINGO_MSG.mark, { cell, marked: true });
+    await waitFor(() => (host.server as any).cards.get(guest.me().playerId).marks.size === 4, 3000, 'daubs stored');
+    guest.room.send(BINGO_MSG.claim, {});
+    await waitFor(() => st(host.room).phase === 'INTERMISSION', 3000, 'INTERMISSION');
+    const serial = guest.card().serial;
+    const sent = guest.cards.length;
+    host.room.send(BINGO_MSG.nextRound, {});
+    await waitFor(() => st(host.room).round === 2 && calls(host.room).length === 0, 3000, 'round 2');
+    // Same card (kept), no daubs — on the server and in the card re-sent to the player.
+    await waitFor(() => guest.cards.length > sent, 3000, 'card re-sent');
+    expect(guest.card()).toMatchObject({ serial, deal: 1, marks: [] });
+    expect((host.server as any).cards.get(guest.me().playerId).marks.size).toBe(0);
   });
 
   it('a late card counts every call once the next round clears the calls', async () => {

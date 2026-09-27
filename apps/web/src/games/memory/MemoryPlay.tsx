@@ -136,13 +136,18 @@ export function MemoryPlay() {
   const [wrong, setWrong] = useState<number | null>(null);
   const [pressed, setPressed] = useState<number | null>(null);
   const roundRef = useRef(round);
+  // A new round — or a new run/match that starts again at the same round number (solo Retry after
+  // failing round 1, a rematch) — clears the private tap feedback.
+  const attempt = `${meta?.matchNo ?? 0}:${mine?.runs ?? 0}:${round}`;
+  const attemptRef = useRef(attempt);
   useEffect(() => {
-    if (roundRef.current !== round) {
-      roundRef.current = round;
+    roundRef.current = round;
+    if (attemptRef.current !== attempt) {
+      attemptRef.current = attempt;
       setFound([]);
       setWrong(null);
     }
-  }, [round]);
+  }, [attempt, round]);
   const you = useLatestMessage<MemoryYou>(MEMORY_MSG.you);
   useEffect(() => {
     if (you && you.round === round) setFound(you.found);

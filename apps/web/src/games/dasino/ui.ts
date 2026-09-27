@@ -22,8 +22,10 @@ interface DasinoUiState {
    * settled the spin; showing the new balance would spoil the result).
    */
   freeze: number | null;
-  /** My recent slot spins (newest first). */
+  /** My recent slot spins (newest first), in the room `logRoom`. */
   slotLog: SlotResultPayload[];
+  /** Room code the spin log (and held balance) belongs to. */
+  logRoom: string | null;
   setTable: (table: DasinoTable) => void;
   setChip: (chip: number) => void;
   setLines: (lines: 1 | 3 | 5) => void;
@@ -31,6 +33,8 @@ interface DasinoUiState {
   setBetMode: (mode: InsideBetType) => void;
   setFreeze: (freeze: number | null) => void;
   logSlot: (result: SlotResultPayload) => void;
+  /** Entering a room: a different room than the log's clears it (the store outlives rooms). */
+  enterRoom: (code: string) => void;
 }
 
 export const useDasinoUi = create<DasinoUiState>((set) => ({
@@ -41,6 +45,7 @@ export const useDasinoUi = create<DasinoUiState>((set) => ({
   betMode: 'straight',
   freeze: null,
   slotLog: [],
+  logRoom: null,
   setTable: (table) => set({ table }),
   setChip: (chip) => set({ chip }),
   setLines: (lines) => set({ lines }),
@@ -48,6 +53,7 @@ export const useDasinoUi = create<DasinoUiState>((set) => ({
   setBetMode: (betMode) => set({ betMode }),
   setFreeze: (freeze) => set({ freeze }),
   logSlot: (result) => set((s) => (s.slotLog.some((r) => r.id === result.id && r.at === result.at) ? s : { slotLog: [result, ...s.slotLog].slice(0, 12) })),
+  enterRoom: (code) => set((s) => (s.logRoom === code ? s : { logRoom: code, slotLog: [], freeze: null })),
 }));
 
 export function useMotion(): { reduced: boolean; fx: 'high' | 'low' | 'off' } {

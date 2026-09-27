@@ -396,6 +396,23 @@ describe('DAS Survey — anonymous answers + predictions', () => {
     expect(JSON.stringify(again.all)).not.toMatch(/"answer":1/);
   });
 
+  it('refuses answers while the host has the game paused, and takes them again after the resume', async () => {
+    const t = await setup(3, { custom: CUSTOM, answerMs: 6000 });
+    await start(t);
+    const [a, b] = t.clients as [Client, Client, Client];
+    a.room.send('party:host', { action: 'pause' });
+    await waitFor(() => t.server.state.paused === true, 2000, 'paused');
+    const s1 = q(t);
+    b.room.send(SURVEY_MSG.answer, { q: s1, option: 0 });
+    await waitFor(() => b.errors.some((e) => e.type === SURVEY_MSG.answer), 2000, 'refused');
+    expect(b.errors.find((e) => e.type === SURVEY_MSG.answer)).toMatchObject({ code: 'wrong_phase', message: 'The game is paused.' });
+    expect(json(a).seats[b.id()].answered).toBe(false);
+    a.room.send('party:host', { action: 'resume' });
+    await waitFor(() => t.server.state.paused === false, 2000, 'resumed');
+    b.room.send(SURVEY_MSG.answer, { q: s1, option: 0 });
+    await waitFor(() => json(a).seats[b.id()].answered === true, 2000, 'answered after resume');
+  });
+
   it('ends the game cleanly when fewer than 3 players remain', async () => {
     const t = await setup(3, { custom: CUSTOM, answerMs: 4000 });
     await start(t);
@@ -409,7 +426,9 @@ describe('DAS Survey — anonymous answers + predictions', () => {
     await waitFor(() => t.server.state.phase === 'RESULTS', 3000, 'results');
     await waitFor(() => outcomes.length === 1, 2000, 'outcome');
     expect(outcomes[0]!.reason).toBe('not_enough_players');
-    expect(outcomes[0]!.placements.flat().sort()).toEqual([a.id(), b.id()].sort());
+    // The player who left is still placed — last — so leaving never dodges a result.
+    expect(outcomes[0]!.placements.flat().sort()).toEqual([a.id(), b.id(), c.id()].sort());
+    expect(outcomes[0]!.placements.at(-1)).toEqual([c.id()]);
   });
 
   it('lets a late joiner answer the open question and score', async () => {

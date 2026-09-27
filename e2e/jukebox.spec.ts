@@ -146,12 +146,15 @@ async function createLobby(page: Page, gameId = 'chess', name = 'Host'): Promise
 }
 
 test.describe('jukebox', () => {
-  test('library loads from the manifest; open → play → next → seek', async ({ page }) => {
+  test('library loads from the manifest; open → play → next → seek', async ({ page, isMobile }) => {
     await page.goto('/');
     const n = await libraryReady(page);
-    await expect(dock(page)).toHaveCount(1);
+    // Desktop floor: the quick control in the HUD + the physical jukebox in the corner; phones: the control.
+    await expect(dock(page)).toHaveCount(isMobile ? 1 : 2);
     await openPlayer(page);
-    await expect(panel(page).locator('[data-part="track"]')).toHaveCount(n);
+    // The title-strip rack shows one letter (eight selections) at a time.
+    await expect(panel(page).locator('[data-part="track"]')).toHaveCount(Math.min(n, 8));
+    await expect(panel(page).locator('[data-part="track"]').first()).toHaveAttribute('data-code', 'A1');
     await expect(page.locator('[data-jukebox] canvas[data-part="visualizer"]')).toHaveCount(1);
     await closePlayer(page);
 
@@ -280,6 +283,39 @@ test.describe('jukebox', () => {
     expect(census.sources).toBeLessThanOrEqual(1);
   });
 
+  test('the physical jukebox stands in the floor corner; walking up to it opens the machine', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'phones have no free floor corner (covered by the phone test)');
+    await page.goto('/');
+    await libraryReady(page);
+    const machine = page.locator('[data-jukebox][data-dock="floor"] [data-part="machine-open"]');
+    await expect(machine).toBeVisible();
+    await expect(machine).toHaveAccessibleName(/^Jukebox — /);
+    // In the room's left corner, standing on the row's floor line, clear of every cabinet and the plaque.
+    const vp = page.viewportSize()!;
+    const box = (await machine.boundingBox())!;
+    expect(box.x + box.width).toBeLessThan(vp.width * 0.3);
+    await expectNoOverlap(machine, [page.locator('[data-part="cabinet"][aria-current="true"]'), page.locator('[data-part="plaque"]')]);
+
+    // Walk up to it: the machine up close, rising from where it stands, the record on its turntable.
+    await machine.click();
+    await expect(panel(page)).toBeVisible();
+    await expect(page.locator('.jb-player')).toHaveAttribute('data-anchor', 'floor');
+    await expect(panel(page).locator('[data-part="dome"] [data-part="record"]')).toHaveCount(1);
+    await panel(page).locator('[data-part="track"][data-code="A1"] .jb-track__main').click();
+    await expect.poll(async () => (await snap(page)).playing, { timeout: 15_000 }).toBe(true);
+    await expect(page.locator('[data-jukebox][data-dock="floor"]')).toHaveAttribute('data-playing', 'true');
+    await expect(panel(page).locator('[data-part="record"]')).toHaveAttribute('data-playing', 'true');
+    await page.keyboard.press('Escape');
+    await expect(panel(page)).toBeHidden();
+    await expect(machine).toBeFocused();
+
+    // The quick control in the HUD opens the same machine, dropped down under it.
+    await page.locator('.af-hud [data-jukebox] [data-part="mini-open"]').click();
+    await expect(panel(page)).toBeVisible();
+    await expect(page.locator('.jb-player')).toHaveAttribute('data-anchor', 'top-right');
+    await closePlayer(page);
+  });
+
   test('reload restores the track and approximate position, resuming after a gesture', async ({ page }) => {
     await page.goto('/');
     await libraryReady(page);
@@ -305,9 +341,12 @@ test.describe('jukebox', () => {
     test.skip(!isMobile, 'phone viewports only');
     await page.goto('/');
     await libraryReady(page);
-    // Floor: the floating dock avoids the HUD and plaque controls.
+    // Floor: no room for the machine on a phone — the quick control sits in the floor's extras row, clear of
+    // the HUD and plaque controls.
+    await expect(page.locator('[data-jukebox][data-dock="floor"]')).toHaveCount(0);
     await expect(dock(page)).toBeVisible();
-    await expectNoOverlap(dock(page), [page.locator('.af-floor button, .af-floor a[href]')]);
+    await expect(page.locator('.af-floor__jukebox [data-jukebox][data-dock="slot"]')).toBeVisible();
+    await expectNoOverlap(dock(page), [page.locator('.af-floor button:not([data-jukebox] button), .af-floor a[href]')]);
 
     await playFirstTrack(page);
     await closePlayer(page);
