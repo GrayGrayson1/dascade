@@ -13,6 +13,7 @@ export const ROOM_LOADERS: Record<GameId, () => Promise<AnyGameRoom>> = {
   wheel: async () => (await import('./wheel/WheelRoom.ts')).WheelRoom,
   dasino: async () => (await import('./dasino/DasinoRoom.ts')).DasinoRoom,
   circuit: async () => (await import('./circuit/CircuitRoom.ts')).CircuitRoom,
+  kart: async () => (await import('./kart/KartRoom.ts')).KartRoom,
   quest: async () => (await import('./quest/QuestRoom.ts')).QuestRoom,
   chess: async () => (await import('./chess/ChessRoom.ts')).ChessRoom,
   checkers: async () => (await import('./checkers/CheckersRoom.ts')).CheckersRoom,

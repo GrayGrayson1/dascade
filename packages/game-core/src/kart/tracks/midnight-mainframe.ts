@@ -1,0 +1,121 @@
+import type { KartTrackDef } from '../trackdef.ts';
+
+export const MIDNIGHT_MAINFRAME: KartTrackDef = {
+  id: 'midnight-mainframe',
+  biome: 'cyber',
+  points: [
+    [0, 0, 4],
+    [85, 0, 4],
+    [170, 0, 4],
+    [177.7, -1.5, 4],
+    [184.1, -5.9, 4],
+    [226.6, -48.3, 2],
+    [233.1, -52.6, 1.5],
+    [240.7, -54.1, 1],
+    [280.7, -54.1, 0],
+    [287.2, -55.9, 0],
+    [292, -60.6, 0],
+    [293.7, -67.1, 0],
+    [293.7, -130.5, 0],
+    [293.7, -193.8, 0],
+    [293.7, -257.1, 0],
+    [292, -263.6, 0],
+    [287.2, -268.4, 0],
+    [280.7, -270.1, 0],
+    [240.7, -270.1, 0],
+    [233.8, -271.5, 0],
+    [228, -275.4, 0],
+    [185.6, -317.8, 0],
+    [179.7, -321.7, 0],
+    [172.8, -323.1, 0],
+    [84.9, -323.1, 0],
+    [-3, -323.1, 0],
+    [-10.5, -321.1, 0],
+    [-16, -315.6, 0],
+    [-18, -308.1, 0],
+    [-18, -288.1, 0],
+    [-18.9, -283.5, 0],
+    [-21.5, -279.6, 0],
+    [-39.9, -261.2, 0],
+    [-43, -255.9, 0],
+    [-43, -249.7, 0],
+    [-39.9, -244.3, 0],
+    [-21.5, -225.9, 0],
+    [-18.4, -220.5, 0],
+    [-18.4, -214.3, 0],
+    [-21.5, -208.9, 0],
+    [-39.9, -190.5, 0],
+    [-43, -185.2, 0],
+    [-43, -178.9, 0],
+    [-39.9, -173.6, 0],
+    [-21.5, -155.2, 0],
+    [-18.9, -151.3, 0],
+    [-18, -146.7, 0],
+    [-18, -82.3, 1.5],
+    [-18, -18, 3],
+    [-15.6, -9, 3.3],
+    [-9, -2.4, 3.7],
+  ],
+  halfWidth: 6.5,
+  shoulder: 1.5,
+  offroad: 'metal',
+  edge: 'wall',
+  edges: [
+    // The data bus runs along the top layer: nothing but the void on its right.
+    { from: 0.02, to: 0.11, side: 'right', kind: 'drop' },
+  ],
+  boostPads: [
+    // Two data lanes down the bus.
+    { at: 0.05, d: 3 },
+    { at: 0.07, d: -3 },
+    // Out of the first chicane.
+    { at: 0.205, d: 0 },
+    // Survive the firewall, then fire out of it.
+    { at: 0.444, d: -2.5 },
+    // Clean exit from the pin row, then a chain up the climb.
+    { at: 0.885, d: 0 },
+    { at: 0.905, d: 0 },
+    { at: 0.925, d: 0 },
+  ],
+  branches: [
+    {
+      // The bypass through the core: a narrow trace that skips the last two laser gates.
+      from: 0.304,
+      to: 0.62,
+      points: [
+        [278, -128, 0],
+        [246, -146, 0],
+        [214, -176, 0],
+        [184, -216, 0],
+        [156, -258, 0],
+        [124, -300, 0],
+      ],
+      surface: 'road',
+      halfWidth: 4.5,
+    },
+  ],
+  itemRows: [
+    { at: 0.1, count: 4 },
+    { at: 0.232, count: 3 },
+    { at: 0.5, count: 3 },
+    { at: 0.65, count: 4 },
+    { at: 0.95, count: 4 },
+  ],
+  hazards: [
+    // The firewall: three laser gates in time with each other — hit the first one as it switches
+    // off at full speed and the others open in front of you.
+    { kind: 'laser', at: 0.285, d: 0, period: 1.6, phase: 0 },
+    { kind: 'laser', at: 0.34, d: 0, period: 1.6, phase: 0 },
+    { kind: 'laser', at: 0.395, d: 0, period: 1.6, phase: 0 },
+  ],
+  landmarks: [
+    // The core: beside the bypass, in view from the whole firewall corridor.
+    { kind: 'cpu-tower', at: 0.386, d: -48, scale: 1.2 },
+    // Framed at the ends of the straights.
+    { kind: 'data-spire', at: 0.14, d: 24 },
+    { kind: 'tower', at: 0.44, d: 26 },
+    { kind: 'data-spire', at: 0.685, d: 26 },
+  ],
+  decorSeed: 6661,
+  parLapMs: 41_800,
+};

@@ -10,6 +10,7 @@ export const GAME_MODULES: Record<GameId, () => Promise<{ default: GameClientMod
   wheel: () => import('./wheel/index.tsx'),
   dasino: () => import('./dasino/index.tsx'),
   circuit: () => import('./circuit/index.tsx'),
+  kart: () => import('./kart/index.tsx'),
   quest: () => import('./quest/index.tsx'),
   chess: () => import('./chess/index.tsx'),
   checkers: () => import('./checkers/index.tsx'),

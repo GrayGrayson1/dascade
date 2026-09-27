@@ -200,7 +200,10 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   dome's `--jb-arch` rather than overriding colours on the parts. The quick control (`[data-part=mini-open]`,
   `[data-part=mini]`) is the small button in the floor HUD, top bar or shell menu.
 - **The claw machine** stands at the right end of the row (`[data-part=claw-machine]`, `.clw-*`,
-  `apps/web/src/arcade/claw.css`): body from `--cabinet-*`, marquee and trim from `--clw-accent`.
+  `apps/web/src/arcade/claw.css`): body from `--cabinet-*`, marquee and trim from `--clw-accent`. Its close-up
+  (`[data-part=claw-closeup]`, `.clwx*`, `clawCloseup.css`) uses the same tokens for its cabinet; the inside of
+  the glass (the plushies, the claw) is fixed printed/lit art like the cabinets' screens. Where the floor has no
+  room for the machine, a quick Claw button (`[data-part=claw-quick]`) sits in the HUD or the phone extras row.
 - **Keep the row's ends free for them.** On floors wide enough for the machines, the lineup carries
   `data-jukebox="floor"` / `data-claw="floor"`; a FloorDecor prop that would stand in the same spot steps
   aside with `:root[data-theme='<id>'] .af-floor:has(.af-lineup[data-claw='floor']) .<prop> { display: none }`

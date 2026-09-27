@@ -1,353 +1,225 @@
 /**
- * The claw machine at the right end of the cabinet row — the floor's Easter egg.
+ * The claw machine at the right end of the cabinet row — the floor's Easter egg — plus its quick
+ * button (where the floor has no room for the machine) and the host that opens the close-up.
  *
  * Built like the cabinets (flat SVG panels, cabinet body tokens, a side panel turned towards the
- * aisle): a lit CLAW marquee with chaser bulbs, a glass case with a gantry, the claw and a pile of
- * pixel plushies, a prize chute, a control deck and a prize door. Press it and the claw goes for a
- * toy: across, down, grab, up — and either it slips, it misses, or it carries the plush to the chute,
- * the plush pops out of the prize door and confetti flies (claw.ts has the odds and the timing).
+ * aisle): a lit CLAW marquee with chaser bulbs, a glass case with the parked claw and the pile of pixel
+ * plushies, a prize chute, a control deck and a prize door. Walk up to it (click / Enter) and it grows
+ * into the close-up (ClawCloseup.tsx, lazy loaded), where you operate it. The pile is shared
+ * (clawInventory.ts): what you win there is missing here, and the prize door shows it for a moment.
  *
- * Cosmetic and local only (a prize count is kept in this browser). Motion runs on one
- * requestAnimationFrame loop while a try is on; reduced motion skips straight to the result and
- * visual effects set to off/low drop or thin the confetti. Sounds go through sfx()/synth.
+ * Cosmetic and local only (the pile and your prize shelf are kept in this browser).
  */
-import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useApp } from '../app/store.ts';
-import { sfx, synth } from '../audio/audio.ts';
-import { CLAW_ART, IDLE_OPEN, RIG, TOY_SPOTS, clawPose, planClaw, type ClawOutcome, type ClawPhase, type ClawPlan, type ClawPose } from './claw.ts';
+import { Suspense, lazy, memo, useEffect, useId, useMemo, useRef } from 'react';
+import { CLAW_ART, FLOOR_HOME_X, FLOOR_PLUSH_SCALE, floorOrder, floorPlacement } from './claw.ts';
+import { spritePaths, spriteColor, spriteSize } from './clawArt.ts';
+import { pileToToys, shelfTotal, useClaw, type ClawOpener } from './clawInventory.ts';
+import type { ToyKind } from './clawPhysics.ts';
+import { sfx } from '../audio/audio.ts';
 import './claw.css';
 
-const PLUSH = ['.a..a.', 'aaaaaa', 'awaawa', 'aaaaaa', '.aaaa.'];
-const PLUSH_COLORS = ['#ff4fd8', '#22d3ee', '#ffd23f', '#2de38f', '#a78bfa', '#ff8a3d'];
-const CONFETTI = ['#ff4fd8', '#ffd23f', '#22d3ee', '#2de38f', '#a78bfa', '#ff8a3d', '#ffffff'];
+const loadCloseup = () => import('./ClawCloseup.tsx');
+const ClawCloseup = lazy(loadCloseup);
 
-/** One path per colour of a pixel sprite (1 unit a pixel). */
-function spritePath(rows: readonly string[], ch: string): string {
-  let d = '';
-  rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) if (row[x] === ch) d += `M${x} ${y}h1v1h-1z`;
+/** Opens the close-up from `el` (the floor machine, or a quick button). */
+export function openClaw(from: ClawOpener['from'], el: HTMLElement | null, rectEl: Element | null = el): void {
+  const r = rectEl?.getBoundingClientRect();
+  sfx('select');
+  useClaw.getState().openCloseup({
+    from,
+    el,
+    rect: r && r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null,
   });
-  return d;
-}
-const PLUSH_BODY = spritePath(PLUSH, 'a');
-const PLUSH_EYES = spritePath(PLUSH, 'w');
-
-const toyTransform = (x: number, y: number) => `translate(${(x - 6).toFixed(2)} ${y.toFixed(2)}) scale(2)`;
-const prongAngle = (open: number) => -12 + 40 * open;
-
-interface Toy {
-  id: number;
-  spot: number;
-  color: number;
-  /** Restocked: drops into the machine. */
-  fresh?: boolean;
-}
-let toyIds = 0;
-function stock(shift: number, fresh = false): Toy[] {
-  return TOY_SPOTS.map((_, spot) => ({ id: ++toyIds, spot, color: (spot * 5 + shift) % PLUSH_COLORS.length, fresh }));
 }
 
-type Display = 'idle' | 'playing' | 'won' | 'slipped' | 'missed';
-const MARQUEE: Record<Display, string> = { idle: 'CLAW', playing: 'CLAW', won: 'WINNER!', slipped: 'SO CLOSE', missed: 'TRY AGAIN' };
-const RESULT: Record<ClawOutcome, Display> = { win: 'won', slip: 'slipped', miss: 'missed' };
-const TAG_LINE: Record<Exclude<Display, 'idle'>, string> = {
-  playing: 'Good luck!',
-  won: 'You won a plush!',
-  slipped: 'So close — it slipped!',
-  missed: 'Missed — try again',
-};
-
-const PRIZES_KEY = 'dascade:v1:claw';
-function readPrizes(): number {
-  try {
-    const n = Number(JSON.parse(localStorage.getItem(PRIZES_KEY) ?? '{}')?.won);
-    return Number.isInteger(n) && n > 0 ? Math.min(n, 99_999) : 0;
-  } catch {
-    return 0;
-  }
-}
-function writePrizes(won: number): void {
-  try {
-    localStorage.setItem(PRIZES_KEY, JSON.stringify({ won }));
-  } catch {
-    /* private mode / storage off: the count just isn't kept */
-  }
-}
-
-/** Motor and mechanism noises for the start of each phase. */
-function phaseSound(phase: ClawPhase, plan: ClawPlan): void {
-  switch (phase) {
-    case 'move':
-    case 'carry':
-      synth.tone({ type: 'sawtooth', freq: 58, to: 63, dur: phase === 'move' ? plan.move : plan.carry, gain: 0.03 });
-      break;
-    case 'drop':
-      synth.tone({ type: 'square', freq: 150, to: 92, dur: plan.drop * 0.9, gain: 0.018 });
-      break;
-    case 'grab':
-      synth.tone({ type: 'square', freq: 260, to: 110, dur: 0.07, gain: 0.08 });
-      break;
-    case 'lift':
-      synth.tone({ type: 'square', freq: 92, to: 150, dur: plan.lift * 0.9, gain: 0.018 });
-      break;
-    case 'back':
-      if (plan.outcome === 'miss') {
-        synth.tone({ type: 'triangle', freq: 330, to: 300, dur: 0.18, gain: 0.07 });
-        synth.tone({ type: 'triangle', freq: 250, to: 185, start: 0.2, dur: 0.32, gain: 0.07 });
-      } else synth.tone({ type: 'sawtooth', freq: 58, to: 63, dur: plan.back, gain: 0.025 });
-      break;
-    default:
-      break;
-  }
-}
-
-export const ClawMachine = memo(function ClawMachine() {
-  const reduced = useApp((s) => s.settings.reducedMotion);
-  const fx = useApp((s) => s.settings.fx);
-  const [toys, setToys] = useState<Toy[]>(() => stock(0));
-  const [display, setDisplay] = useState<Display>('idle');
-  const [prize, setPrize] = useState<Toy | null>(null);
-  const [burst, setBurst] = useState(0);
-  const [prizes, setPrizes] = useState(readPrizes);
-  const prizesRef = useRef(prizes);
-  const [said, setSaid] = useState('');
-  const uid = `clw${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-
-  const busy = useRef(false);
-  const streak = useRef(0);
-  const raf = useRef(0);
-  const timers = useRef<number[]>([]);
-  const toysRef = useRef(toys);
-  toysRef.current = toys;
-  const gantry = useRef<SVGGElement>(null);
-  const cable = useRef<SVGRectElement>(null);
-  const head = useRef<SVGGElement>(null);
-  const prongL = useRef<SVGGElement>(null);
-  const prongR = useRef<SVGGElement>(null);
-  const toyEls = useRef(new Map<number, SVGGElement>());
-
-  const later = useCallback((ms: number, fn: () => void) => {
-    const t = window.setTimeout(() => {
-      timers.current = timers.current.filter((x) => x !== t);
-      fn();
-    }, ms);
-    timers.current.push(t);
-  }, []);
+/** Mounts the close-up while it's open (lazy chunk). ArcadeFloor renders one. */
+export function ClawHost() {
+  const open = useClaw((s) => s.open !== null);
+  // Leaving the floor (a route change) with the machine open: it closes (the close-up settles its try
+  // as it unmounts), so coming back doesn't reopen it.
   useEffect(
     () => () => {
-      cancelAnimationFrame(raf.current);
-      for (const t of timers.current) window.clearTimeout(t);
+      if (useClaw.getState().open) useClaw.getState().closeCloseup();
     },
     [],
   );
+  return open ? (
+    <Suspense fallback={null}>
+      <ClawCloseup />
+    </Suspense>
+  ) : null;
+}
 
-  /** Writes a pose straight onto the rig (no React render per frame). Null parks everything. */
-  const apply = useCallback((pose: ClawPose | null, target: Toy | null) => {
-    const x = pose?.x ?? RIG.homeX;
-    const drop = pose?.drop ?? 0;
-    const a = prongAngle(pose?.open ?? IDLE_OPEN);
-    gantry.current?.setAttribute('transform', `translate(${x.toFixed(2)} 0)`);
-    cable.current?.setAttribute('height', (RIG.hubY - 44 + drop).toFixed(2));
-    head.current?.setAttribute('transform', `translate(${x.toFixed(2)} ${(RIG.hubY + drop).toFixed(2)})`);
-    prongL.current?.setAttribute('transform', `rotate(${a.toFixed(1)} -3 3)`);
-    prongR.current?.setAttribute('transform', `rotate(${(-a).toFixed(1)} 3 3)`);
-    if (!target) return;
-    const el = toyEls.current.get(target.id);
-    if (!el) return;
-    const toy = pose?.toy ?? null;
-    if (toy === 'gone') {
-      el.setAttribute('visibility', 'hidden');
-      return;
-    }
-    const spot = TOY_SPOTS[target.spot]!;
-    el.removeAttribute('visibility');
-    el.setAttribute('transform', toyTransform(toy?.x ?? spot.x, toy?.y ?? spot.y));
-  }, []);
-
-  const celebrate = useCallback(
-    (target: Toy) => {
-      sfx('pop');
-      setToys((list) => list.filter((t) => t.id !== target.id));
-      setPrize(target);
-      setDisplay('won');
-      if (!useApp.getState().settings.reducedMotion && useApp.getState().settings.fx !== 'off') setBurst((n) => n + 1);
-      later(160, () => sfx('win'));
-      later(5200, () => setPrize((p) => (p?.id === target.id ? null : p)));
-    },
-    [later],
+/** The compact Claw control for floors without room for the machine (HUD / phone extras row). */
+export function ClawQuickButton({ className }: { className?: string }) {
+  const won = useClaw((s) => shelfTotal(s.inv.shelf));
+  const label = `Claw machine${won ? ` (${won} prize${won === 1 ? '' : 's'} won)` : ''}`;
+  return (
+    <button
+      type="button"
+      className={`dc-btn dc-btn--ghost dc-btn--icon clw-quick ${className ?? ''}`}
+      data-part="claw-quick"
+      aria-label={label}
+      title="Claw machine"
+      onPointerEnter={() => void loadCloseup()}
+      onClick={(e) => openClaw('quick', e.currentTarget)}
+    >
+      <svg viewBox="0 0 12 12" width="20" height="20" aria-hidden focusable="false" shapeRendering="crispEdges">
+        <path
+          d="M1 1h10v1H1zM5 2h2v2H5zM3 4h6v1H3zM2 5h2v1H2zM8 5h2v1H8zM1 6h2v2H1zM9 6h2v2H9zM2 8h2v1H2zM8 8h2v1H8zM3 9h1v1H3zM8 9h1v1H8zM5 8h2v1H5zM4 9h4v2H4z"
+          fill="currentColor"
+        />
+      </svg>
+    </button>
   );
+}
 
-  const finish = useCallback(
-    (plan: ClawPlan, target: Toy) => {
-      busy.current = false;
-      apply(null, plan.outcome === 'win' ? null : target);
-      if (plan.outcome === 'win') {
-        streak.current = 0;
-        const won = prizesRef.current + 1;
-        prizesRef.current = won;
-        writePrizes(won);
-        setPrizes(won);
-        setSaid(`You won a plush! Prizes won: ${won}.`);
-        // Nearly cleaned out: the attendant restocks the machine.
-        if (toysRef.current.filter((t) => t.id !== target.id).length < 4) later(1200, () => setToys(stock(toyIds % PLUSH_COLORS.length, true)));
-      } else {
-        streak.current += 1;
-        setDisplay(RESULT[plan.outcome]);
-        setSaid(plan.outcome === 'slip' ? 'So close — the plush slipped out of the claw.' : 'Missed! The claw came up empty.');
-      }
-      later(plan.outcome === 'win' ? 2600 : 1800, () => {
-        if (!busy.current) setDisplay('idle');
-      });
-    },
-    [apply, later],
+type Display = 'idle' | 'playing' | 'won';
+const MARQUEE: Record<Display, string> = { idle: 'CLAW', playing: 'CLAW', won: 'WINNER!' };
+
+/** A floor-art plush (1 art unit a pixel), bottom-centre at (x, y). */
+const FloorPlush = memo(function FloorPlush({ kind, color, x, y }: { kind: ToyKind; color: number; x: number; y: number }) {
+  const { w, h } = spriteSize(kind);
+  return (
+    <g
+      className="clw-toy"
+      transform={`translate(${(x - (w * FLOOR_PLUSH_SCALE) / 2).toFixed(2)} ${(y - h * FLOOR_PLUSH_SCALE).toFixed(2)}) scale(${FLOOR_PLUSH_SCALE})`}
+    >
+      {spritePaths(kind).map(({ ch, d }) => (
+        <path key={ch} d={d} fill={spriteColor(ch, color) ?? 'none'} />
+      ))}
+    </g>
   );
+});
 
-  const play = useCallback(() => {
-    if (busy.current) return;
-    const current = toysRef.current;
-    const plan = planClaw(
-      current.map((t) => t.spot),
-      streak.current,
-      Math.random,
-    );
-    const target = plan ? current.find((t) => t.spot === plan.toy) : undefined;
-    if (!plan || !target) return;
-    busy.current = true;
-    sfx('coin');
-    setDisplay('playing');
-    setSaid('');
-    if (useApp.getState().settings.reducedMotion) {
-      // No motion: straight to the result.
-      if (plan.outcome === 'win') celebrate(target);
-      finish(plan, target);
-      return;
-    }
-    const t0 = performance.now();
-    let phase: ClawPhase | null = null;
-    let slipped = false;
-    let landed = false;
-    const slipAt = plan.move + plan.drop + plan.grab + plan.lift * plan.slipAt;
-    const frame = (now: number) => {
-      const t = (now - t0) / 1000;
-      const pose = clawPose(plan, t);
-      if (pose.phase !== phase) {
-        phase = pose.phase;
-        phaseSound(phase, plan);
-      }
-      if (plan.outcome === 'slip' && !slipped && t >= slipAt) {
-        slipped = true;
-        synth.tone({ type: 'triangle', freq: 520, to: 150, dur: 0.32, gain: 0.09 });
-      }
-      apply(pose, target);
-      if (plan.outcome === 'win' && !landed && t >= plan.prizeAt) {
-        landed = true;
-        celebrate(target);
-      }
-      if (pose.phase === 'done') {
-        raf.current = 0;
-        finish(plan, target);
-        return;
-      }
-      raf.current = requestAnimationFrame(frame);
-    };
-    raf.current = requestAnimationFrame(frame);
-  }, [apply, celebrate, finish]);
+export const ClawMachine = memo(function ClawMachine() {
+  const pile = useClaw((s) => s.inv.pile);
+  const won = useClaw((s) => shelfTotal(s.inv.shelf));
+  const floor = useClaw((s) => s.floor);
+  const prize = useClaw((s) => s.lastPrize);
+  const isOpen = useClaw((s) => s.open !== null);
+  const uid = `clw${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const machineRef = useRef<HTMLSpanElement>(null);
 
-  const confetti = reduced || fx === 'off' ? 0 : fx === 'low' ? 40 : 110;
-  const label = `Claw machine — try your luck${prizes ? ` (${prizes} prize${prizes === 1 ? '' : 's'} won)` : ''}`;
+  // The pile, settled, in draw order.
+  const toys = useMemo(() => floorOrder(pileToToys(pile)), [pile]);
+
+  // WINNER! lights for a few seconds after you come back with a prize.
+  useEffect(() => {
+    if (floor !== 'won' || isOpen) return;
+    const t = window.setTimeout(() => useClaw.getState().settleFloor(), 5200);
+    return () => window.clearTimeout(t);
+  }, [floor, isOpen]);
+
+  const display: Display = isOpen ? 'playing' : floor;
+  const label = `Claw machine — step up and play${won ? ` (${won} prize${won === 1 ? '' : 's'} won)` : ''}`;
   const word = MARQUEE[display];
   const id = (k: string) => `${uid}-${k}`;
   const url = (k: string) => `url(#${id(k)})`;
+  const showPrize = display === 'won' && prize;
 
   return (
-    <>
-      <button type="button" className="clw" data-part="claw-machine" data-state={display} aria-label={label} onClick={play}>
-        <span className="clw__machine">
-          <svg className="clw-art" viewBox={`0 0 ${CLAW_ART.w} ${CLAW_ART.h}`} aria-hidden focusable="false">
-            <ClawDefs uid={uid} />
-            <ClawBody uid={uid} />
+    <button
+      type="button"
+      className="clw"
+      data-part="claw-machine"
+      data-state={display}
+      aria-label={label}
+      aria-haspopup="dialog"
+      onPointerEnter={() => void loadCloseup()}
+      onFocus={() => void loadCloseup()}
+      onClick={(e) => openClaw('floor', e.currentTarget, machineRef.current)}
+    >
+      <span className="clw__machine" ref={machineRef}>
+        <svg className="clw-art" viewBox={`0 0 ${CLAW_ART.w} ${CLAW_ART.h}`} aria-hidden focusable="false">
+          <ClawDefs uid={uid} />
+          <ClawBody uid={uid} />
 
-            {/* marquee */}
-            <rect x="20" y="3" width="122" height="24" rx="2" fill={url('sign')} />
-            <rect x="24" y="8" width="114" height="14" rx="1.5" fill="#3a0c3a" opacity=".22" />
-            <text className="clw-word" x="81" y={word.length > 5 ? 18.6 : 19.8} textAnchor="middle" fontSize={word.length > 5 ? 9.4 : 12.5}>
-              {word}
-            </text>
-            {Array.from({ length: 20 }, (_, i) => (
-              <g key={i} className={i % 2 ? 'clw-bulb clw-bulb--b' : 'clw-bulb'}>
-                <circle cx={24 + i * 6} cy="5.2" r="1.1" />
-                <circle cx={138 - i * 6} cy="24.8" r="1.1" />
-              </g>
-            ))}
-
-            {/* inside the glass: the pile, the rig, the chute */}
-            <g clipPath={url('glass')}>
-              <rect x="24" y="104" width="30" height="44" fill="#fff" opacity=".04" />
-              {toys.map((t) => {
-                const spot = TOY_SPOTS[t.spot]!;
-                return (
-                  <g
-                    key={t.id}
-                    ref={(el) => {
-                      if (el) toyEls.current.set(t.id, el);
-                      else toyEls.current.delete(t.id);
-                    }}
-                    className="clw-toy"
-                    data-fresh={t.fresh ? 'true' : undefined}
-                    style={t.fresh ? { ['--d' as string]: t.spot } : undefined}
-                    transform={toyTransform(spot.x, spot.y)}
-                  >
-                    <path d={PLUSH_BODY} fill={PLUSH_COLORS[t.color]} />
-                    <path d={PLUSH_EYES} fill="#fff" />
-                    <rect x="1" y="4" width="4" height="1" fill="#000" opacity=".22" />
-                  </g>
-                );
-              })}
-              <g ref={gantry} transform={`translate(${RIG.homeX} 0)`}>
-                <rect x="-7" y="38.4" width="14" height="5.6" rx="1" fill="#c9c3e6" />
-                <rect x="-4" y="40" width="8" height="1.4" fill="#6f6a8e" />
-                <rect ref={cable} x="-0.6" y="44" width="1.2" height={RIG.hubY - 44} fill="#8f88b3" />
-              </g>
-              <g ref={head} transform={`translate(${RIG.homeX} ${RIG.hubY})`}>
-                <path d="M0 4V12.5" stroke="#8f88b3" strokeWidth="1.3" strokeLinecap="round" />
-                <g ref={prongL} transform={`rotate(${prongAngle(IDLE_OPEN)} -3 3)`}>
-                  <path d="M-3 3L-8 9.5L-5.6 14" fill="none" stroke="#d7d2ec" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </g>
-                <g ref={prongR} transform={`rotate(${-prongAngle(IDLE_OPEN)} 3 3)`}>
-                  <path d="M3 3L8 9.5L5.6 14" fill="none" stroke="#d7d2ec" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </g>
-                <rect x="-5" y="0" width="10" height="4.4" rx="1.2" fill="#c9c3e6" />
-                <rect x="-5" y="2.6" width="10" height="1" fill="#6f6a8e" />
-              </g>
-              {/* the chute's clear front, then reflections on the glass */}
-              <rect x="24" y="104" width="30" height="44" fill="#bfe9ff" opacity=".08" stroke="#c9c3e6" strokeOpacity=".55" strokeWidth=".8" />
-              <rect x="23" y="102.6" width="32" height="2.4" rx=".6" fill="#c9c3e6" />
-              <path d="M22 122L72 36H86L22 146Z" fill="#fff" opacity=".045" />
-              <rect x="129" y="40" width="2" height="104" fill="#fff" opacity=".05" />
+          {/* marquee */}
+          <rect x="20" y="3" width="122" height="24" rx="2" fill={url('sign')} />
+          <rect x="24" y="8" width="114" height="14" rx="1.5" fill="#3a0c3a" opacity=".22" />
+          <text className="clw-word" x="81" y={word.length > 5 ? 18.6 : 19.8} textAnchor="middle" fontSize={word.length > 5 ? 9.4 : 12.5}>
+            {word}
+          </text>
+          {Array.from({ length: 20 }, (_, i) => (
+            <g key={i} className={i % 2 ? 'clw-bulb clw-bulb--b' : 'clw-bulb'}>
+              <circle cx={24 + i * 6} cy="5.2" r="1.1" />
+              <circle cx={138 - i * 6} cy="24.8" r="1.1" />
             </g>
+          ))}
 
-            {/* prize door: the win pops out here */}
-            <g clipPath={url('door')}>
-              {prize ? (
-                <g className="clw-prize" transform="translate(40 200) scale(2)">
-                  <path d={PLUSH_BODY} fill={PLUSH_COLORS[prize.color]} />
-                  <path d={PLUSH_EYES} fill="#fff" />
-                </g>
-              ) : null}
-              <rect className="clw-flap" data-open={prize ? 'true' : undefined} x="30.5" y="190.5" width="31" height="23" rx="1.4" fill={url('metal')} />
+          {/* inside the glass: the pile, the parked rig, the chute */}
+          <g clipPath={url('glass')}>
+            <rect x="24" y="104" width="30" height="44" fill="#fff" opacity=".04" />
+            {toys.map((t) => {
+              const p = floorPlacement(t);
+              return <FloorPlush key={t.id} kind={t.kind} color={t.color} x={p.x} y={p.y} />;
+            })}
+            <g transform={`translate(${FLOOR_HOME_X.toFixed(2)} 0)`}>
+              <rect x="-7" y="38.4" width="14" height="5.6" rx="1" fill="#c9c3e6" />
+              <rect x="-4" y="40" width="8" height="1.4" fill="#6f6a8e" />
+              <rect x="-0.6" y="44" width="1.2" height="6" fill="#8f88b3" />
             </g>
-          </svg>
-        </span>
-        <span className="clw__tag" aria-hidden>
-          <span className="clw__name">Claw machine</span>
-          <span className="clw__line">{display === 'idle' ? (prizes ? `Prizes won: ${prizes}` : 'Press to play') : TAG_LINE[display]}</span>
-        </span>
-      </button>
-      {burst && confetti ? <Confetti key={burst} amount={confetti} /> : null}
-      <span className="visually-hidden" role="status" aria-live="polite">
-        {said}
+            <g transform={`translate(${FLOOR_HOME_X.toFixed(2)} 50)`}>
+              <path d="M0 4V12.5" stroke="#8f88b3" strokeWidth="1.3" strokeLinecap="round" />
+              <g transform="rotate(-6 -3 3)">
+                <path
+                  d="M-3 3L-8 9.5L-5.6 14"
+                  fill="none"
+                  stroke="#d7d2ec"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+              <g transform="rotate(6 3 3)">
+                <path d="M3 3L8 9.5L5.6 14" fill="none" stroke="#d7d2ec" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
+              <rect x="-5" y="0" width="10" height="4.4" rx="1.2" fill="#c9c3e6" />
+              <rect x="-5" y="2.6" width="10" height="1" fill="#6f6a8e" />
+            </g>
+            {/* the chute's clear front, then reflections on the glass */}
+            <rect
+              x="24"
+              y="104"
+              width="30"
+              height="44"
+              fill="#bfe9ff"
+              opacity=".08"
+              stroke="#c9c3e6"
+              strokeOpacity=".55"
+              strokeWidth=".8"
+            />
+            <rect x="23" y="102.6" width="32" height="2.4" rx=".6" fill="#c9c3e6" />
+            <path d="M22 122L72 36H86L22 146Z" fill="#fff" opacity=".045" />
+            <rect x="129" y="40" width="2" height="104" fill="#fff" opacity=".05" />
+          </g>
+
+          {/* prize door: your last win waits here for a moment */}
+          <g clipPath={url('door')}>
+            {showPrize ? (
+              <g className="clw-prize">
+                <FloorPlush kind={prize.kind} color={prize.color} x={46} y={212} />
+              </g>
+            ) : null}
+            <rect
+              className="clw-flap"
+              data-open={showPrize ? 'true' : undefined}
+              x="30.5"
+              y="190.5"
+              width="31"
+              height="23"
+              rx="1.4"
+              fill={url('metal')}
+            />
+          </g>
+        </svg>
       </span>
-    </>
+      <span className="clw__tag" aria-hidden>
+        <span className="clw__name">Claw machine</span>
+        <span className="clw__line">{display === 'won' ? 'You won a plush!' : won ? `Prizes won: ${won}` : 'Step up and play'}</span>
+      </span>
+    </button>
   );
 });
 
@@ -482,64 +354,3 @@ const ClawBody = memo(function ClawBody({ uid }: { uid: string }) {
     </g>
   );
 });
-
-/** A burst of pixel confetti from the marquee, raining down over the floor; unmounts itself when done. */
-function Confetti({ amount }: { amount: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    const c = ref.current;
-    const ctx = c?.getContext('2d');
-    if (!c || !ctx) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = c.clientWidth;
-    const h = c.clientHeight;
-    c.width = Math.max(1, Math.round(w * dpr));
-    c.height = Math.max(1, Math.round(h * dpr));
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // The canvas spans the machine plus the floor to its left and the air above (.clw-confetti): the
-    // confetti bursts out of the marquee.
-    const cr = c.getBoundingClientRect();
-    const mr = c.parentElement?.querySelector('.clw__machine')?.getBoundingClientRect();
-    const ox = mr ? mr.left + mr.width / 2 - cr.left : w * 0.8;
-    const oy = mr ? mr.top + mr.height * 0.06 - cr.top : h * 0.45;
-    const spread = mr ? mr.width * 0.7 : w * 0.2;
-    const size = Math.max(3.5, Math.min(8, (mr?.width ?? w / 2.7) / 24));
-    const parts = Array.from({ length: amount }, () => ({
-      x: ox + (Math.random() - 0.5) * spread,
-      y: oy + Math.random() * 6,
-      vx: -Math.random() * 7 + 1.8,
-      vy: -(3.5 + Math.random() * 6),
-      s: size * (0.7 + Math.random() * 0.6),
-      c: CONFETTI[Math.floor(Math.random() * CONFETTI.length)]!,
-      r: Math.random() * 6.28,
-      vr: (Math.random() - 0.5) * 0.5,
-    }));
-    const start = performance.now();
-    let last = start;
-    let raf = 0;
-    const tick = (now: number) => {
-      const k = Math.min(2.5, (now - last) / 16.67);
-      last = now;
-      ctx.clearRect(0, 0, w, h);
-      let alive = 0;
-      for (const p of parts) {
-        p.vy += 0.17 * k;
-        p.vx *= 1 - 0.012 * k;
-        p.x += p.vx * k;
-        p.y += p.vy * k;
-        p.r += p.vr * k;
-        if (p.y > h + 8) continue;
-        alive++;
-        const flip = Math.abs(Math.cos(p.r));
-        ctx.fillStyle = p.c;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.round(p.s), Math.max(1, Math.round(p.s * 0.65 * flip)));
-      }
-      if (alive > 0 && now - start < 4000) raf = requestAnimationFrame(tick);
-      else setDone(true);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [amount]);
-  return done ? null : <canvas ref={ref} className="clw-confetti" aria-hidden />;
-}

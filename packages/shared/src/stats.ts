@@ -106,6 +106,9 @@ export const STAT_EXTRA_LABELS: Record<string, string> = {
   // DASh Circuit
   minLapMs: 'Best lap',
   fastestLaps: 'Fastest laps',
+  // DASphalt GP (also minLapMs, fastestLaps)
+  itemHits: 'Item hits',
+  maxCupPoints: 'Best cup score',
   // DASQuest
   questsCompleted: 'Quests completed',
   checksPassed: 'Checks passed',
@@ -138,6 +141,7 @@ export const STAT_GAME_DISPLAY: Partial<Record<GameId, StatGameDisplay>> = {
   blackjack: { scoreLabel: 'Best final balance' },
   dasino: { scoreLabel: 'Best final balance' },
   circuit: { scoreLabel: 'Best race time', scoreFormat: 'ms' },
+  kart: { scoreLabel: 'Best race time', scoreFormat: 'ms' },
   quest: { scoreLabel: 'Best party score', coop: true },
 };
 

@@ -202,42 +202,45 @@
     translate: 0 0;
   }
 }
-/* A restock: fresh plushies tumble into the machine. */
-.clw-toy[data-fresh='true'] {
-  animation: clw-drop 520ms cubic-bezier(0.3, 0, 0.6, 1) both;
-  animation-delay: calc(var(--d, 0) * 45ms);
-}
-@keyframes clw-drop {
-  from {
-    translate: 0 -96px;
-  }
-  80% {
-    translate: 0 1px;
-  }
-  to {
-    translate: 0 0;
-  }
-}
-.clw-confetti {
-  position: absolute;
-  left: -170%;
-  top: -75%;
-  width: 270%;
-  max-width: none;
-  height: 175%;
-  z-index: 3;
-  pointer-events: none;
-}
-
 /* Motion + effects settings. */
 :root[data-fx='off'] .clw-bulb,
 :root[data-reduced-motion='true'] .clw-bulb,
 :root[data-reduced-motion='true'] .clw-word,
-:root[data-reduced-motion='true'] .clw-prize,
-:root[data-reduced-motion='true'] .clw-toy {
+:root[data-reduced-motion='true'] .clw-prize {
   animation: none;
 }
 :root[data-reduced-motion='true'] .clw,
 :root[data-reduced-motion='true'] .clw * {
   transition: none;
+}
+
+/* The quick Claw button: where the floor has no room for the machine (tablets: the HUD; phones: the
+   extras row, like the jukebox's quick control). Hidden while the machine stands on the floor. */
+.clw-quick {
+  display: inline-grid;
+  place-items: center;
+}
+.af-hud__claw {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+.af-floor__claw {
+  display: none !important;
+}
+@media (max-width: 699px), (max-height: 540px) and (orientation: landscape) {
+  .af-hud__claw {
+    display: none !important;
+  }
+  .af-floor__claw {
+    display: inline-grid !important;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+.af-floor:has(.af-lineup[data-claw='floor']) :is(.af-hud__claw, .af-floor__claw) {
+  display: none !important;
 }

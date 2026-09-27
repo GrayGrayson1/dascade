@@ -163,13 +163,14 @@ export const CABINETS: Record<CabinetId, CabinetDef> = {
   },
   circuit: {
     id: 'circuit',
-    title: 'DASh Circuit',
-    marquee: 'DASH CIRCUIT',
-    family: 'Neon Racing',
-    tagline: GAME_CATALOG.circuit.tagline,
-    description: GAME_CATALOG.circuit.description,
+    title: 'DAS Raceway',
+    marquee: 'DAS RACEWAY',
+    family: 'Racing',
+    tagline: 'Two racers, one cabinet: DASh Circuit and DASphalt GP.',
+    description:
+      'Top-down neon racing in DASh Circuit, or kart racing with drifts, items and Grand Prix cups in DASphalt GP. Race friends, race bots, or race the clock.',
     accent: GAME_CATALOG.circuit.accent,
-    games: [g('circuit')],
+    games: [g('circuit', 'Top-down neon racing. Build your car, then chase the lap record.'), g('kart', 'Kart racing with drift boosts, items, bots and Grand Prix cups.')],
   },
   quest: {
     id: 'quest',

@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "load": "tsx scripts/load-test.ts",
+    "load:kart": "tsx scripts/load-kart.ts",
     "music:index": "tsx scripts/music/index.ts"
   },
   "devDependencies": {

@@ -9,7 +9,7 @@
  *   without walking up to the machine.
  * Scenes adapt to any logical resolution from ~60×45 up to ~200×150.
  */
-import type { CabinetId, GameAccent, GameId } from '@dascade/shared';
+import { cabinetForGame, type CabinetId, type GameAccent, type GameId } from '@dascade/shared';
 import { drawStatic, rect, textWidth, drawTextC, type AttractFrame, type Scene } from './attractKit.ts';
 import { blackjack, bingo, circuit, dasketch, holdem, quest, slots, wheel } from './scenes/originals.ts';
 import { highlow, roulette } from './scenes/casino.ts';
@@ -17,6 +17,7 @@ import { checkers, chess, ships } from './scenes/boardroom.ts';
 import { deception, masterpiece, survey, trivia, words } from './scenes/party.ts';
 import { putt, tanks } from './scenes/sports.ts';
 import { asteroids, blocks, bricks, memory, paddle, snake } from './scenes/classics.ts';
+import { kart } from './scenes/kart.ts';
 
 export type { AttractFrame, Scene } from './attractKit.ts';
 
@@ -30,6 +31,7 @@ export const SCENES = {
   roulette,
   highlow,
   circuit,
+  kart,
   quest,
   chess,
   checkers,
@@ -62,7 +64,7 @@ export const CABINET_PLAYLISTS: Record<CabinetId, readonly SceneId[]> = {
   putt: ['putt'],
   tanks: ['tanks'],
   classics: ['snake', 'bricks', 'paddle', 'asteroids', 'blocks', 'memory'],
-  circuit: ['circuit'],
+  circuit: ['circuit', 'kart'],
   quest: ['quest'],
 };
 
@@ -75,7 +77,10 @@ export function scenesForGame(gameId: GameId, variant?: string | null): readonly
     return table ? [table] : ['roulette', 'slots', 'highlow'];
   }
   if (gameId === 'tournament') return ['chess', 'putt', 'snake'];
-  return gameId in SCENES ? [gameId as SceneId] : ['dasketch'];
+  if (gameId in SCENES) return [gameId as SceneId];
+  // A game without its own scene yet borrows its cabinet's playlist (never another cabinet's art).
+  const cabinet = cabinetForGame(gameId);
+  return cabinet ? CABINET_PLAYLISTS[cabinet.id].slice(0, 1) : ['dasketch'];
 }
 
 export interface AttractRequest {

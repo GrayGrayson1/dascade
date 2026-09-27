@@ -7,6 +7,7 @@ import { Avatar, Button, IconButton, Kbd } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
 import { serverUrl } from '../net/serverUrl.ts';
 import { sfx } from '../audio/audio.ts';
+import { ClawQuickButton } from './ClawMachine.tsx';
 import { NeonWord } from './NeonWord.tsx';
 import { CABINET_LIST } from '@dascade/shared';
 import { fill, tickerItems, useThemeCopy, useThemeFlavour } from '../themes/copy.ts';
@@ -134,6 +135,8 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
         <span className="af-hud__icons">
           {/* The jukebox's quick control (the jukebox UI portals it in; the machine itself stands on the floor). */}
           <span className="af-hud__jukebox" data-jukebox-slot="hud" data-jukebox-variant="compact" />
+          {/* The claw machine's quick control, where the floor has no room for the machine (claw.css). */}
+          <ClawQuickButton className="af-hud__claw" />
           <IconButton
             icon={muted ? 'sound-off' : 'sound-on'}
             label={muted ? 'Unmute sound' : 'Mute sound'}

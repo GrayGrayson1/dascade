@@ -8,12 +8,13 @@ describe('crumbCabinet', () => {
     expect(crumbCabinet('blackjack')?.id).toBe('dasino');
     expect(crumbCabinet('chess')?.id).toBe('boardroom');
     expect(crumbCabinet('trivia')?.id).toBe('stravaganza');
+    expect(crumbCabinet('circuit')?.id).toBe('circuit');
+    expect(crumbCabinet('kart')?.id).toBe('circuit');
   });
 
   it('never repeats the game ("DASino › DASino") and skips single-game cabinets', () => {
     expect(crumbCabinet('dasino')).toBeNull();
     expect(crumbCabinet('wheel')).toBeNull();
-    expect(crumbCabinet('circuit')).toBeNull();
     expect(crumbCabinet('tournament')).toBeNull();
     for (const id of GAME_IDS) {
       const cabinet = crumbCabinet(id);

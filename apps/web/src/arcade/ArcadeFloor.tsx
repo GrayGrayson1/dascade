@@ -42,7 +42,7 @@ import { ArcadeRoom, type RoomSize } from './ArcadeRoom.tsx';
 import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
 import { CLAW_ART } from './claw.ts';
-import { ClawMachine } from './ClawMachine.tsx';
+import { ClawHost, ClawMachine, ClawQuickButton } from './ClawMachine.tsx';
 import { JUKEBOX_FLOOR, JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
   COVERFLOW,
@@ -739,6 +739,8 @@ export function ArcadeFloor() {
           {wide ? null : <TournamentKiosk variant="strip" />}
           {/* Phones: the jukebox's quick control lives here (the HUD has no room; the floor no corner). */}
           <span className="af-floor__jukebox" data-jukebox-slot="extras" data-jukebox-variant="compact" />
+          {/* …and the claw machine's (the floor has no room for the machine itself). */}
+          <ClawQuickButton className="af-floor__claw" />
           <Button
             variant="ghost"
             icon="users"
@@ -757,6 +759,7 @@ export function ArcadeFloor() {
       </div>
 
       <ArcadeFooter status={status} />
+      <ClawHost />
     </main>
   );
 }
