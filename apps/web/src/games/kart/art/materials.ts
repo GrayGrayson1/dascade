@@ -54,9 +54,10 @@ export function makeVoxelMaterial(o: VoxelMaterialOptions = {}): MeshLambertMate
     vertexColors: true,
     transparent: o.transparent ?? false,
     opacity: o.opacity ?? 1,
-    side: o.doubleSide ? DoubleSide : undefined,
     depthWrite: o.depthWrite ?? true,
   });
+  // (never pass `side: undefined`: three.js logs a warning for undefined parameters)
+  if (o.doubleSide) m.side = DoubleSide;
   const rim: RimUniforms | null = o.rim ? { rimColor: { value: new Color(0xbfe8ff) }, rimStrength: { value: 0.55 } } : null;
   m.onBeforeCompile = patch(rim);
   m.customProgramCacheKey = () => (rim ? 'dasphalt-voxel-rim' : 'dasphalt-voxel');
@@ -71,13 +72,14 @@ export function rimOf(m: Material): RimUniforms | null {
 
 /** Unlit vertex-coloured material (glowing things, far LODs in the fog). */
 export function makeUnlitMaterial(o: VoxelMaterialOptions = {}): MeshBasicMaterial {
-  return new MeshBasicMaterial({
+  const m = new MeshBasicMaterial({
     vertexColors: true,
     transparent: o.transparent ?? false,
     opacity: o.opacity ?? 1,
-    side: o.doubleSide ? DoubleSide : undefined,
     depthWrite: o.depthWrite ?? true,
   });
+  if (o.doubleSide) m.side = DoubleSide;
+  return m;
 }
 
 /** Shared singletons for art that lives in more than one place (portraits, renderer). */

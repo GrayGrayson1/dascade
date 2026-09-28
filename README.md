@@ -1,6 +1,6 @@
 # DASCADE — Delta Alpha Sierra Arcade
 
-A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **24 games**, plus a **Tournament Center** for brackets and Swiss events, **eleven themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
+A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **25 games**, plus a **Tournament Center** for brackets and Swiss events, **eleven themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
 
 > All casino-style games use meaningless **virtual chips**. There is no real-money wagering, purchasing, deposits or cash-out of any kind.
 
@@ -30,19 +30,20 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | Asteroid Run (`asteroids`) | 1–4 | Top-down space survival, solo or co-op |
 | | Memory Matrix (`memory`) | 1–30 | Visual memory and reaction rounds, synchronized for everyone |
 | | Block Drop (`blocks`) | 1–16 | Falling-block puzzle (marathon or timed blitz), solo or a score race |
-| **DASh Circuit** | DASh Circuit (`circuit`) | 1–20 | Top-down neon racer with a car customizer and time trials |
+| **DAS Raceway** | DASh Circuit (`circuit`) | 1–20 | Top-down neon racer with a car customizer and time trials |
+| | DASphalt GP (`kart`) | 1–30 | 3D kart racer: eight racers, drift mini-turbos, eleven items, eight tracks in two cups, bots, Grand Prix and time trial with ghosts |
 | **DASQuest** | DASQuest (`quest`) | 1–12 | Co-op branching adventure: *The Glitch Beneath Delta Alpha* |
 
 Every game supports spectators. Classics games keep verified high-score boards.
 
-Two machines stand at the ends of the row on wider screens, at the depth of its far cabinets: the **jukebox** on the left (see [Jukebox and audio](#jukebox-and-audio)) and a **claw machine** on the right. The claw machine is the floor's Easter egg, and you operate it: walk up to it (or press the quick **Claw** button where the floor has no room for it, e.g. on phones) and it grows into a close-up. Insert a free token, steer the gantry in two axes with the joystick, the arrow keys/WASD or a gamepad (it has mass: it accelerates, brakes and swings), and drop. A small grip model decides what happens, not a coin flip: how well you centred the claw on a plush (its shadow on the pile shows where it'll land), how buried the plush is, its shape, which prongs got purchase, the claw's weak coil and the jolts of the lift and the carry. A good grab usually wins but can slip at the worst moment; a sloppy one shoves or drops the toy back into the pile, which really changes. Wins pop out of the prize door onto your shelf. It is purely cosmetic and local: free play, no money or value, and the pile and your shelf are kept in this browser (`apps/web/src/arcade/clawPhysics.ts`, `ClawCloseup.tsx`).
+Two machines stand at the ends of the row on wider screens, at the depth of its far cabinets: the **jukebox** on the left (see [Jukebox and audio](#jukebox-and-audio)) and a **claw machine** on the right. The claw machine is the floor's Easter egg, and you operate it: walk up to it (or press the quick **Claw** button where the floor has no room for it, e.g. on phones) and it grows into a close-up. Insert a free token, steer the gantry in two axes with the joystick, the arrow keys/WASD or a gamepad (it has mass: it accelerates, brakes and swings), and drop. A small grip model decides what happens, not a coin flip: how well you centred the claw on a plush (its shadow and footprint ring on the pile show where it'll land, and amber prong marks warn when a tip will come down on a neighbour), how buried the plush is, its shape, which prongs got purchase, the claw's weak coil and the jolts of the lift and the carry. A good grab usually wins but can slip at the worst moment; a sloppy one shoves or drops the toy back into the pile, which really changes. The machine's LED line says why a try missed, and a failed grab stirs the pile. Wins pop out of the prize door onto your shelf. It is purely cosmetic and local: free play, no money or value, and the pile and your shelf are kept in this browser (`apps/web/src/arcade/clawPhysics.ts`, `ClawCloseup.tsx`).
 
 ### Single- and multi-game cabinets
 
 A cabinet is navigation, not a game. `packages/shared/src/cabinets.ts` lists the 11 cabinets and the games each one holds. Game rules, capacity and rooms come from `packages/shared/src/catalog.ts`.
 
 - **Single-game cabinets** open their game's title screen directly: `/play/<gameId>`.
-- **Multi-game cabinets** (DASino, DAS Boardroom, DAStravaganza, DAScade Classics) open an in-world game picker at `/cabinet/<cabinetId>`. Each cabinet has its own setting: a casino floor, an executive lounge, a game-show stage, a retro select screen. Every entry is a real link to `/play/<gameId>`, so deep links, refresh and the back button all work. Results screens offer **Back to cabinet**.
+- **Multi-game cabinets** (DASino, DAS Boardroom, DAStravaganza, DAScade Classics, DAS Raceway) open an in-world game picker at `/cabinet/<cabinetId>`. Each cabinet has its own setting: a casino floor, an executive lounge, a game-show stage, a retro select screen. Every entry is a real link to `/play/<gameId>`, so deep links, refresh and the back button all work. Results screens offer **Back to cabinet**.
 - A cabinet entry can be a **variant** of one game. The three DASino tables share the `dasino` room and differ only by `variant` (`/play/dasino?table=roulette|slots|dice`). Aliases such as `/play/poker`, `/play/roulette` and `/play/slots` redirect to the right place.
 
 Other routes: `/room/:code` and `/r/:code` join a room, and `/tournaments` opens the Tournament Center.
@@ -159,7 +160,7 @@ LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=trivia,deception,masterpiece,words
 | `survey` | Answer and prediction bursts including duplicates; nobody ever receives another player's answer |
 | `dj` | Room DJ with 30 clients in one room: host scrubs/pauses while everyone queues, a skip vote at the exact strict majority (with duplicate votes), 8 leave and 8 join, then the host leaves; every client must end on the identical DJ state |
 
-`pnpm load` exits non-zero when any scenario fails its thresholds. Racing has a separate scripted-input bot runner, which prints a `RESULT:` health line: `LOAD_URL=http://localhost:2567 pnpm exec tsx scripts/load-circuit.ts --bots 20` (see its header for `--laps`, `--track`, `--spectators` and more).
+`pnpm load` exits non-zero when any scenario fails its thresholds. Racing has a separate scripted-input bot runner, which prints a `RESULT:` health line: `LOAD_URL=http://localhost:2567 pnpm exec tsx scripts/load-circuit.ts --bots 20` (see its header for `--laps`, `--track`, `--spectators` and more). DASphalt GP has its own: `LOAD_URL=http://localhost:2567 pnpm load:kart -- --clients 30` (the server needs `DASCADE_RELAXED_LIMITS=1`; see its header for `--bots`, `--mode gp`, `--churn`, `--spikes`, `--hostile` and more).
 
 ## Architecture
 
@@ -192,6 +193,7 @@ For details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The game contrac
 
   Office-unsafe words are filtered out at build time and checked again at runtime. The sources, tiers and regeneration steps are in [`data/LICENSE.md`](apps/game-server/src/rooms/words/data/LICENSE.md). `pnpm build` copies the folder to `apps/game-server/dist/words-data/`, and `DASCADE_WORDS_DICT` can point to another copy.
 - **Supabase JS** (optional persistence) and **Phaser 4** (the games that use it, lazy loaded) were already part of the stack.
+- **three.js** (MIT) renders DASphalt GP. It is imported only from `apps/web/src/games/kart/`, so it loads with that game's lazy chunk and never with the arcade floor. Every model, texture and sound in the game is generated in code.
 
 ## Environment variables
 
@@ -241,7 +243,7 @@ The **jukebox** is a global feature, not a cabinet, and it is a real machine: on
 - **Room DJ**. Music keeps playing through every route change (floor, cabinet, lobby, match, results, tournament) and through theme switches. After a reload it restores the track and position, and resumes on your next click. Every theme dresses the same machine differently (a CD utility, a mixtape deck, a brass executive stereo…), and the one on the floor takes the theme's cabinet finish and accent lights, like the cabinets beside it.
 
 - **One engine** (`apps/web/src/audio/`): a single `AudioContext` created on the first user gesture, and a mixer with separate buses for **sound effects**, **game music** (the procedural soundtrack) and the **jukebox** (one `<audio>` element → one shared analyser). Settings → Sound has master, effects, game-music and jukebox volumes.
-- **Mixing policy** (`mixPolicy.ts`): the jukebox never turns effects down. Audible effects briefly dip the music, and sustained sounds (the DASh Circuit engine) hold it lower. While the jukebox plays, game music is muted by default (Settings: *duck*, *mute* or *keep*). All gain changes are smooth ramps.
+- **Mixing policy** (`mixPolicy.ts`): the jukebox never turns effects down. Audible effects briefly dip the music, and sustained sounds (the DASh Circuit and DASphalt GP engines, the claw's gantry motor) hold it lower. While the jukebox plays, game music is muted by default (Settings: *duck*, *mute* or *keep*). All gain changes are smooth ramps.
 - **Autoplay:** nothing plays before a click or keypress. If the browser still blocks playback, the jukebox shows a gentle "Click to enable audio" prompt instead of an error.
 - **Personal by default:** each player controls their own music. Room DJ (below) is opt-in, and local mute, volume and opt-out always win.
 - State is stored in `localStorage['dascade:v1:jukebox']`. QA hook: `window.__DASCADE_AUDIO__`.

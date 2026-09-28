@@ -3,7 +3,7 @@ import { KART_TRACK_IDS } from '@dascade/shared/games/kart';
 import { KART_TRACK_DEFS, buildTrack, createKartState, type KartTrack } from '@dascade/game-core/kart';
 import type { BufferGeometry } from 'three';
 import { BIOMES, OFFROAD, paletteSig, worldPalette } from './biomes.ts';
-import { LANDMARK_KINDS, buildLandmark } from './landmarks.ts';
+import { LANDMARK_KINDS, NO_GROUND_PAD, buildLandmark, landmarkFootprint } from './landmarks.ts';
 import { emptyPose, poseFromState } from './pose.ts';
 import { scatterProps } from './props.ts';
 import { RoadIndex, curbMask, roadPaths } from './roads.ts';
@@ -144,6 +144,18 @@ describe('terrain', () => {
   });
 });
 
+describe('gaps', () => {
+  it('the terrain is a chasm under every gap', () => {
+    for (const t of tracks) {
+      if (t.def.biome === 'sky' || !t.gaps.length) continue;
+      const paths = roadPaths(t);
+      const field = new DistanceField(paths, t.bounds, 6, 100, 200);
+      const h = terrainHeightFn(field, { groundY: t.bounds.minZ - 0.35, dropDepth: 30, hills: 20, extent: 100, res: 10 }, t.def.decorSeed);
+      for (let i = 0; i < t.n; i++) if (t.noGround[i]) expect(h(t.xs[i]!, t.ys[i]!)).toBeLessThan(t.zs[i]! - 20);
+    }
+  });
+});
+
 describe('props + landmarks', () => {
   it('scatter is deterministic per track and keeps off the road', () => {
     for (const t of tracks) {
@@ -165,6 +177,19 @@ describe('props + landmarks', () => {
       l.update(1.5);
       for (const g of l.geometries) expect(finite(g)).toBe(true);
     }
+  });
+  it('footprints are measured from the models (no separate table)', () => {
+    const rows: string[] = [];
+    for (const k of LANDMARK_KINDS) {
+      const r = landmarkFootprint(k, BIOMES.city);
+      if (NO_GROUND_PAD.has(k)) expect(r).toBe(0);
+      else {
+        expect(r).toBeGreaterThan(2);
+        expect(r).toBeLessThan(40);
+      }
+      rows.push(`${k}=${r.toFixed(1)}`);
+    }
+    if (process.env.PRINT_FOOTPRINTS) console.log(rows.join(' '));
   });
   it('every track landmark kind is one the renderer knows', () => {
     for (const t of tracks) for (const lm of t.landmarks) expect(LANDMARK_KINDS as readonly string[]).toContain(lm.kind);

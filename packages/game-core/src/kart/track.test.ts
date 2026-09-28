@@ -344,8 +344,11 @@ describe('hazards', () => {
     const b = hazardPose(t, 3, wind + 40).s;
     expect(hazardPose(t, 3, wind + 10).active).toBe(true);
     expect(((a - b) / 30) * 60).toBeCloseTo(rollerSpeed(t.hazards[3]!), 3);
-    const laser = Array.from({ length: 120 }, (_, k) => hazardPose(t, 4, k).active);
-    expect(laser.filter(Boolean).length).toBe(60);
+    // Lasers: on for `duty` (default 40 %) of the cycle, with a warning blink just before.
+    const laser = Array.from({ length: 120 }, (_, k) => hazardPose(t, 4, k));
+    expect(laser.filter((p) => p.active).length).toBe(48);
+    expect(laser.some((p) => p.warn && !p.active)).toBe(true);
+    for (let k = 0; k < 120; k++) if (laser[k]!.warn) expect(laser[k]!.active).toBe(false);
   });
 });
 

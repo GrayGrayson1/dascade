@@ -41,7 +41,7 @@ import { ArcadeFooter, ArcadeHeader, useServerStatus } from './ArcadeHud.tsx';
 import { ArcadeRoom, type RoomSize } from './ArcadeRoom.tsx';
 import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
-import { CLAW_ART } from './claw.ts';
+import { CLAW_ART, CLAW_FLOOR_MIN_H } from './claw.ts';
 import { ClawHost, ClawMachine, ClawQuickButton } from './ClawMachine.tsx';
 import { JUKEBOX_FLOOR, JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
@@ -589,7 +589,9 @@ export function ArcadeFloor() {
       // The machines: each centred in the free floor beyond its end of the lineup, standing on the far
       // cabinets' floor line.
       stage.dataset.jukebox = props ? 'floor' : 'none';
-      stage.dataset.claw = props ? 'floor' : 'none';
+      // The claw machine only when it's big enough to read (otherwise the quick Claw button shows).
+      const clawFloor = props && clawH >= CLAW_FLOOR_MIN_H;
+      stage.dataset.claw = clawFloor ? 'floor' : 'none';
       if (props) {
         const free = W / 2 - reach;
         setVar(stage, '--jbx-x', `${Math.round(Math.max(propGap, (free - jbW) / 2))}px`);
@@ -609,7 +611,7 @@ export function ArcadeFloor() {
         rowRight: Math.min(mr.width, sr.left - mr.left + m.cx + reach),
         jukebox: props,
         // The floor's own claw machine stands at the right end: the room doesn't paint its pixel one.
-        claw: !props && W >= 1600,
+        claw: !clawFloor && W >= 1600,
       };
       const next: RoomSize = { w: Math.round(mr.width), h: Math.round(Math.max(main.scrollHeight, mr.height)), hints };
       setRoomSize((prev) => {

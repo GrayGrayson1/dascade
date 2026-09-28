@@ -15,7 +15,7 @@ import { KART_ITEM_IDS, type KartItemId } from '@dascade/shared/games/kart';
 import type { Rng } from '@dascade/shared';
 import { itemCode, itemUses } from './itemcodes.ts';
 import { applyHit, type ItemUse, type KartState } from './kart.ts';
-import { clamp, datan2, dcos, dsin, f32, loopDelta, qheading } from './math.ts';
+import { clamp, datan2, dcos, dsin, f32, loopDelta, qheading, qvel } from './math.ts';
 import { EDGE_DROP, EDGE_WALL, locate, newLoc, racingPointAt, type KartTrack } from './track.ts';
 import type { KartHitCause } from '@dascade/shared/games/kart';
 
@@ -311,8 +311,9 @@ export class ItemWorld {
     const dy = t.state.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     const pull = 7 / 60;
-    st.vx += (dx / dist) * pull;
-    st.vy += (dy / dist) * pull;
+    // Re-quantize: authoritative state must stay exactly representable on the wire (prediction).
+    st.vx = qvel(st.vx + (dx / dist) * pull);
+    st.vy = qvel(st.vy + (dy / dist) * pull);
   }
 
   /** Advance every entity one tick and resolve hits. */

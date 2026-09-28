@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createSeededRng } from '@dascade/shared';
-import { KART_RACER_IDS, type KartTrackId } from '@dascade/shared/games/kart';
-import { buildTrack, KART_TRACK_DEFS } from './index.ts';
+import { KART_RACER_IDS, KART_TRACK_IDS, type KartTrackId } from '@dascade/shared/games/kart';
+import { buildTrack, getKartTrack, KART_TRACK_DEFS } from './index.ts';
 import { KartSim } from './sim.ts';
 import type { KartTrack } from './track.ts';
 
@@ -140,17 +140,17 @@ describe('kart determinism across JS engines', () => {
     expect(FORBIDDEN_MATH.test(codeOnly('// Math.cos(x)\n/* Math.sin */ const s = "Math.pow(2, 3)";'))).toBe(false);
   });
 
-  it('track geometry does not depend on the engine’s Math.* implementations', () => {
-    for (const id of ['pixel-plaza', 'dune-drift'] as const) {
+  it('track geometry does not depend on the engine’s Math.* implementations (every track)', () => {
+    for (const id of KART_TRACK_IDS) {
       const reference = trackData(buildTrack(KART_TRACK_DEFS[id]));
       const perturbed = withPerturbedMath(() => trackData(buildTrack(KART_TRACK_DEFS[id])));
       expect(perturbed, id).toEqual(reference);
     }
   });
 
-  it('a seeded 8-kart race (items, bumps, bots, drifts) reproduces bit-identically, even under perturbed Math.*', () => {
+  it('a seeded 8-kart race (items, bumps, bots, drifts, hazards) reproduces bit-identically on every track, even under perturbed Math.*', () => {
     expect(withPerturbedMath(() => Math.cos(1))).not.toBe(Math.cos(1));
-    for (const id of ['pixel-plaza', 'dune-drift'] as const) {
+    for (const id of KART_TRACK_IDS) {
       const reference = race(id, 60 * 20, 3);
       expect(reference.bumps, id).toBeGreaterThan(0);
       expect(race(id, 60 * 20, 3), id).toEqual(reference);
@@ -159,6 +159,13 @@ describe('kart determinism across JS engines', () => {
         id,
       ).toEqual(reference);
     }
+  });
+
+  it('getKartTrack builds each track once per process', () => {
+    const a = getKartTrack('pixel-plaza');
+    expect(getKartTrack('pixel-plaza')).toBe(a);
+    const cache = (globalThis as Record<string, unknown>).__dascadeKartTracks as Map<string, { track: unknown }>;
+    expect(cache.get('pixel-plaza')?.track).toBe(a);
   });
 
   it('different seeds give different races (the rng really drives items/bots)', () => {

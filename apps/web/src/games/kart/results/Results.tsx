@@ -8,7 +8,6 @@ import {
   KART_CUPS,
   KART_GP_POINTS,
   KART_MSG,
-  KART_RACERS,
   KART_TRACKS,
   type KartPublicState,
   type KartRacerId,
@@ -24,7 +23,7 @@ import { ResultsActions } from '../../../shell/common.tsx';
 import { Portrait } from '../lobby/Portrait.tsx';
 import { kartSfx } from '../audio/sounds.ts';
 import { loadBest, type KartBestDoc } from '../docs.ts';
-import { classify, gpStandings, medalFor, type Medal } from './order.ts';
+import { classify, racerSubtitle, gpStandings, medalFor, type Medal } from './order.ts';
 import type { KartController } from '../race/controller.ts';
 
 const MEDAL_LABEL: Record<Exclude<Medal, null>, string> = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' };
@@ -270,7 +269,7 @@ export function Results({ ctrl }: { ctrl: KartController }) {
                         <Portrait racer={s.e.racer} paint={s.e.paint} size={30} view="face" />
                         <span>
                           <b>{s.e.name}</b>
-                          <small>{s.e.bot ? `CPU · ${KART_RACERS[s.e.racer].name}` : KART_RACERS[s.e.racer].name}</small>
+                          <small>{racerSubtitle(s.e.name, s.e.racer, s.e.bot)}</small>
                         </span>
                       </span>
                     </td>
@@ -309,7 +308,7 @@ export function Results({ ctrl }: { ctrl: KartController }) {
                           <Portrait racer={row.r.racer} body={row.r.body} paint={row.r.paint} size={30} view="face" />
                           <span>
                             <b>{row.r.name}</b>
-                            <small>{row.r.bot ? `CPU · ${KART_RACERS[row.r.racer].name}` : KART_RACERS[row.r.racer].name}</small>
+                            <small>{racerSubtitle(row.r.name, row.r.racer, row.r.bot)}</small>
                           </span>
                         </span>
                       </td>

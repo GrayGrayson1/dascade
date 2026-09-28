@@ -570,6 +570,31 @@ export function dotTexture(hard = 0.0): CanvasTexture {
   return canvasTexture(c, false, 1);
 }
 
+/** Shore foam: broken white lacework, opaque at the shore edge (v = 0) fading out to sea (v = 1). */
+export function foamTexture(): CanvasTexture {
+  const c = makeCanvas(256, 64);
+  const g = ctx2d(c);
+  g.clearRect(0, 0, 256, 64);
+  const r = mulberry32(31);
+  for (let i = 0; i < 260; i++) {
+    const x = r() * 256;
+    const v = Math.pow(r(), 1.6);
+    const y = 64 - v * 64;
+    g.fillStyle = `rgba(255,255,255,${(0.95 - v * 0.8).toFixed(2)})`;
+    g.beginPath();
+    g.ellipse(x, y, 3 + r() * 10, 1.5 + r() * 3, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  const grd = g.createLinearGradient(0, 64, 0, 44);
+  grd.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 44, 256, 20);
+  const t = canvasTexture(c, true, 4);
+  t.wrapT = ClampToEdgeWrapping;
+  return t;
+}
+
 /** Crisp contact shadow: a rounded rectangle with a short soft edge (kart footprint). */
 export function contactShadowTexture(): CanvasTexture {
   const c = makeCanvas(128, 96);
@@ -614,12 +639,42 @@ export function wallTextures(style: WallStyle, a: number, b: number): { map: Can
       }
       break;
     case 'sandstone': {
+      // layered strata with weathered blocks, cracks and darker bands (varies across the 4-tile repeat)
       const r = mulberry32(4);
-      for (let i = 0; i < 40; i++) {
-        g.fillStyle = css(r() < 0.5 ? b : shadeInt(a, 0.1));
-        g.fillRect(Math.floor(r() * 128), Math.floor(r() * 64), 10 + r() * 20, 3 + r() * 5);
+      const bands = [0.0, 0.18, 0.34, 0.52, 0.7, 0.86, 1.0];
+      for (let k = 0; k < bands.length - 1; k++) {
+        const y0 = Math.round(bands[k]! * 64);
+        const y1 = Math.round(bands[k + 1]! * 64);
+        g.fillStyle = css(k % 2 ? shadeInt(a, -0.06 + r() * 0.04) : mixInt(a, b, 0.25 + r() * 0.2));
+        g.fillRect(0, y0, 128, y1 - y0);
+        g.fillStyle = css(shadeInt(b, -0.15));
+        g.globalAlpha = 0.5;
+        g.fillRect(0, y1 - 1, 128, 1);
+        g.globalAlpha = 1;
       }
-      g.fillStyle = css(shadeInt(a, 0.15));
+      for (let i = 0; i < 26; i++) {
+        g.fillStyle = css(r() < 0.5 ? shadeInt(a, 0.12) : shadeInt(b, -0.1));
+        g.globalAlpha = 0.55;
+        g.fillRect(Math.floor(r() * 128), Math.floor(r() * 60), 6 + r() * 22, 2 + r() * 4);
+      }
+      g.globalAlpha = 0.45;
+      g.strokeStyle = css(shadeInt(b, -0.35));
+      g.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        let x = r() * 128;
+        let y = 10 + r() * 30;
+        g.beginPath();
+        g.moveTo(x, y);
+        for (let k = 0; k < 3; k++) {
+          x += (r() - 0.5) * 10;
+          y += 6 + r() * 8;
+          g.lineTo(x, y);
+        }
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      // sun-bleached cap
+      g.fillStyle = css(shadeInt(a, 0.18));
       g.fillRect(0, 0, 128, 6);
       break;
     }

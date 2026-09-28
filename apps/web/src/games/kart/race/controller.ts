@@ -13,7 +13,6 @@ import {
   KART_TRACKS,
   type KartBodyId,
   type KartEvent,
-  type KartInput,
   type KartItemId,
   type KartPublicState,
   type KartRaceMetaView,
@@ -48,7 +47,6 @@ import { KartNet, resampleTrace, type NetStats, type RenderEntity } from '../net
 import { NetSim, netDebugFromUrl, type NetSimConfig } from '../net/netSim.ts';
 import type { Pose } from '../net/interp.ts';
 import { KartInputSampler, type InputDevice } from '../input/input.ts';
-import { TestAutopilot } from '../input/autopilot.ts';
 import { HudBridge } from '../hud/bridge.ts';
 import { buildMapBase, drawMap, type MapBase, type MapDot, type MapMark } from '../hud/minimap.ts';
 import { KartEngineSound } from '../audio/engine.ts';
@@ -95,6 +93,12 @@ export interface ControllerUi {
   rosterKey: string;
   /** Waiting for the green light (touch shows a GAS button for the rocket start). */
   locked: boolean;
+  /** The in-race menu (Esc / Start / pause button) is open. */
+  menuOpen: boolean;
+  /** Solo race is paused on the server (`race.paused`). */
+  paused: boolean;
+  /** This race can be paused (solo, not decided yet). */
+  canPause: boolean;
   /** Key of the loaded time-trial ghost ('' = none), so the stage can hand its look to the renderer. */
   ghostKey: string;
 }
@@ -193,6 +197,10 @@ export class KartController {
   private countdownStartedAt = 0;
   private lastPosition = 0;
   private bumpSeq = 0;
+  private pauseRequested = false;
+  private resumeSentAt = -1e9;
+  /** Server time when the current solo pause began (0 = running). */
+  private pausedAtServer = 0;
   private wasWrong = false;
 
   // Local-kart edge detection (sounds / fx).
@@ -212,7 +220,6 @@ export class KartController {
   private ghost: KartGhost | null = null;
   private ghostPose: KartPose = blankKartPose(-1);
   lastPb: { racePb: boolean; lapPb: boolean; ghostSaved: boolean } | null = null;
-  private pilot: TestAutopilot | null = null;
 
   constructor() {
     const snap = getStateSnapshot<KartPublicState>();
@@ -248,6 +255,9 @@ export class KartController {
       rosterKey: '',
       ghostKey: '',
       locked: true,
+      menuOpen: false,
+      paused: false,
+      canPause: false,
     };
     // A key press or a gamepad hides the touch controls; touching the screen brings them back.
     this.sampler.onDevice = (device) => this.setUi(device === 'touch' ? { device, touch: true } : { device, touch: false });
@@ -329,10 +339,31 @@ export class KartController {
     if (on) this.sampler.touched();
   }
 
-  /** Esc / gamepad Start: open (or close) the floating shell menu. */
+  /** Esc / gamepad Start / the pause button: open the in-race menu (pausing a solo race), or close it. */
   openMenu(): void {
-    const btn = document.querySelector<HTMLButtonElement>('[data-part="shell-menu"] > button');
-    btn?.click();
+    if (this.uiState.menuOpen) {
+      this.closeMenu();
+      return;
+    }
+    const phase = this.meta.phase;
+    if (phase !== 'COUNTDOWN' && phase !== 'PLAYING') return;
+    this.setUi({ menuOpen: true });
+    if (this.uiState.canPause && !this.meta.race?.paused) {
+      this.pauseRequested = true;
+      session.send(KART_MSG.pause, { paused: true });
+    }
+  }
+
+  /** Close the in-race menu and resume a paused solo race. */
+  closeMenu(): void {
+    if (!this.uiState.menuOpen) return;
+    this.setUi({ menuOpen: false });
+    // Also when the pause we asked for hasn't arrived yet (messages stay in order: pause, resume).
+    if (this.meta.race?.paused || this.pauseRequested) {
+      this.pauseRequested = false;
+      this.resumeSentAt = performance.now();
+      session.send(KART_MSG.pause, { paused: false });
+    }
   }
 
   cycleFollow(dir: 1 | -1): void {
@@ -355,11 +386,12 @@ export class KartController {
   }
 
   /**
-   * Test hook (E2E): ask the server for a test action it honours only with relaxed limits outside
-   * production (autopilot / finish). Only sent when the page opted in (`?kartTest=1` or the
-   * `kart-test` session flag) so a stray call from the console does nothing in normal play.
+   * Test hook (E2E): asks the server for a test action (`autopilot` drives our kart with the game's
+   * own bot, `finish` jumps to the line). The server only registers `kart:test` on non-production
+   * servers with relaxed limits, so in production this does nothing. Only sent when the page opted
+   * in (`?kartTest=1` or the `kart-test` session flag), so a stray console call is a no-op.
    */
-  test(action: { action: 'autopilot'; on: boolean } | { action: 'finish' } | { action: 'drive'; on: boolean }): boolean {
+  test(action: { action: 'autopilot'; on: boolean } | { action: 'finish' }): boolean {
     let enabled: boolean;
     try {
       enabled = new URLSearchParams(location.search).get('kartTest') === '1' || sessionStorage.getItem('kart-test') === '1';
@@ -367,11 +399,6 @@ export class KartController {
       enabled = false;
     }
     if (!enabled) return false;
-    if (action.action === 'drive') {
-      // Client-side pure-pursuit driver through the normal input path (works in production builds).
-      this.pilot = action.on ? new TestAutopilot(this.track.racingLine, 5, this.track.itemBoxes) : null;
-      return true;
-    }
     // While the server's bot drives our kart we must not send inputs (they'd interleave).
     if (action.action === 'autopilot') this.net.autopilot = action.on;
     session.send('kart:test', action);
@@ -400,6 +427,21 @@ export class KartController {
       this.setUi({ trackId });
       void this.loadTimeTrial();
     }
+    // Solo pause: freeze the HUD clocks at the moment it began; on resume the server has moved goAt
+    // and the finish window on, and snapshots continue from the same tick (reset the clock filter).
+    const paused = Boolean(s.race?.paused);
+    if (paused && !this.pausedAtServer) this.pausedAtServer = serverNow();
+    if (!paused && this.pausedAtServer) {
+      this.pausedAtServer = 0;
+      this.net.onResume();
+    }
+    const live = s.phase === 'COUNTDOWN' || s.phase === 'PLAYING';
+    const canPause = Boolean(s.race?.solo) && live && s.race?.status !== 'done';
+    if (!live && this.uiState.menuOpen) this.setUi({ menuOpen: false });
+    if (paused) this.pauseRequested = false;
+    // Paused without the menu (e.g. we reconnected into a paused race): show it, so Resume is there.
+    if (paused && live && !this.uiState.menuOpen && performance.now() - this.resumeSentAt > 2000) this.setUi({ menuOpen: true });
+    this.setUi({ paused, canPause });
     if (s.phase === 'COUNTDOWN' && prevPhase !== 'COUNTDOWN') {
       this.countdownStartedAt = serverNow();
       this.goPlayed = false;
@@ -676,7 +718,9 @@ export class KartController {
         }
         if (!solo && ev.by && ev.cause !== 'fall' && ev.cause !== 'hazard' && ev.cause !== 'bump') {
           this.pushFeed(
-            `${this.nameOf(ev.by)} ${ev.blocked ? '⟂' : '→'} ${this.nameOf(ev.victim)} · ${what}${ev.blocked ? ' (blocked)' : ''}`,
+            ev.blocked
+              ? `${this.nameOf(ev.victim)} blocked ${this.nameOf(ev.by)}'s ${what}`
+              : `${this.nameOf(ev.by)} → ${this.nameOf(ev.victim)} · ${what}`,
             ev.blocked ? 'block' : mineBy ? 'mine' : 'hit',
           );
         }
@@ -720,6 +764,10 @@ export class KartController {
   private countdown(sNow: number): { toGo: number; since: number } {
     const goAt = this.meta.race?.goAt ?? 0;
     if (!goAt) return { toGo: -1, since: 0 };
+    // Time the lights by our own input frames (input delay included), so GO shows exactly when the
+    // server starts applying them unlocked — the start boost the player sees is the one it gets.
+    const byFrames = this.net.startToGoMs();
+    if (byFrames !== null) return { toGo: byFrames, since: -byFrames };
     return { toGo: goAt - sNow, since: sNow - goAt };
   }
 
@@ -728,13 +776,15 @@ export class KartController {
     this.lastFrameAt = now;
     const race = this.meta.race;
     const phase = this.meta.phase;
-    const sNow = serverNow();
+    // While paused every race clock stands still at the moment the pause began.
+    const sNow = this.pausedAtServer || serverNow();
     const { toGo } = this.countdown(sNow);
     const racing = this.net.status === 'racing';
     const locked = !racing && (toGo > 0 || toGo === -1);
-    const frozen = phase === 'RESULTS' || phase === 'INTERMISSION' || phase === 'LOBBY';
-    this.sampler.enabled = !frozen && !this.uiState.spectating;
-    this.net.update(now, () => this.sampleInput(now, locked), locked, frozen);
+    const frozen = phase === 'RESULTS' || phase === 'INTERMISSION' || phase === 'LOBBY' || this.pausedAtServer > 0;
+    this.sampler.enabled = !frozen && !this.uiState.spectating && !this.uiState.menuOpen;
+    this.sampler.pollMenu();
+    this.net.update(now, () => this.sampler.sample(now, locked), locked, frozen);
     this.setUi({ locked: locked && !frozen });
 
     // --- Karts ---------------------------------------------------------------
@@ -860,7 +910,8 @@ export class KartController {
     view.ghost = this.ghostFrame(sNow, race);
 
     // --- Local feedback: sounds + fx from prediction -------------------------------
-    this.localFeedback(localState, local, now);
+    // Paused / results: nothing moves, so no roulette ticks, squeals or chimes either.
+    this.localFeedback(frozen ? null : localState, local, now);
     this.audio(localState, local, frozen, follow);
 
     if (now - this.lastHud > 66) {
@@ -872,12 +923,6 @@ export class KartController {
       this.drawMinimap(follow);
     }
     return view;
-  }
-
-  private sampleInput(now: number, locked: boolean): KartInput {
-    const st = this.pilot ? this.net.predictor?.state : null;
-    if (this.pilot && st) return this.pilot.drive({ x: st.x, y: st.y, heading: st.heading, speed: forwardSpeed(st) });
-    return this.sampler.sample(now, locked);
   }
 
   private ghostFrame(sNow: number, race: KartRaceMetaView | null): KartPose | null {

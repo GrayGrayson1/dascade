@@ -4,9 +4,10 @@
  * the shared voxel material (vertex colours + glow). Models face local +Z; the renderer turns them
  * toward the road. Unknown kinds fall back to `tower`.
  */
-import { AdditiveBlending, DoubleSide, Group, Mesh, MeshBasicMaterial, SphereGeometry, type BufferGeometry, type Material } from 'three';
+import { AdditiveBlending, DoubleSide, Vector3, Group, Mesh, MeshBasicMaterial, SphereGeometry, type BufferGeometry, type Material } from 'three';
 import type { BiomeStyle } from './biomes.ts';
 import { MeshBuilder } from '../art/builder.ts';
+import { container, spreader } from './kit.ts';
 import { shadeInt } from '../art/palette.ts';
 
 export const LANDMARK_KINDS = [
@@ -33,29 +34,41 @@ export const LANDMARK_KINDS = [
 ] as const;
 export type LandmarkKind = (typeof LANDMARK_KINDS)[number];
 
-/** Ground footprint radius at scale 1 (0 = floats; no clearing). */
-export const LANDMARK_FOOTPRINT: Record<LandmarkKind, number> = {
-  'arcade-cabinet': 12,
-  billboard: 9,
-  tower: 11,
-  arch: 16,
-  'radar-dish': 10,
-  'mesa-arch': 22,
-  lighthouse: 8,
-  crane: 12,
-  'cargo-ship': 0,
-  'ice-castle': 20,
-  'frozen-joystick': 10,
-  'ferris-wheel': 14,
-  'circus-tent': 16,
-  gears: 18,
-  smokestack: 9,
-  blimp: 0,
-  'cpu-tower': 14,
-  'data-spire': 8,
-  'cloud-island': 0,
-  'hot-air-balloon': 0,
-};
+/** Kinds that float or sit in water: no ground pad / clearing. */
+export const NO_GROUND_PAD: ReadonlySet<string> = new Set(['blimp', 'hot-air-balloon', 'cloud-island', 'cargo-ship']);
+
+const footprints = new Map<string, number>();
+const probeMaterial = new MeshBasicMaterial();
+
+/**
+ * Ground footprint half-extent (u, at scale 1) measured from the model itself, so there is no
+ * separate size table to drift out of date. 0 for floating / in-water kinds.
+ */
+export function landmarkFootprint(kind: string, biome: BiomeStyle): number {
+  const k: LandmarkKind = isLandmarkKind(kind) ? kind : 'tower';
+  if (NO_GROUND_PAD.has(k)) return 0;
+  const key = `${k}|${biome.id}`;
+  let r = footprints.get(key);
+  if (r === undefined) {
+    const inst = buildLandmark(k, biome, probeMaterial);
+    inst.group.updateMatrixWorld(true);
+    // ground contact only: points below 4 u (booms, beams and wheels overhead don't need clearance)
+    r = 0;
+    const v = new Vector3();
+    inst.group.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh || m.material !== probeMaterial) return;
+      const pos = m.geometry.getAttribute('position');
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        if (v.y < 4) r = Math.max(r!, Math.abs(v.x), Math.abs(v.z));
+      }
+    });
+    for (const mat of inst.materials) mat.dispose();
+    footprints.set(key, r);
+  }
+  return r;
+}
 
 export interface LandmarkInstance {
   group: Group;
@@ -221,9 +234,9 @@ const DEFS: Record<LandmarkKind, Parts> = {
     },
     anim: [
       {
-        // two soft light cones sweeping the harbour
-        build(b) {
-          for (const dir of [1, -1]) b.cone(dir * 14, 0, 0, 3.2, 26, 0x2e2a1c, 12, 'x', 0, dir < 0);
+        // two soft light cones sweeping the harbour (faint by day)
+        build(b, bi) {
+          for (const dir of [1, -1]) b.cone(dir * 14, 0, 0, 3.2, 26, bi.night ? 0x5a5030 : 0x14120c, 12, 'x', 0, dir < 0);
         },
         pivot: [0, 30.2, 0],
         additive: true,
@@ -243,8 +256,11 @@ const DEFS: Record<LandmarkKind, Parts> = {
       b.box(0, 23, 6, 3, 2, 30, 0xf2a900);
       b.box(0, 24.5, -8, 6, 4, 5, 0xe8364f);
       b.box(0, 24.5, -5.4, 4, 1.4, 0.1, 0x9be7ff, 0.5);
-      b.box(0, 18, 20, 0.2, 10, 0.2, DARK);
-      b.box(0, 12.5, 20, 6, 2.6, 2.4, 0x2563eb);
+      // hanging load: a detailed container on a spreader, hook and cable up to the trolley
+      container(b, 0, 12.5, 20, 0x2563eb, 6, 2.5, 2.4, true);
+      const hookTop = spreader(b, 0, 13.75, 20, 6, 2.4);
+      b.box(0, (hookTop + 22) / 2, 20, 0.14, 22 - hookTop, 0.14, DARK);
+      b.box(0, 22.1, 20, 1.2, 0.5, 1.6, 0x3b4252);
       for (const x of [-5, 5]) for (const z of [-4, 4]) b.box(x, 0.4, z, 1.6, 0.8, 1.6, DARK);
     },
   },
@@ -254,7 +270,19 @@ const DEFS: Record<LandmarkKind, Parts> = {
       b.box(0, 0.8, 0, 60.2, 1.6, 14.2, 0xe8364f);
       b.cone(33, 3, 0, 7, 6, 0x1f3b63, 4, 'x');
       const cols = [0xe8364f, 0x2563eb, 0x22c55e, 0xf97316, 0xffd23f];
-      for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 2; k++) b.box(-18 + i * 5.2, 7.3 + k * 2.6, -4.2 + j * 4.2, 5, 2.5, 4, cols[(i + j * 2 + k) % cols.length]!);
+      for (let i = 0; i < 8; i++)
+        for (let j = 0; j < 3; j++)
+          for (let k = 0; k < 2; k++) {
+            const cc = cols[(i + j * 2 + k) % cols.length]!;
+            const x = -18 + i * 5.2;
+            const y = 7.3 + k * 2.6;
+            const z = -4.2 + j * 4.2;
+            b.box(x, y, z, 5, 2.5, 4, cc);
+            // ribs on the outward faces + end doors so stacks read as containers, not blocks
+            if (j !== 1) for (let r = -2; r <= 2; r++) b.box(x + r * 0.95, y, z + (j === 0 ? -2.02 : 2.02), 0.14, 2.3, 0.05, shadeInt(cc, -0.22));
+            b.box(x + 2.52, y, z, 0.04, 2.3, 3.8, shadeInt(cc, -0.25));
+            b.box(x + 2.55, y, z - 0.6, 0.03, 2.2, 0.05, 0x9aa4b8).box(x + 2.55, y, z + 0.6, 0.03, 2.2, 0.05, 0x9aa4b8);
+          }
       b.box(-26, 10, 0, 6, 8, 12, 0xf1f5f9);
       b.box(-26, 12, 6.05, 5, 1.2, 0.1, 0x9be7ff, 0.6);
       b.cyl(-27, 16, 0, 1, 4, 0xe8364f, 8);
@@ -557,4 +585,5 @@ export function buildLandmark(kind: string, biome: BiomeStyle, material: Materia
 export function clearLandmarkCache(): void {
   for (const g of cache.values()) g.dispose();
   cache.clear();
+  footprints.clear();
 }

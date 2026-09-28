@@ -124,7 +124,12 @@ export class KartLayer {
   cullDistance = 320;
   maxTags = 6;
   /** Karts closer to the camera than this fade out so they never block the view of your kart. */
-  nearFade = 3.4;
+  nearFade = 2.6;
+  /** Camera→target sight line for the occluder fade (three space); tgtDist < 0 = none. */
+  private tgtX = 0;
+  private tgtY = 0;
+  private tgtZ = 0;
+  private tgtDist = -1;
   reducedMotion = false;
 
   constructor(
@@ -393,6 +398,18 @@ export class KartLayer {
     let gi = 0;
     let ci = 0;
     const camPos = camera.position;
+    this.tgtDist = -1;
+    for (let k = 0; k < poses.length; k++) {
+      const p = poses[k]!;
+      if (p.slot !== targetSlot || !p.active) continue;
+      this.tgtX = p.x;
+      this.tgtY = p.z + 0.7;
+      this.tgtZ = -p.y;
+      const dx = this.tgtX - camPos.x;
+      const dy = this.tgtY - camPos.y;
+      const dz = this.tgtZ - camPos.z;
+      this.tgtDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
     for (const v of this.order) v.visible = false;
     for (let k = 0; k < poses.length; k++) {
       const p = poses[k]!;
@@ -406,7 +423,7 @@ export class KartLayer {
       fi = this.writeFlames(v, p, fi, t);
       gi = this.writeExhaustGlow(v, p, gi, t);
       if (!v.lod && v.body.visible) ci = this.writeContact(v, p, ci);
-      const nearCam = v.dist < this.nearFade && p.slot !== targetSlot;
+      const nearCam = p.slot !== targetSlot && this.occludes(p, camPos);
       if (p.flags & KF.shield && !nearCam) bi = this.writeBubble(v, p, bi, t);
       if ((v.dizzyT > 0 || p.flags & KF.spinning) && !nearCam && !v.lod) st = this.writeStars(v, st, t);
       this.writeHeld(v, p, t);
@@ -632,7 +649,7 @@ export class KartLayer {
     v.bodyMesh.visible = !lod;
     v.headMesh.visible = !lod;
     v.lodMesh.visible = lod;
-    const ghosty = v.ghost || (f & (KF.ghost | KF.warp)) !== 0 || (!isTarget && v.dist < this.nearFade);
+    const ghosty = v.ghost || (f & (KF.ghost | KF.warp)) !== 0 || (!isTarget && this.occludes(p, cam));
     const m = ghosty ? this.ghostMat : this.kartMat;
     if (v.bodyMesh.material !== m) {
       v.bodyMesh.material = m;
@@ -692,6 +709,28 @@ export class KartLayer {
       fi++;
     }
     return fi;
+  }
+
+  /**
+   * True when a kart sits between the camera and the followed kart (within ~1.9 u of the sight
+   * line and not further than the target), or is simply very close to the lens: it fades to
+   * translucent so it never hides your own kart.
+   */
+  private occludes(p: KartPose, cam: Vector3): boolean {
+    const px = p.x - cam.x;
+    const py = p.z + 0.7 - cam.y;
+    const pz = -p.y - cam.z;
+    const d2 = px * px + py * py + pz * pz;
+    if (d2 < this.nearFade * this.nearFade) return true;
+    if (this.tgtDist <= 0) return false;
+    const inv = 1 / this.tgtDist;
+    const lx = (this.tgtX - cam.x) * inv;
+    const ly = (this.tgtY - cam.y) * inv;
+    const lz = (this.tgtZ - cam.z) * inv;
+    const along = px * lx + py * ly + pz * lz;
+    if (along < 0.5 || along > this.tgtDist + 0.9) return false;
+    const perp2 = d2 - along * along;
+    return perp2 < 1.9 * 1.9;
   }
 
   /** Explicit target, or the nearest kart ahead within 160 u and ±40° of the nose. */

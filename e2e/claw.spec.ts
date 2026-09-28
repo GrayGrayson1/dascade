@@ -3,7 +3,8 @@
  * (phones) opens its close-up; you operate it (keys / joystick / the big button); a try ends in a
  * result; a win drops a plush out of the prize door onto your shelf and out of the shared pile;
  * closing settles or cancels a try cleanly. Wins are made deterministic with the close-up's test hook
- * (`__dascadeClaw.rig()` lines the claw up over an exposed plush and makes the coil strong).
+ * (`__dascadeClaw.rig()`, only present with `?clawSeed=`: dead over the best grip, an absurdly strong
+ * coil — a guaranteed win).
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -33,10 +34,14 @@ async function walkUp(page: Page, isMobile: boolean): Promise<void> {
   await hook(page);
 }
 
+/** A drop straight after the token is ignored (a double click can't insert and drop at once). */
+const settle = (page: Page) => page.waitForTimeout(450);
+
 async function winOnce(page: Page): Promise<void> {
   await go(page).click();
   await expect(go(page)).toHaveAttribute('data-mode', 'drop');
   expect(await rig(page)).toBe(true);
+  await settle(page);
   await go(page).click();
   await expect(page.locator('[data-part="claw-prize"]')).toBeVisible({ timeout: 30_000 });
   await expect(status(page)).toHaveText(/^You won a (blob|bunny|star|cube bot) plush!/);
@@ -134,6 +139,7 @@ test.describe('the claw machine', () => {
     await go(page).click();
     await expect(go(page)).toHaveAttribute('data-mode', 'drop');
     await rig(page);
+    await settle(page);
     await go(page).click();
     await expect(closeup(page)).toHaveAttribute('data-phase', /drop|close/);
     await page.getByRole('button', { name: 'Leave the claw machine' }).click();
@@ -173,6 +179,91 @@ test.describe('the claw machine', () => {
     await walkUp(page, isMobile);
     await winOnce(page);
     await expect(page.locator('.clwx-confetti')).toHaveCount(0);
+  });
+
+  test('the glass renders at full resolution even with the opening zoom (motion on)', async ({ page, isMobile }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await openFloor(page);
+    await walkUp(page, isMobile);
+    await page.waitForTimeout(700); // past the zoom
+    const res = await page.locator('.clwx__view').evaluate((c: HTMLCanvasElement) => ({
+      w: c.width,
+      want: c.clientWidth * Math.min(2, window.devicePixelRatio || 1),
+    }));
+    expect(res.want).toBeGreaterThan(100);
+    expect(Math.abs(res.w - res.want)).toBeLessThanOrEqual(2);
+  });
+
+  test('says on the machine why a try missed, and a held key never inserts and drops at once', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'keyboard path on desktop');
+    await openFloor(page);
+    await walkUp(page, isMobile);
+    const led = page.locator('[data-part="claw-led"]');
+    await expect(led).toHaveText('FREE PLAY · PRESS START');
+    // Hold Enter on the focused big button: the token goes in, the repeats don't drop.
+    await expect(go(page)).toBeFocused();
+    await page.keyboard.down('Enter');
+    for (let i = 0; i < 6; i++) await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    await expect(closeup(page)).toHaveAttribute('data-phase', 'aim');
+    await page.waitForTimeout(500);
+    await expect(closeup(page)).toHaveAttribute('data-phase', 'aim');
+    await expect(led).toHaveText('RING = WHERE THE PRONGS LAND');
+    // Drop straight over the chute (nothing there): the LED says why.
+    await settle(page);
+    await page.keyboard.press('Enter');
+    await expect(closeup(page)).toHaveAttribute('data-phase', 'idle', { timeout: 30_000 });
+    await expect(led).toHaveText(/MISSED — NOTHING TO GRAB|CAUGHT A NEIGHBOUR|ONE PRONG/);
+    await expect(status(page)).toHaveText(/^Missed\./);
+  });
+
+  test('a second thumb can drop while the first holds the joystick; clicking the room leaves', async ({ page, isMobile }) => {
+    await openFloor(page);
+    await walkUp(page, isMobile);
+    await go(page).click();
+    await expect(go(page)).toHaveAttribute('data-mode', 'drop');
+    await settle(page);
+    // A non-primary touch never gets a click: the button acts on pointer-down.
+    await go(page).dispatchEvent('pointerdown', { isPrimary: false, pointerType: 'touch', button: 0, pointerId: 7 });
+    await expect(closeup(page)).not.toHaveAttribute('data-phase', 'aim');
+    await expect(closeup(page)).toHaveAttribute('data-phase', 'idle', { timeout: 30_000 });
+    // Outside the machine (the room around it) leaves.
+    const vp = page.viewportSize()!;
+    await page.mouse.click(4, vp.height - 4);
+    await expect(closeup(page)).toHaveCount(0);
+  });
+
+  test('if the close-up cannot load, it says so in place and can try again (the floor stays)', async ({ page, isMobile }) => {
+    await openFloor(page);
+    let block = true;
+    await page.route('**/*ClawCloseup*', (route) => (block ? route.abort() : route.continue()));
+    if (isMobile) await page.locator('[data-part="claw-quick"]:visible').first().click();
+    else await machine(page).click();
+    const oops = page.locator('[data-part="claw-unavailable"]');
+    await expect(oops).toBeVisible();
+    await expect(page.locator('.af-cab')).toHaveCount(CABINETS);
+    block = false;
+    await oops.getByRole('button', { name: 'Try again' }).click();
+    await expect(closeup(page)).toBeVisible();
+    await expect(page).toHaveURL(/clawSeed=7/);
+  });
+
+  test('mid-width floors: a speck of a machine is replaced by the quick button', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop widths');
+    await page.setViewportSize({ width: 900, height: 700 });
+    await openFloor(page);
+    await expect(page.locator('[data-part="claw-machine"]:visible')).toHaveCount(0);
+    const quick = page.locator('[data-part="claw-quick"]:visible');
+    await expect(quick).toHaveCount(1);
+    await quick.click();
+    await expect(closeup(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(closeup(page)).toHaveCount(0);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(machine(page)).toBeVisible();
+    const box = (await machine(page).boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(120);
+    await expect(page.locator('[data-part="claw-quick"]:visible')).toHaveCount(0);
   });
 
   test('phones: no floor machine, a quick Claw button opens the close-up and it fits the screen', async ({ page, isMobile }) => {

@@ -3,27 +3,30 @@
  * context always give the same next state, bit for bit, on every JS engine. It runs on the server
  * (authoritative) and in client prediction (replay after every snapshot).
  *
- * Feel (targets are written down in feel.test.ts, the "feel lab"):
- *  - Velocity lives in the kart frame: forward speed gets thrust/brake/drag; sideways speed decays
- *    fast (strong grip) and the velocity turns with the nose at ~95 % (a little slip), so the kart
- *    is planted and goes where it points.
+ * Feel (targets are pinned in kart.test.ts; `lab/run.ts` prints the numbers):
+ *  - Velocity lives in world space: thrust/brake change the forward component, drag acts on the
+ *    speed; the velocity turns ~75 % with the nose at once and realigns with it at the grip rate
+ *    (1–3° of slip), so the kart is planted and goes where it points.
  *  - Steering sets a target yaw rate reached in ~70 ms. Authority is low at a crawl, peaks at mid
- *    speed and eases off to 60 % at top speed (no twitch on straights, still turns hard at speed).
+ *    speed and eases off at top speed (handling), capped there by the grip stat's lateral limit.
  *  - Hop-drift: pressing drift while steering at speed makes a small hop; the drift direction locks
- *    to the steer side. Holding inside tightens the arc, outside widens it. The velocity lags the
- *    nose (visible slide) with reduced grip. Charge builds 2–4 points/tick (faster when tighter):
- *    stages at 108/234/396 points ≈ 0.6/1.3/2.2 s → a mini-turbo on release (0.6 / 1.1 / 1.6 s).
+ *    to the steer side. The drift is kinematic: inside steer tightens the arc (≈ 11 u), outside
+ *    widens it (≈ 60 u); the body holds 12–25° inside the arc. Charge comes from how much the kart
+ *    actually turns (528 points/rad, ≤ 16/tick): stages at 432/936/1584 points ≈ 47°/100°/170° of
+ *    turning (0.6/1.3/2.2 s on a neutral arc) → a mini-turbo on release. A drift never exceeds grip
+ *    top speed, so snaking down a straight earns nothing.
  *  - Boosts (pads, turbos, mini-turbos, start boost, trick landings) raise the top speed and push
- *    hard, and ignore the off-road penalty.
+ *    hard, and ignore the off-road penalty (dirt shortcuts are deep: slower still without a boost).
+ *  - Start: throttle held for 3–60 applied frames before GO → boost; held longer → a short wheelspin.
  *  - Air: gravity 30 u/s²; ramps launch by speed; air control is reduced. Pressing drift within
  *    0.25 s of leaving a ramp (or hopping at the lip) is a trick → landing boost.
- *  - Walls: the kart is pushed back inside, the normal speed bounces at 35 %, the nose swings
- *    along the wall, at least 40 % of the speed is kept along it (non-head-on), and for 0.25 s a
- *    held stick can't steer back into it — a hit costs speed but never pins or stops you dead.
+ *  - Walls: the kart is pushed back inside, the normal speed bounces at 35 %, at least 40 % of the
+ *    speed is kept along the wall (non-head-on), the nose swings along it over a few ticks (≤ 6 rad/s)
+ *    and for 0.25 s a held stick can't steer back into it — never pinned, never a dead stop.
  *  - Drops/gaps: fall for 1.2 s, then respawn stopped on the centreline at the last safe point
  *    (past the gap for gaps) with 1.5 s of immunity.
- *  - Spin-out: 1 s of two full turns (the nose ends where it started) at quickly bleeding speed,
- *    then 1.5 s of immunity so hits can never chain.
+ *  - Item spin-out: 1 s of two full turns (the nose ends where it started), exits at ~30 % speed;
+ *    hazard stumble: 0.5 s, one turn, keeps 70 %. Immunity follows, so hits can never chain.
  */
 import type { KartInput } from '@dascade/shared/games/kart';
 import { CODE_SHIELD, CODE_TURBO, CODE_TURBO3, CODE_WARP, isTrailableCode, itemFromCode, trapThrowsAhead } from './itemcodes.ts';
@@ -77,6 +80,8 @@ export const PHYS = {
   scrub: 0.6,
   /** Grip multipliers. */
   gripOffroad: 0.85,
+  /** Dirt shortcut top speed, relative to the racer's off-road top speed. */
+  dirtTop: 0.72,
   gripSlick: 0.1,
   /** Air steering authority. */
   airControl: 0.35,
@@ -93,6 +98,9 @@ export const PHYS = {
   driftSwing: 9,
   driftSwingResponse: 20,
   driftScrub: 0.02,
+  /** Drift charge points per radian of path rotation, and the per-tick cap (a tight arc). */
+  chargePerRad: 528,
+  chargeMaxPerTick: 16,
   /** Walls. */
   wallRestitution: 0.35,
   /** Fraction of the pre-impact speed always kept along the wall (non-head-on hits). */
@@ -117,15 +125,24 @@ export const PHYS = {
   padPower: 30,
   turboTicks: 78,
   turboPower: 36,
-  startBoostTicks: 66,
-  startBoostPower: 32,
+  startBoostTicks: 16,
+  startBoostPower: 18,
   trickTicks: 45,
   trickPower: 26,
   /** Start boost window: throttle held for 3..60 ticks when the lights go out; longer = wheelspin. */
   startMinRev: 3,
   startMaxRev: 60,
-  stallTicks: 50,
+  stallTicks: 16,
+  /** Thrust share during the wheelspin of a too-early start. */
+  stallThrust: 0.4,
   spinTicks: 60,
+  /** A spin keeps this share of the speed at the hit and bleeds at spinDrag (u/s²): it exits at ~30–40 %. */
+  spinKeep: 0.53,
+  /** Hazard knock: half the spin (one turn), keeps 70 % of the speed, 1 s immunity after it. */
+  stumbleTicks: 30,
+  stumbleKeep: 0.7,
+  stumbleImmuneTicks: 60,
+  spinDrag: 6,
   /** Immunity after a hit (counts from the hit, so ~1.5 s after the 1 s spin). */
   hitImmuneTicks: 150,
   blockImmuneTicks: 30,
@@ -359,10 +376,11 @@ export function giveBoost(st: KartState, ticks: number, power: number): void {
 export type HitOutcome = 'ignored' | 'blocked' | 'hit';
 
 /**
- * Apply an item/hazard hit to a kart (mutates). `spin` = spin-out; `slick` = fizz puddle (grip loss,
- * no spin, shields don't block). A trailing puck/mine/fizz blocks one hit from behind.
+ * Apply an item/hazard hit to a kart (mutates). `spin` = item spin-out (1 s, two turns);
+ * `stumble` = hazard knock (0.5 s, one turn, keeps more speed and the held item); `slick` = fizz
+ * puddle (grip loss, no spin, shields don't block). A trailing puck/mine/fizz blocks one hit from behind.
  */
-export function applyHit(st: KartState, kind: 'spin' | 'slick', fromBehind: boolean): HitOutcome {
+export function applyHit(st: KartState, kind: 'spin' | 'stumble' | 'slick', fromBehind: boolean): HitOutcome {
   if (st.warpTicks > 0 || st.fallTicks > 0) return 'ignored';
   if (kind === 'slick') {
     if (st.immuneTicks > 0 || st.slickTicks > 0) return 'ignored';
@@ -384,13 +402,20 @@ export function applyHit(st: KartState, kind: 'spin' | 'slick', fromBehind: bool
     st.immuneTicks = PHYS.blockImmuneTicks;
     return 'blocked';
   }
-  st.spinTicks = PHYS.spinTicks;
-  st.immuneTicks = PHYS.hitImmuneTicks;
-  // Exactly two turns in the spin: the nose ends where it started.
+  // Whole turns at the same rate (two for a spin, one for a stumble): the nose ends where it started.
   st.angVel = qang((4 * 3.141592653589793) / (PHYS.spinTicks * KART_DT));
   st.driftDir = 0;
   st.driftCharge = 0;
   st.driftArmed = false;
+  if (kind === 'stumble') {
+    st.spinTicks = PHYS.stumbleTicks;
+    st.immuneTicks = PHYS.stumbleTicks + PHYS.stumbleImmuneTicks;
+    st.vx = qvel(st.vx * PHYS.stumbleKeep);
+    st.vy = qvel(st.vy * PHYS.stumbleKeep);
+    return 'hit';
+  }
+  st.spinTicks = PHYS.spinTicks;
+  st.immuneTicks = PHYS.hitImmuneTicks;
   st.boostTicks = 0;
   st.boostPower = 0;
   st.magnetTicks = 0;
@@ -399,8 +424,8 @@ export function applyHit(st: KartState, kind: 'spin' | 'slick', fromBehind: bool
     consumeUse(st);
     st.trailing = false;
   }
-  st.vx = qvel(st.vx * 0.45);
-  st.vy = qvel(st.vy * 0.45);
+  st.vx = qvel(st.vx * PHYS.spinKeep);
+  st.vy = qvel(st.vy * PHYS.spinKeep);
   return 'hit';
 }
 
@@ -621,6 +646,7 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
   let vx = st.vx;
   let vy = st.vy;
   const velA0 = datan2(vy, vx);
+  const speed0 = dhypot(vx, vy);
   const boosting = st.boostTicks > 0;
   const slow = surface === SURF_OFFROAD || surface === SURF_DIRT || surface === SURF_MUD;
   const offroadSlow = slow && !boosting;
@@ -629,7 +655,14 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
   let topMul = 1;
   if (boosting) topMul += st.boostPower / 100;
   if (st.magnetTicks > 0) topMul += st.magnetPower / 100;
-  const surfTop = offroadSlow ? (surface === SURF_MUD ? Math.max(0.62, spec.offroadTop) : spec.offroadTop) : 1;
+  // Dirt shortcuts are deep: much slower than a grass shoulder unless you boost through them.
+  const surfTop = offroadSlow
+    ? surface === SURF_MUD
+      ? Math.max(0.62, spec.offroadTop)
+      : surface === SURF_DIRT
+        ? spec.offroadTop * PHYS.dirtTop
+        : spec.offroadTop
+    : 1;
   const top = spec.topSpeed * surfTop * topMul;
   if (st.grounded) {
     const vf0 = vx * fx + vy * fy;
@@ -638,7 +671,12 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
       if (vf < -0.5) vf = Math.min(0, vf + spec.brake * throttle * dt);
       else {
         const r = Math.max(0, vf) / top;
-        const a = spec.accel * Math.max(0, 1 - r * r) * throttle * (offroadSlow ? spec.offroadAccel : 1) * (st.stallTicks > 0 ? 0.12 : 1);
+        const a =
+          spec.accel *
+          Math.max(0, 1 - r * r) *
+          throttle *
+          (offroadSlow ? spec.offroadAccel : 1) *
+          (st.stallTicks > 0 ? PHYS.stallThrust : 1);
         vf += a * dt;
       }
     }
@@ -655,8 +693,8 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
     const speed = dhypot(vx, vy);
     if (speed > 0) {
       let drag: number = PHYS.roll;
-      if (throttle === 0 && brake === 0 && !boosting) drag += PHYS.coast;
-      if (spinning) drag += 26;
+      if (spinning) drag += PHYS.spinDrag;
+      else if (throttle === 0 && brake === 0 && !boosting) drag += PHYS.coast;
       let next = Math.max(0, speed - drag * dt);
       if (next > top) next = Math.max(top, next - ((next - top) * (offroadSlow ? PHYS.overBleedOffroad : PHYS.overBleed) + 2) * dt);
       vx *= next / speed;
@@ -705,9 +743,6 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
     }
   }
   const along = st.driftDir !== 0 ? clamp(steer * st.driftDir, -1, 1) : 0;
-  if (st.driftDir !== 0 && st.grounded && !slow && speedAbs > PHYS.driftMin) {
-    st.driftCharge = Math.min(DRIFT_CHARGE_MAX, st.driftCharge + Math.round((2 + Math.round(along + 1)) * 4 * spec.chargeRate));
-  }
 
   // --- Steering + grip ------------------------------------------------------------------------
   const speed = dhypot(vx, vy);
@@ -719,7 +754,16 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
     const k = PHYS.driftArcWide + (PHYS.driftArcTight - PHYS.driftArcWide) * ((along + 1) / 2);
     const arc = st.driftDir * driftArcRate(spec, speed, k);
     const newVel = velA0 + arc * dt;
-    const kept = speed * (1 - PHYS.driftScrub * dt);
+    // Never faster than grip driving: the nose-forward thrust can't push the drift over top speed
+    // (a boost's own top still applies; leftover speed above it bleeds as usual).
+    const kept = Math.min(speed * (1 - PHYS.driftScrub * dt), Math.max(top, speed0));
+    // Charge comes from how much the kart actually turns: ~47° of path rotation for stage 1,
+    // ~100° for stage 2, ~170° for stage 3 (0.6 / 1.3 / 2.2 s on a neutral arc). A weave down a
+    // straight never turns enough to earn a mini-turbo.
+    if (!slow && speedAbs > PHYS.driftMin) {
+      const pts = Math.min(PHYS.chargeMaxPerTick, Math.round(Math.abs(arc) * dt * PHYS.chargePerRad * spec.chargeRate));
+      st.driftCharge = Math.min(DRIFT_CHARGE_MAX, st.driftCharge + pts);
+    }
     vx = dcos(newVel) * kept;
     vy = dsin(newVel) * kept;
     const body = newVel + st.driftDir * (PHYS.driftAngle + PHYS.driftAngleInside * along);
@@ -1004,7 +1048,7 @@ export function stepKart(prev: KartState, input: KartInput, spec: KartSpec, trac
       }
       if (!pose.active) continue;
     }
-    const out = applyHit(st, 'spin', false);
+    const out = applyHit(st, 'stumble', false);
     if (out !== 'ignored') {
       info.hazardHit = i;
       info.hazardBlocked = out === 'blocked';

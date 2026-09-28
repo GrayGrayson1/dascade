@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { KART_GHOST_MAX_BYTES } from '@dascade/shared/games/kart';
 import { ghostDocBytes, mergeBest, parseBest, parseGhostDoc, type KartGhostDoc } from './docs.ts';
 import { fitProjection } from './hud/minimap.ts';
-import { TestAutopilot } from './input/autopilot.ts';
 import { resampleTrace } from './net/netClient.ts';
 
 describe('personal bests', () => {
@@ -80,25 +79,5 @@ describe('fitProjection', () => {
     expect(x0).toBeCloseTo(10);
     expect(x1).toBeCloseTo(210);
     expect(y0).toBeGreaterThan(y1);
-  });
-});
-
-describe('TestAutopilot', () => {
-  const n = 200;
-  const circle = {
-    xs: Array.from({ length: n }, (_, i) => Math.cos((i / n) * Math.PI * 2) * 100),
-    ys: Array.from({ length: n }, (_, i) => Math.sin((i / n) * Math.PI * 2) * 100),
-  };
-  it('steers left around a counter-clockwise loop and keeps the throttle down', () => {
-    const p = new TestAutopilot(circle);
-    const input = p.drive({ x: 100, y: 0, heading: Math.PI / 2, speed: 20 });
-    expect(input.steer).toBeGreaterThan(0);
-    expect(input.throttle).toBe(1);
-  });
-  it('turns hard toward a target behind it', () => {
-    const p = new TestAutopilot(circle);
-    const input = p.drive({ x: 100, y: 0, heading: -Math.PI / 2, speed: 20 });
-    expect(Math.abs(input.steer)).toBe(1);
-    expect(input.brake).toBeGreaterThan(0);
   });
 });

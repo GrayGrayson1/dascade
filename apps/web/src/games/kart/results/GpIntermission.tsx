@@ -4,7 +4,7 @@
  * start the next race now; otherwise it starts automatically.
  */
 import { useEffect, useRef, useState } from 'react';
-import { KART_CUPS, KART_GP_POINTS, KART_MSG, KART_RACERS, KART_TRACKS, type KartPublicState } from '@dascade/shared/games/kart';
+import { KART_CUPS, KART_GP_POINTS, KART_MSG, KART_TRACKS, type KartPublicState } from '@dascade/shared/games/kart';
 import { formatRaceTime, ordinal } from '@dascade/shared';
 import { Button, Panel, PixelIcon, cx } from '@dascade/ui';
 import { useApp } from '../../../app/store.ts';
@@ -13,7 +13,7 @@ import { session } from '../../../net/session.ts';
 import { Portrait } from '../lobby/Portrait.tsx';
 import { TrackThumb } from '../lobby/TrackThumb.tsx';
 import { kartSfx } from '../audio/sounds.ts';
-import { classify, gpStandings } from './order.ts';
+import { classify, racerSubtitle, gpStandings } from './order.ts';
 import { BIOME_LABEL, trackBiome } from '../trackInfo.ts';
 
 /** Counts 0 → value over ~0.9 s (instantly with reduced motion). */
@@ -84,7 +84,7 @@ export function GpIntermission() {
                   <Portrait racer={r.r.racer} body={r.r.body} paint={r.r.paint} size={40} view="face" />
                   <span className="kr-gp__who">
                     <b>{r.r.name}</b>
-                    <small className="kh-num">{r.r.finished ? formatRaceTime(r.r.finishMs) : 'Classified'}</small>
+                    <small className="kh-num">{r.r.finished ? formatRaceTime(r.r.finishMs) : 'DNF'}</small>
                   </span>
                 </li>
               ))}
@@ -130,7 +130,7 @@ export function GpIntermission() {
                         <Portrait racer={s.e.racer} paint={s.e.paint} size={30} view="face" />
                         <span>
                           <b>{s.e.name}</b>
-                          <small>{s.e.bot ? `CPU · ${KART_RACERS[s.e.racer].name}` : KART_RACERS[s.e.racer].name}</small>
+                          <small>{racerSubtitle(s.e.name, s.e.racer, s.e.bot)}</small>
                         </span>
                       </span>
                     </td>

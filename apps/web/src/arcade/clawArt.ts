@@ -5,7 +5,7 @@
  *
  * Sprite letters: a body · d body shade · e light (inner ears, belly) · w eye white · k pupil · p cheek.
  */
-import type { ToyKind } from './clawPhysics.ts';
+import type { ToyKind } from './clawPile.ts';
 
 export const PLUSH_COLORS = ['#ff4fd8', '#22d3ee', '#ffd23f', '#2de38f', '#a78bfa', '#ff8a3d'] as const;
 export const PLUSH_SHADES = ['#b82f9b', '#1592a8', '#c49a1c', '#1f9e63', '#7155c4', '#c2601f'] as const;

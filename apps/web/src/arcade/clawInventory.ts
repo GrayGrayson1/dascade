@@ -10,7 +10,7 @@
  * No money anywhere: tokens are free, prizes have no value, nothing leaves the browser.
  */
 import { create } from 'zustand';
-import { BOX, KINDS, TOY_COLORS, TOY_KINDS, settleFully, stockToys, type ClawToy, type ToyKind } from './clawPhysics.ts';
+import { KINDS, PILE_AREA, TOY_COLORS, TOY_KINDS, settleFully, stockToys, type ClawToy, type ToyKind } from './clawPile.ts';
 
 export const CLAW_KEY = 'dascade:v2:claw';
 export const LEGACY_CLAW_KEY = 'dascade:v1:claw';
@@ -58,8 +58,8 @@ function parsePile(v: unknown): PileEntry[] | null {
     const o = e as Record<string, unknown>;
     if (typeof o.k !== 'string' || !(TOY_KINDS as readonly string[]).includes(o.k)) return null;
     const c = typeof o.c === 'number' && Number.isInteger(o.c) && o.c >= 0 && o.c < TOY_COLORS ? o.c : null;
-    const x = num(o.x, 0, BOX.w);
-    const z = num(o.z, 0, BOX.d);
+    const x = num(o.x, PILE_AREA.x0, PILE_AREA.x1);
+    const z = num(o.z, PILE_AREA.z0, PILE_AREA.z1);
     if (c === null || x === null || z === null) return null;
     out.push({ k: o.k as ToyKind, c, x, z });
   }
@@ -205,7 +205,8 @@ interface ClawStore {
   /** The floor machine's WINNER! lights go back to idle. */
   settleFloor: () => void;
   /** Saves the machine after a try (and a win's prize). */
-  commit: (toys: readonly ClawToy[], misses: number, seed: number, prize?: { kind: ToyKind; color: number }) => void;
+  /** `lost`: this try missed — the floor's WINNER! lights (and the last prize at its door) go out. */
+  commit: (toys: readonly ClawToy[], misses: number, seed: number, prize?: { kind: ToyKind; color: number }, lost?: boolean) => void;
   /** The attendant tops the machine up. */
   restocked: (toys: readonly ClawToy[], seed: number) => void;
 }
@@ -221,7 +222,7 @@ export const useClaw = create<ClawStore>((set, get) => ({
   },
   closeCloseup: () => set((s) => ({ open: null, floor: s.floor === 'playing' ? 'idle' : s.floor })),
   settleFloor: () => set({ floor: 'idle' }),
-  commit: (toys, misses, seed, prize) => {
+  commit: (toys, misses, seed, prize, lost = false) => {
     const prev = get().inv;
     const shelf = { ...prev.shelf };
     const colors = { ...prev.colors };
@@ -239,7 +240,9 @@ export const useClaw = create<ClawStore>((set, get) => ({
       seed: seed | 0,
     };
     writeStorage(inv);
-    set(prize ? { inv, floor: 'won', lastPrize: { ...prize, at: Date.now() } } : { inv });
+    if (prize) set({ inv, floor: 'won', lastPrize: { ...prize, at: Date.now() } });
+    else if (lost) set((st) => ({ inv, floor: st.open ? 'playing' : 'idle', lastPrize: null }));
+    else set({ inv });
   },
   restocked: (toys, seed) => {
     const inv = { ...get().inv, pile: toysToPile(toys), seed: seed | 0 };

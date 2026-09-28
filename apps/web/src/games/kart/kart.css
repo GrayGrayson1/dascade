@@ -12,6 +12,21 @@
 
 /* ---------- Stage ---------- */
 .kr {
+  /* Over-the-scene palette. Text drawn straight over the 3D world must not use theme text colours:
+     those are designed for panels and are dark in the light themes (corporate-98: #0e0e12 on a dark
+     road ≈ 2:1). Floating HUD text is a fixed light ink with a dark outline, or sits on a fixed dark
+     plate, so it is legible over any road, sky or snow in every theme. Themed colours stay for
+     accents and for text inside themed panels (lap panel, spectator bar, results). */
+  --kh-ink: #ffffff;
+  --kh-ink-muted: #e4e1f2;
+  --kh-ink-dark: #0b0716;
+  --kh-shade: #07050f;
+  --kh-plate: rgba(9, 7, 20, 0.8);
+  --kh-plate-strong: rgba(9, 7, 20, 0.9);
+  --kh-outline:
+    0 0 1px #07050f, 1px 1px 0 #07050f, -1px -1px 0 #07050f, 1px -1px 0 #07050f, -1px 1px 0 #07050f, 0 2px 4px rgba(0, 0, 0, 0.55);
+  /* Accents on the dark plate: any theme accent, lifted towards white so it reads. */
+  --kh-accent-ink: color-mix(in srgb, var(--accent) 45%, #ffffff);
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -129,12 +144,11 @@
   --kh-gold: #ffd23f;
   --kh-silver: #e4e9f5;
   --kh-bronze: #e39a5c;
-  --kh-ink: #0b0716;
   position: absolute;
   inset: 0;
   z-index: var(--z-hud);
   pointer-events: none;
-  color: var(--hud-fg);
+  color: var(--kh-ink);
   font-family: var(--font-tech);
   transition: opacity var(--dur-3) var(--ease-out);
 }
@@ -146,6 +160,7 @@
   pointer-events: auto;
 }
 .kh-panel {
+  color: var(--hud-fg);
   background: var(--hud-bg);
   border: var(--panel-border-width, 1px) solid var(--hud-border);
   border-radius: var(--hud-radius);
@@ -161,7 +176,7 @@
 .kh-label,
 .kh-times dt {
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--hud-muted);
 }
@@ -169,11 +184,10 @@
 .kh-pos,
 .kh-banner,
 .kh-count,
-.kh-intro,
-.kh-wrongway {
+.kh-intro {
   text-shadow:
-    0 2px 0 color-mix(in srgb, var(--shade) 85%, transparent),
-    0 0 18px color-mix(in srgb, var(--shade) 55%, transparent);
+    var(--kh-outline),
+    0 0 18px rgba(0, 0, 0, 0.45);
 }
 
 /* ---------- Item slot (top-left): a slot-machine window ---------- */
@@ -197,7 +211,7 @@
   border: 2px solid var(--hud-border);
   box-shadow:
     var(--hud-shadow),
-    inset 0 0 0 3px color-mix(in srgb, var(--shade) 50%, transparent);
+    inset 0 0 0 3px color-mix(in srgb, var(--kh-shade) 50%, transparent);
 }
 .kh-item__reel {
   position: relative;
@@ -208,10 +222,10 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--shade) 70%, transparent),
+      color-mix(in srgb, var(--kh-shade) 70%, transparent),
       transparent 24%,
       transparent 76%,
-      color-mix(in srgb, var(--shade) 70%, transparent)
+      color-mix(in srgb, var(--kh-shade) 70%, transparent)
     ),
     linear-gradient(180deg, #1d1830, #0d0a18);
   display: grid;
@@ -221,7 +235,7 @@
   width: 82%;
   height: 82%;
   object-fit: contain;
-  filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--shade) 70%, transparent));
+  filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--kh-shade) 70%, transparent));
 }
 .kh-item__icon:not([src]) {
   visibility: hidden;
@@ -284,7 +298,7 @@
   box-shadow:
     var(--hud-shadow),
     0 0 calc(22px * var(--render-glow, 1)) color-mix(in srgb, var(--kh-gold) 55%, transparent),
-    inset 0 0 0 3px color-mix(in srgb, var(--shade) 50%, transparent);
+    inset 0 0 0 3px color-mix(in srgb, var(--kh-shade) 50%, transparent);
 }
 .kh-item[data-state='trail'] .kh-item__frame {
   border-style: dashed;
@@ -298,20 +312,25 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--kh-gold);
-  color: var(--kh-ink);
+  color: var(--kh-ink-dark);
   font: 800 13px/1.4 var(--font-num);
   text-align: center;
 }
 .kh-item__count:empty {
   display: none;
 }
+.kh-item__name:empty {
+  visibility: hidden;
+}
 .kh-item__name {
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--hud-fg);
-  text-shadow: 0 1px 0 var(--shade);
+  color: var(--kh-ink);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--kh-plate-strong);
   min-height: 12px;
 }
 @keyframes kh-reel {
@@ -344,10 +363,19 @@
 }
 
 /* ---------- Lap + times (top-right) ---------- */
-.kh-lap {
+/* Top-right: [pause] [lap + times], left of the shell's menu button. */
+.kh-tr {
   position: absolute;
   top: calc(var(--kh-pad) + var(--safe-top));
   right: calc(var(--kh-pad) + var(--safe-right) + 52px);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.kh-pausebtn {
+  pointer-events: auto;
+}
+.kh-lap {
   display: grid;
   gap: 4px;
   padding: 8px 14px 10px;
@@ -391,7 +419,7 @@
 }
 .kh-times dd {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--hud-fg);
 }
 .kh-times__pb dd {
@@ -403,8 +431,8 @@
   position: absolute;
   right: calc(var(--kh-pad) + var(--safe-right));
   bottom: calc(var(--kh-pad) + var(--safe-bottom) + 6px);
-  color: var(--hud-fg);
-  --kh-place: var(--hud-fg);
+  color: var(--kh-ink);
+  --kh-place: var(--kh-ink);
 }
 .kh-pos[data-place='1'] {
   --kh-place: var(--kh-gold);
@@ -416,8 +444,17 @@
   --kh-place: var(--kh-bronze);
 }
 .kh-pos__wrap {
+  position: relative;
   display: flex;
   align-items: flex-start;
+  /* A skewed dark plate under the place: with the outline it keeps "4th" readable over snow, sky or
+     a bright billboard in every theme (ink, outline and plate are fixed, not theme colours). */
+  padding: 8px 14px 6px 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(9, 7, 20, 0.84), rgba(9, 7, 20, 0.7));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 22px rgba(0, 0, 0, 0.35);
   transform: skewX(-8deg);
   transform-origin: 100% 100%;
 }
@@ -426,7 +463,7 @@
   font-weight: 800;
   line-height: 0.82;
   color: var(--kh-place);
-  -webkit-text-stroke: 2px color-mix(in srgb, var(--shade) 80%, transparent);
+  -webkit-text-stroke: 3px var(--kh-shade);
   paint-order: stroke fill;
   letter-spacing: -0.04em;
 }
@@ -442,7 +479,7 @@
   margin-left: 4px;
   font-size: clamp(16px, 2.4vh, 24px);
   font-weight: 700;
-  color: var(--hud-muted);
+  color: var(--kh-ink);
 }
 .kh-pos[data-bump$='-a'] .kh-pos__wrap {
   animation: kh-pop-a 520ms var(--ease-spring);
@@ -524,12 +561,13 @@
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: color-mix(in srgb, var(--shade) 58%, transparent);
+  color: var(--kh-ink);
+  background: var(--kh-plate-strong);
   transition: transform var(--dur-2) var(--ease-out);
 }
 .kh-near__row.is-me {
-  background: color-mix(in srgb, var(--accent) 55%, var(--shade));
+  background: var(--kh-plate-strong);
+  box-shadow: inset 3px 0 0 var(--kh-accent-ink);
   transform: translateX(6px);
 }
 .kh-near__row.is-out {
@@ -543,7 +581,7 @@
   width: 8px;
   height: 14px;
   border-radius: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--shade) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kh-shade) 70%, transparent);
 }
 .kh-near__name {
   overflow: hidden;
@@ -574,8 +612,8 @@
   padding: 6px;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--shade) 55%, transparent) 55%,
-    color-mix(in srgb, var(--shade) 10%, transparent) 72%
+    color-mix(in srgb, var(--kh-shade) 55%, transparent) 55%,
+    color-mix(in srgb, var(--kh-shade) 10%, transparent) 72%
   );
 }
 .kh-map__canvas {
@@ -602,7 +640,7 @@
   width: 22px;
   height: 6px;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--shade) 55%, transparent);
+  background: color-mix(in srgb, var(--kh-shade) 55%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--light) 25%, transparent);
 }
 .kh-drift[data-stage='1'] i:nth-child(1),
@@ -639,15 +677,12 @@
   font-size: clamp(26px, 4.4vw, 54px);
   line-height: 1;
   letter-spacing: 0.04em;
-  color: #fff;
-  --kh-tone: var(--accent);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--kh-tone) 55%, transparent) 18%,
-    color-mix(in srgb, var(--kh-tone) 55%, transparent) 82%,
-    transparent
-  );
+  color: var(--kh-ink);
+  --kh-tone: var(--kh-accent-ink);
+  background:
+    linear-gradient(90deg, transparent, var(--kh-tone) 18%, var(--kh-tone) 82%, transparent) top / 100% 3px no-repeat,
+    linear-gradient(90deg, transparent, var(--kh-tone) 18%, var(--kh-tone) 82%, transparent) bottom / 100% 3px no-repeat,
+    linear-gradient(90deg, transparent, var(--kh-plate) 14%, var(--kh-plate) 86%, transparent);
   transform: skewX(-10deg);
   white-space: nowrap;
 }
@@ -682,24 +717,39 @@
     transform: skewX(-10deg);
   }
 }
+/* A warning in a fixed danger colour in every theme: opaque plate, white text (≈ 7:1), and it
+   pulses its ring rather than fading the text. */
 .kh-wrongway {
   display: none;
   align-items: center;
   gap: 10px;
-  padding: 8px 18px;
+  padding: 8px 20px;
   border-radius: 10px;
-  background: color-mix(in srgb, #e11d48 80%, transparent);
+  border: 3px solid #fff;
+  background: #b3102a;
   color: #fff;
   font-family: var(--font-display);
-  font-size: clamp(22px, 3vw, 36px);
+  font-size: clamp(24px, 3.2vw, 38px);
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 0 0 3px #07050f,
+    0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.kh-wrongway svg {
+  width: 1em;
+  height: 1em;
 }
 .kh-wrongway[data-show] {
   display: inline-flex;
-  animation: kh-blink 700ms steps(2, jump-none) infinite;
+  animation: kh-warn 800ms ease-in-out infinite;
 }
-@keyframes kh-blink {
+@keyframes kh-warn {
   50% {
-    opacity: 0.45;
+    box-shadow:
+      0 0 0 3px #07050f,
+      0 0 0 9px rgba(255, 60, 80, 0.55),
+      0 8px 24px rgba(0, 0, 0, 0.5);
   }
 }
 .kh-window {
@@ -708,7 +758,8 @@
   align-items: baseline;
   padding: 4px 12px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--shade) 70%, transparent);
+  color: var(--kh-ink);
+  background: var(--kh-plate-strong);
   font-size: 13px;
 }
 .kh-window[data-show] {
@@ -724,22 +775,23 @@
   border-radius: 999px;
   font-weight: 700;
   font-size: 15px;
-  color: #fff;
-  background: color-mix(in srgb, var(--shade) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--light) 25%, transparent);
+  color: var(--kh-ink);
+  background: var(--kh-plate-strong);
+  border: 1px solid rgba(255, 255, 255, 0.28);
 }
 .kh-toast[data-show] {
   display: block;
   animation: kh-toast-in 260ms var(--ease-out) both;
 }
+/* Deep, near-opaque tones: white text stays ≥ 5:1 over any scene. */
 .kh-toast[data-tone='hit'] {
-  background: color-mix(in srgb, #e11d48 78%, transparent);
+  background: rgba(176, 16, 52, 0.94);
 }
 .kh-toast[data-tone='mine'] {
-  background: color-mix(in srgb, #16a34a 80%, transparent);
+  background: rgba(21, 110, 52, 0.94);
 }
 .kh-toast[data-tone='block'] {
-  background: color-mix(in srgb, #0891b2 80%, transparent);
+  background: rgba(11, 98, 128, 0.94);
 }
 @keyframes kh-toast-in {
   from {
@@ -770,17 +822,17 @@
   line-height: 0.85;
   letter-spacing: -0.04em;
   color: #fff;
-  -webkit-text-stroke: 5px color-mix(in srgb, var(--shade) 90%, transparent);
+  -webkit-text-stroke: 5px color-mix(in srgb, var(--kh-shade) 90%, transparent);
   paint-order: stroke fill;
   text-shadow:
-    0 6px 0 color-mix(in srgb, var(--shade) 70%, transparent),
+    0 6px 0 color-mix(in srgb, var(--kh-shade) 70%, transparent),
     0 0 calc(40px * var(--render-glow, 1)) color-mix(in srgb, var(--accent) 45%, transparent);
 }
 /* The rocket-start window: the last number turns gold (a subtle cue, the pill says why). */
 .kh-count[data-boost] .kh-count__num {
   color: var(--kh-gold);
   text-shadow:
-    0 6px 0 color-mix(in srgb, var(--shade) 70%, transparent),
+    0 6px 0 color-mix(in srgb, var(--kh-shade) 70%, transparent),
     0 0 calc(34px * var(--render-glow, 1)) color-mix(in srgb, var(--kh-gold) 70%, transparent);
 }
 .kh-count[data-beat='a'] .kh-count__num {
@@ -861,13 +913,17 @@
 .kh-intro {
   position: absolute;
   left: calc(var(--kh-pad) + var(--safe-left) + 4vw);
-  bottom: calc(var(--kh-pad) + var(--safe-bottom) + 18vh);
+  /* Above the minimap disc (same size formula), never over it. */
+  bottom: calc(var(--kh-pad) + var(--safe-bottom) + clamp(130px, 14vw, 200px) + 20px);
   display: grid;
   gap: 4px;
-  padding: 14px 28px 16px 20px;
-  border-left: 6px solid var(--accent);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--shade) 72%, transparent), transparent);
+  padding: 14px 44px 16px 20px;
+  border-left: 6px solid var(--kh-accent-ink);
+  background: linear-gradient(90deg, var(--kh-plate-strong), var(--kh-plate) 70%, transparent);
   animation: kh-intro-in 700ms var(--ease-out) both;
+}
+.kh-intro .kh-intro__kicker {
+  color: var(--kh-accent-ink);
 }
 .kh-intro__name {
   margin: 0;
@@ -877,7 +933,7 @@
   color: #fff;
 }
 .kh-intro__meta {
-  color: var(--hud-fg);
+  color: var(--kh-ink-muted);
   font-size: var(--fs-sm);
 }
 @keyframes kh-intro-in {
@@ -909,9 +965,10 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: color-mix(in srgb, var(--shade) 70%, transparent);
-  border-right: 3px solid var(--hud-muted);
+  color: var(--kh-ink);
+  background: var(--kh-plate-strong);
+  --tone: #9d98b8;
+  border-right: 3px solid var(--tone);
   animation: kh-feed-in 240ms var(--ease-out) both;
   white-space: nowrap;
   overflow: hidden;
@@ -919,16 +976,16 @@
   max-width: 100%;
 }
 .kh-feed__row[data-tone='hit'] {
-  border-right-color: #ff5a5f;
+  --tone: #ff5a5f;
 }
 .kh-feed__row[data-tone='mine'] {
-  border-right-color: #2de38f;
+  --tone: #2de38f;
 }
 .kh-feed__row[data-tone='block'] {
-  border-right-color: #22d3ee;
+  --tone: #22d3ee;
 }
 .kh-feed__row[data-tone='info'] {
-  border-right-color: var(--kh-gold);
+  --tone: var(--kh-gold);
 }
 @keyframes kh-feed-in {
   from {
@@ -945,9 +1002,11 @@
   transform: translateX(-50%);
   display: flex;
   gap: 14px;
-  font-size: 11px;
-  color: var(--hud-muted);
-  opacity: 0.85;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--kh-ink-muted);
+  background: var(--kh-plate);
   white-space: nowrap;
 }
 .kh[data-status='racing'] .kh-hint {
@@ -973,9 +1032,9 @@
   font-size: 10px;
   line-height: 16px;
   text-align: center;
-  color: var(--hud-fg);
-  background: color-mix(in srgb, var(--shade) 70%, transparent);
-  border: 1px solid var(--hud-border);
+  color: var(--kh-ink);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.45);
 }
 .kh-spec {
   position: absolute;
@@ -1016,7 +1075,7 @@
   width: 250px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--shade) 85%, transparent);
+  background: color-mix(in srgb, var(--kh-shade) 85%, transparent);
   color: #d8fbe8;
   font: 11px/1.4 var(--font-num);
   pointer-events: auto;
@@ -1091,9 +1150,9 @@
   justify-content: space-between;
   padding: 0 10px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--shade) 45%, transparent);
-  border: 2px solid color-mix(in srgb, var(--light) 30%, transparent);
-  color: color-mix(in srgb, var(--light) 80%, transparent);
+  background: rgba(9, 7, 20, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.85);
 }
 .kt-touch__rail svg {
   width: 18px;
@@ -1111,8 +1170,8 @@
     radial-gradient(circle at 40% 32%, #ffffff, #d8d3ef 62%, #a7a0cf);
   border: 3px solid color-mix(in srgb, var(--accent) 80%, transparent);
   box-shadow:
-    0 4px 14px color-mix(in srgb, var(--shade) 60%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--shade) 35%, transparent);
+    0 4px 14px color-mix(in srgb, var(--kh-shade) 60%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--kh-shade) 35%, transparent);
 }
 .kt-touch__right {
   position: absolute;
@@ -1143,14 +1202,15 @@
   width: var(--kt-btn);
   aspect-ratio: 1;
   border-radius: 50%;
-  border: 3px solid color-mix(in srgb, var(--light) 45%, transparent);
-  background: color-mix(in srgb, var(--shade) 42%, transparent);
-  color: #fff;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(9, 7, 20, 0.6);
+  color: var(--kh-ink);
+  text-shadow: var(--kh-outline);
   font-family: var(--font-pixel);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--shade) 45%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--kh-shade) 45%, transparent);
   transition:
     transform 80ms ease-out,
     background 80ms;
@@ -1251,12 +1311,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
-  min-height: 40px;
+  padding: 6px 12px;
+  min-height: 44px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--light) 30%, transparent);
-  background: color-mix(in srgb, var(--shade) 55%, transparent);
-  color: var(--hud-muted);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--kh-plate);
+  color: var(--kh-ink-muted);
   font-size: 11px;
   font-family: var(--font-pixel);
 }
@@ -1298,11 +1358,13 @@
   .kh {
     --kh-pad: 8px;
   }
+  .kh-tr {
+    right: calc(var(--kh-pad) + var(--safe-right) + 48px);
+  }
   .kh-lap {
     min-width: 0;
     padding: 5px 10px 6px;
     gap: 2px;
-    right: calc(var(--kh-pad) + var(--safe-right) + 48px);
   }
   .kh-lap__n {
     font-size: 26px;
@@ -1355,54 +1417,93 @@
 }
 
 /* Portrait phones: the HUD becomes a top strip, controls a bottom band. */
+/* Portrait phones. The portrait chase camera puts the horizon at ~35 % and the kart small in the
+   lower-middle, so the HUD lives in the sky band and the thumbs' band only:
+     top row      minimap (left) · lap + time (right, left of the menu button)
+     under it     race feed (left, 2 rows) · place (right)
+     sky band     banners / toasts / wrong way, the intro card
+     middle       nothing: the road ahead and the kart stay clear (countdown numeral only)
+     bottom       touch controls                                                              */
 @media (orientation: portrait) and (max-width: 700px) {
+  .kh-tr {
+    right: calc(var(--kh-pad) + var(--safe-right) + 50px);
+  }
   .kh-lap {
-    right: calc(var(--kh-pad) + var(--safe-right) + 48px);
     min-width: 0;
     padding: 6px 10px;
   }
   .kh-times {
     display: none;
   }
+  .kh[data-part] .kh-map {
+    top: calc(var(--kh-pad) + var(--safe-top));
+    bottom: auto;
+    width: 84px;
+    padding: 4px;
+  }
+  .kh[data-part]:not([data-touch='true']) .kh-map {
+    top: calc(var(--kh-pad) + var(--safe-top) + 98px);
+  }
+  .kh[data-part] .kh-pos {
+    top: calc(var(--kh-pad) + var(--safe-top) + 78px);
+    bottom: auto;
+    right: calc(var(--kh-pad) + var(--safe-right));
+    left: auto;
+  }
+  .kh[data-part] .kh-pos__wrap {
+    transform-origin: 100% 0;
+  }
+  .kh[data-part] .kh-pos__big {
+    font-size: 58px;
+  }
+  .kh[data-part] .kh-pos__sfx {
+    font-size: 24px;
+  }
   .kh-top {
-    top: calc(var(--kh-pad) + var(--safe-top) + 74px);
+    top: calc(var(--kh-pad) + var(--safe-top) + 164px);
     width: 92vw;
   }
   .kh-banner {
     font-size: 26px;
   }
-  .kh[data-touch='true'] .kh-pos {
-    top: calc(var(--kh-pad) + var(--safe-top) + 4px);
-    right: auto;
-    left: calc(var(--kh-pad) + var(--safe-left) + 104px);
-  }
-  .kh[data-touch='true'] .kh-map {
-    width: 92px;
-  }
-  .kh[data-touch='true'] .kh-pos__big {
-    font-size: 62px;
+  .kh-banner[data-tone='orange'],
+  .kh-banner[data-tone='gold'] {
+    font-size: 32px;
   }
   .kh-count {
-    top: 42%;
+    top: 44%;
   }
-  /* Portrait phones: under the top HUD strip, above the count. */
   .kh-intro {
     left: 16px;
     right: 16px;
     bottom: auto;
-    top: calc(var(--safe-top) + 104px);
+    top: calc(var(--kh-pad) + var(--safe-top) + 164px);
+    padding: 10px 18px 12px 14px;
   }
   .kh-intro__name {
-    font-size: 40px;
+    font-size: 36px;
   }
-  .kh-feed {
-    top: calc(var(--safe-top) + 130px);
+  .kh[data-part] .kh-feed {
+    top: calc(var(--kh-pad) + var(--safe-top) + 94px);
     bottom: auto;
-    max-width: 70vw;
+    left: calc(var(--kh-pad) + var(--safe-left));
+    right: auto;
+    justify-items: start;
+    max-width: 58vw;
+  }
+  .kh[data-part] .kh-feed__row {
+    border-right: 0;
+    border-left: 3px solid var(--tone);
+  }
+  .kh[data-part] .kh-feed__row:nth-last-child(n + 3) {
+    display: none;
+  }
+  .kh[data-part][data-touch='true'] .kh-drift {
+    bottom: 48vh;
   }
   .kt-touch__zone {
     width: 52%;
-    height: 42%;
+    height: 40%;
   }
   .kt-touch {
     --kt-btn: 80px;
@@ -1564,7 +1665,11 @@
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 2;
+  /* Behind the dialog: it frames the moment without covering titles or buttons. */
+  z-index: 0;
+}
+.kr-results > .kr-results__panel {
+  z-index: 1;
 }
 .kr-confetti i {
   position: absolute;
@@ -2127,9 +2232,78 @@
   align-items: center;
   gap: 8px;
 }
+.kp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* Selected = white ring + a tick; keyboard focus = the standard gold offset ring on top. */
+.kp-swatch {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 2px solid var(--line-strong);
+  background: var(--kp-swatch);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.kp-swatch:hover {
+  transform: translateY(-2px);
+}
+.kp-swatch.is-on {
+  border: 3px solid var(--text-0);
+  box-shadow:
+    inset 0 0 0 3px var(--bg-0),
+    0 0 0 1px var(--bg-0);
+}
+.kp-swatch.is-on::after {
+  content: '' / '';
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 9px;
+  height: 17px;
+  border: solid #fff;
+  border-width: 0 4px 4px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+  filter: drop-shadow(0 0 1.5px #000) drop-shadow(0 0 1px #000);
+}
+.kp-swatch:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.kp-paint__custom.is-on input {
+  border: 3px solid var(--text-0);
+}
+.kp-paint__custom input:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+/* 44 px touch targets across the kart lobby (the shared segmented control is 36 px). */
+.kp-settings .dc-segmented__item,
+.kp-setup .dc-segmented__item {
+  min-height: 44px;
+}
+.kp-settings .dc-btn--sm,
+.kp-setup .dc-btn--sm {
+  min-height: 44px;
+}
+.kp-stepper .dc-btn--icon {
+  width: 44px;
+  min-height: 44px;
+}
+.kp-settings .dc-toggle {
+  min-height: 44px;
+}
+[data-game='kart'] .lobby__tabs [role='tab'] {
+  min-height: 44px;
+}
 .kp-paint__custom input {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 2px solid var(--line-strong);
   border-radius: 10px;
@@ -2374,8 +2548,8 @@
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 12px;
-  color: var(--hud-fg);
-  background: var(--hud-bg-strong);
+  color: var(--kh-ink);
+  background: var(--kh-plate-strong);
   pointer-events: none;
   white-space: nowrap;
 }
@@ -2385,4 +2559,92 @@
 :root[data-reduced-motion='true'] .kh-item[data-state='roll'] .kh-item__ghost {
   opacity: 0.9;
   filter: none;
+}
+
+/* ---------- In-race menu / pause ---------- */
+.kp-pause {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-hud) + 4);
+  display: grid;
+  place-items: center;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: var(--overlay-scrim, rgba(5, 4, 12, 0.6));
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: kr-rise var(--dur-3) var(--ease-out) both;
+}
+:root[data-fx='off'] .kp-pause {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.kp-pause__card {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  width: min(380px, 100%);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  text-align: center;
+  color: var(--text-0);
+  background: var(--panel-bg-opaque, var(--panel-bg));
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+}
+.kp-pause__kicker {
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.kp-pause__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 6vw, 46px);
+  line-height: 1;
+}
+.kp-pause__note {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+}
+.kp-pause__actions {
+  display: grid;
+  gap: var(--sp-2);
+  width: 100%;
+}
+.kp-pause__actions > .dc-btn,
+.kp-pause__actions .kp-pause__leave,
+.kp-pause__actions > span {
+  width: 100%;
+  justify-content: center;
+}
+.kp-pause__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.kp-pause__hint kbd {
+  font-family: var(--font-num);
+}
+@media (pointer: coarse) {
+  .kp-pause__hint {
+    display: none;
+  }
+}
+@media (max-height: 500px) {
+  .kp-pause__card {
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .kp-pause__title {
+    font-size: 28px;
+  }
+  .kp-pause__actions .dc-btn--lg {
+    min-height: 48px;
+  }
 }

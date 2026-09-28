@@ -34,17 +34,18 @@ import { shadeInt } from '../art/palette.ts';
 import { BIOMES, OFFROAD, type BiomeStyle, type WorldPalette } from './biomes.ts';
 import { linRGB } from './geo.ts';
 import { buildHazards, type HazardSet } from './hazards.ts';
-import { ARCH_KINDS, LANDMARK_FOOTPRINT, buildLandmark, isLandmarkKind, type LandmarkInstance } from './landmarks.ts';
+import { ARCH_KINDS, buildLandmark, landmarkFootprint, type LandmarkInstance } from './landmarks.ts';
 import { buildProps, type PropSet } from './props.ts';
-import { addSparkle } from './shaderPatches.ts';
+import { addSparkle, addStrata } from './shaderPatches.ts';
 import { RoadIndex, roadPaths, type RoadPath } from './roads.ts';
-import { DistanceField, buildHorizon, buildTerrain, groundDetailTextures, hillsFor, makeSkyDome, setSkyColors, terrainHeightFn, type Horizon } from './terrain.ts';
+import { DistanceField, buildHorizon, buildShoreFoam, buildTerrain, groundDetailTextures, hillsFor, makeSkyDome, setSkyColors, terrainHeightFn, type Horizon } from './terrain.ts';
 import {
   checkerTexture,
   chevronTexture,
   conveyorTexture,
   dotTexture,
   facadeTextures,
+  foamTexture,
   iceTexture,
   makeRoadTextures,
   mudTexture,
@@ -59,6 +60,7 @@ import {
   buildBoostPads,
   buildCurbs,
   buildDropLips,
+  buildEdgeFoam,
   buildGridMarks,
   buildRamps,
   buildRoad,
@@ -112,12 +114,15 @@ export class KartWorld {
   private lightRanges: [number, number][] = [];
   private lastLights = -2;
   private water: Mesh | null = null;
+  private foamTex: Texture | null = null;
   private tmpM = new Matrix4();
   private tmpQ = new Quaternion();
   private tmpV = new Vector3();
   private tmpS = new Vector3();
   private upV = new Vector3(0, 1, 0);
   private stompLanded: { x: number; y: number; z: number }[] = [];
+  /** Last hazard volumes (three space) for the camera probe: [x, z, radius, bottomY, topY] per hazard. */
+  private hzVol: Float32Array = new Float32Array(0);
   props: PropSet;
 
   constructor(
@@ -198,6 +203,9 @@ export class KartWorld {
     }
     add(buildDropLips(this.paths), mat(new MeshBasicMaterial({ color: biome.glow, vertexColors: true, side: DoubleSide })), 'lips');
     const floating = biome.id === 'sky';
+    const skirtMat = mat(new MeshLambertMaterial({ vertexColors: true, side: DoubleSide }));
+    // natural biomes: cliffs and gap faces read as layered rock, not flat slabs
+    if (biome.slopedSkirts) addStrata(skirtMat);
     const embank = biome.slopedSkirts ? shadeInt(OFFROAD[track.def.offroad].base, biome.id === 'snow' ? -0.06 : -0.18) : shadeInt(biome.wallA, -0.25);
     add(
       buildSkirts(this.paths, masks, {
@@ -209,7 +217,7 @@ export class KartWorld {
         color: linRGB(embank),
         cliff: linRGB(floating ? 0x6f7f9e : shadeInt(biome.ground, -0.4)),
       }),
-      mat(new MeshLambertMaterial({ vertexColors: true, side: DoubleSide })),
+      skirtMat,
       'skirts',
     );
 
@@ -248,7 +256,7 @@ export class KartWorld {
     const quay = biome.water ? 70 : undefined;
     const pads = track.landmarks
       .filter((lm) => !(ARCH_KINDS.has(lm.kind) && Math.abs(lm.d) < 1))
-      .map((lm) => ({ x: lm.x, y: lm.y, z: lm.z, r: (isLandmarkKind(lm.kind) ? LANDMARK_FOOTPRINT[lm.kind] : 11) * lm.scale }))
+      .map((lm) => ({ x: lm.x, y: lm.y, z: lm.z, r: landmarkFootprint(lm.kind, biome) * lm.scale }))
       .filter((p) => p.r > 0);
     const terrainOpts = { groundY: this.groundY, dropDepth: 30, hills: hillsFor(biome), extent: 560, res, quay, pads };
     if (!biome.cloudSea) {
@@ -258,24 +266,7 @@ export class KartWorld {
       if (det.glow) this.disposables.push(det.glow);
       const tm = new MeshLambertMaterial({ vertexColors: true, map: det.map });
       // steep faces get rock strata (world-space bands) so hillsides and cliffs read as rock
-      tm.onBeforeCompile = (sh) => {
-        sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vUp;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvUp = normalize(mat3(modelMatrix) * objectNormal).y;');
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vUp;')
-          .replace(
-            '#include <color_fragment>',
-            `#include <color_fragment>
-{
-  float steep = 1.0 - smoothstep(0.55, 0.9, vUp);
-  float band = fract(vWPos.y * 0.42 + sin(vWPos.x * 0.07) * 0.35 + sin(vWPos.z * 0.05) * 0.35);
-  float strata = mix(0.78, 1.08, smoothstep(0.35, 0.5, band)) * mix(0.92, 1.0, step(0.8, band));
-  diffuseColor.rgb *= mix(1.0, strata, steep);
-}`,
-          );
-      };
-      tm.customProgramCacheKey = () => 'dasphalt-terrain';
+      addStrata(tm);
       if (biome.id === 'snow') addSparkle(tm, 1, 4);
       if (det.glow) {
         tm.emissiveMap = det.glow;
@@ -295,6 +286,19 @@ export class KartWorld {
       this.root.add(w);
       this.disposables.push(g);
       this.water = w;
+      // foam where the quay meets the water (terrain crosses the water level ≈ quay + 4 u)
+      const waterY = this.groundY - biome.water.below;
+      const ft = foamTexture();
+      this.foamTex = ft;
+      this.disposables.push(ft);
+      const foamMat = mat(new MeshBasicMaterial({ map: ft, transparent: true, depthWrite: false, opacity: 0.9, side: DoubleSide }));
+      for (const foam of [buildShoreFoam(this.field, (quay ?? 70) + 3.6, waterY + 0.04, 2.2), buildEdgeFoam(this.paths, waterY + 0.05)]) {
+        if (!foam) continue;
+        this.disposables.push(foam);
+        const fm = new Mesh(foam, foamMat);
+        fm.renderOrder = 2;
+        this.root.add(fm);
+      }
     }
     if (biome.cloudSea) {
       const g = new PlaneGeometry(1, 1, 1, 1);
@@ -531,12 +535,64 @@ export class KartWorld {
     const lt = reducedMotion ? 0 : t;
     for (const l of this.landmarks) l.update(lt);
     this.stompLanded.length = 0;
-    for (const h of this.hazards.views) {
+    if (this.hzVol.length !== this.hazards.views.length * 5) this.hzVol = new Float32Array(this.hazards.views.length * 5);
+    for (let i = 0; i < this.hazards.views.length; i++) {
+      const h = this.hazards.views[i]!;
       const p = h.update(tick, t, reducedMotion);
       if (h.landed) this.stompLanded.push(p);
+      const o = i * 5;
+      const r = h.radius;
+      this.hzVol[o] = p.x;
+      this.hzVol[o + 1] = -p.y;
+      switch (h.kind) {
+        case 'stomper':
+          // block half-diagonal + room: a camera right behind the block face can't see past it either
+          this.hzVol[o + 2] = r * 1.45 + 2.4;
+          this.hzVol[o + 3] = p.z - 0.3;
+          this.hzVol[o + 4] = p.z + 2.1;
+          break;
+        case 'sweeper':
+          this.hzVol[o + 2] = r + 0.8;
+          this.hzVol[o + 3] = p.z;
+          this.hzVol[o + 4] = p.z + 3.2;
+          break;
+        case 'roller':
+          this.hzVol[o + 2] = r + 0.6;
+          this.hzVol[o + 3] = p.z - r;
+          this.hzVol[o + 4] = p.z + r + 0.4;
+          break;
+        case 'bumper':
+          this.hzVol[o + 2] = r + 0.5;
+          this.hzVol[o + 3] = p.z;
+          this.hzVol[o + 4] = p.z + 1.8;
+          break;
+        default:
+          this.hzVol[o + 2] = 0;
+      }
     }
     if (this.water && !reducedMotion) this.water.position.y = this.groundY - (this.biome.water?.below ?? 1.6) + Math.sin(t * 0.8) * 0.08;
+    if (this.foamTex && !reducedMotion) this.foamTex.offset.set((t * 0.05) % 1, Math.sin(t * 0.9) * 0.08);
     this.updateBoxes(t, dt, boxes, reducedMotion);
+  }
+
+  /**
+   * Minimum camera height (three space) that keeps a camera at (x, y, z) out of hazard volumes;
+   * -Infinity when it is clear. Cheap: a cylinder test per hazard.
+   */
+  cameraFloor(x: number, y: number, z: number): number {
+    let need = -Infinity;
+    const v = this.hzVol;
+    for (let o = 0; o < v.length; o += 5) {
+      const r = v[o + 2]!;
+      if (r <= 0) continue;
+      const dx = x - v[o]!;
+      const dz = z - v[o + 1]!;
+      if (dx * dx + dz * dz > r * r) continue;
+      if (y < v[o + 3]! - 0.4 || y > v[o + 4]! + 0.5) continue;
+      // clear the top with room to look down over it at the kart
+      need = Math.max(need, v[o + 4]! + 2.4);
+    }
+    return need;
   }
 
   /** Stompers that slammed down this frame (for dust fx). */

@@ -92,6 +92,7 @@ export class SnakeRoom extends ClassicsRoom<SnakeState, SnakeSettings> {
       playersOnly: true,
       silent: true,
       rate: SNAKE_TURN_RATE,
+      maxNodes: 8, // schema maximum 2
     });
     this.handle(SNAKE_MSG.pause, SnakePauseSchema, (p, { paused }) => this.setPaused(p, paused), {
       phases: ['PLAYING'],

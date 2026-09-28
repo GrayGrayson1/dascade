@@ -31,6 +31,13 @@ export class KartPredictor {
   prev: KartState | null = null;
   info: KartStepInfo | null = null;
   seq = 0;
+  /** Seq of the first frame the server applied after GO (0 = not known yet). */
+  goSeq = 0;
+  /**
+   * Input delay in ticks: the server applies frame `seq` at tick ≈ seq + applyLag (from the last
+   * `kart:own`: tick − ack). Used to lock frames exactly as the server will.
+   */
+  applyLag = 0;
   private frames: PendingFrame[] = [];
 
   constructor(track: KartTrack, spec: KartSpec) {
@@ -47,6 +54,27 @@ export class KartPredictor {
     this.prev = null;
     this.info = null;
     this.frames = [];
+    this.goSeq = 0;
+    this.applyLag = 0;
+  }
+
+  /**
+   * Whether the next frame (seq + 1) will be applied on the grid (locked) by the server, given the
+   * race's `goTick` (−1 = not scheduled): once `goSeq` is known it is exact, before that frame
+   * `f` is locked while f + applyLag ≤ goTick (the server applies frames after the tick of GO).
+   */
+  nextFrameLocked(goTick: number): boolean {
+    const next = this.seq + 1;
+    if (this.goSeq > 0) return next < this.goSeq;
+    if (goTick < 0) return true;
+    return next + this.applyLag <= goTick;
+  }
+
+  /** Ticks until the next frame is the first one applied after GO (≤ 0 = racing): time the lights by it. */
+  framesToGo(goTick: number): number {
+    if (this.goSeq > 0) return this.goSeq - (this.seq + 1);
+    if (goTick < 0) return Infinity;
+    return goTick + 1 - (this.seq + 1 + this.applyLag);
   }
 
   /**
@@ -70,13 +98,16 @@ export class KartPredictor {
 
   /**
    * Adopt the server's state for our kart (acknowledged up to `ack`) and replay the frames after
-   * it. `racing` = the snapshot status is racing (frames recorded as locked just before GO are
-   * replayed unlocked, as the server applied them). Returns the position error (u) between the
+   * it. Pass `goSeq` from `kart:own`: frames are then replayed locked/unlocked exactly as the server
+   * applies them (start boost/stall agree at any latency). Without it, `racing` = the snapshot
+   * status is racing (pending frames replay unlocked). Returns the position error (u) between the
    * old prediction and the corrected one (0 on the first reconcile).
    */
-  reconcile(server: KartState, ack: number, serverTick: number, racing: boolean): number {
+  reconcile(server: KartState, ack: number, serverTick: number, racing: boolean, goSeq = 0): number {
     this.frames = this.frames.filter((f) => f.seq > ack);
     if (this.seq < ack) this.seq = ack;
+    if (goSeq > 0) this.goSeq = goSeq;
+    if (ack > 0) this.applyLag = serverTick - ack;
     const old = this.state;
     let s = server;
     let prev = server;
@@ -85,7 +116,9 @@ export class KartPredictor {
     for (const f of this.frames) {
       prev = s;
       tick++;
-      const r = stepKart(s, unpackKartInput(f.packed), this.spec, this.track, { locked: racing ? false : f.locked, tick });
+      // Lock exactly as the server did: by goSeq once known, else the frame's own guess.
+      const locked = this.goSeq > 0 ? f.seq < this.goSeq : racing ? false : f.locked;
+      const r = stepKart(s, unpackKartInput(f.packed), this.spec, this.track, { locked, tick });
       f.tick = tick;
       s = r.state;
       info = r.info;

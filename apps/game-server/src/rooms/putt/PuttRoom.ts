@@ -90,6 +90,7 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
       playersOnly: true,
       silent: true,
       rate: PUTT_AIM_RATE,
+      maxNodes: 8, // schema maximum 3
     });
     this.handle(PUTT_MSG.pickup, EmptySchema, (p) => this.onConcede(p), { phases: ['PLAYING'], playersOnly: true });
     this.handle(

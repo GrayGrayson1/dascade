@@ -1,12 +1,19 @@
 /**
- * Racer stats (1..5, summing to 15) → physical parameters. Tuned with the balance test
- * (balance.test.ts): hard bots on the reference tracks lap every racer within a few percent.
+ * Racer stats (1..5, summing to 15) → physical parameters. Tuned against 8-kart pack races
+ * (lab/pack.ts, balance.test.ts) with solo pace (lab/solotune.ts) and per-stat value
+ * (lab/statvalue.ts) as guides. Every stat-3 value is the same as nova's, so a stat only moves
+ * the racers that differ from 3.
  *
- *  speed    → top speed (≈ 28.7–30 u/s; boosts reach ~40)
- *  accel    → thrust (0 → 95 % of top in ≈ 2.7 s … 1.8 s); heavy karts lose a little
- *  handling → peak yaw rate, drift tightness and drift charge speed
- *  grip     → lateral grip and the cornering limit at speed, off-road top speed, ice
+ *  speed    → top speed (29.4–30.6 u/s for Speed 2–5, a 4 % spread; boosts reach ~40)
+ *  accel    → thrust (0 → 95 % of top in ≈ 2.1 s at Accel 4 … 4.1 s at Accel 1); heavy karts lose a little.
+ *             Accel also sets how fast a racer recovers from hits, bumps and walls.
+ *  handling → peak yaw rate (tight corners, low speed), drift tightness and drift charge speed
+ *  grip     → cornering at speed: the lateral-acceleration limit and steering authority near top
+ *             speed; lateral grip, off-road top speed, ice
  *  weight   → bump mass (heavier pushes lighter karts around)
+ *
+ * Measured value of a stat point (lab/statvalue.ts: stat 1 → 5, lap time, solo): speed ~4.3 %,
+ * handling ~2.5 %, grip ~1.7 %, accel ~1.0 % solo (more in traffic and item races), weight 0 solo.
  */
 import { KART_RACERS, type KartRacerId, type KartRacerStats } from '@dascade/shared/games/kart';
 
@@ -49,19 +56,22 @@ const cache = new Map<KartRacerId, KartSpec>();
 /** Stat → physics coefficients (tuned with lab/balance.ts; see balance.test.ts). */
 export const BALANCE = {
   topBase: 28.6,
-  topPerSpeed: 0.26,
-  accelBase: 17.5,
-  accelPerAccel: 3.2,
+  topPerSpeed: 0.4,
+  accelBase: 13.9,
+  accelPerAccel: 3.3,
   accelPerWeight: -0.4,
-  turnBase: 2.0,
-  turnPerHandling: 0.24,
-  latBase: 30,
+  turnBase: 2.075,
+  turnPerHandling: 0.175,
+  latBase: 28,
   latPerGrip: 5,
   gripBase: 8.5,
   gripPerGrip: 0.9,
-  chargePerHandling: 0.06,
-  steerTopBase: 0.44,
-  steerTopPerHandling: 0.02,
+  chargePerHandling: 0.1,
+  steerTopBase: 0.425,
+  steerTopPerHandling: 0.005,
+  steerTopPerGrip: 0.025,
+  massBase: 0.7,
+  massPerWeight: 0.03,
 };
 
 export function specFromStats(racer: KartRacerId, stats: KartRacerStats): KartSpec {
@@ -74,7 +84,7 @@ export function specFromStats(racer: KartRacerId, stats: KartRacerStats): KartSp
     brake: 40,
     reverseMax: 8,
     turnRate: B.turnBase + B.turnPerHandling * stats.handling,
-    steerTop: B.steerTopBase + B.steerTopPerHandling * stats.handling,
+    steerTop: B.steerTopBase + B.steerTopPerHandling * stats.handling + B.steerTopPerGrip * stats.grip,
     latMax: B.latBase + B.latPerGrip * stats.grip,
     grip: B.gripBase + B.gripPerGrip * stats.grip,
     offroadTop: 0.5 + 0.06 * stats.grip,
@@ -82,7 +92,7 @@ export function specFromStats(racer: KartRacerId, stats: KartRacerStats): KartSp
     iceGrip: 0.1 + 0.05 * stats.grip,
     driftTurn: 1 + 0.02 * (stats.handling - 3),
     chargeRate: 1 + B.chargePerHandling * (stats.handling - 3),
-    mass: 0.7 + 0.15 * stats.weight,
+    mass: B.massBase + B.massPerWeight * stats.weight,
     radius: 1.1,
   };
 }

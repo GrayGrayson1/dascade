@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { GameOutcome } from '@dascade/shared';
 import { KART_GP_POINTS, KART_INPUT_MAX, KART_MSG, KART_RACERS, KART_CUPS, type KartEvent } from '@dascade/shared/games/kart';
-import { bootTestServer, sleep, waitFor } from './helpers.ts';
+import { bootTestServer, collect, sleep, waitFor } from './helpers.ts';
 import { onOutcome, type OutcomeContext } from '../src/platform/hub.ts';
 import { getStatLine } from '../src/platform/stats.ts';
 import { placeKartBeforeFinish } from '../src/rooms/kart/testPlacement.ts';
@@ -18,7 +18,6 @@ import {
   simulateRace,
   st,
   startRace,
-  tune,
   type Client,
 } from './kart-helpers.ts';
 
@@ -216,9 +215,12 @@ describe('KartRoom: racing', () => {
       expect(st(host.room).race.finishDeadline).toBeGreaterThan(0);
       const finishes = host.events.filter((e): e is Extract<KartEvent, { kind: 'finish' }> => e.kind === 'finish');
       expect(finishes.slice(0, 2).map((e) => e.playerId)).toEqual([guest.me().playerId, host.me().playerId]);
-      // The bots still out there get the finish window; fast-forward it.
-      fastForward(host.server, 60 * 60);
+      // Every human is home: the race ends at once; the bots still out there are classified by distance.
       await waitFor(() => st(host.room).phase === 'RESULTS', 5000, 'results');
+      const bots = racers(host)
+        .filter(([, r]) => r.bot)
+        .map(([, r]) => r);
+      expect(bots.every((r) => r.position > 2)).toBe(true);
       const mine = outcomes.filter((o) => o.placements.flat().includes(host.me().playerId));
       expect(mine).toHaveLength(1);
       const o = mine[0]!;
@@ -233,22 +235,57 @@ describe('KartRoom: racing', () => {
     }
   });
 
-  it('bots fill the grid and race to the finish on their own', async () => {
+  it('bots race to the finish on their own, and their finishing never opens the finish window', async () => {
     const host = await createHost();
-    await startRace(host, { laps: 1, bots: 5, botSkill: 'hard' });
+    await startRace(host, { laps: 1, bots: 5, botSkill: 'hard', finishWindowSec: 10 });
     await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'playing');
-    simulateRace(host.server);
+    const s = sim(host.server);
+    // The human waits on the grid while every bot races to the flag.
+    fastForward(host.server, 60 * 60 * 4, () => s.karts.every((k) => k.bot === null || k.progress.finished));
+    expect(s.karts.filter((k) => k.bot !== null && k.progress.finished)).toHaveLength(5);
+    await waitFor(() => racers(host).filter(([, r]) => r.bot && r.finished).length === 5, 3000, 'bots finished (client state)');
+    const bots = racers(host).filter(([, r]) => r.bot);
+    expect(bots.map(([, r]) => r.finishOrder).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+    // Well past any finish window: still racing, nobody's deadline running.
+    fastForward(host.server, 60 * 30);
+    expect(s.status).toBe('racing');
+    expect(st(host.room).race.finishDeadline).toBe(0);
+    expect(racer(host).dnf).toBe(false);
+    // The human crosses the line: every human is home, so the race ends at once.
+    placeKartBeforeFinish(s, racer(host).slot, 8);
+    await drive(host, GAS, 1200);
     await waitFor(() => st(host.room).phase === 'RESULTS', 5000, 'results');
+    expect(racer(host).finished).toBe(true);
+    expect(racer(host).finishOrder).toBe(6);
     const all = racers(host);
-    expect(all).toHaveLength(6);
-    const bots = all.filter(([, r]) => r.bot);
-    expect(bots.filter(([, r]) => r.finished).length).toBeGreaterThanOrEqual(4);
-    const orders = all
-      .filter(([, r]) => r.finished)
-      .map(([, r]) => r.finishOrder)
-      .sort((a, b) => a - b);
-    expect(orders).toEqual(orders.map((_, i) => i + 1));
     expect(all.map(([, r]) => r.position).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('the first human home opens the finish window; when it closes, everyone still out is classified by distance', async () => {
+    const host = await createHost('Fast');
+    const guest = await join(host.room.roomId, 'Slow');
+    await startRace(host, { laps: 1, bots: 3, finishWindowSec: 10 });
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'playing');
+    const s = sim(host.server);
+    placeKartBeforeFinish(s, racer(host).slot, 8);
+    await drive(host, GAS, 1200);
+    await waitFor(() => racer(host).finished, 3000, 'host finished');
+    const deadline = st(host.room).race.finishDeadline;
+    expect(deadline).toBeGreaterThan(Date.now());
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 10_000);
+    expect(s.status).toBe('racing'); // the guest is still out there
+    fastForward(host.server, 60 * 12);
+    expect(s.status).toBe('done');
+    expect(s.raceMs).toBeLessThanOrEqual(racer(host).finishMs + 10_000 + 50);
+    await waitFor(() => st(host.room).phase === 'RESULTS', 5000, 'results');
+    expect(racer(guest).dnf).toBe(true);
+    const rows = racers(host)
+      .map(([, r]) => r)
+      .sort((a, b) => a.position - b.position);
+    expect(rows[0]!.name).toBe('Fast');
+    const out = rows.slice(1);
+    expect(out.every((r) => !r.finished)).toBe(true);
+    for (let i = 1; i < out.length; i++) expect(out[i - 1]!.distance).toBeGreaterThanOrEqual(out[i]!.distance);
   });
 
   it('item hits and item rolls reach clients as events (rolls only to their racer)', async () => {
@@ -407,19 +444,43 @@ describe('KartRoom: racing', () => {
     const perTick = (performance.now() - t0) / 600;
     expect(perTick).toBeLessThan(8); // generous: includes encoding + broadcasting to 20 clients
   });
+
+  it('kart:diag (relaxed-limit test servers only) answers players, never spectators', async () => {
+    const host = await createHost();
+    const watcher = await join(host.room.roomId, 'Watch', { spectator: true });
+    expect(st(watcher.room).players.get(watcher.me().playerId).spectator).toBe(true);
+    const mine = collect(host.room, 'kart:diag');
+    const theirs = collect(watcher.room, 'kart:diag');
+    host.room.send('kart:diag', {});
+    watcher.room.send('kart:diag', { reset: true });
+    await waitFor(() => mine.length === 1, 3000, 'diag reply');
+    await sleep(200);
+    expect(theirs).toHaveLength(0);
+  });
 });
 
 describe('KartRoom: solo', () => {
-  it('a solo time trial starts immediately with no bots and no items, and records the time', async () => {
+  it('a solo room opens in the lobby: the player picks a racer and a time trial, starts it, and the time is recorded', async () => {
     const outcomes: Array<{ outcome: GameOutcome; ctx: OutcomeContext }> = [];
     const stop = onOutcome((outcome, ctx) => outcomes.push({ outcome, ctx }));
     try {
       const guestId = 'g_kart_solo_tt_01';
-      const solo = await createHost('Solo', { solo: true, guestId, settings: { mode: 'timetrial', laps: 1, bots: 7 } });
-      await waitFor(() => st(solo.room).racers.size === 1, 3000, 'grid');
-      tune(solo.server);
+      const solo = await createHost('Solo', { solo: true, guestId });
+      await sleep(200);
+      expect(st(solo.room).phase).toBe('LOBBY');
       expect(st(solo.room).locked).toBe(true);
-      expect(st(solo.room).race).toMatchObject({ solo: true, mode: 'timetrial', items: false });
+      expect(st(solo.room).racers.size).toBe(0);
+      // Solo defaults: a race against five normal bots.
+      expect(JSON.parse(st(solo.room).settingsJson)).toMatchObject({ mode: 'race', bots: 5, botSkill: 'normal' });
+      expect(st(solo.room).race).toMatchObject({ solo: true, mode: 'race', items: true });
+      solo.room.send(KART_MSG.look, { racer: 'mochi', body: 'rocket', paint: '#FF4FD8' });
+      await waitFor(() => st(solo.room).looks.get(solo.me().playerId)?.racer === 'mochi', 3000, 'look');
+      await setSettings(solo, { mode: 'timetrial', laps: 1, track: 'dune-drift' });
+      expect(st(solo.room).race).toMatchObject({ solo: true, mode: 'timetrial', items: false, trackId: 'dune-drift' });
+      solo.room.send('lobby:start', {});
+      await waitFor(() => st(solo.room).racers.size === 1, 3000, 'grid');
+      expect(racer(solo)).toMatchObject({ racer: 'mochi', body: 'rocket', paint: '#ff4fd8' });
+      expect(st(solo.room).race.trackId).toBe('dune-drift');
       await waitFor(() => st(solo.room).phase === 'PLAYING', 6000, 'playing');
       expect(sim(solo.server).kart(racer(solo).slot)!.state.item).toBeGreaterThan(0); // the Turbo Trio
       placeKartBeforeFinish(sim(solo.server), racer(solo).slot, 8);
@@ -439,10 +500,139 @@ describe('KartRoom: solo', () => {
     }
   });
 
-  it('a solo race against bots', async () => {
-    const solo = await createHost('Solo', { solo: true, settings: { mode: 'race', bots: 4 } });
-    await waitFor(() => st(solo.room).racers.size === 5, 3000, 'grid with bots');
-    expect(st(solo.room).race.items).toBe(true);
+  it('a solo race against bots starts only when the player presses Start (defaults: five normal bots)', async () => {
+    const solo = await createHost('Solo', { solo: true });
+    await sleep(200);
+    expect(st(solo.room).phase).toBe('LOBBY');
+    solo.room.send('lobby:start', {});
+    await waitFor(() => st(solo.room).racers.size === 6, 3000, 'grid with bots');
+    expect(st(solo.room).race).toMatchObject({ mode: 'race', items: true, solo: true });
+    const bots = sim(solo.server).karts.filter((k) => k.bot !== null);
+    expect(bots).toHaveLength(5);
+    expect(bots.every((k) => k.bot === 'normal')).toBe(true);
+  });
+
+  it('a solo Grand Prix can be set up and started from the lobby', async () => {
+    const solo = await createHost('Solo', { solo: true });
+    await setSettings(solo, { mode: 'gp', cup: 'joystick', laps: 1, bots: 3, botSkill: 'hard' });
+    solo.room.send('lobby:start', {});
+    await waitFor(() => st(solo.room).race.round === 1 && st(solo.room).racers.size === 4, 3000, 'cup race 1');
+    expect(st(solo.room).race).toMatchObject({ mode: 'gp', rounds: 4, trackId: KART_CUPS.joystick.tracks[0] });
+  });
+});
+
+describe('KartRoom: solo pause', () => {
+  async function soloRace(settings: Record<string, unknown> = { bots: 1, laps: 1 }) {
+    const solo = await createHost('Solo', { solo: true });
+    await setSettings(solo, settings);
+    solo.room.send('lobby:start', {});
+    return solo;
+  }
+
+  it('pausing freezes the race and every clock; resuming carries on exactly where it stopped', async () => {
+    const solo = await soloRace();
+    await waitFor(() => st(solo.room).phase === 'PLAYING', 3000, 'playing');
+    await drive(solo, GAS, 500);
+    const s = sim(solo.server);
+    const mine = s.kart(racer(solo).slot)!;
+    solo.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => st(solo.room).race.paused === true, 2000, 'paused');
+    await sleep(100); // let in-flight snapshots land
+    const tick = s.tick;
+    const raceMs = s.raceMs;
+    const maxRaceMs = s.opts.maxRaceMs;
+    const poses = s.karts.map((k) => [k.state.x, k.state.y, k.state.vx, k.state.vy]);
+    const goAt = st(solo.room).race.goAt;
+    const snaps = solo.snaps.length;
+    const acked = mine.ackSeq;
+    await drive(solo, GAS, 600); // inputs sent while paused are dropped
+    expect(s.tick).toBe(tick);
+    expect(s.raceMs).toBe(raceMs);
+    expect(s.opts.maxRaceMs).toBe(maxRaceMs);
+    expect(s.karts.map((k) => [k.state.x, k.state.y, k.state.vx, k.state.vy])).toEqual(poses);
+    expect(mine.ackSeq).toBe(acked);
+    expect(mine.queue).toHaveLength(0);
+    expect(solo.snaps.length).toBe(snaps);
+    expect(st(solo.room).phase).toBe('PLAYING');
+
+    const pausedFor = Date.now();
+    solo.room.send(KART_MSG.pause, { paused: false });
+    await waitFor(() => st(solo.room).race.paused === false, 2000, 'resumed');
+    // Wall-clock race meta moved on by the pause (serverNow - goAt is still the race time).
+    expect(st(solo.room).race.goAt - goAt).toBeGreaterThanOrEqual(600);
+    expect(st(solo.room).race.goAt - goAt).toBeLessThanOrEqual(Date.now() - pausedFor + 1000);
+    await drive(solo, GAS, 400);
+    await waitFor(() => s.tick > tick + 20 && mine.ackSeq > acked, 2000, 'racing again');
+    // Right after a resume the player must play on for a moment before pausing again.
+    solo.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => solo.errors.some((e) => e.type === KART_MSG.pause), 2000, 'cooldown');
+    expect(solo.errors.find((e) => e.type === KART_MSG.pause)!.code).toBe('rate_limited');
+    expect(st(solo.room).race.paused).toBe(false);
+  });
+
+  it('a pause during the countdown holds the lights: the room timer and the sim GO both wait', async () => {
+    const solo = await createHost('Solo', { solo: true });
+    (solo.server as any).countdownMs = 700;
+    await setSettings(solo, { bots: 0, laps: 1 });
+    solo.room.send('lobby:start', {});
+    await waitFor(() => st(solo.room).phase === 'COUNTDOWN' && st(solo.room).racers.size === 1, 2000, 'grid');
+    solo.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => st(solo.room).race.paused === true, 2000, 'paused');
+    const endsAt = st(solo.room).phaseEndsAt;
+    const goAt = st(solo.room).race.goAt;
+    await sleep(1_000);
+    expect(st(solo.room).phase).toBe('COUNTDOWN');
+    expect(sim(solo.server).status).toBe('grid');
+    solo.room.send(KART_MSG.pause, { paused: false });
+    await waitFor(() => st(solo.room).race.paused === false, 2000, 'resumed');
+    expect(st(solo.room).phaseEndsAt - endsAt).toBeGreaterThanOrEqual(900);
+    expect(st(solo.room).race.goAt - goAt).toBeGreaterThanOrEqual(900);
+    await waitFor(() => st(solo.room).phase === 'PLAYING', 3000, 'green light after the resume');
+    await waitFor(() => sim(solo.server).status === 'racing', 1000, 'sim racing');
+  });
+
+  it('a disconnect while paused keeps the race paused; the player resumes after reconnecting', async () => {
+    const solo = await soloRace();
+    await waitFor(() => st(solo.room).phase === 'PLAYING', 3000, 'playing');
+    solo.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => st(solo.room).race.paused === true, 2000, 'paused');
+    const s = sim(solo.server);
+    const tick = s.tick;
+    solo.room.reconnection.minUptime = 0;
+    const back = new Promise<void>((r) => solo.room.onReconnect(() => r()));
+    (solo.room as any).connection.transport.ws.close(4010);
+    await back;
+    await waitFor(() => s.kart(racer(solo).slot)!.connected, 3000, 'reconnected');
+    await sleep(200);
+    expect(s.tick).toBe(tick);
+    expect(st(solo.room).race.paused).toBe(true);
+    solo.room.send(KART_MSG.pause, { paused: false });
+    await waitFor(() => st(solo.room).race.paused === false && s.tick > tick, 3000, 'resumed');
+  });
+
+  it('a paused racer gone for good lifts the pause, so the race is decided and the room moves on', async () => {
+    const solo = await soloRace();
+    await waitFor(() => st(solo.room).phase === 'PLAYING', 3000, 'playing');
+    solo.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => st(solo.room).race.paused === true, 2000, 'paused');
+    // What the base room does when the reconnect grace runs out (onPlayerAway).
+    (solo.server as any).onPlayerAway((solo.server as any).players.get(solo.me().playerId));
+    await waitFor(() => st(solo.room).phase === 'RESULTS', 5000, 'results');
+    expect(st(solo.room).race.paused).toBe(false);
+    expect(racer(solo).dnf).toBe(true);
+  });
+
+  it('multiplayer races cannot be paused', async () => {
+    const host = await createHost();
+    await join(host.room.roomId, 'Guest');
+    await startRace(host, { bots: 0 });
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'playing');
+    host.room.send(KART_MSG.pause, { paused: true });
+    await waitFor(() => host.errors.some((e) => e.type === KART_MSG.pause), 2000, 'refused');
+    expect(host.errors.find((e) => e.type === KART_MSG.pause)!.code).toBe('not_allowed');
+    expect(st(host.room).race.paused).toBe(false);
+    const tick = sim(host.server).tick;
+    await waitFor(() => sim(host.server).tick > tick + 5, 2000, 'still racing');
   });
 });
 
@@ -540,5 +730,26 @@ describe('KartRoom: Grand Prix', () => {
     await sleep(300);
     expect(st(host.room).race.round).toBe(2);
     expect(st(host.room).race.laps).toBe(1);
+  });
+
+  it('a racer is chosen for the whole cup: kart:look is refused between races', async () => {
+    const host = await createHost('Ann');
+    const hostId = host.me().playerId;
+    host.room.send(KART_MSG.look, { racer: 'mochi', body: 'buggy', paint: '#ff4fd8' });
+    await waitFor(() => st(host.room).looks.get(hostId)?.racer === 'mochi', 3000, 'look');
+    (host.server as any).intermissionMs = 60_000;
+    await startRace(host, { mode: 'gp', cup: 'joystick', laps: 1, bots: 1 });
+    await waitFor(() => st(host.room).phase === 'PLAYING', 3000, 'race 1');
+    expect(racer(host).racer).toBe('mochi');
+    simulateRace(host.server);
+    await waitFor(() => st(host.room).phase === 'INTERMISSION', 5000, 'intermission');
+    host.room.send(KART_MSG.look, { racer: 'brick', body: 'tub', paint: '#a78bfa' });
+    await waitFor(() => host.errors.some((e) => e.type === KART_MSG.look), 2000, 'look refused');
+    expect(st(host.room).looks.get(hostId).racer).toBe('mochi');
+    host.room.send(KART_MSG.next, {});
+    await waitFor(() => st(host.room).race.round === 2 && st(host.room).racers.size === 2, 3000, 'race 2');
+    expect(racer(host)).toMatchObject({ racer: 'mochi', body: 'buggy' });
+    expect(sim(host.server).kart(racer(host).slot)!.racer).toBe('mochi');
+    expect(st(host.room).gp.get(hostId).racer).toBe('mochi');
   });
 });

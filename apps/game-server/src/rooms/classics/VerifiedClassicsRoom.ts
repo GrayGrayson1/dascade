@@ -74,6 +74,8 @@ export abstract class VerifiedClassicsRoom<S extends ClassicsState = ClassicsSta
       playersOnly: true,
       silent: true,
       rate: CLASSICS_INPUT_RATE,
+      // Schema maximum: 7 + the flattened [dt, code] pairs (2 × maxBatchEvents).
+      maxNodes: CLASSICS.maxBatchEvents * 2 + 16,
       maxBytes: 16_000,
     });
     this.watchdog = this.clock.setInterval(() => this.watch(), 500);

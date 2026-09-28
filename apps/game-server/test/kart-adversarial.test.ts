@@ -199,6 +199,24 @@ describe('KartRoom under adversarial conditions', () => {
     await waitFor(() => kart.ackSeq > 10, 2000, 'guest drives');
   });
 
+  it('a race decided while the room is still in its countdown (sim GO a tick early) still reaches the results', async () => {
+    const host = await createHost();
+    (host.server as any).countdownMs = 1200;
+    const watcher = await join(host.room.roomId, 'Watch', { spectator: true });
+    await startRace(host, { bots: 0 });
+    await waitFor(() => st(host.room).phase === 'COUNTDOWN' && st(host.room).racers.size === 1, 3000, 'grid');
+    const server = host.server as any;
+    // The sim's own GO fires a tick before the room's countdown timer (independent clocks)…
+    sim(host.server).go();
+    // …and the only racer is retired in that window (e.g. their reconnect grace expires).
+    server.retirePlayer(host.me().playerId, 'disconnected');
+    server.tick();
+    expect(sim(host.server).status).toBe('done');
+    expect(server.phase).toBe('COUNTDOWN');
+    await waitFor(() => st(watcher.room).phase === 'RESULTS', 5000, 'results after the room timer');
+    expect(racer(watcher, host.me().playerId).dnf).toBe(true);
+  });
+
   it('leaving on the grid retires the racer; the last racer leaving ends the match cleanly', async () => {
     const host = await createHost();
     (host.server as any).countdownMs = 1500;

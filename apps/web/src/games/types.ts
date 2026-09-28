@@ -27,6 +27,8 @@ export interface GameClientModule {
   immersive?: boolean;
   /** The game renders its own pre-start countdown (e.g. racing start lights); hides the shared 3-2-1 overlay. */
   ownCountdown?: boolean;
+  /** Phones (tabbed lobby): open on this section instead of Players (e.g. 'setup' = pick your racer first). */
+  lobbyStartTab?: 'setup';
   /** Background music mood while in this game. */
   musicMood?: 'arcade' | 'chill' | 'casino' | 'race' | 'quest';
 }

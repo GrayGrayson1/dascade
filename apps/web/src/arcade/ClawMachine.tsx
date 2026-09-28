@@ -10,16 +10,35 @@
  *
  * Cosmetic and local only (the pile and your prize shelf are kept in this browser).
  */
-import { Suspense, lazy, memo, useEffect, useId, useMemo, useRef } from 'react';
+import { Component, Suspense, lazy, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CLAW_ART, FLOOR_HOME_X, FLOOR_PLUSH_SCALE, floorOrder, floorPlacement } from './claw.ts';
 import { spritePaths, spriteColor, spriteSize } from './clawArt.ts';
 import { pileToToys, shelfTotal, useClaw, type ClawOpener } from './clawInventory.ts';
-import type { ToyKind } from './clawPhysics.ts';
+import type { ToyKind } from './clawPile.ts';
 import { sfx } from '../audio/audio.ts';
 import './claw.css';
 
-const loadCloseup = () => import('./ClawCloseup.tsx');
-const ClawCloseup = lazy(loadCloseup);
+/**
+ * The close-up's chunk. If it fails to load, the app's stale-deploy handler (chunkReload.ts, on
+ * `vite:preloadError`) would reload the page; a cosmetic floor attraction keeps its failure to itself
+ * instead (ClawBoundary's in-place message). This listener is registered as this module loads — before
+ * main.tsx installs that handler, so it runs first — and swallows the event while a claw load is on.
+ */
+let clawLoads = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    if (clawLoads > 0) e.stopImmediatePropagation();
+  });
+}
+const loadCloseup = () => {
+  clawLoads++;
+  return import('./ClawCloseup.tsx').finally(() => {
+    clawLoads--;
+  });
+};
+/** Warms the close-up's chunk (hover / focus); a failure here is ignored — opening retries it. */
+const preload = () => void loadCloseup().catch(() => undefined);
+let ClawCloseup = lazy(loadCloseup);
 
 /** Opens the close-up from `el` (the floor machine, or a quick button). */
 export function openClaw(from: ClawOpener['from'], el: HTMLElement | null, rectEl: Element | null = el): void {
@@ -43,11 +62,86 @@ export function ClawHost() {
     },
     [],
   );
-  return open ? (
-    <Suspense fallback={null}>
-      <ClawCloseup />
-    </Suspense>
-  ) : null;
+  // Bumped by "Try again" after the chunk failed to load (a fresh lazy() re-imports it).
+  const [attempt, setAttempt] = useState(0);
+  if (!open) return null;
+  return (
+    <ClawBoundary
+      key={attempt}
+      onRetry={() => {
+        ClawCloseup = lazy(loadCloseup);
+        setAttempt((n) => n + 1);
+      }}
+    >
+      <Suspense fallback={null}>
+        <ClawCloseup />
+      </Suspense>
+    </ClawBoundary>
+  );
+}
+
+/**
+ * Keeps a failed close-up (its chunk didn't load: a network blip, a stale deploy) to itself: a small
+ * "being serviced" message with Try again / Close, in place — never a reload or the floor's error screen.
+ */
+class ClawBoundary extends Component<{ onRetry: () => void; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+  override componentDidCatch(): void {
+    /* handled in place: the message below */
+  }
+  override render(): ReactNode {
+    return this.state.failed ? <ClawUnavailable onRetry={this.props.onRetry} /> : this.props.children;
+  }
+}
+
+function ClawUnavailable({ onRetry }: { onRetry: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    const d = ref.current;
+    if (d && !d.open) {
+      try {
+        d.showModal();
+      } catch {
+        d.setAttribute('open', '');
+      }
+    }
+    retryRef.current?.focus();
+  }, []);
+  const close = () => {
+    const op = useClaw.getState().open;
+    if (ref.current?.open) ref.current.close();
+    useClaw.getState().closeCloseup();
+    if (op?.el?.isConnected) op.el.focus({ preventScroll: true });
+  };
+  return (
+    <dialog
+      ref={ref}
+      className="clw-oops"
+      data-part="claw-unavailable"
+      aria-labelledby="clw-oops-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
+    >
+      <p id="clw-oops-title" className="clw-oops__title">
+        The claw machine is being serviced
+      </p>
+      <p className="clw-oops__text">It couldn't load just now. Nothing was lost — your plushies are safe.</p>
+      <div className="clw-oops__actions">
+        <button ref={retryRef} type="button" className="dc-btn dc-btn--primary" onClick={onRetry}>
+          Try again
+        </button>
+        <button type="button" className="dc-btn dc-btn--secondary" onClick={close}>
+          Close
+        </button>
+      </div>
+    </dialog>
+  );
 }
 
 /** The compact Claw control for floors without room for the machine (HUD / phone extras row). */
@@ -61,7 +155,7 @@ export function ClawQuickButton({ className }: { className?: string }) {
       data-part="claw-quick"
       aria-label={label}
       title="Claw machine"
-      onPointerEnter={() => void loadCloseup()}
+      onPointerEnter={preload}
       onClick={(e) => openClaw('quick', e.currentTarget)}
     >
       <svg viewBox="0 0 12 12" width="20" height="20" aria-hidden focusable="false" shapeRendering="crispEdges">
@@ -126,8 +220,8 @@ export const ClawMachine = memo(function ClawMachine() {
       data-state={display}
       aria-label={label}
       aria-haspopup="dialog"
-      onPointerEnter={() => void loadCloseup()}
-      onFocus={() => void loadCloseup()}
+      onPointerEnter={preload}
+      onFocus={preload}
       onClick={(e) => openClaw('floor', e.currentTarget, machineRef.current)}
     >
       <span className="clw__machine" ref={machineRef}>

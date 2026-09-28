@@ -23,6 +23,8 @@ const module: GameClientModule = {
   SettingsPanel: KartSettingsPanel as unknown as GameClientModule['SettingsPanel'],
   PlayerSetup,
   immersive: true,
+  // Phones open the lobby on "Your setup": pick your racer first.
+  lobbyStartTab: 'setup',
   ownCountdown: true,
   musicMood: 'race',
 };

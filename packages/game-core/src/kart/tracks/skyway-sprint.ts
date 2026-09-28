@@ -94,5 +94,5 @@ export const SKYWAY_SPRINT: KartTrackDef = {
     { kind: 'hot-air-balloon', at: 0.8, d: 50 },
   ],
   decorSeed: 2203,
-  parLapMs: 46_600,
+  parLapMs: 47_600,
 };

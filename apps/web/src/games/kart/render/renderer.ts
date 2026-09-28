@@ -25,7 +25,7 @@ import { clearKartArtCache } from '../art/karts.ts';
 import { makeVoxelMaterial, rimOf } from '../art/materials.ts';
 import { DRIFT_STAGE_COLORS, ITEM_COLORS, PRISM, mixInt } from '../art/palette.ts';
 import { BIOMES, OFFROAD, paletteSig, worldPalette, type BiomeStyle } from './biomes.ts';
-import { CameraRig } from './camera.ts';
+import { CameraRig, framingForAspect } from './camera.ts';
 import { Particles, Rings, SHAPE_SOFT, SHAPE_SQUARE, SHAPE_STAR, Skids, SpeedLines, Streaks } from './fx.ts';
 import { clearHazardCache } from './hazards.ts';
 import { KartLayer, type KartVisEvents } from './karts.ts';
@@ -54,7 +54,7 @@ export interface KartRenderer {
 }
 
 const QUALITY_ORDER: KartQuality[] = ['low', 'medium', 'high'];
-const PIXEL_CAP: Record<KartQuality, number> = { low: 1, medium: 1.5, high: 2 };
+const PIXEL_CAP: Record<KartQuality, number> = { low: 1.25, medium: 1.5, high: 2 };
 const LOD_DIST: Record<KartQuality, number> = { low: 34, medium: 50, high: 70 };
 const PARTICLES: Record<KartQuality, number> = { low: 900, medium: 1800, high: 3200 };
 
@@ -65,7 +65,8 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
   let reducedMotion = opts.reducedMotion;
   const autoQuality = opts.autoQuality ?? true;
 
-  const renderer = new WebGLRenderer({ canvas, antialias: quality !== 'low', powerPreference: 'high-performance', alpha: false, stencil: false });
+  // MSAA on every tier (cheap on mobile tile GPUs; the context flag can't change later anyway)
+  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', alpha: false, stencil: false });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NoToneMapping;
   renderer.info.autoReset = false;
@@ -98,6 +99,7 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
   scene.add(camera);
   const rig = new CameraRig(camera);
   rig.reducedMotion = reducedMotion;
+  rig.obstacle = (x, y, z) => world.cameraFloor(x, y, z);
 
   const kartMat = makeVoxelMaterial({ rim: true });
   const ghostMat = makeVoxelMaterial({ rim: true, transparent: true, opacity: 0.4, depthWrite: false });
@@ -127,6 +129,7 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
   // warm the item shaders/geometry so the first pickup doesn't hitch
   void itemModel('prismShell');
 
+  let framed = false;
   let width = 1;
   let height = 1;
   let dpr = 1;
@@ -337,7 +340,7 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
       add.update(dt);
       alpha.update(dt);
       streaks.update(dt);
-      rings.update(dt);
+      rings.update(dt, camera.position);
       skids.update(time);
       const boosting = target ? (target.flags & KF.boosting) !== 0 : false;
       const sp = target ? Math.abs(target.speed) : 0;
@@ -410,17 +413,33 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
           burst(x, y + 1, z, Math.round(40 * m + 6), ITEM_COLORS.pulse.glow, 14, 0.7, 0.5, SHAPE_STAR, 0);
           if (isTarget) rig.kick(0.3);
           break;
-        case 'pickup':
-          for (let i = 0; i < Math.round(16 * m + 4); i++) {
+        case 'pickup': {
+          // Small, additive and low: the cube pops into a handful of prism sparks that fly FORWARD
+          // (away from the chase camera) plus a thin ground ring. Particles and rings fade out near
+          // the camera, so a pickup can never white out the road.
+          const own = at.slot !== undefined && at.slot === targetSlot;
+          let hx = 1;
+          let hz = 0;
+          const pose = at.slot !== undefined ? poseBySlot.get(at.slot) : undefined;
+          if (pose) {
+            hx = Math.cos(pose.heading);
+            hz = -Math.sin(pose.heading);
+          }
+          const n = fxLevel === 'off' ? 4 : Math.round(12 * m + 4);
+          const cy = y + (own ? 0.9 : 1.25);
+          for (let i = 0; i < n; i++) {
             const c = i % 3 === 0 ? PRISM.a : i % 3 === 1 ? PRISM.b : PRISM.c;
             const a = rnd() * Math.PI * 2;
-            add.spawn(x, y + 1.25, z, Math.cos(a) * 5, 2 + rnd() * 4, Math.sin(a) * 5, 0.6, 0.4, 0.1, c, 1, 12, 1, SHAPE_SQUARE);
+            const sp = 2 + rnd() * 2.5;
+            const fwd = own ? 7 + rnd() * 4 : 0;
+            add.spawn(x + hx * 0.6, cy, z + hz * 0.6, hx * fwd + Math.cos(a) * sp, 1.5 + rnd() * 2.5, hz * fwd + Math.sin(a) * sp, 0.4, 0.2, 0.04, c, 0.9, 9, 1.2, SHAPE_STAR);
           }
-          if (fxLevel !== 'off') rings.spawn(x, y + 1.25, z, 2.2, 0.3, 0xffffff, 1);
+          if (fxLevel !== 'off') rings.spawn(x + hx * (own ? 1.5 : 0), y + 0.06, z + hz * (own ? 1.5 : 0), 1.4, 0.3, PRISM.b, 0.35);
           break;
+        }
         case 'confetti': {
           const cols = [0xff4fd8, 0x22d3ee, 0xffd23f, 0x2de38f, 0xff5a5f, 0xa78bfa];
-          const n = reducedMotion ? 40 : Math.round(220 * (fxLevel === 'off' ? 0.25 : m));
+          const n = reducedMotion ? 0 : Math.round(220 * (fxLevel === 'off' ? 0.25 : m));
           // two confetti cannons either side of the kart, then it flutters down around it
           for (let i = 0; i < n; i++) {
             const side = i % 2 ? 1 : -1;
@@ -478,11 +497,9 @@ export function createKartRenderer(canvas: HTMLCanvasElement, opts: CreateKartRe
       height = Math.max(1, Math.round(h));
       dpr = d || 1;
       camera.aspect = width / height;
-      // frame the kart at ~20% of the width on desktop, a bit bigger on wide phones
-      const a = camera.aspect;
-      rig.baseFov = a < 1 ? 66 : a < 1.5 ? 60 : a > 1.95 ? 50 : 58;
-      rig.chaseDist = a < 1 ? 4.7 : a > 1.95 ? 3.95 : 4.4;
-      rig.chaseHeight = a < 1 ? 1.9 : a > 1.95 ? 1.7 : 1.8;
+      // framing per aspect (landscape ≈ 20% kart width; portrait higher/further/pitched down), eased
+      rig.setFraming(framingForAspect(camera.aspect), !framed);
+      framed = true;
       camera.updateProjectionMatrix();
       applyPixelRatio();
     },

@@ -11,8 +11,9 @@
  *   Entity (15 B): u16 id · u8 kind · u8 owner · i24 x, i24 y (1/128 u) · i16 z (1/64 u) · u8 heading (TAU/256) ·
  *                  u8 extra · u8 age (ticks, saturating)
  *
- * `kart:own` — sent only to the racer who drives the kart, the EXACT predictor state (60 B):
- *   u8 version · u16 raceId · u32 tick · u8 slot · u32 ackSeq · state (48 B, see writeState).
+ * `kart:own` — sent only to the racer who drives the kart, the EXACT predictor state (64 B):
+ *   u8 version · u16 raceId · u32 tick · u8 slot · u32 ackSeq · state (48 B, see writeState) ·
+ *   u32 goSeq (first frame applied after GO, 0 before).
  */
 import type { KartItemId } from '@dascade/shared/games/kart';
 import { itemFromCode } from './itemcodes.ts';
@@ -27,7 +28,7 @@ export const KART_OWN_VERSION = 1;
 export const SNAP_HEADER = 20;
 export const SNAP_KART = 20;
 export const SNAP_ENTITY = 15;
-export const OWN_BYTES = 60;
+export const OWN_BYTES = 64;
 export const STATE_BYTES = 48;
 export const MAX_SNAP_KARTS = 32;
 export const MAX_SNAP_ENTITIES = 64;
@@ -107,6 +108,8 @@ export interface KartOwn {
   slot: number;
   ack: number;
   state: KartState;
+  /** Seq of the first input frame the server applied after GO (0 = not yet): pass to `KartPredictor.reconcile`. */
+  goSeq: number;
 }
 
 function setI24(v: DataView, o: number, val: number): void {
@@ -367,7 +370,7 @@ export function readState(v: DataView, o: number): KartState | null {
   };
 }
 
-export function encodeOwn(raceId: number, tick: number, slot: number, ack: number, st: KartState): Uint8Array {
+export function encodeOwn(raceId: number, tick: number, slot: number, ack: number, st: KartState, goSeq = 0): Uint8Array {
   const buf = new ArrayBuffer(OWN_BYTES);
   const v = new DataView(buf);
   v.setUint8(0, KART_OWN_VERSION);
@@ -376,6 +379,7 @@ export function encodeOwn(raceId: number, tick: number, slot: number, ack: numbe
   v.setUint8(7, slot & 0xff);
   v.setUint32(8, ack >>> 0, true);
   writeState(v, 12, st);
+  v.setUint32(60, goSeq >>> 0, true);
   return new Uint8Array(buf);
 }
 
@@ -388,5 +392,5 @@ export function decodeKartOwn(bytes: Uint8Array): KartOwn | null {
   if (slot >= MAX_SNAP_KARTS) return null;
   const state = readState(v, 12);
   if (!state) return null;
-  return { raceId: v.getUint16(1, true), tick: v.getUint32(3, true), slot, ack: v.getUint32(8, true), state };
+  return { raceId: v.getUint16(1, true), tick: v.getUint32(3, true), slot, ack: v.getUint32(8, true), state, goSeq: v.getUint32(60, true) };
 }

@@ -16,7 +16,7 @@
  */
 import { NEUTRAL_KART_INPUT, type KartBotSkill, type KartInput } from '@dascade/shared/games/kart';
 import { DRIFT_STAGE_POINTS, driftArcRate, driftStage, itemIdOf, steerFactor, type KartState } from './kart.ts';
-import { clamp, datan2, dcos, dsin, loopDelta, mod, wrapAngle } from './math.ts';
+import { clamp, datan2, dcos, dsin, loopDelta, mod, sign, wrapAngle } from './math.ts';
 import type { KartSim, SimKart } from './sim.ts';
 import type { KartSpec } from './spec.ts';
 import { hazardPose, mainIndexAt, racingPointAt, type BuiltBranch, type KartTrack } from './track.ts';
@@ -45,39 +45,40 @@ interface SkillProfile {
 }
 
 const PROFILES: Record<KartBotSkill, SkillProfile> = {
+  // Visible, human mistakes (late braking, wide lines, hesitation), little drifting, cautious pace.
   easy: {
-    corner: 0.8,
-    pace: 0.9,
-    mistakeRate: 0.1,
-    driftChance: 0.25,
+    corner: 0.77,
+    pace: 0.82,
+    mistakeRate: 0.12,
+    driftChance: 0.15,
     driftStage: 1,
     startSkill: 0.2,
     items: 0.35,
-    noise: 0.06,
+    noise: 0.015,
     shortcuts: 0,
     hazards: 0.55,
   },
   normal: {
-    corner: 0.9,
-    pace: 0.96,
+    corner: 0.82,
+    pace: 0.885,
     mistakeRate: 0.05,
-    driftChance: 0.7,
+    driftChance: 0.6,
     driftStage: 2,
     startSkill: 0.55,
     items: 0.7,
-    noise: 0.03,
+    noise: 0.01,
     shortcuts: 0.5,
-    hazards: 0.7,
+    hazards: 0.8,
   },
   hard: {
-    corner: 0.97,
+    corner: 1.15,
     pace: 1,
-    mistakeRate: 0.02,
-    driftChance: 0.95,
+    mistakeRate: 0.015,
+    driftChance: 1,
     driftStage: 3,
     startSkill: 0.85,
     items: 1,
-    noise: 0.012,
+    noise: 0.006,
     shortcuts: 1,
     hazards: 1,
   },
@@ -95,7 +96,28 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** A turbo on a dirt cut fires once the sand has slowed the kart below this share of top speed. */
+const DIRT_TURBO_AT = 0.85;
+
 const vcapCache = new WeakMap<KartTrack, Map<string, Float64Array>>();
+const bendCache = new WeakMap<KartTrack, Float64Array>();
+
+/**
+ * The road's own bend per sample (centreline curvature averaged over ±5 samples, 1/u): corners are
+ * found on this, not on the racing line (a min-curvature line straightens parts of long corners).
+ */
+function roadBend(track: KartTrack): Float64Array {
+  let b = bendCache.get(track);
+  if (b) return b;
+  b = new Float64Array(track.n);
+  for (let i = 0; i < track.n; i++) {
+    let sum = 0;
+    for (let j = -5; j <= 5; j++) sum += track.curvature[(i + j + track.n) % track.n]!;
+    b[i] = sum / 11;
+  }
+  bendCache.set(track, b);
+  return b;
+}
 
 /** Max grip-cornering speed per main-line sample for a spec at a skill margin (racing-line curvature). */
 function cornerCaps(track: KartTrack, spec: KartSpec, margin: number): Float64Array {
@@ -147,7 +169,19 @@ export class KartBot {
   private driftWant = 0;
   private driftTicks = 0;
   private straightTicks = 0;
+  /** Drift decision per corner (by its stable start index), taken once per pass. */
   private readonly cornerPlan = new Map<number, boolean>();
+  /** Corner being drifted (its id) — keeps the drift speed plan until its exit. */
+  private driftCorner = -1;
+  /** Ticks before another hop is allowed after a release. */
+  private driftCooldown = 0;
+  /** Why the last drift was released (lab diagnostics). */
+  lastRelease = '';
+  /** Lab: always take (true) / never take (false) shortcuts, regardless of items; null = decide. */
+  forceShortcut: boolean | null = null;
+  /** Braking inside a drift that is running wide. */
+  private driftScrub = false;
+  private kNeedAvg = 0.5;
   private itemBtn = false;
   private itemTicks = 0;
   private releaseBack = false;
@@ -262,13 +296,15 @@ export class KartBot {
     if (!onBranch) {
       for (const b of track.branches) {
         const rel = loopDelta(s, b.from, track.length);
-        if (rel < 0 || rel > 45) continue;
+        // Keep heading into a planned mouth a little past `from` (the kart switches roads only
+        // once it has left the main road).
+        if (rel < (this.branchPlan.get(b.index) ? -40 : 0) || rel > 45) continue;
         if (!this.branchPlan.has(b.index)) {
           const turbo = itemIdOf(st) === 'turbo' || itemIdOf(st) === 'turbo3';
           const useful = b.surface === 'road' ? b.length < b.to - b.from + 5 : turbo;
-          this.branchPlan.set(b.index, useful && this.rnd() < this.p.shortcuts);
+          this.branchPlan.set(b.index, this.forceShortcut ?? (useful && this.rnd() < this.p.shortcuts));
         }
-        if (this.branchPlan.get(b.index) && rel < look + 4) onBranch = b;
+        if (this.branchPlan.get(b.index) && rel < Math.max(look + 4, 40)) onBranch = b;
       }
     }
     // Past a branch's rejoin: decide afresh next lap.
@@ -290,7 +326,19 @@ export class KartBot {
         ty = onBranch.ys[i]!;
       }
     } else if (onBranch) {
-      const i = Math.min(onBranch.n - 1, Math.floor(look / onBranch.spacing) + 2);
+      // Heading for the mouth: aim `look` beyond the branch point nearest the kart.
+      let near = 0;
+      let bestD2 = Infinity;
+      for (let j = 0; j < Math.min(onBranch.n, 40); j++) {
+        const dx = onBranch.xs[j]! - st.x;
+        const dy = onBranch.ys[j]! - st.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          near = j;
+        }
+      }
+      const i = Math.min(onBranch.n - 1, near + Math.ceil(look / onBranch.spacing) + 1);
       tx = onBranch.xs[i]!;
       ty = onBranch.ys[i]!;
     } else {
@@ -298,9 +346,11 @@ export class KartBot {
       const ti = mainIndexAt(track, s + look);
       const hwL = track.hwL[ti]!;
       const hwR = track.hwR[ti]!;
-      let lane = this.lane * (this.mistake > 0 && this.mistakeKind === 1 ? 2.2 : 1);
+      let lane = this.lane;
+      // Mistake: a wide line — drift toward the outside of the bend ahead.
+      if (this.mistake > 0 && this.mistakeKind === 1) lane -= 2.6 * sign(track.racingLine.curvature[mainIndexAt(track, s + look)]!);
       lane += this.avoidance(sim, kart, s);
-      lane += this.padPull(track, s, p.d);
+      lane += this.padPull(track, s, p.d, info.d, look);
       lane += this.hazardDodge(sim, s, speed, p.d + lane, info.d);
       if (this.escape > 0) lane = -p.d; // escaping: the road centre
       const d = clamp(p.d + lane, -hwR + 1.6, hwL - 1.6) - p.d;
@@ -310,7 +360,6 @@ export class KartBot {
     const aim = datan2(ty - st.y, tx - st.x);
     let errH = wrapAngle(aim - st.heading);
     if (info.headingDot < -0.2) errH = wrapAngle(this.trackHeading(track, st, s) - st.heading);
-    if (this.mistake > 0 && this.mistakeKind === 1) errH += dsin(sim.tick * 0.2) * 0.1;
     errH += (this.rnd() - 0.5) * this.p.noise;
 
     // --- Speed plan -----------------------------------------------------------------------------
@@ -320,7 +369,10 @@ export class KartBot {
     const i0 = mainIndexAt(track, s);
     const brakeA = 24;
     const horizon = Math.ceil((speed * speed) / (2 * brakeA) / track.spacing) + 6;
-    const driftBonus = st.driftDir !== 0 ? 1.18 : 1;
+    const corner = onBranch ? null : this.cornerAround(track, s);
+    if (corner === null || corner.id !== this.driftCorner) this.driftCorner = st.driftDir !== 0 ? this.driftCorner : -1;
+    // Drifting (or finishing a corner it drifted) carries more speed than a grip line.
+    const driftBonus = st.driftDir !== 0 || (corner !== null && corner.id === this.driftCorner) ? 1.18 : 1;
     let target = Infinity;
     let maxK = 0;
     for (let k = 0; k < horizon; k++) {
@@ -332,10 +384,15 @@ export class KartBot {
     }
     if (onBranch && st.branch === onBranch.index) target = Math.min(target, 40 - this.maxBranchCurv(onBranch, info.roadS) * 400);
     target = Math.min(target, this.hazardSlow(sim, kart, s, speed));
-    const paceCap = st.boostTicks > 0 || st.magnetTicks > 0 ? Infinity : spec.topSpeed * this.p.pace;
+    // Mistake: hesitation — lifts off for a moment.
+    const hesitate = this.mistake > 0 && this.mistakeKind === 2 ? 0.8 : 1;
+    const paceCap = st.boostTicks > 0 || st.magnetTicks > 0 ? Infinity : spec.topSpeed * this.p.pace * hesitate;
 
     // --- Drift ----------------------------------------------------------------------------------
-    const corner = onBranch ? null : this.nextCorner(track, s);
+    // One decision per corner (stable id = the corner's first curved sample); only corners that turn
+    // enough to earn a mini-turbo (≥ ~57° of path rotation) are drifted; no re-hop in the same
+    // corner and a short cooldown after every release, so there is no hop-hop-hop.
+    if (this.driftCooldown > 0) this.driftCooldown--;
     let drift = false;
     let steer: number;
     if (st.driftDir !== 0) {
@@ -343,26 +400,45 @@ export class KartBot {
       // Steer the arc from the direction of travel: pure-pursuit curvature → inside/outside steer.
       const velA = datan2(st.vy, st.vx);
       const errV = wrapAngle(aim - velA);
-      const wReq = (2 * dsin(errV) * Math.max(speed, 8)) / look;
-      const kNeed = (wReq * st.driftDir) / driftArcRate(spec, speed, 1);
+      const wReq = (2 * dsin(errV) * Math.max(speed, 8)) / Math.max(look, 8);
+      const kRaw = (wReq * st.driftDir) / driftArcRate(spec, speed, 1);
+      // Smoothed demand (the pursuit error spikes as the hop lands).
+      this.kNeedAvg += (kRaw - this.kNeedAvg) * 0.25;
+      const kNeed = kRaw;
       const along = clamp(((kNeed - 0.18) / 0.87) * 2 - 1, -1, 1);
       steer = along * st.driftDir;
       const stage = driftStage(st);
       const exit = this.cornerExit(track, s, st.driftDir);
-      const holdLong = this.mistake > 0 && this.mistakeKind === 2;
-      if (kNeed < 0.12) this.straightTicks++;
+      const holdLong = false;
+      // Only on the ground: in the hop the arc hasn't started yet.
+      if (!st.grounded || this.driftTicks < 30) this.straightTicks = 0;
+      else if (kNeed < 0.12) this.straightTicks++;
       else this.straightTicks = 0;
-      // Nearly at stage 1 at the exit: hold on a moment longer for the mini-turbo.
-      const almost = stage === 0 && st.driftCharge >= DRIFT_STAGE_POINTS[0] - 120;
+      // Nearly at the next stage at the exit: hold on a moment longer for the mini-turbo.
+      const next =
+        stage === 0 ? DRIFT_STAGE_POINTS[0] : stage === 1 ? DRIFT_STAGE_POINTS[1] : stage === 2 ? DRIFT_STAGE_POINTS[2] : Infinity;
+      const almost = st.driftCharge >= next - 100;
       const exiting = exit < 3 + speed * 0.12 && !(almost && this.straightTicks < 12);
-      const release =
-        st.grounded &&
-        ((!holdLong && exiting) ||
-          (!holdLong && stage >= this.p.driftStage && exit < 10 + speed * 0.2) ||
-          this.straightTicks > 10 ||
-          kNeed > 1.35 ||
-          this.driftTicks > 240);
-      drift = !release;
+      const why = !st.grounded
+        ? ''
+        : !holdLong && exiting
+          ? 'exit'
+          : !holdLong && stage >= this.p.driftStage && exit < 10 + speed * 0.2
+            ? 'stage'
+            : this.straightTicks > 14
+              ? 'straight'
+              : this.driftTicks > 30 && this.kNeedAvg > 1.6
+                ? 'tight'
+                : this.driftTicks > 300
+                  ? 'long'
+                  : '';
+      drift = why === '';
+      if (!drift) {
+        this.driftCooldown = 30;
+        this.lastRelease = why;
+      }
+      // Running wide: scrub speed (the arc tightens relative to the path) before giving up on it.
+      this.driftScrub = drift && this.kNeedAvg > 1.02;
     } else if (this.driftHeld) {
       // Hop in progress: keep the button and the side until the direction locks.
       drift = st.driftArmed && this.driftTicks++ < 30;
@@ -370,28 +446,35 @@ export class KartBot {
     } else {
       this.driftTicks = 0;
       steer = 0;
-      if (
-        corner &&
-        corner.start < 3 + speed * 0.14 &&
-        speed > 15 &&
-        st.grounded &&
-        info.surface === 0 &&
-        corner.length > (this.skill === 'easy' ? 45 : 28)
-      ) {
-        let go = this.cornerPlan.get(corner.id);
-        if (go === undefined) {
-          go = this.rnd() < this.p.driftChance;
+      if (corner && this.driftCooldown === 0 && speed > 15 && st.grounded && info.surface === 0 && !this.cornerPlan.has(corner.id)) {
+        // Decide as the corner starts (or on entering it late), once.
+        const ready = corner.start < 3 + speed * 0.14;
+        if (ready) {
+          const enough = Math.abs(corner.remaining) >= (this.skill === 'easy' ? 1.6 : 1.0);
+          // The corner must sit inside the drift arc's range (neither gentler than the widest arc nor
+          // tighter than the tightest), and not in a roller run (the bot holds a lane there).
+          // At the speed it will carry into the corner (a drift allows ~18 % over the grip cap).
+          const ci = mainIndexAt(track, s + corner.start + corner.length / 2);
+          const vIn = Math.min(speed, caps[ci]! * 1.18);
+          const kNeed = (vIn * corner.k) / driftArcRate(spec, vIn, 1);
+          const kPeak = (vIn * corner.kmax) / driftArcRate(spec, vIn, 1);
+          const fits = kNeed >= 0.28 && kPeak <= 1.05 && !this.inRollerRun(track, s, corner.length);
+          const go = enough && fits && this.rnd() < this.p.driftChance;
           this.cornerPlan.set(corner.id, go);
           if (this.cornerPlan.size > 64) this.cornerPlan.clear();
-        }
-        if (go) {
-          drift = true;
-          this.driftWant = corner.sign;
-          this.driftTicks = 0;
-          steer = corner.sign;
+          if (go) {
+            drift = true;
+            this.kNeedAvg = kNeed;
+            this.driftWant = corner.sign;
+            this.driftTicks = 0;
+            this.driftCorner = corner.id;
+            steer = corner.sign;
+          }
         }
       }
     }
+    // Forget decisions for corners well behind (so next lap decides afresh).
+    if (corner === null) this.cornerPlan.clear();
     if (!drift || st.driftDir === 0) {
       if (!(drift && st.driftDir === 0)) {
         // Grip steering: pure pursuit + curvature feed-forward, damped by the yaw rate.
@@ -412,9 +495,24 @@ export class KartBot {
       input.throttle = 0;
     }
     if (Math.abs(errH) > 1.3 && speed > 12 && st.driftDir === 0) input.throttle = 0.3;
+    if (this.driftScrub && st.driftDir !== 0) {
+      input.throttle = 0;
+      input.brake = 0.5;
+    }
 
     this.useItems(sim, kart, input, maxK);
     return input;
+  }
+
+  /** A roller run overlaps the stretch [s, s + len]. */
+  private inRollerRun(track: KartTrack, s: number, len: number): boolean {
+    for (const h of track.hazards) {
+      if (h.kind !== 'roller') continue;
+      const a = mod(h.s - h.amp - s, track.length);
+      const b = mod(h.s - s, track.length);
+      if (a <= len + 10 || b <= len + 10 || a > b) return true;
+    }
+    return false;
   }
 
   /** True when the kart sits at a road edge with its tail toward that edge. */
@@ -438,6 +536,11 @@ export class KartBot {
     for (let i = 0; i < track.hazards.length; i++) {
       const h = track.hazards[i]!;
       if (h.kind !== 'bumper' && h.kind !== 'stomper') continue;
+      // A raised stomper is pass-through: only a slammed (or about to slam) one blocks.
+      if (h.kind === 'stomper') {
+        const pose = hazardPose(track, i, sim.tick);
+        if (!pose.active && !pose.warn) continue;
+      }
       const dx = h.x - st.x;
       const dy = h.y - st.y;
       const fwd = dx * fx + dy * fy;
@@ -464,34 +567,58 @@ export class KartBot {
     return m;
   }
 
-  /** The next corner on the racing line within ~80 u (start, length, sign, mean curvature). */
-  private nextCorner(track: KartTrack, s: number): Corner | null {
+  /**
+   * The corner the kart is in, or the next one within ~80 u, with a stable id (its first curved
+   * sample, found by scanning back from inside it) and the turning still ahead (rad, signed).
+   */
+  private cornerAround(track: KartTrack, s: number): (Corner & { remaining: number; kmax: number }) | null {
     const i0 = mainIndexAt(track, s);
-    const scan = Math.ceil(80 / track.spacing);
-    const rl = track.racingLine.curvature;
-    for (let k = 1; k < scan; k++) {
-      const c = rl[(i0 + k) % track.n]!;
-      if (Math.abs(c) < KMIN) continue;
-      const sign = c > 0 ? 1 : -1;
-      let len = 0;
-      let sum = 0;
-      let j = k;
-      while (j < k + 200) {
-        const cj = rl[(i0 + j) % track.n]! * sign;
-        if (cj < KMIN * 0.45) break;
-        sum += cj;
-        len++;
-        j++;
+    const rl = roadBend(track);
+    const n = track.n;
+    const at = (k: number) => rl[(((i0 + k) % n) + n) % n]!;
+    let startK: number;
+    let sign: number;
+    if (Math.abs(at(0)) >= KMIN * 0.45) {
+      sign = at(0) > 0 ? 1 : -1;
+      startK = 0;
+      while (startK > -200 && at(startK - 1) * sign >= KMIN * 0.45) startK--;
+    } else {
+      startK = -1;
+      for (let k = 1; k < Math.ceil(80 / track.spacing); k++) {
+        if (Math.abs(at(k)) >= KMIN) {
+          startK = k;
+          break;
+        }
       }
-      return { start: k * track.spacing, length: len * track.spacing, sign, k: sum / Math.max(1, len), id: (i0 + k) % track.n };
+      if (startK < 0) return null;
+      sign = at(startK) > 0 ? 1 : -1;
     }
-    return null;
+    let endK = Math.max(startK, 0);
+    while (endK < startK + 400 && at(endK + 1) * sign >= KMIN * 0.45) endK++;
+    let total = 0;
+    let remaining = 0;
+    let kmax = 0;
+    for (let k = startK; k <= endK; k++) {
+      const turn = at(k) * track.spacing;
+      total += turn;
+      if (k >= 0) remaining += turn;
+      kmax = Math.max(kmax, Math.abs(at(k)));
+    }
+    return {
+      start: Math.max(0, startK) * track.spacing,
+      length: (endK - startK + 1) * track.spacing,
+      sign,
+      k: Math.abs(total) / ((endK - startK + 1) * track.spacing),
+      id: (((i0 + startK) % n) + n) % n,
+      remaining,
+      kmax,
+    };
   }
 
   /** Distance (u) until the racing line stops turning toward `dir`. */
   private cornerExit(track: KartTrack, s: number, dir: number): number {
     const i0 = mainIndexAt(track, s);
-    const rl = track.racingLine.curvature;
+    const rl = roadBend(track);
     const n = Math.ceil(60 / track.spacing);
     for (let k = 0; k < n; k++) if (rl[(i0 + k) % track.n]! * dir < KMIN * 0.45) return k * track.spacing;
     return 60;
@@ -542,12 +669,19 @@ export class KartBot {
     return clamp(push, -4, 4);
   }
 
-  /** Lateral offset toward a boost pad ahead (relative to the racing line). */
-  private padPull(track: KartTrack, s: number, lineD: number): number {
+  /**
+   * Lateral offset toward a boost pad ahead (relative to the racing line at the aim point). When the
+   * pad is nearer than the aim point, aim along the straight from the kart through the pad's centre
+   * (aiming at the pad's lane past it would cut across and miss it).
+   */
+  private padPull(track: KartTrack, s: number, lineD: number, kartD: number, look: number): number {
     if (this.p.items < 0.5) return 0;
     for (const p of track.boostPads) {
       const ahead = loopDelta(s, p.s, track.length);
-      if (ahead > 2 && ahead < 45) return clamp(p.d - lineD, -6, 6) * (this.skill === 'hard' ? 1 : 0.6);
+      if (ahead > 2 && ahead < 45) {
+        const want = ahead < look ? kartD + (p.d - kartD) * (look / ahead) : p.d;
+        return clamp(want - lineD, -6, 6) * (this.skill === 'hard' ? 1 : 0.6);
+      }
     }
     return 0;
   }
@@ -557,6 +691,7 @@ export class KartBot {
     if (this.p.hazards <= 0) return 0;
     const track = sim.track;
     let push = 0;
+    let rollerPush = 0;
     // Rollers: through a roller run, hold the lane none of them can reach (the builder guarantees
     // one). Worst case — every roller of the run on the road — so it works in a pack too.
     const aheadS = s + 8 + speed * 0.3;
@@ -576,11 +711,13 @@ export class KartBot {
       let edge = lo;
       let target = myD;
       let bestDist = Infinity;
-      // Commit to the free lane nearest the kart itself (not its aim point, which swaps sides
-      // through a switchback), then keep the aim inside it.
+      // Keep the free lane the kart is already in; otherwise take the one nearest the aim point
+      // (the racing line holds a safe lane through roller runs).
+      let inside: [number, number] | null = null;
       const consider = (a: number, b: number) => {
         if (b - a < 0.4) return;
-        const dist = Math.abs(clamp(kartD, a, b) - kartD);
+        if (kartD >= a && kartD <= b) inside = [a, b];
+        const dist = Math.abs(clamp(myD, a, b) - myD);
         if (dist < bestDist) {
           bestDist = dist;
           const m = Math.min(0.8, (b - a) / 3);
@@ -592,14 +729,26 @@ export class KartBot {
         edge = Math.max(edge, b);
       }
       consider(edge, hi);
+      if (inside) {
+        const [a, b] = inside as [number, number];
+        const m = Math.min(0.8, (b - a) / 3);
+        target = clamp(myD, a + m, b - m);
+      }
       // Normal/hard bots commit fully; easy bots only partly (they still get caught sometimes).
-      push += (target - myD) * (this.p.hazards >= 0.7 ? 1 : 0.6);
+      rollerPush = (target - myD) * (this.p.hazards >= 0.7 ? 1 : 0.6);
     }
     for (let i = 0; i < track.hazards.length; i++) {
       const h = track.hazards[i]!;
       if (h.kind === 'laser' || h.kind === 'roller') continue;
       const ahead = loopDelta(s, h.s, track.length);
       if (ahead < 0 || ahead > 40) continue;
+      // The racing line already keeps clear of static hazards where it can: just follow it — unless
+      // the kart itself is off the line and closing on one (cutting a slalom through a bumper field).
+      if (h.kind !== 'sweeper' || h.amp === 0) {
+        const lineD = track.racingLine.d[mainIndexAt(track, h.s)]!;
+        const kartClear = ahead > 22 || Math.abs(kartD - h.d) >= h.radius + 1.1 + 0.9;
+        if (Math.abs(lineD - h.d) >= h.radius + 1.1 + 0.5 && kartClear) continue;
+      } else if (Math.abs(track.racingLine.d[mainIndexAt(track, h.s)]! - h.d) >= h.amp + h.radius + 1.6) continue;
       const eta = Math.round((ahead / Math.max(speed, 8)) * 60);
       const pose = hazardPose(track, i, sim.tick + eta);
       if (!pose.active && h.kind !== 'bumper') continue;
@@ -611,7 +760,8 @@ export class KartBot {
       const move = side > 0 ? Math.max(0, want - myD) : Math.min(0, want - myD);
       push += move * this.p.hazards;
     }
-    return clamp(push, -8, 8);
+    // A lane hold through a roller run is absolute (the lane is on the road); other dodges are nudges.
+    return clamp(push, -8, 8) + rollerPush;
   }
 
   /**
@@ -722,11 +872,25 @@ export class KartBot {
     switch (id) {
       case 'turbo':
       case 'turbo3': {
-        const onDirt = st.branch >= 0 && sim.track.branches[st.branch]!.surface === 'dirt';
+        // On a dirt cut, fire once the sand has bitten (entry speed spent), not at the mouth.
+        const onDirt =
+          st.branch >= 0 &&
+          sim.track.branches[st.branch]!.surface === 'dirt' &&
+          kart.info.forwardSpeed < kart.spec.topSpeed * DIRT_TURBO_AT;
+        // Save it for a dirt cut coming up (the shortcut only pays with a boost).
+        const cutAhead =
+          this.p.shortcuts > 0 &&
+          st.branch < 0 &&
+          sim.track.branches.some(
+            (b) =>
+              b.surface === 'dirt' &&
+              loopDelta(kart.info.s, b.from, sim.track.length) > 0 &&
+              loopDelta(kart.info.s, b.from, sim.track.length) < 220,
+          );
         if (
           think &&
           st.boostTicks < 5 &&
-          ((straight && kart.info.forwardSpeed > kart.spec.topSpeed * 0.6) || onDirt || kart.info.surface === 1)
+          (onDirt || (!cutAhead && ((straight && kart.info.forwardSpeed > kart.spec.topSpeed * 0.6) || kart.info.surface === 1)))
         )
           tap();
         else this.itemBtn = false;

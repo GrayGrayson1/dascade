@@ -315,6 +315,29 @@ export function buildWallTopper(paths: readonly RoadPath[], masks: ReturnType<ty
   return g.build();
 }
 
+/** Foam strip on the water along drop edges (piers): absolute three-space height `waterY`. */
+export function buildEdgeFoam(paths: readonly RoadPath[], waterY: number, width = 2.4): BufferGeometry | null {
+  const g = mkBuf();
+  for (const p of paths) {
+    for (let i = 0; i < segCount(p); i++) {
+      const j = next(p, i);
+      for (const side of [1, -1] as const) {
+        const ei = side > 0 ? p.edgeL[i] : p.edgeR[i];
+        const ej = side > 0 ? p.edgeL[j] : p.edgeR[j];
+        if (ei !== EDGE_DROP || ej !== EDGE_DROP) continue;
+        const wi = (side > 0 ? p.hwL[i]! : p.hwR[i]!) + p.shoulder + 0.1;
+        const wj = (side > 0 ? p.hwL[j]! : p.hwR[j]!) + p.shoulder + 0.1;
+        const hi = waterY - p.zs[i]!;
+        const hj = waterY - p.zs[j]!;
+        const u0 = p.s[i]! / 4;
+        const u1 = sNext(p, i) / 4;
+        g.quad(P(p, i, side * wi, hi), P(p, i, side * (wi + width), hi), P(p, j, side * (wj + width), hj), P(p, j, side * wj, hj), [u0, 0], [u0, 1], [u1, 1], [u1, 0], 1, 1, 1, 1, side > 0);
+      }
+    }
+  }
+  return g.build();
+}
+
 /** Glowing lip strips on drop edges (readability: "the road ends here"). */
 export function buildDropLips(paths: readonly RoadPath[]): BufferGeometry | null {
   const g = mkBuf();

@@ -86,19 +86,20 @@ export class Particles {
     g.setDrawRange(0, 0);
     this.geo = g;
     this.material = new ShaderMaterial({
-      uniforms: { scale: { value: 600 } },
+      uniforms: { scale: { value: 600 }, maxPx: { value: 64 } },
       transparent: true,
       depthWrite: false,
       blending: additive ? AdditiveBlending : NormalBlending,
       vertexShader: /* glsl */ `
         attribute float size; attribute float alpha; attribute float shape; attribute vec3 color;
-        uniform float scale;
+        uniform float scale; uniform float maxPx;
         varying vec3 vCol; varying float vA; varying float vShape;
         void main() {
           vCol = color; vA = alpha; vShape = shape;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = clamp(size * scale / max(0.1, -mv.z), 0.0, 256.0);
-          vA *= smoothstep(0.2, 1.2, -mv.z);
+          // capped on-screen size + fade inside ~3 u of the eye: nothing can blanket the view
+          gl_PointSize = clamp(size * scale / max(0.1, -mv.z), 0.0, maxPx);
+          vA *= smoothstep(1.0, 2.8, -mv.z);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
@@ -213,6 +214,8 @@ export class Particles {
 
   setScale(viewportHeightPx: number, fovDeg: number): void {
     this.material.uniforms.scale!.value = viewportHeightPx / (2 * Math.tan((fovDeg * Math.PI) / 360));
+    // no single particle bigger than ~7% of the view height
+    this.material.uniforms.maxPx!.value = Math.max(12, viewportHeightPx * 0.07);
   }
 
   dispose(): void {
@@ -607,7 +610,7 @@ export class Rings {
     m.visible = true;
   }
 
-  update(dt: number): void {
+  update(dt: number, cam?: { x: number; y: number; z: number }): void {
     for (let i = 0; i < this.meshes.length; i++) {
       if (this.t[i]! < 0) continue;
       const t = (this.t[i] = this.t[i]! + dt);
@@ -622,7 +625,17 @@ export class Rings {
       const r = 0.5 + e * this.r1[i]!;
       const th = (m.userData.th as number) ?? 1;
       m.scale.set(r, th * (1 + e * 6), r);
-      (m.material as MeshBasicMaterial).opacity = 1 - f;
+      let near = 1;
+      if (cam) {
+        // fade rings whose edge passes close to the camera
+        const dx = m.position.x - cam.x;
+        const dy = m.position.y - cam.y;
+        const dz = m.position.z - cam.z;
+        const edge = Math.abs(Math.sqrt(dx * dx + dz * dz) - r);
+        const d = Math.sqrt(edge * edge + dy * dy);
+        near = Math.max(0, Math.min(1, (d - 1.5) / 3));
+      }
+      (m.material as MeshBasicMaterial).opacity = (1 - f) * near;
     }
   }
 

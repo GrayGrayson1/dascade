@@ -108,5 +108,5 @@ export const FROSTBYTE_PASS: KartTrackDef = {
     { kind: 'ice-castle', at: 0.73, d: -46 },
   ],
   decorSeed: 9127,
-  parLapMs: 45_900,
+  parLapMs: 48_000,
 };

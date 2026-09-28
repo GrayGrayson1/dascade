@@ -140,7 +140,7 @@ export function KartSettingsPanel({ settings, canEdit, update }: SettingsPanelPr
             : gp
               ? 'Four races in a cup. Points for every finish; the most points takes the trophy.'
               : solo
-                ? 'One race against computer racers. Time Trial is for solo rooms.'
+                ? 'One race against computer racers.'
                 : 'One race. Time Trial is available in solo rooms.'}
         </span>
       </div>
@@ -261,7 +261,7 @@ export function KartSettingsPanel({ settings, canEdit, update }: SettingsPanelPr
 
       {tt || solo ? null : (
         <div className="dc-field">
-          <span className="dc-field__label">Finish window after the winner</span>
+          <span className="dc-field__label">Finish window after the first player finishes</span>
           <Segmented
             label="Finish window"
             value={String(settings.finishWindowSec ?? 25)}

@@ -124,6 +124,8 @@ export interface BuiltHazard {
   /** Phase offset in ticks. */
   phase: number;
   amp: number;
+  /** Laser on-share of the cycle. */
+  duty: number;
   x: number;
   y: number;
   z: number;
@@ -716,6 +718,8 @@ export function groundAt(track: KartTrack, x: number, y: number, hint?: RoadHint
 // ---------------------------------------------------------------------------
 
 export interface HazardPose {
+  /** About to become dangerous (telegraph): laser blink before it switches on, stomper about to drop, roller winding up. */
+  warn: boolean;
   x: number;
   y: number;
   z: number;
@@ -763,6 +767,7 @@ export function hazardPose(track: KartTrack, index: number, tick: number): Hazar
   let sPos = h.s;
   let d = h.d;
   let active = true;
+  let warn = false;
   let lift = 0;
   switch (h.kind) {
     case 'bumper':
@@ -770,6 +775,7 @@ export function hazardPose(track: KartTrack, index: number, tick: number): Hazar
     case 'stomper':
       lift = stomperLift(p) * 4.5;
       active = p >= 0.58 && p < 0.84;
+      warn = p >= 0.42 && p < 0.58;
       break;
     case 'sweeper':
       d = h.d + h.amp * dsin(TAU * p);
@@ -779,15 +785,19 @@ export function hazardPose(track: KartTrack, index: number, tick: number): Hazar
       const r = clamp((p - ROLLER_WINDUP) / ROLLER_DUTY, 0, 1);
       sPos = mod(h.s - h.amp * r, track.length);
       active = p >= ROLLER_WINDUP && p < ROLLER_WINDUP + ROLLER_DUTY;
+      warn = p < ROLLER_WINDUP;
       break;
     }
-    case 'laser':
-      active = p < 0.5;
+    case 'laser': {
+      active = p < h.duty;
+      // Blink for the last ~0.4 s before it switches on.
+      warn = p >= 1 - Math.min(24 / P, 1 - h.duty);
       break;
+    }
   }
   const c = pointAtS(track, sPos);
   const z = c.z + (h.kind === 'roller' ? h.radius : 0) + lift;
-  return { x: c.x - c.ty * d, y: c.y + c.tx * d, z, s: sPos, d, heading: datan2(c.ty, c.tx), active, phase: p, radius: h.radius };
+  return { warn, x: c.x - c.ty * d, y: c.y + c.tx * d, z, s: sPos, d, heading: datan2(c.ty, c.tx), active, phase: p, radius: h.radius };
 }
 
 // ---------------------------------------------------------------------------
@@ -987,6 +997,7 @@ export function buildTrack(def: KartTrackDef): KartTrack {
       periodTicks,
       phase: Math.round((h.phase ?? 0) * periodTicks),
       amp,
+      duty: clamp(h.duty ?? 0.4, 0.1, 0.9),
       x: w.x,
       y: w.y,
       z: w.z,
@@ -1126,6 +1137,27 @@ function buildBranch(track: KartTrack, bd: BranchDef, index: number, fail: (m: s
   for (let i = 0; i < sm.n; i++) {
     if (Math.abs(sm.curvature[i]!) * sm.hw[i]! > 0.92) fail(`branch ${index} has a curve too tight for its width`);
   }
+  // Once it has separated from the main road, a branch must not run back over it (unless ≥ 6
+  // above/below): overlap is only allowed in the contiguous run from each mouth.
+  const tmp = { d2: Infinity, seg: 0, t: 0 };
+  const over: boolean[] = [];
+  for (let i = 0; i < sm.n; i++) {
+    tmp.d2 = Infinity;
+    searchPoly(track, true, sm.xs[i]!, sm.ys[i]!, 0, track.n, tmp);
+    const j = tmp.seg;
+    const need = Math.max(track.hwL[j]!, track.hwR[j]!) + sm.hw[i]!;
+    over.push(Math.abs(track.zs[j]! - sm.zs[i]!) < 6 && tmp.d2 < need * need);
+  }
+  let sepFrom = 0;
+  while (sepFrom < sm.n && over[sepFrom]) sepFrom++;
+  let sepTo = sm.n - 1;
+  while (sepTo >= 0 && over[sepTo]) sepTo--;
+  for (let i = sepFrom; i <= sepTo; i++) {
+    if (over[i])
+      fail(
+        `branch ${index} runs back over the main road near (${sm.xs[i]!.toFixed(0)}, ${sm.ys[i]!.toFixed(0)}); keep it clear of the road between its junctions`,
+      );
+  }
   return {
     index,
     def: bd,
@@ -1226,6 +1258,30 @@ function buildRacingLine(track: KartTrack): void {
       hi[i] = Math.min(hi[i]!, r.d + r.width / 2 - 1.5);
       if (lo[i]! > hi[i]!) lo[i] = hi[i] = r.d;
     }
+    // …and straight over the jump: a kart can barely steer in the air, so the line runs dead straight
+    // along the ramp from 20 u before the lip to where a kart at race pace lands (a line that keeps
+    // curving under the flight lands the bot off-line, into the landing rails).
+    const pz = pointAtS(track, r.s).z;
+    const vz = r.launch;
+    let flight = (30 * 2 * vz) / GRAVITY;
+    for (let it = 0; it < 3; it++) {
+      const drop = Math.max(0, pz - pointAtS(track, r.s + flight).z);
+      flight = (30 * (vz + Math.sqrt(vz * vz + 2 * GRAVITY * drop))) / GRAVITY;
+    }
+    const hx = dcos(r.heading);
+    const hy = dsin(r.heading);
+    for (let i = 0; i < n; i++) {
+      const rel = mod(track.s[i]! - r.s + 20, track.length) - 20;
+      if (rel > flight + 5) continue;
+      const cx = xs[i]! - r.x;
+      const cy = ys[i]! - r.y;
+      const along = cx * hx + cy * hy;
+      // The straight's lateral offset from this centre sample, measured on its normal (−ty, tx).
+      const qx = along * hx - cx;
+      const qy = along * hy - cy;
+      const dStraight = clamp(qx * -ty[i]! + qy * tx[i]!, lo[i]!, hi[i]!);
+      lo[i] = hi[i] = dStraight;
+    }
   }
   // Keep clear of dirt-branch mouths (a racing line hugging the inside would slip into the cut).
   for (const b of track.branches) {
@@ -1240,28 +1296,136 @@ function buildRacingLine(track: KartTrack): void {
       else lo[i] = Math.max(lo[i]!, -(track.hwR[i]! - 5.5));
     }
   }
-  const passes: Array<[number, number]> = [
-    [12, 160],
-    [5, 160],
-    [2, 60],
-  ];
-  const next = new Float64Array(n);
-  for (const [k, iters] of passes) {
-    for (let it = 0; it < iters; it++) {
-      for (let i = 0; i < n; i++) {
-        const a = (i - k + n) % n;
-        const b = (i + k) % n;
-        const ax = xs[a]! - ty[a]! * d[a]!;
-        const ay = ys[a]! + tx[a]! * d[a]!;
-        const bx = xs[b]! - ty[b]! * d[b]!;
-        const by = ys[b]! + tx[b]! * d[b]!;
-        const mx = (ax + bx) / 2 - xs[i]!;
-        const my = (ay + by) / 2 - ys[i]!;
-        const target = mx * -ty[i]! + my * tx[i]!;
-        next[i] = clamp(d[i]! + (target - d[i]!) * 0.6, lo[i]!, hi[i]!);
+  // Minimum curvature: projected gradient descent on Σ w·|P(i−k) − 2P(i) + P(i+k)|², the squared
+  // second difference of the line points P = centre + normal·d at stride k, weighted by
+  // (nominal chord / actual chord)⁴ so each term is the true curvature (an inside line has shorter
+  // chords and would otherwise look straighter than it is). Coarse strides first for the global
+  // out-in-out shape, then finer ones. The gradient with respect to d(i) is the (weighted) fourth
+  // difference projected on the normal; the box constraint keeps the line on the road.
+  const px = new Float64Array(n);
+  const py = new Float64Array(n);
+  const ax = new Float64Array(n);
+  const ay = new Float64Array(n);
+  const wt = new Float64Array(n);
+  const relax = (passes: ReadonlyArray<readonly [number, number]>) => {
+    for (const [k, iters] of passes) {
+      const nominal = 2 * k * track.spacing;
+      for (let it = 0; it < iters; it++) {
+        for (let i = 0; i < n; i++) {
+          px[i] = xs[i]! - ty[i]! * d[i]!;
+          py[i] = ys[i]! + tx[i]! * d[i]!;
+        }
+        for (let i = 0; i < n; i++) {
+          const a = (i - k + n) % n;
+          const b = (i + k) % n;
+          const cx = px[b]! - px[a]!;
+          const cy = py[b]! - py[a]!;
+          const r = nominal / (Math.sqrt(cx * cx + cy * cy) || nominal);
+          const w = r * r * r * r;
+          wt[i] = w;
+          ax[i] = (px[a]! - 2 * px[i]! + px[b]!) * w;
+          ay[i] = (py[a]! - 2 * py[i]! + py[b]!) * w;
+        }
+        for (let i = 0; i < n; i++) {
+          const a = (i - k + n) % n;
+          const b = (i + k) % n;
+          const gx = ax[a]! - 2 * ax[i]! + ax[b]!;
+          const gy = ay[a]! - 2 * ay[i]! + ay[b]!;
+          const g = gx * -ty[i]! + gy * tx[i]!;
+          // Jacobi-preconditioned step (the operator's diagonal), stable for any weights.
+          const diag = wt[a]! + 4 * wt[i]! + wt[b]!;
+          d[i] = clamp(d[i]! - (0.25 * g) / diag, lo[i]!, hi[i]!);
+        }
       }
-      d.set(next);
     }
+  };
+  relax([
+    [24, 300],
+    [12, 300],
+    [6, 300],
+    [3, 200],
+  ]);
+
+  let constrained = false;
+
+  // Hazard-aware: where static-lane hazards (bumpers, stompers, a sweeper's swing band, a roller's
+  // lane) leave a free lane, the line holds it — a newcomer following the line isn't fed into them.
+  const bands: Array<Array<[number, number]>> = [];
+  for (let i = 0; i < n; i++) bands.push([]);
+  const pad = 1.1 + 0.8;
+  for (const h of track.hazards) {
+    let s0: number;
+    let s1: number;
+    let b0: number;
+    let b1: number;
+    if (h.kind === 'bumper' || h.kind === 'stomper') {
+      s0 = h.s - h.radius - 5;
+      s1 = h.s + h.radius + 5;
+      b0 = h.d - h.radius - pad;
+      b1 = h.d + h.radius + pad;
+    } else if (h.kind === 'sweeper') {
+      s0 = h.s - h.radius - 5;
+      s1 = h.s + h.radius + 5;
+      b0 = h.d - h.amp - h.radius - pad;
+      b1 = h.d + h.amp + h.radius + pad;
+    } else if (h.kind === 'roller') {
+      s0 = h.s - h.amp - 6;
+      s1 = h.s + 4;
+      b0 = h.d - h.radius - pad;
+      b1 = h.d + h.radius + pad;
+    } else continue;
+    for (let x = s0; x <= s1; x += track.spacing / 2) {
+      const i = mainIndexAt(track, x);
+      const list = bands[i]!;
+      if (!list.some((b) => b[0] === b0 && b[1] === b1)) list.push([b0, b1]);
+    }
+  }
+  let prevLo = NaN;
+  let prevHi = NaN;
+  for (let step = 0; step < n; step++) {
+    const i = step;
+    const list = bands[i]!;
+    if (list.length === 0) {
+      prevLo = prevHi = NaN;
+      continue;
+    }
+    list.sort((a, b) => a[0] - b[0]);
+    // Through hazards the line may use the road up to the kart's own edge limit.
+    const roadLo = -(track.hwR[i]! - 1.4);
+    const roadHi = track.hwL[i]! - 1.4;
+    const gaps: Array<[number, number]> = [];
+    let edge = roadLo;
+    for (const [a, b] of list) {
+      if (Math.min(a, roadHi) - edge >= 0.6) gaps.push([edge, Math.min(a, roadHi)]);
+      edge = Math.max(edge, b);
+    }
+    if (roadHi - edge >= 0.6) gaps.push([edge, roadHi]);
+    if (gaps.length === 0) continue;
+    // Keep the lane chosen just before (continuity), else the one nearest the free line.
+    let pick = gaps.find((g) => g[0] < prevHi && g[1] > prevLo);
+    if (!pick) {
+      let best = Infinity;
+      for (const g of gaps) {
+        const dist = Math.abs(clamp(d[i]!, g[0], g[1]) - d[i]!);
+        if (dist < best) {
+          best = dist;
+          pick = g;
+        }
+      }
+    }
+    lo[i] = pick![0];
+    hi[i] = pick![1];
+    prevLo = pick![0];
+    prevHi = pick![1];
+    constrained = true;
+  }
+  if (constrained) {
+    for (let i = 0; i < n; i++) d[i] = clamp(d[i]!, lo[i]!, hi[i]!);
+    relax([
+      [12, 300],
+      [6, 300],
+      [3, 200],
+    ]);
   }
   const rl = track.racingLine;
   rl.d.set(d);

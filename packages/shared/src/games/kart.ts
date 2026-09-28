@@ -302,7 +302,7 @@ export const KartSettingsSchema = z.object({
   /** Computer racers added to the grid (never more than the free grid slots). */
   bots: z.number().int().min(0).max(11),
   botSkill: z.enum(KART_BOT_SKILLS),
-  /** Seconds the rest of the field gets after the winner crosses the line. */
+  /** Seconds the rest of the field gets after the first human crosses the line (bots never start it). */
   finishWindowSec: z.number().int().min(10).max(60),
 });
 export type KartSettings = z.infer<typeof KartSettingsSchema>;
@@ -360,6 +360,11 @@ export const KART_MSG = {
   event: 'kart:event',
   /** client → server (host, RESULTS): the next Grand Prix race now, or a rematch with the same settings. */
   next: 'kart:next',
+  /**
+   * client → server `KartPausePayload` (solo rooms only, COUNTDOWN/PLAYING): pause or resume the race.
+   * Mirrored in `race.paused`; while paused the sim, snapshots and every race clock stand still.
+   */
+  pause: 'kart:pause',
 } as const;
 
 /**
@@ -434,6 +439,9 @@ export const KartInputSchema = z.object({
 });
 export type KartInputPacket = z.infer<typeof KartInputSchema>;
 
+export const KartPauseSchema = z.object({ paused: z.boolean() });
+export type KartPausePayload = z.infer<typeof KartPauseSchema>;
+
 // ---------------------------------------------------------------------------
 // Events (server → client JSON messages)
 // ---------------------------------------------------------------------------
@@ -502,7 +510,7 @@ export interface KartRaceMetaView {
   items: boolean;
   /** Server epoch ms when the race starts (0 = not scheduled). */
   goAt: number;
-  /** Server epoch ms when the finish window closes (0 = no winner yet). */
+  /** Server epoch ms when the finish window closes (0 = no human has finished yet; bots never open it). */
   finishDeadline: number;
   fastestLapMs: number;
   fastestLapBy: string;
@@ -510,6 +518,11 @@ export interface KartRaceMetaView {
   solo: boolean;
   /** Increments every race (matches the snapshot header). */
   raceId: number;
+  /**
+   * Solo pause (`kart:pause`): the race is frozen. On resume `goAt`, `finishDeadline` and `phaseEndsAt`
+   * move forward by the pause, so `serverNow() - goAt` stays the race time.
+   */
+  paused: boolean;
 }
 
 export interface KartGpEntryView {

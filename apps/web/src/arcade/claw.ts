@@ -4,10 +4,16 @@
  * same pile in 3/4 perspective; the floor art is a front view, so depth only lifts a toy a little
  * and draws it behind the ones in front.
  */
-import { BOX, GANTRY, type ToyKind } from './clawPhysics.ts';
+import { BOX, GANTRY, type ToyKind } from './clawPile.ts';
 
 /** The claw machine's art box (ClawMachine.tsx viewBox) — shared with the floor layout without the art. */
 export const CLAW_ART = { w: 152, h: 250, floor: 242 } as const;
+
+/**
+ * The floor machine only stands at the end of the row when it renders at a readable size (css px
+ * tall); smaller than that it would be a speck, so the floor offers the quick Claw button instead.
+ */
+export const CLAW_FLOOR_MIN_H = 120;
 
 /** The glass case's interior in art units (x span, the floor line). */
 export const FLOOR_GLASS = { x0: 24, x1: 138, floorY: 146 } as const;

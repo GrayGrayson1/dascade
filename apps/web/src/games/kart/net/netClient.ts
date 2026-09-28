@@ -322,7 +322,7 @@ export class KartNet {
     if (!this.synced || !before || pred.seq - own.ack > RESYNC_GAP) {
       // First state of this race, or we ran far ahead during an outage: adopt it outright.
       if (this.synced) this.corrections++;
-      pred.reconcile(own.state, own.ack, own.tick, racing);
+      pred.reconcile(own.state, own.ack, own.tick, racing, own.goSeq);
       this.synced = true;
       this.err.reset();
       return;
@@ -331,7 +331,7 @@ export class KartNet {
     const by = before.y;
     const bz = before.z;
     const bh = before.heading;
-    const dist = pred.reconcile(own.state, own.ack, own.tick, racing);
+    const dist = pred.reconcile(own.state, own.ack, own.tick, racing, own.goSeq);
     const after = pred.state;
     if (!after) return;
     const dh = wrapPi(bh - after.heading);
@@ -342,9 +342,32 @@ export class KartNet {
     }
   }
 
+  /**
+   * A solo pause ended: the server's tick stood still while wall time ran on, so the clock filter's
+   * history no longer maps ticks to local time. Start it afresh (and drop any visual correction).
+   */
+  onResume(): void {
+    this.clock.reset();
+    this.err.reset();
+    this.acc = 0;
+    this.lastUpdateAt = -1;
+  }
+
   // -------------------------------------------------------------------------
   // Local fixed-step prediction
   // -------------------------------------------------------------------------
+
+  /**
+   * Milliseconds until our first input frame applied after GO (the moment the kart really goes,
+   * input delay included) — time the countdown lights by this. Null when unknown.
+   */
+  startToGoMs(): number | null {
+    const pred = this.pred;
+    if (!pred || this.goTick < 0 || !this.synced) return null;
+    const frames = pred.framesToGo(this.goTick);
+    if (!Number.isFinite(frames)) return null;
+    return (frames - this.acc / this.tickMs) * this.tickMs;
+  }
 
   /** Server tick the next local input will most likely be applied at. */
   predictedTick(now: number): number {
@@ -376,7 +399,10 @@ export class KartNet {
       this.acc -= this.tickMs;
       steps++;
       const input = sample();
-      const r = pred.step(input, locked, tick++);
+      // Lock each frame exactly as the server will apply it (by frame, relative to goTick), so the
+      // start boost/stall the player sees is the one the server gives, at any latency.
+      const frameLocked = this.goTick >= 0 || pred.goSeq > 0 ? pred.nextFrameLocked(this.goTick) : locked;
+      const r = pred.step(input, frameLocked, tick++);
       this.lastInput = input;
       if (pred.info && pred.state) {
         this.infos.push(pred.info);

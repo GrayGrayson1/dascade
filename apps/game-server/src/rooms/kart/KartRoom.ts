@@ -1,9 +1,10 @@
 /**
  * DASphalt GP — authoritative kart racing room.
  *
- * Flow: LOBBY (looks, host settings) → COUNTDOWN (grid built, karts locked; inputs are consumed and
- * acknowledged, the sim times the start boost) → PLAYING (race; after the winner the field gets a
- * finish window, then DNF) → RESULTS (single race / time trial / end of a cup).
+ * Flow: LOBBY (looks, host settings; solo rooms too) → COUNTDOWN (grid built, karts locked; inputs are
+ * consumed and acknowledged, the sim times the start boost) → PLAYING (race; the finish window opens
+ * when the first human crosses the line, and the race ends when every human is home or it closes —
+ * computer racers never start it) → RESULTS (single race / time trial / end of a cup).
  * A Grand Prix runs its four races inside one platform match: between races the room sits in
  * INTERMISSION (race result + standings; the host's `kart:next` or an automatic advance starts the
  * next race), so the roster, disconnect handling and the single outcome report span the whole cup.
@@ -25,6 +26,7 @@ import {
   KART_TRACK_IDS,
   KartInputSchema,
   KartLookSchema,
+  KartPauseSchema,
   KartSettingsSchema,
   defaultKartLook,
   packKartInput,
@@ -40,6 +42,7 @@ import { EmptySchema, shuffleInPlace } from '@dascade/shared';
 import { z } from 'zod';
 import { KART_SIM_LIMITS, KartBot, KartSim, getKartTrack, type KartSimEvent, type SimKart } from '@dascade/game-core/kart';
 import { config } from '../../config.ts';
+import { log } from '../../lib/log.ts';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
 import { groupSorted } from '../outcomePlacements.ts';
 import { TickStats, ensureLoopMonitor, processDiagnostics } from './diagnostics.ts';
@@ -54,7 +57,9 @@ const DISTANCE_EVERY = 30;
 const SNAP_EVERY = 3;
 /** Grand Prix: time between races before the next one starts on its own. */
 const GP_INTERMISSION_MS = 15_000;
-/** Test hooks: relaxed limits on a non-production server only. */
+/** Solo pause: play on at least this long after resuming before pausing again (no freeze-frame driving). */
+const PAUSE_COOLDOWN_MS = 1_000;
+/** Test hooks (`kart:test`) and diagnostics (`kart:diag`): relaxed limits on a non-production server only. */
 const TEST_HOOKS = config.relaxedLimits && !config.isProduction;
 
 const DiagSchema = z.object({ reset: z.boolean().optional() });
@@ -63,12 +68,33 @@ const TestHookSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('finish') }),
 ]);
 
-let warmed = false;
-/** Build every track once per process, one per timer turn, so no countdown ever pays for a build. */
-function warmTracks(clock: { setTimeout: (fn: () => void, ms: number) => unknown }): void {
-  if (warmed) return;
-  warmed = true;
-  KART_TRACK_IDS.forEach((id, i) => clock.setTimeout(() => void getKartTrack(id), 50 + i * 40));
+let warming = false;
+/**
+ * Build every track once per process, one per timer turn, so no countdown ever pays for a build.
+ * Process timers (unref'd), not a room clock: a room's clock is cleared when it is disposed, which
+ * used to drop the remaining builds for good if the first kart room closed within ~330 ms.
+ * `getKartTrack` caches each build process-wide.
+ */
+function warmTracks(): void {
+  if (warming) return;
+  warming = true;
+  const warmNext = (i: number) => {
+    const id = KART_TRACK_IDS[i];
+    if (!id) return;
+    const timer = setTimeout(
+      () => {
+        try {
+          getKartTrack(id);
+        } catch (err) {
+          log.error('kart track pre-build failed', { track: id, err: err as Error });
+        }
+        warmNext(i + 1);
+      },
+      i === 0 ? 50 : 40,
+    );
+    timer.unref?.();
+  };
+  warmNext(0);
 }
 
 interface Entrant {
@@ -108,6 +134,9 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   private readonly autopilots = new Map<number, KartBot>();
   /** Diagnostics (read by tests and, on relaxed-limit servers, the load script via `kart:diag`). */
   readonly stats = new TickStats();
+  /** Solo pause: when it began (server epoch ms; 0 = running) and when play last resumed. */
+  private pausedAt = 0;
+  private resumedAt = 0;
 
   protected defaultSettings(): KartSettings {
     return structuredClone(DEFAULT_KART_SETTINGS);
@@ -118,14 +147,15 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   }
 
   protected override onRoomCreated(): void {
-    if (config.relaxedLimits) ensureLoopMonitor();
-    warmTracks(this.clock);
+    if (TEST_HOOKS) ensureLoopMonitor();
+    warmTracks();
     this.normalizeSettings();
     this.syncRacePreview();
     this.state.race.solo = this.isSolo;
 
+    // A racer (and their kart) is chosen for the whole Grand Prix: not between rounds.
     this.handle(KART_MSG.look, KartLookSchema, (p, look) => this.setLook(p, look), {
-      phases: ['LOBBY', 'RESULTS', 'INTERMISSION'],
+      phases: ['LOBBY', 'RESULTS'],
       rate: { burst: 8, perSecond: 3 },
     });
 
@@ -134,6 +164,8 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
       playersOnly: true,
       silent: true,
       rate: KART_INPUT_RATE,
+      // Schema maximum: the object, seq, the array and its frames (3 + maxInputsPerPacket).
+      maxNodes: KART_SIM.maxInputsPerPacket + 8,
     });
 
     this.handle(KART_MSG.next, EmptySchema, () => this.onNext(), {
@@ -142,8 +174,15 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
       rate: { burst: 2, perSecond: 0.5 },
     });
 
-    if (config.relaxedLimits) {
-      // Read-only room + process diagnostics for the load simulation.
+    this.handle(KART_MSG.pause, KartPauseSchema, (p, { paused }) => this.onPause(p, paused), {
+      phases: ['COUNTDOWN', 'PLAYING'],
+      playersOnly: true,
+      rate: { burst: 4, perSecond: 1 },
+      maxNodes: 4,
+    });
+
+    if (TEST_HOOKS) {
+      // Read-only room + process diagnostics for the load simulation (players only; never in production).
       this.handle(
         'kart:diag',
         DiagSchema,
@@ -156,10 +195,8 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
           });
           if (reset) this.stats.reset();
         },
-        { rate: { burst: 5, perSecond: 2 }, silent: true },
+        { rate: { burst: 5, perSecond: 2 }, playersOnly: true, silent: true, maxNodes: 4 },
       );
-    }
-    if (TEST_HOOKS) {
       this.handle('kart:test', TestHookSchema, (p, cmd) => this.testHook(p, cmd), {
         phases: ['COUNTDOWN', 'PLAYING'],
         playersOnly: true,
@@ -227,7 +264,8 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
     look.body = def.body;
     look.paint = def.paint;
     this.state.looks.set(player.id, look);
-    if (this.isSolo) this.startMatch();
+    // Solo rooms open in the lobby too: the player picks a racer and (as host) the mode, track or
+    // cup, laps and bots, then starts. The defaults are a race against 5 normal bots.
   }
 
   protected override onPlayerDisconnected(player: PlayerRecord): void {
@@ -261,7 +299,7 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
 
   private onInput(player: PlayerRecord, seq: number, inputs: number[]): void {
     const slot = this.slotOf.get(player.id);
-    if (!this.sim || slot === undefined) {
+    if (!this.sim || slot === undefined || this.state.race.paused) {
       this.stats.inputPacketsIgnored++;
       return;
     }
@@ -324,7 +362,10 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
     if (sim.status === 'grid') sim.go();
     this.state.race.status = 'racing';
     this.broadcast(KART_MSG.event, { kind: 'go' } satisfies KartEvent);
-    if (sim.karts.length === 0) this.finishRace();
+    // Already decided: an empty grid, or the sim's GO came a tick before the room's and the race was
+    // settled in that window (e.g. the last racer retired) while finishRace() still waited for PLAYING.
+    if (sim.karts.length === 0 || sim.status === 'done') this.finishRace();
+    else this.endIfNoHumanRacing(sim);
   }
 
   /** Host: the next Grand Prix race now (INTERMISSION), or a rematch with the same settings (RESULTS). */
@@ -424,13 +465,16 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
     }
 
     this.raceCounter = (this.raceCounter + 1) & 0xffff;
+    const maxRaceMs = settings.laps * 120_000 + 60_000;
     const sim = new KartSim(
       getKartTrack(trackId),
       {
         laps: settings.laps,
         items: r.items,
-        finishWindowMs: settings.finishWindowSec * 1000,
-        maxRaceMs: settings.laps * 120_000 + 60_000,
+        // The room runs the finish window (see openFinishWindow): the sim's own one, which any
+        // finisher starts (bots included), can then never close before its max race time.
+        finishWindowMs: maxRaceMs,
+        maxRaceMs,
         startItem: r.mode === 'timetrial' ? 'turbo3' : null,
       },
       this.rng,
@@ -504,7 +548,7 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
 
   private tick(): void {
     const sim = this.sim;
-    if (!sim || !this.racing) return;
+    if (!sim || !this.racing || this.state.race.paused) return;
     const t0 = performance.now();
     this.driveAutopilots(sim);
     const events = sim.step();
@@ -608,10 +652,8 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
           r.finishOrder = ev.place;
           r.lap = this.matchSettings.laps + 1;
           standingsDirty = true;
-          if (ev.place === 1) {
-            this.state.race.finishDeadline = Date.now() + this.matchSettings.finishWindowSec * 1000;
-            if (!this.isSolo) this.systemChat(`${r.name} takes the chequered flag!`);
-          }
+          if (ev.place === 1 && !this.isSolo) this.systemChat(`${r.name} takes the chequered flag!`);
+          if (!r.bot) this.openFinishWindow(sim);
           this.broadcast(KART_MSG.event, { kind: 'finish', playerId: who.id, place: ev.place, timeMs: ev.timeMs } satisfies KartEvent);
           break;
         }
@@ -642,6 +684,31 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
       }
     }
     if (standingsDirty) this.syncMeta();
+    this.endIfNoHumanRacing(sim);
+  }
+
+  /**
+   * The first human across the line opens the finish window (computer racers never do): the race
+   * ends when it closes, or sooner once every human is home. The window is the sim's time limit
+   * pulled in to `now + finishWindowSec`; the max race time still caps everything.
+   */
+  private openFinishWindow(sim: KartSim): void {
+    const race = this.state.race;
+    if (race.finishDeadline > 0 || sim.status !== 'racing') return;
+    const windowMs = this.matchSettings.finishWindowSec * 1000;
+    race.finishDeadline = Date.now() + windowMs;
+    sim.opts.maxRaceMs = Math.min(sim.opts.maxRaceMs, sim.raceMs + windowMs);
+  }
+
+  /**
+   * Every human racer is home (finished, retired or out): end the race on the sim's next step.
+   * Computer racers still out there are classified by distance (the sim marks them DNF and keeps
+   * their standing), so nobody waits for bots once the people are done.
+   */
+  private endIfNoHumanRacing(sim: KartSim): void {
+    if (sim.status !== 'racing') return;
+    const humanRacing = sim.karts.some((k) => k.bot === null && !k.retired && !k.dnf && !k.progress.finished);
+    if (!humanRacing) sim.opts.maxRaceMs = Math.min(sim.opts.maxRaceMs, sim.raceMs);
   }
 
   /** Copy positions + laps (and, unless skipped, the validated distance) into the schema. */
@@ -663,7 +730,56 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
     const racer = this.state.racers.get(playerId);
     if (racer) racer.active = false;
     if (!this.sim || slot === undefined || !this.racing) return;
+    // A paused solo racer who is gone for good (left, or their reconnect grace ran out): the race
+    // runs on so it can be decided and the room can close.
+    this.applyPause(false);
     this.handleEvents(this.sim.retire(slot, reason));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Solo pause
+  // ---------------------------------------------------------------------------
+
+  /**
+   * `kart:pause` (solo rooms, the player, COUNTDOWN/PLAYING until the race is decided). While paused
+   * the sim does not step, no snapshots are sent, inputs are dropped, and every race clock stands
+   * still: the countdown (room timer + the sim's GO tick), the finish window and the max race time
+   * (sim time), the results delay (room timers). A disconnect keeps the pause (the player resumes
+   * after reconnecting); a racer gone for good lifts it (see retirePlayer).
+   */
+  private onPause(player: PlayerRecord, paused: boolean): void {
+    if (!this.isSolo) return this.reject(player, KART_MSG.pause, 'not_allowed', 'Only solo races can be paused.');
+    if (this.state.race.paused === paused) return;
+    if (paused) {
+      const sim = this.sim;
+      if (!sim || sim.status === 'done' || this.isScheduled('results')) {
+        return this.reject(player, KART_MSG.pause, 'not_allowed', 'The race is over.');
+      }
+      if (Date.now() < this.resumedAt + PAUSE_COOLDOWN_MS) {
+        return this.reject(player, KART_MSG.pause, 'rate_limited', 'Play on for a moment before pausing again.');
+      }
+    }
+    this.applyPause(paused);
+  }
+
+  private applyPause(paused: boolean): void {
+    const race = this.state.race;
+    if (race.paused === paused) return;
+    const now = Date.now();
+    if (paused) {
+      this.pausedAt = now;
+    } else {
+      // Wall-clock values move on by the pause (the sim's own clocks never ran), so
+      // `serverNow - goAt` stays the race time and the countdown/finish window resume where they were.
+      const held = Math.max(0, now - this.pausedAt);
+      if (race.goAt > 0) race.goAt += held;
+      if (race.finishDeadline > 0) race.finishDeadline += held;
+      if (this.state.phaseEndsAt > 0) this.state.phaseEndsAt += held;
+      this.pausedAt = 0;
+      this.resumedAt = now;
+    }
+    race.paused = paused;
+    this.freezeTimers(paused);
   }
 
   // ---------------------------------------------------------------------------
@@ -877,6 +993,8 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
     this.matchStats.clear();
     const race = this.state.race;
     race.status = 'idle';
+    race.paused = false;
+    this.pausedAt = 0;
     race.goAt = 0;
     race.finishDeadline = 0;
     race.fastestLapMs = 0;

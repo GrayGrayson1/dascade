@@ -73,6 +73,7 @@ import { allocateRoomCode, releaseRoomCode } from '../lib/roomCodes.ts';
 import { clientIpFromAuth, ipRateKey } from '../lib/clientIp.ts';
 import { log } from '../lib/log.ts';
 import { config } from '../config.ts';
+import { DEFAULT_MAX_NODES, exceedsNodeLimit } from '../lib/payloadNodes.ts';
 import { matchSink, type MatchSummary } from '../persistence/index.ts';
 import { emitOutcome, type OutcomePlayer } from '../platform/hub.ts';
 import { getRating, ratingIdentity } from '../platform/ratings.ts';
@@ -130,6 +131,14 @@ export interface MessageOptions {
    * schema (a cheap guard for handlers that accept arrays/strings, e.g. drawing batches).
    */
   maxBytes?: number;
+  /**
+   * Reject payloads holding more than this many values (objects, arrays and primitives each count
+   * one) before anything else walks them. Zod parses every array element before it checks `.max()`,
+   * so without it one client could make any array-accepting handler parse a whole ~250 KB frame at
+   * its message rate. Counted with an early exit (`exceedsNodeLimit`), O(min(size, maxNodes)).
+   * Defaults to DEFAULT_MAX_NODES; high-rate streams set their schema's maximum plus a small margin.
+   */
+  maxNodes?: number;
 }
 
 type Handler<T> = (player: PlayerRecord, payload: T, client: Client) => void;
@@ -581,6 +590,11 @@ export abstract class BaseGameRoom<
         if (!opts.silent) this.reject(client, type, 'not_allowed', 'Spectators cannot do that.');
         return;
       }
+      // Structural size first (cheap, bounded): everything after it (JSON length, Zod) is O(payload).
+      if (exceedsNodeLimit(raw, opts.maxNodes ?? DEFAULT_MAX_NODES)) {
+        if (!opts.silent) this.reject(client, type, 'invalid_payload', 'That action is too large.');
+        return;
+      }
       if (opts.maxBytes !== undefined && jsonLength(raw) > opts.maxBytes) {
         if (!opts.silent) this.reject(client, type, 'invalid_payload', 'That action is too large.');
         return;
@@ -870,6 +884,19 @@ export abstract class BaseGameRoom<
     this.timers.clear();
   }
 
+  /**
+   * Freeze (true) or thaw (false) every pending named timer, keeping its remaining time (e.g. a
+   * solo pause, including the base countdown). Timers scheduled while frozen run normally, and
+   * platform timers (reconnect grace, host migration, tournaments) are never frozen. Wall-clock
+   * values the game published (phaseEndsAt, deadlines) are the game's to shift on thaw.
+   */
+  protected freezeTimers(frozen: boolean): void {
+    for (const t of this.timers.values()) {
+      if (frozen) t.pause();
+      else t.resume();
+    }
+  }
+
   // ===========================================================================
   // Internals
   // ===========================================================================
@@ -879,7 +906,7 @@ export abstract class BaseGameRoom<
       SYS.time,
       TimeSyncRequestSchema,
       (_p, { t0 }, client) => client.send(SYS.time, { t0, server: Date.now() }),
-      { rate: { burst: 10, perSecond: 2 }, silent: true },
+      { rate: { burst: 10, perSecond: 2 }, silent: true, maxNodes: 4 },
     );
 
     this.handle(

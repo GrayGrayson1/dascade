@@ -133,7 +133,7 @@ export class BingoRoom extends BaseGameRoom<BingoState, BingoSettings> {
         if (marked) card.marks.add(cell);
         else card.marks.delete(cell);
       },
-      { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true, silent: true, rate: { burst: 40, perSecond: 15 } },
+      { phases: ['PLAYING', 'INTERMISSION'], playersOnly: true, silent: true, rate: { burst: 40, perSecond: 15 }, maxNodes: 8 },
     );
 
     this.handle(BINGO_MSG.call, BingoCallSchema, (p, payload) => this.handleHostCall(p, payload?.value), {

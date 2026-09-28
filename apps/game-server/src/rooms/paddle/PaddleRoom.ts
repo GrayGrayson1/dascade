@@ -116,6 +116,7 @@ export class PaddleRoom extends ClassicsRoom<PaddleState, PaddleSettings> {
       playersOnly: true,
       silent: true,
       rate: PADDLE_INPUT_RATE,
+      maxNodes: 8, // schema maximum 4
     });
     this.handle(PADDLE_MSG.pause, PaddlePauseSchema, (p, { paused }) => this.setPaused(p, paused), {
       phases: ['PLAYING'],

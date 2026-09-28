@@ -11,7 +11,7 @@ import {
   toysToPile,
   useClaw,
 } from './clawInventory.ts';
-import { BOX, TOY_COLORS, stockToys } from './clawPhysics.ts';
+import { KINDS, PILE_AREA, PILE_TOP, TOY_COLORS, stockToys } from './clawPile.ts';
 
 const valid = () => JSON.stringify(freshInventory(3));
 
@@ -67,7 +67,7 @@ describe('parseInventory', () => {
       null,
       5,
     );
-    expect(inv.pile).toEqual([{ k: 'bot', c: 1, x: 0, z: BOX.d }]);
+    expect(inv.pile).toEqual([{ k: 'bot', c: 1, x: PILE_AREA.x0, z: PILE_AREA.z1 }]);
     expect(inv.shelf).toEqual({ blob: 0, bunny: 0, star: 99_999, bot: 0 });
     expect(inv.won).toBe(99_999);
     expect(inv.misses).toBe(999);
@@ -90,6 +90,21 @@ describe('parseInventory', () => {
 });
 
 describe('the pile in storage', () => {
+  it('never lets a tampered pile stack up into the gantry', () => {
+    const pile = Array.from({ length: MAX_PILE }, (_, i) => ({
+      k: (['blob', 'bunny', 'star', 'bot'] as const)[i % 4],
+      c: 0,
+      x: 60,
+      z: 30,
+    }));
+    const toys = pileToToys(pile);
+    expect(toys).toHaveLength(MAX_PILE);
+    for (const t of toys) {
+      expect(t.y).toBeLessThan(PILE_TOP + 4);
+      expect(t.y + KINDS[t.kind].h).toBeLessThan(40);
+    }
+  });
+
   it('stores bottom-first and rebuilds the same heap', () => {
     const toys = stockToys(8, 20);
     const pile = toysToPile(toys);
@@ -128,6 +143,16 @@ describe('the store', () => {
     // a plain save (the end of the same try) doesn't count it again
     useClaw.getState().commit(toys, 0, 12);
     expect(useClaw.getState().inv.won).toBe(before + 1);
+  });
+
+  it('a later miss clears the floor WINNER! lights and the old prize at the door', () => {
+    const toys = stockToys(5, 12);
+    useClaw.getState().commit(toys, 0, 1, { kind: 'bot', color: 1 });
+    expect(useClaw.getState().floor).toBe('won');
+    expect(useClaw.getState().lastPrize?.kind).toBe('bot');
+    useClaw.getState().commit(toys, 1, 2, undefined, true);
+    expect(useClaw.getState().floor).toBe('idle');
+    expect(useClaw.getState().lastPrize).toBeNull();
   });
 
   it('opens once, closes cleanly', () => {

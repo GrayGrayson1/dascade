@@ -10,7 +10,20 @@
  * art); the chrome around the canvas takes the theme's cabinet tokens in CSS.
  */
 import { SPRITES, spriteColor } from './clawArt.ts';
-import { BOX, CHUTE, CLAW, GANTRY, KINDS, headPos, surfaceAt, type ClawSim, type ClawToy, type ToyKind } from './clawPhysics.ts';
+import {
+  BOX,
+  CHUTE,
+  CLAW,
+  GANTRY,
+  KINDS,
+  contactHeight,
+  headPos,
+  prongTips,
+  surfaceAt,
+  type ClawSim,
+  type ClawToy,
+  type ToyKind,
+} from './clawPhysics.ts';
 
 /** The canvas's logical size (CSS scales it; the backing store follows devicePixelRatio). */
 export const VIEW = { w: 480, h: 400 } as const;
@@ -182,6 +195,11 @@ function sprite(kind: ToyKind, color: number, face: Face, shade = 2): HTMLCanvas
 // Static backdrop (cached per canvas size): walls, floor, the chute hole, the rails.
 
 let backdrop: { key: string; canvas: HTMLCanvasElement } | null = null;
+
+/** Redraws the cached backdrop next frame (e.g. once the pixel font has loaded for the wall sign). */
+export function invalidateBackdrop(): void {
+  backdrop = null;
+}
 
 function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   const fl = (x: number, z: number) => project(x, 0, z);
@@ -394,8 +412,12 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
   // then the claw with whatever it holds, then everything nearer the glass.
   const split = head.z - 6;
   for (const it of items) if (it.z >= split) it.draw();
+  // The claw's shadow on the top of whatever is right under it, and — while you aim — its footprint
+  // draped over the pile: where each prong tip will come down (amber: on a plush that will stop it high).
   const surf = surfaceAt(sim.toys, head.x, head.z);
+  const marks = aimMarks(sim);
   drawClawShadow(ctx, head.x, surf, head.z, sim.hubY - CLAW.prong - surf);
+  if (marks) drawAimMarks(ctx, marks, 1);
   drawClaw(ctx, sim, fx);
   let infront = false;
   for (const it of items) {
@@ -403,11 +425,14 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
     it.draw();
     infront = true;
   }
-  // X-ray: wherever the plushies nearer the glass hide the claw, a faint ghost of it still shows.
-  if (infront && sim.hubY < 40) {
-    ctx.globalAlpha = 0.28;
-    drawClaw(ctx, sim, fx, true);
-    ctx.globalAlpha = 1;
+  // X-ray: wherever the plushies nearer the glass hide the claw or its footprint, a ghost still shows.
+  if (infront) {
+    if (marks) drawAimMarks(ctx, marks, 0.45);
+    if (sim.hubY < 40) {
+      ctx.globalAlpha = 0.28;
+      drawClaw(ctx, sim, fx, true);
+      ctx.globalAlpha = 1;
+    }
   }
   for (const b of fx.bits) {
     const p = project(b.x, b.y, b.z);
@@ -487,26 +512,111 @@ function drawDropShadow(ctx: CanvasRenderingContext2D, x: number, y: number, z: 
 function drawClawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, z: number, height: number): void {
   const p = project(x, y, z);
   const h = Math.max(0, height);
-  // Sharper and darker as the claw comes down onto it.
+  // Crisp enough to find from the top of the case; sharper and darker as the claw comes down.
   const k = Math.max(0, Math.min(1, 1 - h / 55));
-  const rx = (CLAW.openR * 0.9 + h * 0.08) * KX * p.s;
-  const ry = rx * 0.42;
-  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rx);
-  g.addColorStop(0, `rgba(0,0,0,${(0.3 + 0.35 * k).toFixed(3)})`);
-  g.addColorStop(0.55, `rgba(0,0,0,${(0.18 + 0.25 * k).toFixed(3)})`);
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(1, ry / rx);
-  ctx.translate(-p.x, -p.y);
-  ctx.fillStyle = g;
+  const rx = (4.5 + h * 0.03) * KX * p.s;
+  const ry = rx * 0.5;
+  ctx.fillStyle = `rgba(8,2,20,${(0.42 + 0.3 * k).toFixed(3)})`;
   ctx.beginPath();
-  ctx.arc(p.x, p.y, rx, 0, Math.PI * 2);
+  ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-  // A tiny centre mark: where the axis lands.
-  ctx.fillStyle = `rgba(0,0,0,${(0.25 + 0.3 * k).toFixed(3)})`;
-  ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
+  ctx.fillStyle = `rgba(8,2,20,${(0.2 + 0.2 * k).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, rx * 1.5, ry * 1.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+interface AimMarks {
+  ring: { x: number; y: number }[];
+  /** The aiming laser: from under the hub down to the spot. */
+  laser: { x0: number; y0: number; x1: number; y1: number };
+  tips: { x: number; y: number; high: boolean }[];
+  centre: { x: number; y: number };
+  alpha: number;
+}
+
+/** The claw's open footprint draped over the pile (null when there's nothing to aim). */
+function aimMarks(sim: ClawSim): AimMarks | null {
+  const aiming = sim.phase === 'aim';
+  const dropping = sim.phase === 'drop';
+  if (!aiming && !dropping) return null;
+  const head = headPos(sim);
+  // Fade out as the real prongs come down onto the spot.
+  const alpha = aiming ? Math.min(1, sim.t * 3) : Math.max(0, Math.min(1, (sim.hubY - contactHeight(sim, head.x, head.z)) / 20));
+  if (alpha <= 0.02) return null;
+  // The footprint, level at the height the claw comes down to (clean to read, unlike a ring draped
+  // over every bump of the pile); the prong marks below sit on their own spots.
+  const ground = Math.max(0, surfaceAt(sim.toys, head.x, head.z) - 1);
+  const ring: { x: number; y: number }[] = [];
+  for (const [cx, cz] of CIRCLE) ring.push(project(head.x + cx * CLAW.openR, ground, head.z + cz * CLAW.openR));
+  const hubStop = surfaceAt(sim.toys, head.x, head.z) - CLAW.sink;
+  const tips = prongTips(head.x, head.z).map(([x, z]) => {
+    const y = surfaceAt(sim.toys, x, z);
+    const stopAt = y - CLAW.tipSink + CLAW.prong;
+    const p = project(x, y, z);
+    return { x: p.x, y: p.y, high: stopAt > hubStop + 0.5 && y > 0.5 };
+  });
+  const c = project(head.x, surfaceAt(sim.toys, head.x, head.z), head.z);
+  const top = project(head.x, sim.hubY - CLAW.prong * 0.4, head.z);
+  return { ring, tips, centre: { x: c.x, y: c.y }, laser: { x0: top.x, y0: top.y, x1: c.x, y1: c.y }, alpha };
+}
+
+const CIRCLE: [number, number][] = (() => {
+  const out: [number, number][] = [];
+  let x = 1;
+  let z = 0;
+  const n = 36;
+  // rotate a unit vector by 10° each step (cos/sin of 10° as constants)
+  const c = 0.984807753;
+  const sn = 0.173648178;
+  for (let i = 0; i < n; i++) {
+    out.push([x, z]);
+    [x, z] = [x * c - z * sn, x * sn + z * c];
+  }
+  return out;
+})();
+
+function drawAimMarks(ctx: CanvasRenderingContext2D, m: AimMarks, alpha: number): void {
+  ctx.globalAlpha = alpha * m.alpha;
+  // The aiming laser (a faint pink line, like a real machine's pointer).
+  ctx.strokeStyle = 'rgba(255,90,200,0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(m.laser.x0, m.laser.y0);
+  ctx.lineTo(m.laser.x1, m.laser.y1);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // The footprint: a ring (a dark casing under a light dashed line, so it reads on any plush).
+  const ring = () => {
+    ctx.beginPath();
+    m.ring.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+  };
+  ctx.lineJoin = 'round';
+  ring();
+  ctx.strokeStyle = 'rgba(12,4,26,0.85)';
+  ctx.lineWidth = 5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+  ring();
+  ctx.strokeStyle = '#ffd9f6';
+  ctx.lineWidth = 2.2;
+  ctx.setLineDash([6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Where each prong tip lands (amber: on another plush — it will stop high and pinch).
+  for (const t of m.tips) {
+    blk(ctx, t.x - 6, t.y - 6, 12, 12, '#140a24');
+    blk(ctx, t.x - 4, t.y - 4, 8, 8, t.high ? '#ffb43f' : '#f4f1ff');
+  }
+  // The claw's axis.
+  const c = m.centre;
+  blk(ctx, c.x - 8, c.y - 2.5, 16, 5, '#140a24');
+  blk(ctx, c.x - 2.5, c.y - 8, 5, 16, '#140a24');
+  blk(ctx, c.x - 6.5, c.y - 1, 13, 2, '#ffffff');
+  blk(ctx, c.x - 1, c.y - 6.5, 2, 13, '#ffffff');
+  ctx.globalAlpha = 1;
 }
 
 function drawChuteWalls(ctx: CanvasRenderingContext2D): void {
@@ -585,94 +695,95 @@ const PRONGS: readonly [number, number][] = [
   [0.8660254, -0.5],
 ];
 
+/** Snapped pixel block (logical units; the canvas scale makes them crisp device pixels). */
+function blk(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string): void {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
+}
+
+/** A chunky pixel line: square blocks stepped along a–b (the claw's parts, in the plushies' language). */
+function pixelLine(
+  ctx: CanvasRenderingContext2D,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  size: number,
+  color: string,
+): void {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / Math.max(1, size * 0.5)));
+  for (let i = 0; i <= n; i++) {
+    const x = a.x + (dx * i) / n;
+    const y = a.y + (dy * i) / n;
+    blk(ctx, x - size / 2, y - size / 2, size, size, color);
+  }
+}
+
+const CHROME = { outline: '#141225', dark: '#6f6a8e', mid: '#c9c3e6', light: '#f4f1ff', back: '#8f88b3' } as const;
+
 function drawClaw(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, ghost = false): void {
   const head = headPos(sim);
   // Trolley on the bridge.
   const tr = project(sim.gx, TOP, sim.gz);
   const hub = project(head.x, sim.hubY, head.z);
   const s = hub.s;
-  ctx.fillStyle = '#1a1830';
-  roundRect(ctx, tr.x - 9 * tr.s, tr.y - 5 * tr.s, 18 * tr.s, 10 * tr.s, 2);
-  ctx.fill();
-  ctx.fillStyle = '#c9c3e6';
-  roundRect(ctx, tr.x - 8 * tr.s, tr.y - 6 * tr.s, 16 * tr.s, 7 * tr.s, 2);
-  ctx.fill();
-  ctx.fillStyle = '#6f6a8e';
-  ctx.fillRect(tr.x - 6 * tr.s, tr.y - 2.5 * tr.s, 12 * tr.s, 1.4 * tr.s);
+  const P = Math.max(2, KX * s * 1.05); // one art pixel, like the plushies'
+  const tp = Math.max(2, KX * tr.s * 1.05);
+  blk(ctx, tr.x - tp * 2.6, tr.y - tp * 1.6, tp * 5.2, tp * 2.8, CHROME.outline);
+  blk(ctx, tr.x - tp * 2.2, tr.y - tp * 1.3, tp * 4.4, tp * 1.2, CHROME.mid);
+  blk(ctx, tr.x - tp * 2.2, tr.y - tp * 0.1, tp * 4.4, tp * 0.9, CHROME.dark);
   // A little motor light: on while the gantry's moving.
   const moving = Math.abs(sim.vx) + Math.abs(sim.vz) > 1 || sim.phase === 'drop' || sim.phase === 'lift';
-  ctx.fillStyle = moving ? '#ff3d6e' : '#5a1a30';
-  ctx.fillRect(tr.x + 4 * tr.s, tr.y - 5 * tr.s, 2 * tr.s, 2 * tr.s);
+  blk(ctx, tr.x + tp * 1.1, tr.y - tp * 1.1, tp * 0.8, tp * 0.8, moving ? '#ff3d6e' : '#5a1a30');
 
   // Cable.
-  ctx.strokeStyle = '#8f88b3';
-  ctx.lineWidth = Math.max(1.4, 2 * s);
-  ctx.beginPath();
-  ctx.moveTo(tr.x, tr.y + 3 * tr.s);
-  ctx.lineTo(hub.x, hub.y - 6.5 * KY * s);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(tr.x - 0.5, tr.y + 3 * tr.s);
-  ctx.lineTo(hub.x - 0.5, hub.y - 6.5 * KY * s);
-  ctx.stroke();
+  const hubW = 8.5 * KX * s;
+  const hubH = 6.5 * KY * s;
+  const cableTop = { x: tr.x, y: tr.y + tp * 1.2 };
+  const cableBot = { x: hub.x, y: hub.y - hubH };
+  pixelLine(ctx, cableTop, cableBot, Math.max(2, P * 0.55), CHROME.outline);
+  pixelLine(ctx, cableTop, cableBot, Math.max(1, P * 0.3), CHROME.back);
 
   const r = CLAW.closedR + (CLAW.openR - CLAW.closedR) * sim.open;
+  // Prong tips that got purchase light up green while it closes and lifts (amber: only a little).
+  const showGrip = !ghost && sim.grip && sim.grip.toy !== null && (sim.phase === 'close' || sim.phase === 'lift' || sim.phase === 'top');
   const prong = (i: number) => {
     const [ux, uz] = PRONGS[i]!;
     const at = (rad: number, dy: number) => project(head.x + ux * rad, sim.hubY + dy, head.z + uz * rad);
-    const base = at(3.2, -1.2);
+    const base = at(3.2, -0.6);
     const knee = at(r * 1.08 + 1.2, -CLAW.prong * 0.45);
     const tip = at(r * 0.92, -CLAW.prong);
-    const hook = at(Math.max(0, r * 0.92 - 2.2), -CLAW.prong + 0.8);
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(base.x, base.y);
-      ctx.lineTo(knee.x, knee.y);
-      ctx.lineTo(tip.x, tip.y);
-      ctx.lineTo(hook.x, hook.y);
-    };
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    path();
-    ctx.strokeStyle = '#1a1830';
-    ctx.lineWidth = 6.2 * s;
-    ctx.stroke();
-    path();
-    ctx.strokeStyle = i === 0 ? '#8f88b3' : '#d7d2ec';
-    ctx.lineWidth = 3.8 * s;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 1.1 * s;
-    ctx.beginPath();
-    ctx.moveTo(base.x - 0.6, base.y);
-    ctx.lineTo(knee.x - 0.6, knee.y);
-    ctx.stroke();
+    const hook = at(Math.max(0, r * 0.92 - 2.4), -CLAW.prong + 1);
+    const body = i === 0 ? CHROME.back : CHROME.mid;
+    // outline, fill, then a highlight down the upper arm
+    pixelLine(ctx, base, knee, P * 1.9, CHROME.outline);
+    pixelLine(ctx, knee, tip, P * 1.9, CHROME.outline);
+    pixelLine(ctx, tip, hook, P * 1.9, CHROME.outline);
+    pixelLine(ctx, base, knee, P, body);
+    pixelLine(ctx, knee, tip, P, body);
+    pixelLine(ctx, tip, hook, P, body);
+    if (i !== 0)
+      pixelLine(ctx, { x: base.x - P * 0.3, y: base.y - P * 0.3 }, { x: knee.x - P * 0.3, y: knee.y - P * 0.3 }, P * 0.45, CHROME.light);
+    const q = sim.grip?.prongs[i] ?? 0;
+    const tipColor = showGrip ? (q > 0.3 ? '#2de38f' : q > 0 ? '#ffb43f' : CHROME.dark) : CHROME.dark;
+    blk(ctx, hook.x - P * 0.8, hook.y - P * 0.8, P * 1.6, P * 1.6, CHROME.outline);
+    blk(ctx, hook.x - P * 0.5, hook.y - P * 0.5, P, P, tipColor);
   };
 
   // Back prong, the prize (tucked up under the hub), the hub, then the front prongs.
   prong(0);
   const held = !ghost && sim.held ? sim.toys.find((t) => t.id === sim.held!.id) : undefined;
   if (held) drawToy(ctx, held, fx, sim);
-  const hubW = 8.5 * KX * s;
-  const hubH = 6.5 * KY * s;
-  ctx.fillStyle = '#1a1830';
-  roundRect(ctx, hub.x - hubW / 2 - 1.5, hub.y - hubH - 1.5, hubW + 3, hubH + 3, 4 * s);
-  ctx.fill();
-  const g = ctx.createLinearGradient(hub.x - hubW / 2, 0, hub.x + hubW / 2, 0);
-  g.addColorStop(0, '#6f6a8e');
-  g.addColorStop(0.3, '#f4f1ff');
-  g.addColorStop(0.55, '#b9b3d6');
-  g.addColorStop(1, '#3a3656');
-  ctx.fillStyle = g;
-  roundRect(ctx, hub.x - hubW / 2, hub.y - hubH, hubW, hubH, 3.5 * s);
-  ctx.fill();
+  const x0 = hub.x - hubW / 2;
+  const y0 = hub.y - hubH;
+  blk(ctx, x0 - P * 0.5, y0 - P * 0.5, hubW + P, hubH + P, CHROME.outline);
+  blk(ctx, x0, y0, hubW, hubH, CHROME.mid);
+  blk(ctx, x0, y0, P, hubH, CHROME.light);
+  blk(ctx, x0 + hubW - P, y0, P, hubH, CHROME.dark);
+  blk(ctx, x0, y0 + hubH - P * 0.8, hubW, P * 0.8, CHROME.dark);
   // A pink band and a little status light.
-  ctx.fillStyle = '#ff4fd8';
-  ctx.fillRect(hub.x - hubW / 2, hub.y - hubH * 0.45, hubW, 2.2 * s);
-  ctx.fillStyle = sim.phase === 'close' || sim.held ? '#2de38f' : '#ffd23f';
-  ctx.fillRect(hub.x - 1.5 * s, hub.y - hubH * 0.82, 3 * s, 3 * s);
+  blk(ctx, x0, y0 + hubH * 0.45, hubW, P * 0.7, '#ff4fd8');
+  blk(ctx, hub.x - P * 0.5, y0 + P * 0.5, P, P, sim.phase === 'close' || sim.held ? '#2de38f' : '#ffd23f');
   prong(1);
   prong(2);
 }
@@ -723,10 +834,4 @@ function drawToy(ctx: CanvasRenderingContext2D, t: ClawToy, fx: RenderFx, sim: C
   }
   ctx.restore();
   void sim;
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, r);
-  else ctx.rect(x, y, w, h);
 }

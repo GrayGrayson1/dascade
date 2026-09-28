@@ -69,6 +69,11 @@ export interface SimKart {
   queue: Array<{ seq: number; packed: number }>;
   lastSeq: number;
   ackSeq: number;
+  /**
+   * Seq of this kart's first input frame applied after the green light (0 before GO). Frames below
+   * it were applied locked (they count toward the start boost); the owner's predictor replays by it.
+   */
+  goSeq: number;
   credit: number;
   starved: number;
   connected: boolean;
@@ -169,6 +174,7 @@ export class KartSim {
       queue: [],
       lastSeq: 0,
       ackSeq: 0,
+      goSeq: 0,
       credit: 0,
       starved: 0,
       connected: true,
@@ -272,6 +278,7 @@ export class KartSim {
     if (this.status !== 'grid') return [];
     this.status = 'racing';
     this.goTick = this.tick;
+    for (const k of this.ordered) k.goSeq = k.ackSeq + 1;
     return [{ type: 'go' }];
   }
 
@@ -497,7 +504,7 @@ export class KartSim {
   encodeOwn(slot: number): Uint8Array | null {
     const k = this.bySlot.get(slot);
     if (!k || k.retired) return null;
-    return encodeOwn(this.raceId, this.tick, k.slot, k.ackSeq, k.state);
+    return encodeOwn(this.raceId, this.tick, k.slot, k.ackSeq, k.state, k.goSeq);
   }
 
   statusCode(): KartStatusCode {

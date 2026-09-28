@@ -5,7 +5,8 @@
  *   const url = await renderRacerPortrait('mochi', 'tub', '#ff4fd8', 256);
  *
  * `view`: 'kart' = the whole kart at a 3/4 angle (default), 'face' = head-and-shoulders close-up.
- * Call `disposePortraitRenderer()` when leaving the game to free the WebGL context.
+ * The WebGL context is created on demand and released automatically ~2.5 s after the last portrait
+ * (cached data URLs stay); `disposePortraitRenderer()` frees it immediately and clears the cache.
  */
 import {
   AmbientLight,
@@ -31,6 +32,28 @@ let scene: Scene | null = null;
 let camera: PerspectiveCamera | null = null;
 const results = new Map<string, Promise<string>>();
 let queue: Promise<unknown> = Promise.resolve();
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+/** The offscreen WebGL context is released this long after the last portrait (results stay cached). */
+const IDLE_RELEASE_MS = 2500;
+
+/** Release the offscreen context (keeps the cached data URLs); it is recreated on the next request. */
+function releaseContext(): void {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  if (!renderer) return;
+  renderer.dispose();
+  renderer.forceContextLoss();
+  renderer = null;
+  scene = null;
+  camera = null;
+}
+
+function scheduleRelease(): void {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(releaseContext, IDLE_RELEASE_MS);
+}
 
 function setup(): { renderer: WebGLRenderer; scene: Scene; camera: PerspectiveCamera } | null {
   if (renderer && scene && camera) return { renderer, scene, camera };
@@ -121,6 +144,7 @@ export function renderRacerPortrait(racer: KartRacerId, body: KartBodyId, paint:
             } catch {
               resolve('');
             }
+            scheduleRelease();
           };
           if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
           else run();
@@ -132,11 +156,11 @@ export function renderRacerPortrait(racer: KartRacerId, body: KartBodyId, paint:
   return p;
 }
 
+/**
+ * Free the offscreen WebGL context now and forget cached portraits. Optional: the context is also
+ * released automatically ~2.5 s after the last portrait, so the lobby never holds a live context.
+ */
 export function disposePortraitRenderer(): void {
-  renderer?.dispose();
-  renderer?.forceContextLoss();
-  renderer = null;
-  scene = null;
-  camera = null;
+  releaseContext();
   results.clear();
 }

@@ -44,3 +44,27 @@ export function addSparkle(m: MeshLambertMaterial, amount = 1, cell = 5): void {
     );
   });
 }
+
+/** Rock strata on steep faces (world-space bands): cliffs, embankments and hillsides read as rock. */
+export function addStrata(m: MeshLambertMaterial, strength = 1): void {
+  chain(m, `strata${strength}`, (sh) => {
+    ensureWorldPos(sh);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vPatchUp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPatchUp = normalize(mat3(modelMatrix) * objectNormal).y;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vPatchUp;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  float steep = 1.0 - smoothstep(0.55, 0.9, abs(vPatchUp));
+  vec3 w = vPatchWPos;
+  float band = fract(w.y * 0.42 + sin(w.x * 0.07) * 0.35 + sin(w.z * 0.05) * 0.35);
+  float strata = mix(0.76, 1.1, smoothstep(0.35, 0.5, band)) * mix(0.9, 1.0, step(0.8, band));
+  float grain = 0.94 + 0.06 * fract(sin(dot(floor(w * 2.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  diffuseColor.rgb *= mix(1.0, strata * grain, steep * ${strength.toFixed(2)});
+}`,
+      );
+  });
+}

@@ -12,6 +12,7 @@
  */
 import type { KartTrackId } from '@dascade/shared/games/kart';
 import { buildTrack, type KartTrack } from './track.ts';
+import type { KartTrackDef } from './trackdef.ts';
 import { KART_TRACK_DEFS } from './tracks/index.ts';
 
 export * from './trackdef.ts';
@@ -30,16 +31,22 @@ export * from './bot.ts';
 export { KART_TRACK_DEFS, KART_PLACEHOLDER_TRACKS } from './tracks/index.ts';
 export { f32, qheading, headingIndex, HEADING_Q } from './math.ts';
 
-const built = new Map<KartTrackId, KartTrack>();
+/**
+ * Process-wide cache of built tracks, shared even if this module is instantiated twice (e.g. two
+ * bundles or import paths in one process): a track is built once per def, never rebuilt.
+ */
+const CACHE_KEY = '__dascadeKartTracks';
+type TrackCache = Map<KartTrackId, { def: KartTrackDef; track: KartTrack }>;
+const built: TrackCache = ((globalThis as Record<string, unknown>)[CACHE_KEY] as TrackCache | undefined) ?? new Map();
+(globalThis as Record<string, unknown>)[CACHE_KEY] = built;
 
-/** Built track for an id (cached; throws KartTrackError for an invalid def). */
+/** Built track for an id (cached process-wide; throws KartTrackError for an invalid def). */
 export function getKartTrack(id: KartTrackId): KartTrack {
-  let t = built.get(id);
-  if (!t) {
-    const def = KART_TRACK_DEFS[id];
-    if (!def) throw new Error(`unknown kart track ${id}`);
-    t = buildTrack(def);
-    built.set(id, t);
-  }
-  return t;
+  const def = KART_TRACK_DEFS[id];
+  if (!def) throw new Error(`unknown kart track ${id}`);
+  const hit = built.get(id);
+  if (hit && hit.def === def) return hit.track;
+  const track = buildTrack(def);
+  built.set(id, { def, track });
+  return track;
 }

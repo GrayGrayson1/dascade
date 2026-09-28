@@ -10,7 +10,8 @@
  *
  * Closing rule: before you drop, closing hands the token back (nothing happened). Once you've dropped,
  * the try plays out — closing just settles it instantly (the same steps, not drawn), so a prize is
- * never lost or counted twice. Unmounting (a route change) does the same.
+ * never lost or counted twice. Unmounting (a route change) does the same. A reload or a closed tab
+ * mid-try rolls the try back (the pile was last saved before it): nothing lost, nothing doubled.
  */
 import {
   useCallback,
@@ -39,6 +40,7 @@ import {
   fastForward,
   insertToken,
   restock,
+  rigSureWin,
   settleFully,
   stepClaw,
   type ClawEvent,
@@ -46,9 +48,10 @@ import {
   type ClawSim,
   type ClawToy,
   type GripReport,
+  type MissCause,
   type ToyKind,
 } from './clawPhysics.ts';
-import { VIEW, ageLife, burstBits, drawClawScene, lifeOf, type RenderFx } from './clawRender.ts';
+import { VIEW, ageLife, burstBits, drawClawScene, invalidateBackdrop, lifeOf, type RenderFx } from './clawRender.ts';
 import './clawCloseup.css';
 
 type Lights = 'idle' | 'aim' | 'tense' | 'win' | 'sad' | 'restock';
@@ -65,6 +68,38 @@ const GRIP_LINE: Record<GripReport['quality'], (name: string) => string> = {
   nudge: (n) => `One prong caught the ${n} — just a shove.`,
   none: () => 'Nothing under the claw.',
 };
+
+/**
+ * Why it missed, on the machine's LED line (and, longer, for screen readers): short enough for a phone,
+ * specific enough to learn from.
+ */
+const CAUSE_LINE: Record<MissCause, { led: string; said: string }> = {
+  nothing: { led: 'MISSED — NOTHING TO GRAB', said: 'Missed — there was nothing under the claw to grab.' },
+  shove: { led: 'ONE PRONG — JUST A SHOVE', said: 'Only one prong caught it — just a shove. Centre the ring on a plush.' },
+  neighbour: {
+    led: 'CAUGHT A NEIGHBOUR',
+    said: 'The prongs came down on its neighbours and never got under it. Pick one with room around it (watch for amber prong marks).',
+  },
+  buried: { led: 'TOO DEEP IN THE PILE', said: 'It was pinned under other plushies. Go for one on top.' },
+  offcentre: { led: 'OFF-CENTRE — NO GRIP', said: 'Grabbed off-centre: it rolled out of the prongs. Line the cross up on its middle.' },
+  weak: { led: 'NO GRIP — WEAK CLAW', said: "The claw was weak this time — it couldn't hold it." },
+  shook: { led: 'SHOOK LOOSE', said: 'It was up, but the motor jolt shook it loose.' },
+  swung: { led: 'SWUNG LOOSE', said: 'It was up, but it swung loose on the way.' },
+  slid: { led: 'SLIPPED — OFF-CENTRE', said: 'It was up, but held off-centre it slid out of the prongs.' },
+  dropped: { led: 'SLIPPED — WEAK CLAW', said: 'It was up, but the claw loosened and dropped it.' },
+  chute: { led: 'SO CLOSE — AT THE CHUTE', said: 'So close — it dropped right by the chute.' },
+};
+
+const GRIP_LED: Record<GripReport['quality'], string> = {
+  great: 'FIRM GRIP!',
+  good: 'GOT IT… HOLD ON…',
+  weak: 'WEAK GRIP…',
+  nudge: 'ONE PRONG…',
+  none: 'NOTHING TO GRAB…',
+};
+
+const LED_IDLE = 'FREE PLAY · PRESS START';
+const LED_AIM = 'RING = WHERE THE PRONGS LAND';
 
 interface Prize {
   key: number;
@@ -104,6 +139,7 @@ export default function ClawCloseup() {
   const goRef = useRef<HTMLButtonElement>(null);
 
   const [sign, setSign] = useState<Sign>(IDLE_SIGN);
+  const [led, setLed] = useState(LED_IDLE);
   const [phase, setPhase] = useState<ClawSim['phase']>('idle');
   const [timer, setTimer] = useState(AIM_TIME);
   const [prize, setPrize] = useState<Prize | null>(null);
@@ -132,6 +168,11 @@ export default function ClawCloseup() {
   const timers = useRef<number[]>([]);
   const signTimer = useRef(0);
   const prizeKey = useRef(0);
+  /** When the token went in (a drop in the same breath — a double click — is ignored). */
+  const tokenAt = useRef(0);
+  /** A pointer press on the big button already acted: skip the click that follows it. */
+  const pointerPressAt = useRef(0);
+  const closeRef = useRef<() => void>(() => undefined);
 
   const later = useCallback((ms: number, fn: () => void) => {
     const t = window.setTimeout(() => {
@@ -152,13 +193,14 @@ export default function ClawCloseup() {
   );
 
   /** Saves the machine (and a prize) to the shared inventory. */
-  const commit = useCallback((won?: ClawToy) => {
+  const commit = useCallback((won?: ClawToy, lost = false) => {
     const sim = simRef.current!;
     useClaw.getState().commit(
       sim.toys.filter((t) => t.mode !== 'chute'),
       sim.misses,
       sim.seed,
       won ? { kind: won.kind, color: won.color } : undefined,
+      lost,
     );
   }, []);
 
@@ -177,6 +219,7 @@ export default function ClawCloseup() {
       clawSound.door();
       later(150, () => clawSound.win());
       setSaid(`You won a ${kindName(toy.kind)} plush! It's on your shelf.`);
+      setLed(`WINNER! A ${kindName(toy.kind).toUpperCase()} FOR YOUR SHELF`);
     },
     [commit, flash, later],
   );
@@ -189,6 +232,7 @@ export default function ClawCloseup() {
     useClaw.getState().restocked(sim.toys, sim.seed);
     clawSound.restock();
     flash({ word: 'RESTOCKED!', lights: 'restock' }, 2200);
+    setLed('FRESH PLUSHIES!');
     setSaid('The attendant restocked the machine with fresh plushies.');
   }, [flash]);
 
@@ -201,6 +245,7 @@ export default function ClawCloseup() {
         switch (e.type) {
           case 'token':
             if (live) clawSound.token();
+            setLed(LED_AIM);
             flash({ word: 'GO!', lights: 'aim' }, 1100, () => ({ word: 'AIM', lights: 'aim' }));
             setSaid(
               `Token in — free play. Move the claw with the arrow keys or the joystick, drop it with Space or the big button. ${AIM_TIME} seconds.`,
@@ -217,6 +262,7 @@ export default function ClawCloseup() {
             if (live) clawSound.press();
             window.clearTimeout(signTimer.current);
             setSign({ word: e.auto ? "TIME'S UP" : 'DROP!', lights: 'tense' });
+            setLed('GOOD LUCK…');
             setSaid(e.auto ? "Time's up — the claw drops." : 'Claw dropped.');
             break;
           case 'touch':
@@ -228,6 +274,7 @@ export default function ClawCloseup() {
           case 'grip': {
             const t = e.report.toy !== null ? sim.toys.find((x) => x.id === e.report.toy) : undefined;
             setSaid(GRIP_LINE[e.report.quality](t ? kindName(t.kind) : 'plush'));
+            setLed(GRIP_LED[e.report.quality]);
             if (t && e.report.quality === 'nudge') lifeOf(fx, t.id).wobble = 1;
             break;
           }
@@ -248,6 +295,9 @@ export default function ClawCloseup() {
             } else setSaid('It slid out of the prongs.');
             break;
           }
+          case 'jostle':
+            for (const id of e.toys) lifeOf(fx, id).wobble = Math.max(lifeOf(fx, id).wobble, 0.7);
+            break;
           case 'land': {
             if (live) clawSound.thud(e.hard);
             const l = lifeOf(fx, e.toy);
@@ -281,19 +331,12 @@ export default function ClawCloseup() {
           case 'done': {
             const sim = simRef.current!;
             if (e.result !== 'win') {
-              commit();
+              commit(undefined, true);
               if (live) (e.result === 'slip' ? clawSound.sad : clawSound.buzz)();
               flash(e.result === 'slip' ? { word: 'SO CLOSE', lights: 'sad' } : { word: 'TRY AGAIN', lights: 'sad' }, 2600);
-              const q = sim.grip?.toy != null ? sim.grip.quality : 'none';
-              setSaid(
-                e.result === 'slip'
-                  ? 'So close — it slipped out of the claw. Press the button to play again.'
-                  : q === 'none'
-                    ? 'Missed — the claw came up empty. Press the button to play again.'
-                    : q === 'nudge'
-                      ? 'Just a shove — the claw came up empty. Press the button to play again.'
-                      : "It wouldn't come up — the claw couldn't hold it. Press the button to play again.",
-              );
+              const line = CAUSE_LINE[e.cause ?? 'nothing'];
+              setLed(line.led);
+              setSaid(`${e.result === 'slip' ? 'So close. ' : 'Missed. '}${line.said} Press the button to play again.`);
             } else commit();
             later(1600, () => {
               fx.light = 1;
@@ -328,7 +371,10 @@ export default function ClawCloseup() {
     const events = fastForward(sim);
     for (const e of events)
       if (e.type === 'win') useClaw.getState().commit(sim.toys, sim.misses, sim.seed, { kind: e.toy.kind, color: e.toy.color });
-    commit();
+    commit(
+      undefined,
+      events.some((e) => e.type === 'done' && e.result !== 'win'),
+    );
   }, [commit]);
 
   // ---- primary action: the big button / Space / Enter / pad A ----
@@ -341,8 +387,11 @@ export default function ClawCloseup() {
         return;
       }
       const events: ClawEvent[] = [];
-      if (insertToken(sim, events)) handle(events, true);
-    } else if (sim.phase === 'aim') input.current.drop = true;
+      if (insertToken(sim, events)) {
+        tokenAt.current = performance.now();
+        handle(events, true);
+      }
+    } else if (sim.phase === 'aim' && performance.now() - tokenAt.current > 350) input.current.drop = true;
   }, [doRestock, handle]);
 
   // ---- open: show the dialog, restock if due, zoom out of the machine that opened it ----
@@ -417,6 +466,8 @@ export default function ClawCloseup() {
     anim.oncancel = done;
   }, [closing, settleNow]);
 
+  closeRef.current = close;
+
   // ---- the loop: fixed-step physics, draw, motor, knob ----
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -433,14 +484,18 @@ export default function ClawCloseup() {
     let shownTimer = Math.ceil(sim.timer);
     let lastDir = '';
     let cable = 0;
-    let padWasA = false;
+    let padWasA = true; // a button already held when it opened doesn't count
+    let padWasB = true;
     const root = dialogRef.current;
 
+    // The backing store follows the canvas's LAYOUT size (clientWidth — not getBoundingClientRect, which
+    // includes the open zoom's scale transform) × the device pixel ratio (capped).
     const resize = () => {
-      const r = canvas.getBoundingClientRect();
+      const cssW = canvas.clientWidth;
+      if (cssW <= 0) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const w = Math.max(1, Math.round(r.width * dpr));
-      const h = Math.max(1, Math.round((r.width * dpr * VIEW.h) / VIEW.w));
+      const w = Math.max(1, Math.round(cssW * dpr));
+      const h = Math.max(1, Math.round((cssW * dpr * VIEW.h) / VIEW.w));
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -450,6 +505,9 @@ export default function ClawCloseup() {
     resize();
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
     ro?.observe(canvas);
+    window.addEventListener('resize', resize);
+    // The wall sign is baked into a cached backdrop: redraw it once the pixel font is in.
+    void document.fonts?.ready.then(() => invalidateBackdrop());
 
     const readInput = (): ClawInput => {
       const inp = input.current;
@@ -479,6 +537,10 @@ export default function ClawCloseup() {
       const a = !!pad.buttons[0]?.pressed;
       if (a && !padWasA) primary();
       padWasA = a;
+      // B / Circle (or Start) leaves.
+      const b = !!pad.buttons[1]?.pressed || !!pad.buttons[9]?.pressed;
+      if (b && !padWasB) closeRef.current();
+      padWasB = b;
     };
 
     const frame = (now: number) => {
@@ -560,14 +622,21 @@ export default function ClawCloseup() {
     const onBlur = () => {
       input.current.keys.clear();
       input.current.stick = [0, 0];
+      // A hidden tab stops the frame loop: silence the motor and release the jukebox dip now (the next
+      // visible frame turns them back on if anything's still moving).
+      if (document.visibilityState !== 'visible') motor.current?.silence();
     };
+    const onHide = () => motor.current?.silence();
     window.addEventListener('blur', onBlur);
     document.addEventListener('visibilitychange', onBlur);
+    window.addEventListener('pagehide', onHide);
     return () => {
       cancelAnimationFrame(raf);
       ro?.disconnect();
+      window.removeEventListener('resize', resize);
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onBlur);
+      window.removeEventListener('pagehide', onHide);
       motor.current?.stop();
       motor.current = null;
     };
@@ -584,8 +653,9 @@ export default function ClawCloseup() {
     };
   }, [settleNow]);
 
-  // ---- test hook (harmless: this machine is local and cosmetic) ----
+  // ---- test hook: only with ?clawSeed= (tests); harmless anyway (this machine is local and cosmetic) ----
   useEffect(() => {
+    if (urlClawSeed() === null) return;
     const w = window as unknown as { __dascadeClaw?: unknown };
     w.__dascadeClaw = {
       state: () => {
@@ -597,17 +667,8 @@ export default function ClawCloseup() {
         const t = exposedToy(simRef.current!);
         return t ? { x: t.x, z: t.z, kind: t.kind } : null;
       },
-      /** Lines the claw up over the most exposed plush and makes the coil strong: a sure win. */
-      rig: () => {
-        const s = simRef.current!;
-        const best = exposedToy(s);
-        if (!best) return false;
-        s.strengthScale = 6;
-        s.gx = Math.max(GANTRY.minX, Math.min(GANTRY.maxX, best.x));
-        s.gz = Math.max(GANTRY.minZ, Math.min(GANTRY.maxZ, best.z));
-        s.vx = s.vz = s.sx = s.sz = s.svx = s.svz = 0;
-        return true;
-      },
+      /** A guaranteed win: dead over the best grip, with an absurdly strong coil (aiming only). */
+      rig: () => rigSureWin(simRef.current!),
     };
     return () => {
       delete w.__dascadeClaw;
@@ -623,14 +684,17 @@ export default function ClawCloseup() {
       return;
     }
     if (e.key === ' ' || e.key === 'Enter') {
+      // Held keys auto-repeat: never let one press insert the token AND drop (a fresh press drops).
+      if (e.repeat) {
+        e.preventDefault();
+        return;
+      }
       const t = e.target as HTMLElement;
       // A focused button handles its own activation (the big one is `primary` too).
       if (t.closest('button')) return;
       e.preventDefault();
-      if (!e.repeat) {
-        pressFlash();
-        primary();
-      }
+      pressFlash();
+      primary();
     }
   };
   const onKeyUp = (e: React.KeyboardEvent) => {
@@ -670,16 +734,19 @@ export default function ClawCloseup() {
         useClaw.getState().closeCloseup();
         if (op?.el?.isConnected) op.el.focus({ preventScroll: true });
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) close();
-      }}
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
     >
       <h2 id={titleId} className="visually-hidden">
         Claw machine
       </h2>
-      <div className="clwx__stage">
+      {/* A click on the room around the machine (not on it) leaves. */}
+      <div
+        className="clwx__stage"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) close();
+        }}
+      >
         <div ref={machineRef} className="clwx__machine" data-lights={sign.lights}>
           {/* marquee */}
           <div className="clwx__marquee" data-area="marquee">
@@ -692,6 +759,11 @@ export default function ClawCloseup() {
                 {timerShown !== null ? `0:${String(timerShown).padStart(2, '0')}` : 'FREE'}
               </span>
             </div>
+          </div>
+
+          {/* the LED line: what to do, and why a try missed */}
+          <div className="clwx__led" data-area="led" data-part="claw-led">
+            <span className="clwx__led-text">{led}</span>
           </div>
 
           {/* the glass case */}
@@ -731,7 +803,18 @@ export default function ClawCloseup() {
               data-part="claw-go"
               aria-label={goLabel}
               aria-disabled={mode === 'busy' || undefined}
-              onClick={() => primary()}
+              // Pressed on pointer-down, so a second thumb works while the first holds the joystick (a
+              // non-primary touch never gets a click); the click after a pointer press is skipped, and
+              // keyboard clicks (detail 0) still act.
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                pointerPressAt.current = performance.now();
+                primary();
+              }}
+              onClick={(e) => {
+                if (e.detail !== 0 && performance.now() - pointerPressAt.current < 1500) return;
+                primary();
+              }}
             >
               <span className="clwx__go-cap">
                 <span className="clwx__go-label" aria-hidden>

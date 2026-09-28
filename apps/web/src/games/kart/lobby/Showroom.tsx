@@ -212,6 +212,8 @@ async function createShowroom(canvas: HTMLCanvasElement, reduced: boolean, fx: s
       hubMat?.dispose();
       // Kart geometry is cached by the art module (shared with the race): never disposed here.
       renderer.dispose();
+      // Release the GPU context now (browsers cap live contexts; GC may take a long time).
+      renderer.forceContextLoss();
     },
   };
 }
@@ -220,6 +222,9 @@ export function Showroom({ racer, body, paint, label }: ShowroomProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const live = useRef<Live | null>(null);
   const [failed, setFailed] = useState(false);
+  // A WebGL context can fail to start while the GPU process is busy (another tab, a context being
+  // released): retry once on a fresh canvas before falling back to the static portrait.
+  const [attempt, setAttempt] = useState(0);
   const reduced = useApp((s) => s.settings.reducedMotion);
   const fx = useApp((s) => s.settings.fx);
   const init = useRef({ racer, body, paint, reduced, fx });
@@ -236,7 +241,8 @@ export function Showroom({ racer, body, paint, label }: ShowroomProps) {
           return;
         }
         if (!l) {
-          setFailed(true);
+          if (attempt === 0) setTimeout(() => alive && setAttempt(1), 500);
+          else setFailed(true);
           return;
         }
         live.current = l;
@@ -249,7 +255,7 @@ export function Showroom({ racer, body, paint, label }: ShowroomProps) {
       live.current?.dispose();
       live.current = null;
     };
-  }, []);
+  }, [attempt]);
 
   useEffect(() => {
     live.current?.setKart(racer, body, paint);
@@ -261,7 +267,7 @@ export function Showroom({ racer, body, paint, label }: ShowroomProps) {
 
   return (
     <div className="kp-setup__stage" role="img" aria-label={label}>
-      {failed ? <Portrait racer={racer} body={body} paint={paint} size={220} /> : <canvas ref={ref} aria-hidden />}
+      {failed ? <Portrait racer={racer} body={body} paint={paint} size={220} /> : <canvas key={attempt} ref={ref} aria-hidden />}
     </div>
   );
 }

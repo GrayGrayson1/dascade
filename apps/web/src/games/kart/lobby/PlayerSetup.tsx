@@ -16,7 +16,7 @@ import {
   type KartPublicState,
   type KartRacerStats,
 } from '@dascade/shared/games/kart';
-import { Button, ColorSwatches, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
+import { Button, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
 import { useRoomSelector } from '../../../net/hooks.ts';
 import { session, useSessionStore } from '../../../net/session.ts';
 import { sfx } from '../../../audio/audio.ts';
@@ -48,6 +48,57 @@ export function StatBars({ stats, compact = false }: { stats: KartRacerStats; co
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Spoken names for the quick paints (screen readers otherwise read "hash two two d three…"). */
+const PAINT_NAMES: Record<string, string> = {
+  '#22d3ee': 'Cyan',
+  '#f97316': 'Orange',
+  '#ff4fd8': 'Pink',
+  '#ffd23f': 'Yellow',
+  '#2de38f': 'Green',
+  '#a78bfa': 'Lavender',
+  '#ff5a5f': 'Red',
+  '#60a5fa': 'Blue',
+  '#a3e635': 'Lime',
+  '#f8fafc': 'White',
+  '#1f2937': 'Charcoal',
+  '#fbbf24': 'Gold',
+};
+
+function paintName(hex: string): string | undefined {
+  return PAINT_NAMES[hex.toLowerCase()];
+}
+
+/**
+ * Paint picker: named swatches (roving radio group, 44 px targets). The selected swatch shows a
+ * check and a white ring; keyboard focus adds the standard gold offset ring on top, so the two
+ * never look alike.
+ */
+function PaintSwatches({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const selected = value.toLowerCase();
+  const anySelected = KART_PAINTS.some((c) => c === selected);
+  return (
+    <div className="kp-swatches" role="radiogroup" aria-label="Kart paint" onKeyDown={(e) => handleRovingKeys(e, 'radio')}>
+      {KART_PAINTS.map((c, i) => {
+        const on = c === selected;
+        return (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            aria-label={PAINT_NAMES[c] ?? c}
+            title={PAINT_NAMES[c] ?? c}
+            tabIndex={rovingTabIndex(on, i, anySelected)}
+            className={cx('kp-swatch', on && 'is-on')}
+            style={{ '--kp-swatch': c } as CSSProperties}
+            onClick={() => onChange(c)}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -202,17 +253,12 @@ export function PlayerSetup() {
         <div className="dc-field">
           <span className="dc-field__label">Paint</span>
           <div className="kp-paint">
-            <ColorSwatches
-              colors={KART_PAINTS}
-              value={cur.paint}
-              onChange={(paint) => (sfx('click'), commit({ ...cur, paint }))}
-              label="Kart paint"
-            />
-            <label className="kp-paint__custom" title="Custom paint">
+            <PaintSwatches value={cur.paint} onChange={(paint) => (sfx('click'), commit({ ...cur, paint }))} />
+            <label className={cx('kp-paint__custom', !paintName(cur.paint) && 'is-on')} title="Custom paint">
               <input
                 type="color"
                 value={cur.paint}
-                aria-label="Custom paint colour"
+                aria-label={paintName(cur.paint) ? 'Custom paint colour' : `Custom paint colour (selected, ${cur.paint})`}
                 onChange={(e) => commit({ ...cur, paint: e.currentTarget.value })}
               />
             </label>

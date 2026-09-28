@@ -25,7 +25,11 @@ export const config = {
     /** Server-only secret key (sb_secret_...). Never sent to browsers. */
     secretKey: process.env.SUPABASE_SECRET_KEY ?? '',
   },
-  /** Max inbound WebSocket frame size. */
+  /**
+   * Max inbound WebSocket frame size. Legitimate messages need ~200 KB: a custom trivia pack upload
+   * (up to 200,000 JSON characters) and quest saves (120,000-character blobs). Oversized *structures*
+   * are refused cheaply per handler by BaseGameRoom.handle()'s node guard (`maxNodes`).
+   */
   maxPayloadBytes: 256 * 1024,
   /** Max JSON body for HTTP matchmaking (create/join options incl. initial settings). */
   maxMatchmakeBodyBytes: 128 * 1024,

@@ -15,6 +15,7 @@ import {
   DASKETCH_MSG,
   DEFAULT_DASKETCH_SETTINGS,
   DasketchSettingsSchema,
+  SKETCH_LIMITS,
   SketchChooseSchema,
   SketchDrawSchema,
   SketchSyncSchema,
@@ -121,10 +122,13 @@ export class DasketchRoom extends BaseGameRoom<DasketchState, DasketchSettings> 
       playersOnly: true,
       rate: RATE.stream,
       silent: true,
+      // The draw budget's maximum: 3 + 6 per event (24) + the points of the whole message (2 × 600) = 1,347.
+      maxNodes: SKETCH_LIMITS.pointsPerMessage * 2 + SKETCH_LIMITS.eventsPerMessage * 8,
     });
     this.handle(DASKETCH_MSG.sync, SketchSyncSchema, (p) => this.sendCanvas(p), {
       rate: { burst: 4, perSecond: 0.5 },
       silent: true,
+      maxNodes: 4,
     });
     this.handle(DASKETCH_MSG.words, SketchWordsSchema, (p, { words }) => this.setCustomWords(p, words), {
       hostOnly: true,

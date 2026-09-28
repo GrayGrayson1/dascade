@@ -10,14 +10,15 @@ import { useApp } from '../../app/store.ts';
 import { useRoomSelector } from '../../net/hooks.ts';
 import { KartController } from './race/controller.ts';
 import { createFlatView } from './race/flatView.ts';
+import { recommendedKartQuality } from './render/quality.ts';
 import { Hud } from './hud/Hud.tsx';
 import { TouchControls } from './hud/TouchControls.tsx';
 import { NetDebug } from './hud/NetDebug.tsx';
+import { PauseMenu } from './hud/PauseMenu.tsx';
 import { TrackThumb } from './lobby/TrackThumb.tsx';
 import { BIOME_LABEL, trackBiome } from './trackInfo.ts';
 import { Results } from './results/Results.tsx';
 import { GpIntermission } from './results/GpIntermission.tsx';
-import type { KartQuality } from './render/types.ts';
 import type { KartRenderer } from './render/renderer.ts';
 import type { FlatView } from './race/flatView.ts';
 
@@ -32,15 +33,6 @@ declare global {
 }
 
 const STEPS = ['Loading the garage', 'Building the track', 'Painting the world', 'Warming up engines'] as const;
-
-function defaultQuality(): KartQuality {
-  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  const small = Math.min(window.innerWidth, window.innerHeight) < 560;
-  const mem = (navigator as { deviceMemory?: number }).deviceMemory ?? 8;
-  if (coarse && (small || mem <= 4)) return 'low';
-  if (coarse || mem <= 4) return 'medium';
-  return 'high';
-}
 
 export function RaceStage() {
   const phase = useRoomSelector((s: KartPublicState) => s.phase);
@@ -103,7 +95,7 @@ export function RaceStage() {
         const q = quality.current;
         renderer = mod.createKartRenderer(canvas, {
           track,
-          quality: defaultQuality(),
+          quality: recommendedKartQuality(),
           reducedMotion: q.reducedMotion,
           fx: q.fx,
           autoQuality: true,
@@ -188,6 +180,7 @@ export function RaceStage() {
       {ui.touch && !ui.spectating && !ui.finished && !dimmed ? (
         <TouchControls sampler={ctrl.sampler} bridge={ctrl.hud} itemsOn={ui.items} locked={ui.locked} />
       ) : null}
+      <PauseMenu ctrl={ctrl} />
       {phase === 'RESULTS' ? <Results ctrl={ctrl} /> : null}
       {phase === 'INTERMISSION' ? <GpIntermission /> : null}
       {ui.netDebug ? <NetDebug ctrl={ctrl} renderer={rendererRef.current} /> : null}

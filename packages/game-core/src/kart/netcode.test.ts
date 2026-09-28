@@ -7,6 +7,7 @@ import { KartPredictor } from './predictor.ts';
 import { KartSim } from './sim.ts';
 import { decodeKartOwn, decodeKartSnapshot, KartFlag, OWN_BYTES, SNAP_HEADER, SNAP_KART, encodeOwn } from './snapshot.ts';
 import { racerSpec } from './spec.ts';
+import { giveItem } from './items.ts';
 
 describe('snapshot', () => {
   const race = (n: number, ticks: number) => {
@@ -67,6 +68,32 @@ describe('snapshot', () => {
       expect(own.state).toEqual(k.state);
     }
     expect(sim.encodeOwn(29)).toBeNull();
+  });
+
+  it('authoritative state is always exactly on the wire grid (items, magnets, bumps, hits)', () => {
+    const sim = new KartSim(
+      getKartTrack('pixel-plaza'),
+      { laps: 3, items: true, finishWindowMs: 20000, maxRaceMs: 600000 },
+      createSeededRng(21),
+      5,
+    );
+    for (let i = 0; i < 8; i++) sim.addRacer(i, 'b' + i, KART_RACER_IDS[i]!, 'hard');
+    sim.startCountdown(30);
+    let magnetTicks = 0;
+    let checked = 0;
+    for (let t = 0; t < 60 * 60; t++) {
+      // Hand out magnets so the tug path is exercised every race.
+      if (t % 600 === 300) for (const k of sim.karts) if (k.position > 1 && k.state.item === 0) giveItem(k.state, 'magnet');
+      sim.step();
+      for (const k of sim.karts) {
+        if (k.state.magnetTicks > 0) magnetTicks++;
+        const own = decodeKartOwn(sim.encodeOwn(k.slot)!)!;
+        expect(own.state).toEqual(k.state);
+        checked++;
+      }
+    }
+    expect(magnetTicks).toBeGreaterThan(300);
+    expect(checked).toBeGreaterThan(20000);
   });
 
   it('rejects malformed input', () => {
@@ -161,6 +188,48 @@ describe('client prediction', () => {
     pred.reconcile(own.state, own.ack, own.tick, true);
     expect(pred.pending).toHaveLength(0);
     expect(pred.state).toEqual(k.state);
+  });
+
+  it('start boost / stall: the prediction agrees with the server at 0, 100 and 200 ms', () => {
+    const track = getKartTrack('pixel-plaza');
+    const outcomes: string[] = [];
+    for (const lag of [0, 6, 12]) {
+      // `hold`: frames of throttle before the kart's own first unlocked frame (0 = gas at GO).
+      for (const hold of [0, 2, 3, 10, 30, 55, 60, 61, 90, 239]) {
+        const sim = new KartSim(track, { laps: 1, items: false, finishWindowMs: 1000, maxRaceMs: 60_000 }, createSeededRng(1), 3);
+        sim.addRacer(0, 'me', 'nova');
+        const pred = new KartPredictor(track, racerSpec('nova'));
+        sim.startCountdown(240);
+        const toServer: Array<{ at: number; seq: number; packed: number[] }> = [];
+        const toClient: Array<{ at: number; bytes: Uint8Array }> = [];
+        let predicted = 'none';
+        let server = 'none';
+        for (let t = 0; t < 420; t++) {
+          const locked = pred.nextFrameLocked(sim.goTick);
+          const throttle = pred.framesToGo(sim.goTick) <= hold ? 1 : 0;
+          const f = pred.step({ ...NEUTRAL_KART_INPUT, throttle }, locked, sim.tick + 1 + lag);
+          if (pred.info && pred.info.startBoost !== 'none' && predicted === 'none') predicted = pred.info.startBoost;
+          toServer.push({ at: t + lag, seq: f.seq, packed: [f.packed] });
+          while (toServer.length && toServer[0]!.at <= t) {
+            const p = toServer.shift()!;
+            sim.pushInputs(0, p.seq, p.packed);
+          }
+          sim.step();
+          const k = sim.kart(0)!;
+          if (k.info.startBoost !== 'none' && server === 'none') server = k.info.startBoost;
+          toClient.push({ at: t + lag, bytes: sim.encodeOwn(0)! });
+          while (toClient.length && toClient[0]!.at <= t) {
+            const own = decodeKartOwn(toClient.shift()!.bytes)!;
+            pred.reconcile(own.state, own.ack, own.tick, sim.status === 'racing', own.goSeq);
+          }
+        }
+        outcomes.push(`${lag}/${hold}:${server}`);
+        expect(predicted, `lag ${lag} ticks, hold ${hold}: server ${server}`).toBe(server);
+        const want = hold >= 3 && hold <= 60 ? 'boost' : hold > 60 ? 'stall' : 'none';
+        expect(server, `lag ${lag}, hold ${hold}`).toBe(want);
+      }
+    }
+    expect(outcomes.length).toBe(30);
   });
 
   it('frames before the first reconcile are numbered and replayed; reset clears', () => {

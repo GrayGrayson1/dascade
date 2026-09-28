@@ -1,5 +1,5 @@
 /** Pure ordering helpers for results, podiums and Grand Prix standings (unit tested). */
-import type { KartGpEntryView, KartRacerView } from '@dascade/shared/games/kart';
+import { KART_RACERS, type KartGpEntryView, type KartRacerId, type KartRacerView } from '@dascade/shared/games/kart';
 
 export interface RacerRow {
   id: string;
@@ -96,4 +96,11 @@ export function medalFor(bestLapMs: number, parLapMs: number): Medal {
   if (bestLapMs <= parLapMs * 1.07) return 'silver';
   if (bestLapMs <= parLapMs * 1.16) return 'bronze';
   return null;
+}
+
+/** Second line under a racer's name: the racer they drive, "CPU" for bots (never the name twice). */
+export function racerSubtitle(name: string, racer: KartRacerId, bot: boolean): string {
+  const racerName = KART_RACERS[racer]?.name ?? racer;
+  if (bot) return racerName === name ? 'CPU' : `CPU · ${racerName}`;
+  return racerName;
 }

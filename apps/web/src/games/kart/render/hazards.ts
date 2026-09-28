@@ -14,13 +14,15 @@ import {
   type Texture,
   Vector3,
 } from 'three';
-import { hazardPose, pointAtS, type HazardPose, type KartTrack } from '@dascade/game-core/kart';
+import { hazardPose, pointAtS, type HazardKind, type HazardPose, type KartTrack } from '@dascade/game-core/kart';
 import { MeshBuilder } from '../art/builder.ts';
 import { shadeInt } from '../art/palette.ts';
 import type { BiomeStyle } from './biomes.ts';
 
 export interface HazardView {
   group: Group;
+  kind: HazardKind;
+  radius: number;
   update(tick: number, t: number, reducedMotion: boolean): HazardPose;
   /** True on the frame a stomper lands (for dust fx). */
   landed: boolean;
@@ -72,6 +74,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         toThree(base, group);
         view = {
           group,
+          kind: h.kind,
+          radius: r,
           landed: false,
           update(tick, t, rm) {
             const p = hazardPose(track, h.index, tick);
@@ -115,6 +119,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         let wasActive = false;
         view = {
           group,
+          kind: h.kind,
+          radius: r,
           landed: false,
           update(tick) {
             const p = hazardPose(track, h.index, tick);
@@ -136,9 +142,47 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         const harbor = biome.id === 'harbor';
         const obj = geo(`sweeper:${biome.id}`, (b) => {
           if (harbor) {
-            b.box(0, 0, 0, 2.6, 2.2, 2.2, 0x2563eb);
-            for (let k = -2; k <= 2; k++) b.box(k * 0.5, 0, 1.11, 0.1, 2, 0.04, 0x1e40af);
-            b.box(0, 1.2, 0, 2.7, 0.2, 2.3, 0xffd23f);
+            // a shipping container slung under a crane spreader: ribs, doors, corner castings, a hazard
+            // band, four chains to a hook block and a flashing beacon (long axis along the road)
+            const C = 0x2563eb;
+            const CD = 0x1d4ed8;
+            const RIB = 0x1e3a8a;
+            b.box(0, 0, 0, 2.6, 2.0, 2.0, C);
+            for (let k = -5; k <= 5; k++) {
+              const x = k * 0.23;
+              b.box(x, 0.05, 1.01, 0.09, 1.7, 0.04, RIB).box(x, 0.05, -1.01, 0.09, 1.7, 0.04, RIB);
+            }
+            for (let k = -4; k <= 4; k++) b.box(k * 0.28, 1.01, 0, 0.1, 0.04, 1.9, CD);
+            // door end (+X) with leaves, locking bars and handles; plain ribbed end (−X)
+            b.box(1.31, 0, 0, 0.03, 1.9, 1.9, CD);
+            b.box(1.325, 0, 0, 0.02, 1.9, 0.04, 0x0f1f4a);
+            for (const z of [-0.7, -0.25, 0.25, 0.7]) {
+              b.box(1.34, 0, z, 0.03, 1.85, 0.05, 0xc0c7d2);
+              b.box(1.36, -0.2, z, 0.04, 0.05, 0.14, 0xc0c7d2);
+            }
+            for (let k = -3; k <= 3; k++) b.box(-1.31, 0, k * 0.26, 0.03, 1.7, 0.08, RIB);
+            // corner castings
+            for (const x of [-1.27, 1.27]) for (const y of [-0.96, 0.96]) for (const z of [-0.97, 0.97]) b.box(x, y, z, 0.14, 0.14, 0.14, 0x1c1f2b);
+            // hazard band around the base (black / yellow blocks)
+            for (let k = 0; k < 10; k++) {
+              const x = -1.17 + k * 0.26;
+              const col = k % 2 ? 0x1b1b22 : 0xffd23f;
+              b.box(x, -0.78, 1.04, 0.26, 0.26, 0.03, col).box(x, -0.78, -1.04, 0.26, 0.26, 0.03, col);
+            }
+            // …and on both ends (the view you approach it from)
+            for (let k = 0; k < 7; k++) {
+              const z = -0.78 + k * 0.26;
+              const col = k % 2 ? 0x1b1b22 : 0xffd23f;
+              b.box(1.38, -0.78, z, 0.03, 0.26, 0.26, col).box(-1.34, -0.78, z, 0.03, 0.26, 0.26, col);
+            }
+            // spreader frame, chains, hook block, beacon
+            b.box(0, 1.28, 0, 2.7, 0.16, 0.34, 0xffd23f);
+            b.box(-1.2, 1.28, 0, 0.3, 0.16, 2.0, 0xffd23f).box(1.2, 1.28, 0, 0.3, 0.16, 2.0, 0xffd23f);
+            for (const x of [-1.2, 1.2]) for (const z of [-0.9, 0.9]) b.strut(x, 1.36, z, x * 0.06, 2.0, z * 0.06, 0.04, 0x2a2d3a);
+            b.box(0, 2.18, 0, 0.36, 0.4, 0.3, 0xffd23f);
+            b.box(0, 2.18, 0.16, 0.37, 0.2, 0.02, 0x1b1b22);
+            b.torus(0, 1.94, 0, 0.14, 0.035, 0xc0c7d2, 4, 12, 0, 'z');
+            b.ball(0.15, 2.44, 0, 0.08, 0xff8a1f, 1, 1);
           } else {
             b.ball(0, 0, 0, 1.1, 0x2a2d3a, 2);
             b.torus(0, 0, 0, 1.12, 0.1, 0xffd23f, 3, 20, 0.6, 'y');
@@ -151,7 +195,10 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         });
         const cable = geo('cable', (b) => b.box(0, -0.5, 0, 0.08, 1, 0.08, 0x1c1f2b));
         const m = new Mesh(obj, voxel);
-        m.scale.setScalar(r / 1.3);
+        const loadScale = r / 1.3;
+        m.scale.setScalar(loadScale);
+        // hook top (model 2.4 above the load centre for the container; the ball's cap at 1.4)
+        const hookTop = (harbor ? 2.4 : 1.4) * loadScale;
         const top = new Mesh(beam, voxel);
         const c = new Mesh(cable, voxel);
         const sh = new Mesh(plane, shadowMat);
@@ -163,6 +210,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         const pz = c0.z + pivotH;
         top.position.set(px, pz, -py);
         top.rotation.y = Math.atan2(c0.ty, c0.tx);
+        m.rotation.order = 'YXZ';
+        m.rotation.y = Math.atan2(c0.ty, c0.tx);
         c.position.set(px, pz, -py);
         // a proper gantry: legs outside the road edges, a girder across at pivot height
         const reach = Math.max(c0.hwL, c0.hwR) + track.shoulder + 3.2;
@@ -187,11 +236,17 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         const down = new Vector3(0, -1, 0);
         view = {
           group,
+          kind: h.kind,
+          radius: r,
           landed: false,
           update(tick) {
             const p = hazardPose(track, h.index, tick);
-            m.position.set(p.x, p.z + 1.4, -p.y);
-            dir.set(p.x - px, p.z + 2.4 - pz, -p.y + py);
+            // hang the load so its bottom clears the road by ~0.3 u (it hits karts' bodies, not the ground)
+            const cy = p.z + 1.0 * loadScale + 0.3;
+            m.position.set(p.x, cy, -p.y);
+            // swing tilt: lean the load a little with the swing's lateral speed
+            m.rotation.x = Math.sin(p.phase * Math.PI * 2 + Math.PI / 2) * 0.12;
+            dir.set(p.x - px, cy + hookTop - pz, -p.y + py);
             const len = dir.length();
             c.quaternion.setFromUnitVectors(down, dir.multiplyScalar(1 / Math.max(1e-4, len)));
             c.scale.set(1, len, 1);
@@ -223,6 +278,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         let roll = 0;
         view = {
           group,
+          kind: h.kind,
+          radius: r,
           landed: false,
           update(tick, _t, _rm) {
             const p = hazardPose(track, h.index, tick);
@@ -265,6 +322,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         beam.scale.set(1, 1, hw * 2 + 0.8);
         view = {
           group,
+          kind: h.kind,
+          radius: r,
           landed: false,
           update(tick, _t, rm) {
             const p = hazardPose(track, h.index, tick);
@@ -282,6 +341,8 @@ export function buildHazards(track: KartTrack, biome: BiomeStyle, voxel: Materia
         break;
       }
     }
+    view.kind = h.kind;
+    view.radius = r;
     views.push(view);
   }
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { KART_GP_POINTS, type KartGpEntryView, type KartRacerView } from '@dascade/shared/games/kart';
-import { classify, gpStandings, medalFor } from './order.ts';
+import { classify, gpStandings, medalFor, racerSubtitle } from './order.ts';
 
 const racer = (p: Partial<KartRacerView>): KartRacerView => ({
   slot: 0,
@@ -75,5 +75,13 @@ describe('medalFor', () => {
     expect(medalFor(47_000, 41_000)).toBe('bronze');
     expect(medalFor(60_000, 41_000)).toBeNull();
     expect(medalFor(0, 41_000)).toBeNull();
+  });
+});
+
+describe('racerSubtitle', () => {
+  it('never repeats a bot name', () => {
+    expect(racerSubtitle('Brick', 'brick', true)).toBe('CPU');
+    expect(racerSubtitle('Zed', 'nova', false)).toBe('Nova');
+    expect(racerSubtitle('Bot 2', 'nova', true)).toBe('CPU · Nova');
   });
 });

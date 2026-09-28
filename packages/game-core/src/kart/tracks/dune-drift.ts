@@ -31,16 +31,17 @@ const P = turtle(
 );
 const f = (piece: number, t = 0.5) => pieceFrac(P, piece, t);
 
-// The dirt chord across the inside of the mesa sweeper.
-const cutA = P.at(5, 0.1);
-const cutB = P.at(5, 0.9);
-const cut = (t: number, inward: number): [number, number, number] => {
-  const mid = P.at(5, 0.1 + 0.8 * t);
-  const cx = cutA.x + (cutB.x - cutA.x) * t;
-  const cy = cutA.y + (cutB.y - cutA.y) * t;
-  // Slightly bowed toward the main road so it leaves and rejoins smoothly.
-  return [cx + (mid.x - cx) * inward, cy + (mid.y - cy) * inward, mid.z];
-};
+// The dirt cut: a straight chord from the foot of the climb across the inside of the mesa loop to
+// the middle of the mesa top, skipping the climb and the whole 150° sweeper (≈ 120 u instead of
+// ≈ 230 u). Deep sand: ~0.3 s slower than the road without a boost, ~1.1 s faster with a turbo
+// fired on the sand (lab/shortcuts.ts).
+const cutA = P.at(4, 0);
+const cutB = P.at(6, 0.5);
+const cut = (t: number): [number, number, number] => [
+  cutA.x + (cutB.x - cutA.x) * t,
+  cutA.y + (cutB.y - cutA.y) * t,
+  cutA.z + (cutB.z - cutA.z) * t,
+];
 
 export const DUNE_DRIFT: KartTrackDef = {
   id: 'dune-drift',
@@ -54,17 +55,17 @@ export const DUNE_DRIFT: KartTrackDef = {
   gaps: [{ from: f(9, 0.1), to: f(9, 0.36) }],
   branches: [
     {
-      from: f(5, 0.1),
-      to: f(5, 0.9),
+      from: f(4, 0),
+      to: f(6, 0.5),
       surface: 'dirt',
-      halfWidth: 6,
-      points: [cut(0.2, 0.25), cut(0.5, 0), cut(0.8, 0.25)],
+      halfWidth: 8,
+      points: [cut(0.3), cut(0.6)],
     },
   ],
   boostPads: [
     { at: f(8, 0.72), d: 0 },
     // The shortcut's reward: a pad on the rejoin line.
-    { at: f(6, 0.15), d: 3 },
+    { at: f(6, 0.75), d: 0 },
     { at: f(3, 0.9), d: -2 },
   ],
   itemRows: [
@@ -83,7 +84,7 @@ export const DUNE_DRIFT: KartTrackDef = {
     { kind: 'radar-dish', at: f(6, 0.5), d: -40 },
   ],
   decorSeed: 2202,
-  parLapMs: 39_200,
+  parLapMs: 41_700,
 };
 
 /** Authoring aid: the piece fractions. */

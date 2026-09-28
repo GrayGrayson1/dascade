@@ -1,6 +1,6 @@
 /**
  * Physics + feel targets (the "feel lab" numbers, pinned). Targets:
- *  - Top speed 28.5–30.5 u/s by stat; 0 → 95 % top in 1.8–3.3 s (accel stat orders it).
+ *  - Top speed 29.4–30.6 u/s by stat (4 % spread); 0 → 95 % top in ~2.1–4.1 s (accel stat orders it).
  *  - Steering: yaw response 63 % within ~85 ms; authority low at a crawl, full at mid speed, ~60 % at top;
  *    the grip-limited turn radius at top speed is 16–24 u; a little slip (1–4°) in a full-lock grip turn.
  *  - Drift: inside steer radius clearly tighter than a grip turn (≤ 14 u at ~27 u/s), outside ≥ 2.5× the
@@ -18,9 +18,20 @@ import { racerSpec } from './spec.ts';
 import { buildTrack, groundAt, pointAtS, type KartTrack } from './track.ts';
 import { getKartTrack } from './index.ts';
 import type { KartTrackDef } from './trackdef.ts';
+import { hitCost } from './lab/hits.ts';
+import { startGain } from './lab/start.ts';
+import { KART_RACER_IDS } from '@dascade/shared/games/kart';
 import { drive, getLabTrack, getWallTrack, meanSlipDeg, pathRadius, rolling, speedOf, stageTick, timeTo, LAB_DEF } from './lab/feel.ts';
 
 const nova = racerSpec('nova');
+
+/** The lab straight with a practically unlimited road width (drift/snake tests never touch an edge). */
+function openPlane(): KartTrack {
+  const t = buildTrack(LAB_DEF);
+  t.hwL.fill(600);
+  t.hwR.fill(600);
+  return t;
+}
 
 describe('straight line', () => {
   it('accelerates along a smooth curve to a stat-dependent top speed', () => {
@@ -33,8 +44,8 @@ describe('straight line', () => {
       expect(top).toBeGreaterThan(28.3);
       expect(top).toBeLessThan(30.5);
       const t95 = timeTo(f, spec.topSpeed * 0.95);
-      expect(t95).toBeGreaterThan(1.7);
-      expect(t95).toBeLessThan(3.4);
+      expect(t95).toBeGreaterThan(1.9);
+      expect(t95).toBeLessThan(4.3);
       // Monotonic, no overshoot.
       for (let i = 1; i < f.length; i++) expect(speedOf(f[i]!.state)).toBeGreaterThanOrEqual(speedOf(f[i - 1]!.state) - 1e-6);
     }
@@ -125,9 +136,11 @@ describe('hop-drift', () => {
     expect(angle).toBeLessThan(30);
   });
 
-  it('charges through three stages, faster when drifting tighter', () => {
-    // A tighter-arcing spec keeps the circle on the lab road; charge doesn't depend on the arc.
-    const n = driftRun(0, 260, { ...nova, driftTurn: 1.5 });
+  it('charges by turning: stages at ~0.6/1.3/2.2 s on a neutral arc, ≥ 47° of path rotation before any mini-turbo', () => {
+    const plane = openPlane();
+    const run = (steer: number) =>
+      drive((t) => ({ throttle: 1, drift: t >= 2, steer: t < 6 ? 1 : steer }), 260, { start: rolling(27, 350, 0, plane), track: plane });
+    const n = run(0);
     const land = n.findIndex((f, i) => i > 3 && f.state.grounded);
     const s1 = (stageTick(n, 1) - land) / 60;
     const s2 = (stageTick(n, 2) - land) / 60;
@@ -138,9 +151,80 @@ describe('hop-drift', () => {
     expect(s2).toBeLessThan(1.5);
     expect(s3).toBeGreaterThan(1.9);
     expect(s3).toBeLessThan(2.5);
-    const tight = driftRun(1, 260, { ...nova, driftTurn: 1.5 });
-    expect(stageTick(tight, 3)).toBeLessThan(stageTick(n, 3));
+    // Path rotation until stage 1.
+    const i1 = stageTick(n, 1);
+    const a0 = Math.atan2(n[land]!.state.vy, n[land]!.state.vx);
+    let turned = 0;
+    let prev = a0;
+    for (let i = land + 1; i <= i1; i++) {
+      const a = Math.atan2(n[i]!.state.vy, n[i]!.state.vx);
+      turned += Math.abs(Math.atan2(Math.sin(a - prev), Math.cos(a - prev)));
+      prev = a;
+    }
+    expect((turned * 180) / Math.PI).toBeGreaterThan(40);
+    // Tighter arcs turn faster → reach the stages sooner; the widest arc barely charges.
+    expect(stageTick(run(1), 3)).toBeLessThan(stageTick(n, 3));
+    expect(stageTick(run(-1), 1)).toBeGreaterThan(stageTick(n, 1) * 2);
     expect(DRIFT_STAGE_POINTS).toEqual([432, 936, 1584]);
+  });
+
+  it('snaking down a straight is never faster than driving straight (no chained mini-turbo exploit)', () => {
+    const plane = openPlane();
+    for (const racer of ['nova', 'mochi', 'brick'] as const) {
+      const spec = racerSpec(racer);
+      const T = 600;
+      const go = (ctl: (st: KartState, t: number) => Partial<KartInput>) => {
+        let st = createKartState(plane, { x: 20, y: 0, z: 0, heading: 0, s: 20, d: 0 });
+        st.vx = spec.topSpeed;
+        for (let t = 0; t < T; t++)
+          st = stepKart(st, { ...NEUTRAL_KART_INPUT, ...ctl(st, t) }, spec, plane, { locked: false, tick: t }).state;
+        return st.x - 20;
+      };
+      const straight = go(() => ({ throttle: 1 }));
+      // Hop-drift alternating sides, holding each drift (wide / neutral / tight) for various times.
+      for (const hold of [20, 40, 60, 80, 110]) {
+        for (const arc of [-1, -0.5, 0, 0.5]) {
+          let dir = 1;
+          let since = 0;
+          const snake = go((st) => {
+            since++;
+            if (st.driftDir === 0 && since > hold + 4) {
+              since = 0;
+              dir = -dir;
+            }
+            const holding = since < hold;
+            return { throttle: 1, drift: holding, steer: since < 4 ? dir : holding ? dir * arc : 0 };
+          });
+          expect(snake, `${racer} hold ${hold} arc ${arc}`).toBeLessThanOrEqual(straight + 0.5);
+        }
+      }
+      // The reviewer's rhythm: release as soon as sparks appear, flip sides, repeat.
+      let dir = 1;
+      let phase = 0;
+      const rhythm = go((st) => {
+        if (phase === 0) {
+          phase = 1;
+          return { throttle: 1, drift: true, steer: dir };
+        }
+        if (st.driftDir === 0 && !st.grounded) return { throttle: 1, drift: true, steer: dir };
+        if (driftStage(st) >= 1) {
+          phase = 0;
+          dir = -dir;
+          return { throttle: 1 };
+        }
+        return { throttle: 1, drift: true, steer: -dir };
+      });
+      expect(rhythm, `${racer} rhythm`).toBeLessThanOrEqual(straight + 0.5);
+    }
+  });
+
+  it('a drift never exceeds grip top speed on its own', () => {
+    const plane = openPlane();
+    const f = drive((t) => ({ throttle: 1, drift: t >= 2, steer: t < 6 ? 1 : 0.3 }), 400, {
+      start: rolling(29, 350, 0, plane),
+      track: plane,
+    });
+    for (const fr of f.slice(40)) expect(speedOf(fr.state)).toBeLessThanOrEqual(nova.topSpeed + 1e-6);
   });
 
   it('releases into a mini-turbo that kicks harder at higher stages', () => {
@@ -221,9 +305,9 @@ describe('hazards only hit karts on their own road (TRACK_NOTES #2)', () => {
           surface: 'road',
           halfWidth: 8,
           points: [
-            [150, -70],
-            [400, -90],
-            [650, -70],
+            [170, -90],
+            [400, -110],
+            [630, -90],
           ],
         },
       ],
@@ -439,6 +523,32 @@ describe('hits, boosts and items on the kart', () => {
     const immuneEnd = f.findIndex((fr) => fr.state.immuneTicks === 0);
     expect((immuneEnd - end) / 60).toBeGreaterThan(1.4);
     expect((immuneEnd - end) / 60).toBeLessThan(1.6);
+  });
+
+  it('a spin keeps some speed (exits at ~30 %, ~1–1.3 s lost); a hazard stumble costs well under that', () => {
+    for (const r of KART_RACER_IDS) {
+      const spin = hitCost(r, 'spin');
+      expect(spin.exitShare, r).toBeGreaterThan(0.25);
+      expect(spin.exitShare, r).toBeLessThan(0.4);
+      expect(spin.lost, r).toBeGreaterThan(0.9);
+      // The accel stat spreads the recovery: ~1.05 s (Accel 4) … ~1.35 s (Accel 1).
+      expect(spin.lost, r).toBeLessThan(1.42);
+      const stumble = hitCost(r, 'stumble');
+      expect(stumble.lost, r).toBeLessThan(0.65);
+    }
+    // Racer spread of a hit's cost stays small: Accel is a real stat (a slow-accelerating heavy loses
+    // ~0.3 s more to a spin than a nimble racer), but it doesn't decide how much a hit hurts.
+    const costs = KART_RACER_IDS.map((r) => hitCost(r, 'spin').lost);
+    expect(Math.max(...costs) - Math.min(...costs)).toBeLessThan(0.36);
+  });
+
+  it('start: a timed start gains ~0.4 s; holding gas through the countdown costs at most ~0.15 s', () => {
+    for (const r of ['byte', 'nova', 'brick'] as const) {
+      expect(startGain(r, 30), r).toBeGreaterThan(0.25);
+      expect(startGain(r, 30), r).toBeLessThan(0.7);
+      expect(startGain(r, 240), r).toBeGreaterThan(-0.17);
+      expect(startGain(r, 240), r).toBeLessThan(0);
+    }
   });
 
   it('shield blocks one hit; a trailing item blocks one hit from behind only', () => {

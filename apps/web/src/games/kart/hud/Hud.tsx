@@ -56,43 +56,55 @@ export function Hud({ ctrl, hidden = false }: { ctrl: KartController; hidden?: b
         </section>
       ) : null}
 
-      <section className="kh-lap kh-panel" data-part="scoreboard" aria-label="Lap and times">
-        <div className="kh-lap__main">
-          <span className="kh-label">LAP</span>
-          <b className="kh-num kh-lap__n" ref={b.ref('lap')}>
-            1
-          </b>
-          <span className="kh-num kh-lap__of" ref={b.ref('lapOf')} />
-        </div>
-        <div className="kh-clock" data-part="timer">
-          <PixelIcon name="clock" />
-          <span className="kh-num" ref={b.ref('clock')}>
-            0:00.000
-          </span>
-        </div>
-        <dl className="kh-times">
-          <div>
-            <dt>LAST</dt>
-            <dd className="kh-num" ref={b.ref('last')}>
-              --:--.---
-            </dd>
+      <div className="kh-tr">
+        {ui.canPause && !hidden ? (
+          <IconButton
+            className="kh-pausebtn"
+            icon="pause"
+            label="Pause race"
+            variant="secondary"
+            aria-haspopup="dialog"
+            onClick={() => ctrl.openMenu()}
+          />
+        ) : null}
+        <section className="kh-lap kh-panel" data-part="scoreboard" aria-label="Lap and times">
+          <div className="kh-lap__main">
+            <span className="kh-label">LAP</span>
+            <b className="kh-num kh-lap__n" ref={b.ref('lap')}>
+              1
+            </b>
+            <span className="kh-num kh-lap__of" ref={b.ref('lapOf')} />
           </div>
-          <div>
-            <dt>BEST</dt>
-            <dd className="kh-num" ref={b.ref('best')}>
-              --:--.---
-            </dd>
+          <div className="kh-clock" data-part="timer">
+            <PixelIcon name="clock" />
+            <span className="kh-num" ref={b.ref('clock')}>
+              0:00.000
+            </span>
           </div>
-          {tt ? (
-            <div className="kh-times__pb">
-              <dt>PB</dt>
-              <dd className="kh-num" ref={b.ref('pb')}>
+          <dl className="kh-times">
+            <div>
+              <dt>LAST</dt>
+              <dd className="kh-num" ref={b.ref('last')}>
                 --:--.---
               </dd>
             </div>
-          ) : null}
-        </dl>
-      </section>
+            <div>
+              <dt>BEST</dt>
+              <dd className="kh-num" ref={b.ref('best')}>
+                --:--.---
+              </dd>
+            </div>
+            {tt ? (
+              <div className="kh-times__pb">
+                <dt>PB</dt>
+                <dd className="kh-num" ref={b.ref('pb')}>
+                  --:--.---
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+      </div>
 
       {solo ? null : (
         <section className="kh-pos" data-part="position" ref={b.ref('pos')} aria-label="Race position">

@@ -113,6 +113,8 @@ export interface HazardDef {
   phase?: number;
   /** Travel: lateral swing amplitude (sweeper), along-track run length in units (roller). */
   amp?: number;
+  /** Laser: share of the cycle it is on (default 0.4). Its warning blink precedes it. */
+  duty?: number;
 }
 
 /**

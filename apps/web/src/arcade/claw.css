@@ -204,6 +204,8 @@
 }
 /* Motion + effects settings. */
 :root[data-fx='off'] .clw-bulb,
+:root[data-fx='off'] .clw-word,
+:root[data-fx='off'] .clw-prize,
 :root[data-reduced-motion='true'] .clw-bulb,
 :root[data-reduced-motion='true'] .clw-word,
 :root[data-reduced-motion='true'] .clw-prize {
@@ -243,4 +245,36 @@
 }
 .af-floor:has(.af-lineup[data-claw='floor']) :is(.af-hud__claw, .af-floor__claw) {
   display: none !important;
+}
+
+/* The close-up couldn't load (ClawMachine.tsx ClawUnavailable): a small in-place message. */
+.clw-oops {
+  width: min(360px, calc(100vw - 32px));
+  padding: 20px 20px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: min(var(--panel-radius), 12px);
+  background: var(--panel-bg-opaque);
+  box-shadow: var(--panel-shadow);
+  color: var(--text-0);
+}
+.clw-oops::backdrop {
+  background: rgba(3, 2, 10, 0.6);
+}
+.clw-oops__title {
+  margin: 0 0 6px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm, 14px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.clw-oops__text {
+  margin: 0 0 14px;
+  color: var(--text-1);
+  font-size: var(--fs-xs, 13px);
+}
+.clw-oops__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }

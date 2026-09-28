@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLAW_ART, FLOOR_GLASS, FLOOR_HOME_X, floorOrder, floorPlacement } from './claw.ts';
-import { BOX, CHUTE, stockToys } from './clawPhysics.ts';
+import { BOX, CHUTE, stockToys } from './clawPile.ts';
 
 describe('floor claw machine geometry', () => {
   it('keeps every plush of a stocked pile inside the floor art glass', () => {

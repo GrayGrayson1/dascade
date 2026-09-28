@@ -125,6 +125,15 @@ export class MeshBuilder {
     return this.add(t, color, glow, new Matrix4().compose(new Vector3(x, y, z), q, new Vector3(w, h, d)));
   }
 
+  /** A thin box from point A to point B (cables, chains, braces). */
+  strut(ax: number, ay: number, az: number, bx: number, by: number, bz: number, w: number, color: ColorRepresentation, glow = 0): this {
+    const t = template('box', () => new BoxGeometry(1, 1, 1));
+    const d = new Vector3(bx - ax, by - ay, bz - az);
+    const len = d.length() || 1e-4;
+    const q = new Quaternion().setFromUnitVectors(Y, d.multiplyScalar(1 / len));
+    return this.add(t, color, glow, new Matrix4().compose(new Vector3((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), q, new Vector3(w, len, w)));
+  }
+
   /** Cylinder (prism with `sides`) centred at (x,y,z), radius r, length h along `axis`. */
   cyl(x: number, y: number, z: number, r: number, h: number, color: ColorRepresentation, sides = 8, axis: Axis = 'y', glow = 0, rTop = r): this {
     const key = `cyl${sides}:${(rTop / r).toFixed(3)}`;

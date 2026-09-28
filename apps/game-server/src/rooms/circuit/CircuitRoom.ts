@@ -72,6 +72,8 @@ export class CircuitRoom extends BaseGameRoom<CircuitState, CircuitSettings> {
       playersOnly: true,
       silent: true,
       rate: CIRCUIT_INPUT_RATE,
+      // Schema maximum: the object, seq, the array and its frames (3 + maxInputsPerPacket).
+      maxNodes: CIRCUIT_SIM.maxInputsPerPacket + 8,
     });
 
     this.handle(

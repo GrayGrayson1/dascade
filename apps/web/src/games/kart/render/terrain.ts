@@ -42,6 +42,8 @@ export class DistanceField {
   readonly z: Float32Array;
   /** Lowest road height among roads within 14 u (so terrain never rises over a lower road). */
   readonly zLow: Float32Array;
+  /** 1 within (half-width + shoulder + gapPad) of a gap sample: the terrain becomes a chasm there. */
+  readonly gap: Uint8Array;
 
   constructor(
     paths: readonly RoadPath[],
@@ -59,7 +61,25 @@ export class DistanceField {
     this.drop = new Uint8Array(N);
     this.z = new Float32Array(N).fill(bounds.minZ);
     this.zLow = new Float32Array(N).fill(Infinity);
+    this.gap = new Uint8Array(N);
     const r = Math.ceil(radius / cell);
+    // chasms: stamp generously around gap samples (the terrain grid is coarser than a gap is long)
+    const gapPad = 18;
+    for (const p of paths) {
+      for (let i = 0; i < p.n; i++) {
+        if (!p.noGround[i]) continue;
+        const reach = Math.max(p.hwL[i]!, p.hwR[i]!) + p.shoulder + gapPad;
+        const rr = Math.ceil(reach / cell);
+        const ci = Math.round((p.xs[i]! - this.x0) / cell);
+        const cj = Math.round((p.ys[i]! - this.y0) / cell);
+        for (let gj = Math.max(0, cj - rr); gj <= Math.min(this.ny - 1, cj + rr); gj++)
+          for (let gi = Math.max(0, ci - rr); gi <= Math.min(this.nx - 1, ci + rr); gi++) {
+            const dx = this.x0 + gi * cell - p.xs[i]!;
+            const dy = this.y0 + gj * cell - p.ys[i]!;
+            if (dx * dx + dy * dy <= reach * reach) this.gap[gj * this.nx + gi] = 1;
+          }
+      }
+    }
     for (const p of paths) {
       for (let i = 0; i < p.n; i++) {
         const sx = p.xs[i]!;
@@ -98,6 +118,10 @@ export class DistanceField {
   at(x: number, y: number): number {
     if (x < this.x0 || y < this.y0 || x > this.x0 + (this.nx - 1) * this.cell || y > this.y0 + (this.ny - 1) * this.cell) return this.radius;
     return this.dist[this.idx(x, y)]!;
+  }
+  gapAt(x: number, y: number): boolean {
+    if (x < this.x0 || y < this.y0 || x > this.x0 + (this.nx - 1) * this.cell || y > this.y0 + (this.ny - 1) * this.cell) return false;
+    return this.gap[this.idx(x, y)] === 1;
   }
   dropAt(x: number, y: number): boolean {
     return this.drop[this.idx(x, y)] === 1 && this.at(x, y) < this.radius;
@@ -177,7 +201,8 @@ export function terrainHeightFn(field: DistanceField, o: TerrainOptions, seed: n
     const rz = field.roadLowZ(x, y) - 0.6;
     const follow = 1 - smooth(4, 80, dist);
     h = h * (1 - follow) + Math.max(h, rz) * follow;
-    if (field.dropAt(x, y)) h = Math.min(h, rz - o.dropDepth * smooth(-4, 6, dist));
+    if (field.gapAt(x, y)) h = Math.min(h, rz - o.dropDepth);
+    else if (field.dropAt(x, y)) h = Math.min(h, rz - o.dropDepth * smooth(-4, 6, dist));
     if (o.quay !== undefined && dist > o.quay) h = Math.min(h, o.groundY - 6 * smooth(o.quay, o.quay + 12, dist));
     if (o.pads)
       for (const p of o.pads) {
@@ -615,4 +640,72 @@ export function buildHorizon(biome: BiomeStyle, centre: [number, number], radius
   };
   recolor(biome.fog, biome.night);
   return { meshes, textures, recolor };
+}
+
+/**
+ * Shore foam: a thin strip along the iso-line `dist = iso` of the distance field (where the quay
+ * terrain meets the water), traced with marching squares. Three space, at height `y`. u runs along
+ * the strip (world units / 4), v across (0 inner → 1 outer).
+ */
+export function buildShoreFoam(field: DistanceField, iso: number, y: number, width: number): BufferGeometry | null {
+  const { nx, ny, cell, x0, y0, dist } = field;
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const at = (i: number, j: number) => dist[j * nx + i]! - iso;
+  const lerp = (a: number, b: number) => a / (a - b);
+  const edgePoint = (i: number, j: number, e: number): [number, number] => {
+    // edges: 0 bottom (i,j)-(i+1,j), 1 right (i+1,j)-(i+1,j+1), 2 top (i,j+1)-(i+1,j+1), 3 left (i,j)-(i,j+1)
+    const a = at(i, j);
+    const b = at(i + 1, j);
+    const c = at(i + 1, j + 1);
+    const d = at(i, j + 1);
+    const fx = e === 0 ? lerp(a, b) : e === 1 ? 1 : e === 2 ? lerp(d, c) : 0;
+    const fy = e === 0 ? 0 : e === 1 ? lerp(b, c) : e === 2 ? 1 : lerp(a, d);
+    return [x0 + (i + fx) * cell, y0 + (j + fy) * cell];
+  };
+  const seg = (p: [number, number], q: [number, number], outward: [number, number]) => {
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    const l = Math.sqrt(dx * dx + dy * dy) || 1;
+    // normal toward larger distance (the water)
+    const flip = -dy * outward[0] + dx * outward[1] < 0 ? -1 : 1;
+    const nxv = (-dy / l) * flip;
+    const nyv = (dx / l) * flip;
+    const w = width / 2;
+    const P = (x: number, yy: number) => pos.push(x, y, -yy);
+    const u0 = (p[0] + p[1]) / 4;
+    const u1 = u0 + l / 4;
+    P(p[0] - nxv * w, p[1] - nyv * w);
+    P(q[0] - nxv * w, q[1] - nyv * w);
+    P(q[0] + nxv * w, q[1] + nyv * w);
+    P(p[0] - nxv * w, p[1] - nyv * w);
+    P(q[0] + nxv * w, q[1] + nyv * w);
+    P(p[0] + nxv * w, p[1] + nyv * w);
+    uv.push(u0, 0, u1, 0, u1, 1, u0, 0, u1, 1, u0, 1);
+  };
+  const TABLE: Record<number, number[][]> = {
+    1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]], 5: [[3, 2], [0, 1]], 6: [[0, 2]], 7: [[3, 2]],
+    8: [[2, 3]], 9: [[0, 2]], 10: [[0, 3], [1, 2]], 11: [[1, 2]], 12: [[1, 3]], 13: [[0, 1]], 14: [[3, 0]],
+  };
+  for (let j = 0; j < ny - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      const a = at(i, j);
+      const b = at(i + 1, j);
+      const c = at(i + 1, j + 1);
+      const d = at(i, j + 1);
+      const code = (a > 0 ? 1 : 0) | (b > 0 ? 2 : 0) | (c > 0 ? 4 : 0) | (d > 0 ? 8 : 0);
+      const edges = TABLE[code];
+      if (!edges) continue;
+      // outward = gradient of dist (toward water)
+      const gx = b + c - a - d;
+      const gy = c + d - a - b;
+      for (const [e0, e1] of edges) seg(edgePoint(i, j, e0!), edgePoint(i, j, e1!), [gx, gy]);
+    }
+  if (!pos.length) return null;
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
 }

@@ -74,6 +74,8 @@ export class AsteroidsRoom extends ClassicsRoom<AsteroidsState, AsteroidsSetting
       playersOnly: true,
       silent: true,
       rate: ASTEROIDS_INPUT_RATE,
+      // Schema maximum: the object, seq, the array and its frames (3 + maxInputsPerPacket).
+      maxNodes: ASTEROIDS_NET.maxInputsPerPacket + 8,
     });
     this.handle(ASTEROIDS_MSG.pause, AsteroidsPauseSchema, (p, { paused }) => this.setPaused(p, paused), {
       phases: ['PLAYING'],

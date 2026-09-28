@@ -1,10 +1,13 @@
 /**
- * DASphalt GP smoke paths: cabinet → title → solo race vs bots (countdown, keyboard driving with
- * server-side progress, a full 1-lap race finished by the client test autopilot, results), a
- * two-player room, touch controls on phones, and exit + re-enter.
+ * DASphalt GP smoke paths: cabinet → title → Play solo → the solo lobby (racer, mode, laps, bots) →
+ * race vs bots (countdown, keyboard driving with server-side progress, pause + resume, a full 1-lap
+ * race finished by the server's test autopilot, results), a two-player room, touch controls on
+ * phones, and exit + re-enter.
  *
- * The autopilot is client-side (`window.__KART__.test({ action: 'drive' })`, opt-in via the
- * `kart-test` session flag): it produces ordinary inputs, so it runs against production builds.
+ * The autopilot is the server's `kart:test` hook (the game's own bot drives our kart), which the
+ * server registers only with DASCADE_RELAXED_LIMITS=1 and NODE_ENV ≠ production. Run against a build
+ * with `SERVE_WEB=1 DASCADE_RELAXED_LIMITS=1 node apps/game-server/dist/index.js` (no NODE_ENV).
+ * The client forwards it only when the page opted in (the `kart-test` session flag).
  */
 import { expect, test, type Page } from '@playwright/test';
 import { joinRoom, leaveRoom, myPlayerId, roomState, setName, startGame, waitForPhase } from './helpers';
@@ -17,6 +20,30 @@ async function optIn(page: Page): Promise<void> {
       /* storage unavailable */
     }
   });
+}
+
+/** The player id arrives with the server's welcome, a moment after the room URL: wait for it. */
+async function waitForMe(page: Page): Promise<string> {
+  await expect.poll(() => myPlayerId(page), { timeout: 15_000 }).not.toBeNull();
+  return (await myPlayerId(page))!;
+}
+
+/** The start sequence is only 4 s: record what the lights showed instead of racing to catch it. */
+async function watchStartLights(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__kartLights = [];
+    const seen = w.__kartLights as string[];
+    const obs = new MutationObserver(() => {
+      const phase = document.querySelector('[data-part="start-lights"]')?.getAttribute('data-phase');
+      if (phase && seen[seen.length - 1] !== phase) seen.push(phase);
+    });
+    obs.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
+  });
+}
+
+async function phaseIsOneOf(page: Page, phases: string[], timeout = 20_000): Promise<void> {
+  await expect.poll(async () => phases.includes((await roomState(page))?.phase), { timeout }).toBe(true);
 }
 
 async function distance(page: Page, id: string): Promise<number> {
@@ -67,29 +94,50 @@ async function setStepper(page: Page, label: 'Laps' | 'Bots', value: number): Pr
 }
 
 test.describe('DASphalt GP', () => {
-  test('race vs bots: countdown, keyboard driving, finish a lap, results, exit and re-enter', async ({ page, isMobile }) => {
+  test('solo: lobby first (racer, mode, race setup), then countdown, keyboard driving, finish, results, exit and re-enter', async ({
+    page,
+    isMobile,
+  }) => {
     test.setTimeout(240_000);
     await optIn(page);
     await openKartFromCabinet(page);
     await setName(page, 'Zed');
-    // A private room of one with computer racers (the lobby lets us pick a racer and a short race).
-    await page.getByRole('button', { name: 'Create game' }).click();
+    // Play solo opens a private room of one in the lobby: nothing starts until we press Start.
+    await page.getByRole('button', { name: 'Play solo' }).click();
     await page.waitForURL(/\/room\/[A-Z0-9]{5}$/);
-    const me = (await myPlayerId(page))!;
+    await expect(page.locator('.lobby').first()).toBeVisible();
+    const me = await waitForMe(page);
+    const s = await roomState(page);
+    expect(s.phase).toBe('LOBBY');
+    expect(s.race.solo).toBe(true);
+    expect(JSON.parse(s.settingsJson)).toMatchObject({ mode: 'race', bots: 5, botSkill: 'normal' });
 
-    // Lobby: pick a racer and set up a short race against two bots.
+    // Lobby: pick a racer…
     await showLobbySection(page, /^Your setup/, '[data-part="kart-setup"]');
     await page.getByRole('radio', { name: /^Mochi, Drifter$/ }).click();
     await expect.poll(async () => (await roomState(page))?.looks?.[me]?.racer, { timeout: 10_000 }).toBe('mochi');
+    // …every mode is offered solo (Time Trial included)…
+    const mode = (await settingsPanel(page)).getByRole('radiogroup', { name: 'Mode' });
+    await mode.getByRole('radio', { name: 'Time Trial' }).click();
+    await expect.poll(async () => JSON.parse((await roomState(page))?.settingsJson ?? '{}').mode).toBe('timetrial');
+    await mode.getByRole('radio', { name: 'Race' }).click();
+    await expect.poll(async () => JSON.parse((await roomState(page))?.settingsJson ?? '{}').mode).toBe('race');
+    // …and set up a short race against two bots.
     await setStepper(page, 'Laps', 1);
     await setStepper(page, 'Bots', 2);
+    expect((await roomState(page))?.phase).toBe('LOBBY');
 
+    await watchStartLights(page);
     await startGame(page);
-    await waitForPhase(page, 'COUNTDOWN', 20_000);
+    // The countdown is 4 s: by the time we look it may already be over.
+    await phaseIsOneOf(page, ['COUNTDOWN', 'PLAYING']);
     await expect(page.getByRole('img', { name: 'Race view' })).toBeVisible({ timeout: 30_000 });
-    // Our own start sequence (lamps + numbers), not the shared overlay.
-    await expect(page.locator('[data-part="start-lights"]')).toHaveAttribute('data-phase', /count|go/, { timeout: 15_000 });
     await waitForPhase(page, 'PLAYING', 20_000);
+    // Our own start sequence (big numbers and GO), not the shared overlay.
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__kartLights as string[]), { timeout: 5_000 })
+      .toEqual(expect.arrayContaining([expect.stringMatching(/count|go/)]));
+    await expect(page.locator('.countdown-overlay')).toHaveCount(0);
     const s0 = await roomState(page);
     expect(Object.keys(s0.racers)).toHaveLength(3);
 
@@ -113,8 +161,20 @@ test.describe('DASphalt GP', () => {
       await expect(page.locator('[data-part="controls"]')).toBeVisible();
     }
 
-    // Finish the lap with the test autopilot (ordinary inputs through the normal path).
-    expect(await page.evaluate(() => (window as any).__KART__?.test({ action: 'drive', on: true }))).toBe(true);
+    // Solo races pause: the menu takes focus, the race freezes, Esc resumes.
+    if (isMobile) await page.getByRole('button', { name: 'Pause race' }).click();
+    else await page.keyboard.press('Escape');
+    const menu = page.getByRole('dialog', { name: 'Paused' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('button', { name: 'Resume' })).toBeFocused();
+    await expect.poll(async () => (await roomState(page))?.race?.paused).toBe(true);
+    if (isMobile) await menu.getByRole('button', { name: 'Resume' }).click();
+    else await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect.poll(async () => (await roomState(page))?.race?.paused).toBe(false);
+
+    // Finish the lap with the server's test autopilot (the game's bot drives our kart).
+    expect(await page.evaluate(() => (window as any).__KART__?.test({ action: 'autopilot', on: true }))).toBe(true);
     await waitForPhase(page, 'RESULTS', 150_000);
     const results = page.locator('[data-part="results"]');
     await expect(results).toBeVisible();
@@ -144,10 +204,10 @@ test.describe('DASphalt GP', () => {
     await page.getByRole('button', { name: 'Create game' }).click();
     await page.waitForURL(/\/room\/[A-Z0-9]{5}$/);
     const code = page.url().split('/').pop()!;
-    const hostId = (await myPlayerId(page))!;
+    const hostId = await waitForMe(page);
     await setStepper(page, 'Bots', 0);
     const guest = await joinRoom(browser, code, 'Guest');
-    const guestId = (await myPlayerId(guest))!;
+    const guestId = await waitForMe(guest);
     await expect.poll(async () => Object.keys((await roomState(page))?.players ?? {}).length).toBe(2);
 
     await startGame(page);
@@ -195,7 +255,7 @@ test.describe('DASphalt GP', () => {
     }
     // Auto-gas is on by default on touch: the kart pulls away without touching anything.
     await expect(controls.getByRole('button', { name: /Auto-gas on/ })).toHaveAttribute('aria-pressed', 'true');
-    const me = (await myPlayerId(page))!;
+    const me = await waitForMe(page);
     const before = await distance(page, me);
     await expect.poll(async () => (await distance(page, me)) - before, { timeout: 20_000 }).toBeGreaterThan(5);
 

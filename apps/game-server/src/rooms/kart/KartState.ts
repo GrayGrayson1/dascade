@@ -57,6 +57,7 @@ export const KartRaceMeta = schema(
     entrants: t.uint8().default(0),
     solo: t.boolean().default(false),
     raceId: t.uint16().default(0),
+    paused: t.boolean().default(false),
   },
   'KartRaceMeta',
 );

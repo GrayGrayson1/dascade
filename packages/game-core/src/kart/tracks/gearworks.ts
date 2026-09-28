@@ -110,13 +110,14 @@ export const GEARWORKS: KartTrackDef = {
     { at: 0.8, count: 4 },
   ],
   hazards: [
-    // The press line: five stompers in a travelling wave — hold a steady ~22 u/s and each one
-    // falls just behind you.
-    { kind: 'stomper', at: 0.238, d: 0, radius: 4.2, period: 2, phase: 0 },
-    { kind: 'stomper', at: 0.256, d: 0, radius: 4.2, period: 2, phase: 0.45 },
-    { kind: 'stomper', at: 0.274, d: 0, radius: 4.2, period: 2, phase: 0.9 },
-    { kind: 'stomper', at: 0.292, d: 0, radius: 4.2, period: 2, phase: 0.35 },
-    { kind: 'stomper', at: 0.31, d: 0, radius: 4.2, period: 2, phase: 0.8 },
+    // The press line: five stompers in a travelling wave, alternating sides — slalom through the
+    // clear lane beside each press, or hold a steady ~22 u/s down the middle and each one falls
+    // just behind you. They lift and shudder before every slam.
+    { kind: 'stomper', at: 0.238, d: 2.4, radius: 3, period: 2, phase: 0 },
+    { kind: 'stomper', at: 0.256, d: -2.4, radius: 3, period: 2, phase: 0.45 },
+    { kind: 'stomper', at: 0.274, d: 2.4, radius: 3, period: 2, phase: 0.9 },
+    { kind: 'stomper', at: 0.292, d: -2.4, radius: 3, period: 2, phase: 0.35 },
+    { kind: 'stomper', at: 0.31, d: 2.4, radius: 3, period: 2, phase: 0.8 },
   ],
   landmarks: [
     // Between the press line and the catwalk: seen from both levels.
@@ -127,5 +128,5 @@ export const GEARWORKS: KartTrackDef = {
     { kind: 'crane', at: 0.93, d: -32 },
   ],
   decorSeed: 7309,
-  parLapMs: 44_000,
+  parLapMs: 45_100,
 };

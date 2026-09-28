@@ -93,12 +93,12 @@ export const HARBOR_HAIRPINS: KartTrackDef = {
     { at: 0.86, count: 4 },
   ],
   hazards: [
-    // Crane crates swinging across the pier…
-    { kind: 'sweeper', at: 0.18, d: 0, amp: 4.6, radius: 2.2, period: 3.2 },
+    // Crane crates swinging out over one half of the road (the other half stays clear)…
+    { kind: 'sweeper', at: 0.18, d: -2.9, amp: 1.6, radius: 1.9, period: 3.2 },
     // …over the container yard…
-    { kind: 'sweeper', at: 0.455, d: 0, amp: 5.5, radius: 2.2, period: 3.6, phase: 0.3 },
+    { kind: 'sweeper', at: 0.455, d: 2.9, amp: 1.6, radius: 1.9, period: 3.6, phase: 0.3 },
     // …and across the drydock.
-    { kind: 'sweeper', at: 0.535, d: 0, amp: 5.5, radius: 2.2, period: 3.4, phase: 0.7 },
+    { kind: 'sweeper', at: 0.535, d: -2.9, amp: 1.6, radius: 1.9, period: 3.4, phase: 0.7 },
   ],
   landmarks: [
     // At the tip of the pier, beyond the apex of the lighthouse hairpin: dead ahead all the way out.
@@ -109,5 +109,5 @@ export const HARBOR_HAIRPINS: KartTrackDef = {
     { kind: 'crane', at: 0.905, d: 30 },
   ],
   decorSeed: 4417,
-  parLapMs: 39_200,
+  parLapMs: 38_700,
 };

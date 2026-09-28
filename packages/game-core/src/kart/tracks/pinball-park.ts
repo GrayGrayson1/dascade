@@ -99,5 +99,5 @@ export const PINBALL_PARK: KartTrackDef = {
     { kind: 'hot-air-balloon', at: 0.05, d: -40, z: 20 },
   ],
   decorSeed: 5531,
-  parLapMs: 38_900,
+  parLapMs: 39_500,
 };

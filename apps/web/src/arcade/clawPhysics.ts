@@ -30,31 +30,25 @@
  * Randomness only through the state's own seed (mulberry32), so the same seed + inputs replay exactly.
  */
 
-// ---------------------------------------------------------------------------------------------------
-// World geometry
+import {
+  BOX,
+  CHUTE,
+  GANTRY,
+  KINDS,
+  freshToy,
+  inChute,
+  nextRandom,
+  settleFully,
+  settlePile,
+  surfaceAt,
+  topToyAt,
+  type ClawToy,
+  type ToyKind,
+} from './clawPile.ts';
 
-export const BOX = { w: 100, d: 60 } as const;
-/** The prize chute: an open hole in the front-left corner (x0‥x1, z0‥z1), behind a low clear wall. */
-export const CHUTE = { x0: 1, x1: 22, z0: 1, z1: 21, wall: 11 } as const;
-
-export const GANTRY = {
-  minX: 7,
-  maxX: 94,
-  minZ: 6,
-  maxZ: 54,
-  /** Parked over the chute. */
-  homeX: 11.5,
-  homeZ: 11,
-  /** The claw head's height with the cable wound up. */
-  topY: 62,
-  /** Player-driven travel: top speed, acceleration, braking (units/s, units/s²). */
-  maxSpeed: 30,
-  accel: 85,
-  brake: 150,
-  /** The automatic carry home. */
-  carrySpeed: 34,
-  carryAccel: 120,
-} as const;
+// The pile model lives in clawPile.ts (the floor needs it without the machine); re-exported for the
+// close-up and the tests.
+export * from './clawPile.ts';
 
 export const CLAW = {
   /** Tip depth below the hub with the prongs open. */
@@ -81,6 +75,11 @@ export const CLAW = {
 export const AIM_TIME = 20;
 export const DT = 1 / 120;
 const G = 981;
+/** The prongs' opening parked and while aiming. */
+export const IDLE_OPEN = 0.2;
+export const AIM_OPEN = 0.72;
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+const hyp = (x: number, z: number) => Math.sqrt(x * x + z * z);
 
 /** The claw's strength and the payout loosening at the top of the lift. */
 export const STRENGTH = 0.9;
@@ -89,216 +88,6 @@ export const CARRY_STRENGTH = 0.85;
 export function payoutBonus(misses: number): number {
   const m = Number.isFinite(misses) ? Math.max(0, Math.floor(misses)) : 0;
   return m < 3 ? 0 : Math.min(0.15, (m - 2) * 0.05);
-}
-
-// ---------------------------------------------------------------------------------------------------
-// Toys
-
-export type ToyKind = 'blob' | 'bunny' | 'star' | 'bot';
-export const TOY_KINDS: readonly ToyKind[] = ['blob', 'bunny', 'star', 'bot'];
-export const TOY_COLORS = 6;
-
-export interface KindSpec {
-  /** Horizontal radius and height. */
-  r: number;
-  h: number;
-  mass: number;
-  /** How well prongs hold it (squishy round plush 1, hard slippery bot less). */
-  grip: number;
-  /** How much it tilts when it hangs off-centre. */
-  tilt: number;
-  /** Its widest line, as a fraction of its height: prong tips need to get below it. */
-  waist: number;
-  name: string;
-}
-
-export const KINDS: Record<ToyKind, KindSpec> = {
-  blob: { r: 6, h: 8, mass: 1, grip: 1, tilt: 1, waist: 0.45, name: 'blob' },
-  bunny: { r: 4.6, h: 13, mass: 0.85, grip: 0.95, tilt: 1.5, waist: 0.32, name: 'bunny' },
-  star: { r: 6.6, h: 5, mass: 0.7, grip: 0.8, tilt: 0.8, waist: 0.5, name: 'star' },
-  bot: { r: 5.4, h: 9, mass: 1.25, grip: 0.8, tilt: 0.55, waist: 0.4, name: 'cube bot' },
-};
-
-export type ToyMode = 'pile' | 'held' | 'fall' | 'chute';
-
-export interface ClawToy {
-  id: number;
-  kind: ToyKind;
-  color: number;
-  x: number;
-  /** Bottom height. */
-  y: number;
-  z: number;
-  mode: ToyMode;
-  vx: number;
-  vy: number;
-  vz: number;
-  /** Visual tilt (radians; + leans right on screen) — hanging off a prong, a shove, a tumble. */
-  tilt: number;
-  /** Arrived in a restock (the renderer tumbles it in). */
-  fresh?: boolean;
-}
-
-/** Surface height of a toy at a floor point (−Infinity outside its footprint). */
-export function toySurface(t: ClawToy, px: number, pz: number): number {
-  const k = KINDS[t.kind];
-  const dx = px - t.x;
-  const dz = pz - t.z;
-  const q = (dx * dx + dz * dz) / (k.r * k.r);
-  if (q >= 1) return -Infinity;
-  let f: number;
-  switch (t.kind) {
-    case 'blob':
-      f = Math.sqrt(1 - q);
-      break;
-    case 'bunny':
-      f = q < 0.12 ? 1 : 0.72 * Math.sqrt(1 - q);
-      break;
-    case 'star':
-      f = 1 - 0.35 * q;
-      break;
-    default:
-      f = q < 0.8 ? 1 : 1 - (q - 0.8) * 2.5;
-  }
-  return t.y + k.h * f;
-}
-
-/** The highest surface at a floor point among the resting toys (the floor is 0). */
-export function surfaceAt(toys: readonly ClawToy[], px: number, pz: number, skip = -1): number {
-  let best = 0;
-  for (const t of toys) {
-    if (t.mode !== 'pile' || t.id === skip) continue;
-    const s = toySurface(t, px, pz);
-    if (s > best) best = s;
-  }
-  return best;
-}
-
-export function inChute(x: number, z: number, slack = 0): boolean {
-  return x < CHUTE.x1 + slack && z < CHUTE.z1 + slack && x > CHUTE.x0 - slack && z > CHUTE.z0 - slack;
-}
-
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-const hyp = (x: number, z: number) => Math.sqrt(x * x + z * z);
-
-/** Keeps a resting toy inside the glass and out of the chute hole (onto the floor beside it). */
-function constrain(t: ClawToy): void {
-  const r = KINDS[t.kind].r;
-  t.x = clamp(t.x, r * 0.8, BOX.w - r * 0.8);
-  t.z = clamp(t.z, r * 0.8, BOX.d - r * 0.8);
-  // Beside the chute's wall: pushed out along the shallower side.
-  const px = CHUTE.x1 + r * 0.7 - t.x;
-  const pz = CHUTE.z1 + r * 0.7 - t.z;
-  if (px > 0 && pz > 0) {
-    if (px < pz) t.x += px;
-    else t.z += pz;
-  }
-}
-
-/**
- * Re-stacks the pile: every resting toy sits on the highest one it overlaps (or the floor), and toys
- * perched on an edge roll off outward, nudging what they rolled off. Toys left hanging in the air (the
- * one under them was taken) start falling instead of teleporting down.
- */
-export function settlePile(toys: ClawToy[], iterations = 8, instant = false): void {
-  const pile = toys.filter((t) => t.mode === 'pile');
-  const target = new Map<number, number>();
-  for (let it = 0; it < iterations; it++) {
-    pile.sort((a, b) => (target.get(a.id) ?? a.y) - (target.get(b.id) ?? b.y) || a.id - b.id);
-    const placed: ClawToy[] = [];
-    let moved = false;
-    for (const t of pile) {
-      constrain(t);
-      const kt = KINDS[t.kind];
-      let best = 0;
-      let sup: ClawToy | null = null;
-      let supRatio = 0;
-      for (const p of placed) {
-        const kp = KINDS[p.kind];
-        const lim = (kt.r + kp.r) * 0.8;
-        const d = hyp(t.x - p.x, t.z - p.z);
-        if (d >= lim) continue;
-        const ratio = d / lim;
-        const rest = (target.get(p.id) ?? p.y) + kp.h * (0.92 - 0.5 * ratio * ratio);
-        if (rest > best) {
-          best = rest;
-          sup = p;
-          supRatio = ratio;
-        }
-      }
-      if (sup && supRatio > (target.get(sup.id) ?? sup.y) / 60 + 0.45 - (best > 16 ? 0.2 : 0) && it < iterations - 1) {
-        // Perched on an edge: roll outward, shove the one underneath a little the other way.
-        const d = Math.max(0.001, hyp(t.x - sup.x, t.z - sup.z));
-        const push = (supRatio - 0.5) * 3;
-        t.x += ((t.x - sup.x) / d) * push;
-        t.z += ((t.z - sup.z) / d) * push;
-        sup.x -= ((t.x - sup.x) / d) * push * 0.15;
-        sup.z -= ((t.z - sup.z) / d) * push * 0.15;
-        moved = true;
-      }
-      target.set(t.id, best);
-      placed.push(t);
-    }
-    if (!moved) break;
-  }
-  for (const t of pile) {
-    const y = target.get(t.id) ?? 0;
-    if (t.y > y + 0.6 && !instant) {
-      t.mode = 'fall';
-      t.vx = 0;
-      t.vz = 0;
-      t.vy = 0;
-    } else t.y = y;
-  }
-}
-
-// ---------------------------------------------------------------------------------------------------
-// Randomness (mulberry32 over the state's seed)
-
-export function nextRandom(sim: { seed: number }): number {
-  let a = (sim.seed = (sim.seed + 0x6d2b79f5) | 0);
-  a = Math.imul(a ^ (a >>> 15), a | 1);
-  a ^= a + Math.imul(a ^ (a >>> 7), a | 61);
-  return ((a ^ (a >>> 14)) >>> 0) / 4294967296;
-}
-
-// ---------------------------------------------------------------------------------------------------
-// Stock
-
-/** A fresh machine's worth of toys, heaped towards the middle-back (settled). */
-export function stockToys(seed: number, count: number, firstId = 1): ClawToy[] {
-  const rng = { seed: seed | 0 };
-  const toys: ClawToy[] = [];
-  for (let i = 0; i < count; i++) toys.push(freshToy(rng, firstId + i, i, false));
-  settleFully(toys);
-  return toys;
-}
-
-function freshToy(rng: { seed: number }, id: number, i: number, fresh: boolean): ClawToy {
-  const kind = TOY_KINDS[(i + Math.floor(nextRandom(rng) * 2)) % TOY_KINDS.length]!;
-  // A heap: two draws averaged lean towards the middle of the pile's area.
-  const x = 29 + (nextRandom(rng) * 0.75 + nextRandom(rng) * 0.25) * 66;
-  const z = 6 + (nextRandom(rng) * 0.75 + nextRandom(rng) * 0.25) * 48;
-  return {
-    id,
-    kind,
-    color: Math.floor(nextRandom(rng) * TOY_COLORS),
-    x,
-    z,
-    y: fresh ? 58 + nextRandom(rng) * 10 : i * 0.5,
-    mode: fresh ? 'fall' : 'pile',
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    tilt: 0,
-    fresh: fresh || undefined,
-  };
-}
-
-/** Settles until nothing is left in the air (for a loaded or freshly stocked pile — no animation). */
-export function settleFully(toys: ClawToy[]): void {
-  for (const t of toys) if (t.mode === 'fall') t.mode = 'pile';
-  settlePile(toys, 24, true);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -327,7 +116,19 @@ export interface GripReport {
   /** Hold ÷ load at lift-off. */
   margin: number;
   quality: 'great' | 'good' | 'weak' | 'nudge' | 'none';
+  /** How many prong tips came down on other plushies (they stop high and pinch instead of cradle). */
+  onNeighbours: number;
+  /** The tips ended above the target's waist (they never got under it). */
+  tipsHigh: boolean;
 }
+
+/**
+ * Why a try came up empty — what the machine shows on its LED line, so a miss is explainable:
+ * nothing under the claw, a one-prong shove, tips caught on a neighbour, a buried plush, an off-centre
+ * grab, a weak coil, or — once it was up — a jolt, a swing, a slide, or a drop right by the chute.
+ */
+export type MissCause =
+  'nothing' | 'shove' | 'neighbour' | 'buried' | 'offcentre' | 'weak' | 'shook' | 'swung' | 'slid' | 'dropped' | 'chute';
 
 export interface HeldToy {
   id: number;
@@ -359,10 +160,11 @@ export type ClawEvent =
   | { type: 'carry' }
   | { type: 'slip'; toy: number; cause: SlipCause }
   | { type: 'land'; toy: number; hard: boolean }
+  | { type: 'jostle'; toys: number[] }
   | { type: 'release' }
   | { type: 'chute'; toy: number }
   | { type: 'win'; toy: ClawToy }
-  | { type: 'done'; result: ClawResult };
+  | { type: 'done'; result: ClawResult; cause: MissCause | null };
 
 export interface ClawInput {
   /** Joystick, −1‥1 each (x right, z back). */
@@ -408,6 +210,10 @@ export interface ClawSim {
   misses: number;
   /** Test/tuning hook: multiplies the claw's strength (1 = as built). */
   strengthScale: number;
+  /** Why this try failed (set as it goes; final at 'done'). */
+  cause: MissCause | null;
+  /** The toy that slipped after lift-off, and why (for 'chute' vs the slip's own cause). */
+  slipped: { toy: number; cause: SlipCause } | null;
 }
 
 export function createSim(toys: ClawToy[], seed: number, misses = 0): ClawSim {
@@ -440,6 +246,8 @@ export function createSim(toys: ClawToy[], seed: number, misses = 0): ClawSim {
     result: null,
     misses: Math.max(0, Math.floor(misses) || 0),
     strengthScale: 1,
+    cause: null,
+    slipped: null,
   };
 }
 
@@ -455,6 +263,8 @@ export function insertToken(sim: ClawSim, events: ClawEvent[] = []): boolean {
   sim.hadToy = false;
   sim.won = false;
   sim.result = null;
+  sim.cause = null;
+  sim.slipped = null;
   events.push({ type: 'token' });
   return true;
 }
@@ -480,7 +290,12 @@ const PRONG_DIRS: readonly [number, number][] = [
   [0.8660254, -0.5],
 ];
 
-/** Where the claw would stop if dropped right here (for the renderer's aiming shadow). */
+/** Where the prong tips come down with the claw wide open, around a head at (hx, hz). */
+export function prongTips(hx: number, hz: number, r: number = CLAW.openR): [number, number][] {
+  return PRONG_DIRS.map(([ux, uz]) => [hx + ux * r, hz + uz * r]);
+}
+
+/** Where the claw would stop if dropped right here (for the renderer's aiming marks). */
 export function contactHeight(sim: ClawSim, hx = headPos(sim).x, hz = headPos(sim).z): number {
   let hub = -Infinity;
   for (const [ox, oz] of [
@@ -492,9 +307,9 @@ export function contactHeight(sim: ClawSim, hx = headPos(sim).x, hz = headPos(si
   ] as const)
     hub = Math.max(hub, surfaceAt(sim.toys, hx + ox, hz + oz) - CLAW.sink);
   let tip = -Infinity;
-  for (const [ux, uz] of PRONG_DIRS)
-    tip = Math.max(tip, surfaceAt(sim.toys, hx + ux * CLAW.openR, hz + uz * CLAW.openR) - CLAW.tipSink + CLAW.prong);
-  return Math.max(hub, tip, CLAW.prong);
+  for (const [tx, tz] of prongTips(hx, hz)) tip = Math.max(tip, surfaceAt(sim.toys, tx, tz) - CLAW.tipSink + CLAW.prong);
+  // Never above the gantry (a hand-stacked pile can't jam the drop).
+  return Math.min(GANTRY.topY - 2, Math.max(hub, tip, CLAW.prong));
 }
 
 /**
@@ -504,7 +319,17 @@ export function contactHeight(sim: ClawSim, hx = headPos(sim).x, hz = headPos(si
 export function evaluateGrip(sim: ClawSim): GripReport {
   const { x: hx, z: hz } = headPos(sim);
   const tipY = sim.hubY - CLAW.prong;
-  let best: GripReport = { toy: null, prongs: [0, 0, 0], opposed: 0, offset: Infinity, buried: 0, margin: 0, quality: 'none' };
+  let best: GripReport = {
+    toy: null,
+    prongs: [0, 0, 0],
+    opposed: 0,
+    offset: Infinity,
+    buried: 0,
+    margin: 0,
+    quality: 'none',
+    onNeighbours: 0,
+    tipsHigh: false,
+  };
   let bestScore = 0;
   for (const t of sim.toys) {
     if (t.mode !== 'pile') continue;
@@ -538,16 +363,48 @@ export function evaluateGrip(sim: ClawSim): GripReport {
     const score = opposed + sum * 0.01 + t.y * 0.0001;
     if (score > bestScore) {
       bestScore = score;
-      best = { toy: t.id, prongs: q, opposed, offset: dist, buried: buriedLoad(sim.toys, t), margin: 0, quality: 'none' };
+      best = {
+        toy: t.id,
+        prongs: q,
+        opposed,
+        offset: dist,
+        buried: buriedLoad(sim.toys, t),
+        margin: 0,
+        quality: 'none',
+        onNeighbours: 0,
+        tipsHigh: tipY > waist,
+      };
     }
   }
-  if (best.toy === null) return best;
-  const t = sim.toys.find((x) => x.id === best.toy)!;
+  const target = best.toy;
+  // Which tips came down on another plush (higher than where they'd have hooked the target).
+  for (const [tx, tz] of prongTips(hx, hz)) {
+    const under = topToyAt(sim.toys, tx, tz);
+    if (under && under.id !== target && surfaceAt(sim.toys, tx, tz) - CLAW.tipSink > tipY - 0.6) best.onNeighbours++;
+  }
+  if (target === null) return best;
+  const t = sim.toys.find((x) => x.id === target)!;
   const k = KINDS[t.kind];
   const hold = holdStrength(sim, best.opposed, t.kind) * comFactor(best.offset, k.r);
   best.margin = hold / (k.mass + best.buried);
   best.quality = best.opposed < 0.15 ? 'nudge' : best.margin >= 2.2 ? 'great' : best.margin >= 1.6 ? 'good' : 'weak';
   return best;
+}
+
+/** Why a grab that never came up failed (pure; from the grip report). */
+export function grabCause(g: GripReport, r: number): MissCause {
+  if (g.toy === null) return g.onNeighbours > 0 ? 'neighbour' : 'nothing';
+  if (g.quality === 'nudge') return g.onNeighbours > 0 && g.tipsHigh ? 'neighbour' : 'shove';
+  if (g.buried >= 0.35) return 'buried';
+  if (g.onNeighbours > 0 && (g.tipsHigh || g.prongs.some((q) => q < 0.45))) return 'neighbour';
+  if (g.offset > r * 0.35) return 'offcentre';
+  return 'weak';
+}
+
+/** Why a plush that was up came out (pure). `nearChute`: it came down right beside the chute. */
+export function slipCause(cause: SlipCause, nearChute: boolean): MissCause {
+  if (nearChute) return 'chute';
+  return cause === 'jolt' ? 'shook' : cause === 'swing' ? 'swung' : cause === 'slide' ? 'slid' : 'dropped';
 }
 
 /**
@@ -591,8 +448,11 @@ export function stepClaw(sim: ClawSim, input: ClawInput, events: ClawEvent[]): v
   switch (sim.phase) {
     case 'idle':
       brakeGantry(sim, dt);
+      sim.open = approach(sim.open, IDLE_OPEN, dt * 2);
       break;
     case 'aim': {
+      // The prongs hang open while you aim, so the grab's footprint reads.
+      sim.open = approach(sim.open, AIM_OPEN, dt * 2.5);
       const before = Math.ceil(sim.timer);
       sim.timer = Math.max(0, sim.timer - dt);
       const after = Math.ceil(sim.timer);
@@ -686,10 +546,16 @@ export function stepClaw(sim: ClawSim, input: ClawInput, events: ClawEvent[]): v
       if (!busy && sim.t >= 0.5) {
         sim.result = sim.won ? 'win' : sim.hadToy ? 'slip' : 'miss';
         sim.misses = sim.won ? 0 : sim.misses + 1;
+        if (sim.won) sim.cause = null;
+        else if (sim.slipped) {
+          const t = sim.toys.find((x) => x.id === sim.slipped!.toy);
+          const near = !!t && t.x < CHUTE.x1 + 12 && t.z < CHUTE.z1 + 12;
+          sim.cause = slipCause(sim.slipped.cause, near);
+        } else if (!sim.cause) sim.cause = sim.grip ? grabCause(sim.grip, 6) : 'nothing';
         sim.phase = 'idle';
         sim.t = 0;
         sim.open = 0.2;
-        events.push({ type: 'done', result: sim.result });
+        events.push({ type: 'done', result: sim.result, cause: sim.cause });
       }
       break;
     }
@@ -789,17 +655,23 @@ function startClose(sim: ClawSim, events: ClawEvent[]): void {
   // The prongs stop where they meet the toy.
   sim.openStop = t ? clamp(0.1 + (report.opposed / 3) * 0.35, 0.08, 0.5) : 0;
   events.push({ type: 'grip', report });
-  if (!t) return;
-  const k = KINDS[t.kind];
   const { x: hx, z: hz } = headPos(sim);
+  if (!t) {
+    // Closing on nothing it could hold — but prongs pushed into the pile still stir it up.
+    sim.cause = grabCause(report, 6);
+    if (surfaceAt(sim.toys, hx, hz) > 0.5 || report.onNeighbours > 0) jostle(sim, hx, hz, 1.6, -1, events);
+    return;
+  }
+  const k = KINDS[t.kind];
   if (report.quality === 'nudge') {
     // One prong shoves it: dragged a little towards the axis, tilted, left in the pile.
+    sim.cause = grabCause(report, k.r);
     const d = Math.max(0.001, hyp(t.x - hx, t.z - hz));
     const push = Math.min(3, d * 0.35);
     t.x -= ((t.x - hx) / d) * push;
     t.z -= ((t.z - hz) / d) * push;
     t.tilt = ((t.x - hx) / d) * 0.35;
-    settlePile(sim.toys);
+    jostle(sim, hx, hz, 1.4, t.id, events);
     return;
   }
   // Squeezed towards the axis: an opposed grip centres it, a lopsided one leaves it hanging off a side.
@@ -822,7 +694,41 @@ function startClose(sim: ClawSim, events: ClawEvent[]): void {
   t.mode = 'held';
   t.vx = t.vy = t.vz = 0;
   t.tilt = 0;
-  void k;
+}
+
+const DIRS8: readonly [number, number][] = [
+  [1, 0],
+  [0.7071, 0.7071],
+  [0, 1],
+  [-0.7071, 0.7071],
+  [-1, 0],
+  [-0.7071, -0.7071],
+  [0, -1],
+  [0.7071, -0.7071],
+];
+
+/**
+ * A failed grab stirs the pile: the prongs closing into it shove the plushies round (x, z) outward a
+ * little, so the next try faces a changed pile instead of the same failure again.
+ */
+function jostle(sim: ClawSim, cx: number, cz: number, strength: number, skip: number, events: ClawEvent[]): void {
+  const moved: number[] = [];
+  for (const o of sim.toys) {
+    if (o.mode !== 'pile' || o.id === skip) continue;
+    const dx = o.x - cx;
+    const dz = o.z - cz;
+    const d = hyp(dx, dz);
+    if (d > 14) continue;
+    let ux = dx / Math.max(0.001, d);
+    let uz = dz / Math.max(0.001, d);
+    if (d < 0.3) [ux, uz] = DIRS8[Math.floor(nextRandom(sim) * 8) % 8]!;
+    const k = strength * (1 - d / 14) * (0.6 + 0.8 * nextRandom(sim));
+    o.x += ux * k + (nextRandom(sim) - 0.5) * k * 0.8;
+    o.z += uz * k + (nextRandom(sim) - 0.5) * k * 0.8;
+    moved.push(o.id);
+  }
+  settlePile(sim.toys);
+  if (moved.length) events.push({ type: 'jostle', toys: moved });
 }
 
 /** The held toy: follows the head; the load bites; it slides and maybe goes. */
@@ -852,7 +758,15 @@ function holdStep(sim: ClawSim, dt: number, events: ClawEvent[]): void {
     h.liftedOff = true;
     const pinned = buriedLoad(sim.toys, t);
     if (h.hold0 * h.weak < (k.mass + pinned) * 0.95) {
+      // It won't come up: the prongs slide off it, it tumbles back and knocks its neighbours about.
+      if (sim.grip) sim.cause = grabCause(sim.grip, k.r);
       slip(sim, t, 'liftoff', events);
+      const [ux, uz] = DIRS8[Math.floor(nextRandom(sim) * 8) % 8]!;
+      const v = 10 + 12 * nextRandom(sim);
+      t.vx = ux * v;
+      t.vz = uz * v;
+      t.vy = 35;
+      jostle(sim, t.x, t.z, 1.2, t.id, events);
       return;
     }
     events.push({ type: 'lifted', toy: t.id });
@@ -909,6 +823,7 @@ function placeHeld(sim: ClawSim, t: ClawToy, h: HeldToy): void {
 
 function slip(sim: ClawSim, t: ClawToy, cause: SlipCause, events: ClawEvent[]): void {
   sim.hadToy = sim.hadToy || cause !== 'liftoff';
+  if (cause !== 'liftoff') sim.slipped = { toy: t.id, cause };
   sim.held = null;
   sim.openStop = Math.max(sim.openStop, 0.35);
   t.mode = 'fall';
@@ -1043,4 +958,34 @@ export function restock(sim: ClawSim, count: number): number {
   }
   sim.seed = (sim.seed + rng.seed) | 0;
   return added;
+}
+
+/**
+ * A sure win (the close-up's test hook, only with `?clawSeed=`): puts the trolley dead over the plush
+ * the claw would grip best, with the swing settled, and makes the coil absurdly strong. False if nothing
+ * can be gripped. Aiming state only.
+ */
+export function rigSureWin(sim: ClawSim): boolean {
+  if (sim.phase !== 'aim') return false;
+  let best: { x: number; z: number; score: number } | null = null;
+  const save = { gx: sim.gx, gz: sim.gz, sx: sim.sx, sz: sim.sz, hubY: sim.hubY };
+  for (const t of sim.toys) {
+    if (t.mode !== 'pile') continue;
+    const x = clamp(t.x, GANTRY.minX, GANTRY.maxX);
+    const z = clamp(t.z, GANTRY.minZ, GANTRY.maxZ);
+    sim.gx = x;
+    sim.gz = z;
+    sim.sx = sim.sz = 0;
+    sim.hubY = contactHeight(sim);
+    const g = evaluateGrip(sim);
+    const score = g.toy === null || g.quality === 'nudge' ? 0 : g.opposed * comFactor(g.offset, 6);
+    if (score > 0.3 && (!best || score > best.score)) best = { x, z, score };
+  }
+  Object.assign(sim, save);
+  if (!best) return false;
+  sim.gx = best.x;
+  sim.gz = best.z;
+  sim.vx = sim.vz = sim.sx = sim.sz = sim.svx = sim.svz = 0;
+  sim.strengthScale = 1000;
+  return true;
 }

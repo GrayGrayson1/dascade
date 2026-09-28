@@ -79,19 +79,21 @@ export const MIDNIGHT_MAINFRAME: KartTrackDef = {
   ],
   branches: [
     {
-      // The bypass through the core: a narrow trace that skips the last two laser gates.
+      // The bypass through the core: a narrow trace that skips the last two laser gates — and
+      // snakes through the server racks (a tight S at racing speed: clip a wall and it's gone).
       from: 0.304,
       to: 0.62,
       points: [
         [278, -128, 0],
-        [246, -146, 0],
-        [214, -176, 0],
-        [184, -216, 0],
-        [156, -258, 0],
+        [256.8, -160.7, 0],
+        [222.2, -181.3, 0],
+        [205.5, -218, 0],
+        [170.9, -238.7, 0],
+        [154.1, -275.3, 0],
         [124, -300, 0],
       ],
       surface: 'road',
-      halfWidth: 4.5,
+      halfWidth: 3.8,
     },
   ],
   itemRows: [
@@ -102,11 +104,12 @@ export const MIDNIGHT_MAINFRAME: KartTrackDef = {
     { at: 0.95, count: 4 },
   ],
   hazards: [
-    // The firewall: three laser gates in time with each other — hit the first one as it switches
-    // off at full speed and the others open in front of you.
-    { kind: 'laser', at: 0.285, d: 0, period: 1.6, phase: 0 },
-    { kind: 'laser', at: 0.34, d: 0, period: 1.6, phase: 0 },
-    { kind: 'laser', at: 0.395, d: 0, period: 1.6, phase: 0 },
+    // The firewall: three laser gates on a 2 s cycle, each on for 0.36 s after a warning blink,
+    // phased as a wave — keep a steady racing pace through the first open gate and the others are
+    // open when you reach them.
+    { kind: 'laser', at: 0.285, d: 0, period: 2, phase: 0, duty: 0.18 },
+    { kind: 'laser', at: 0.34, d: 0, period: 2, phase: 0.75, duty: 0.18 },
+    { kind: 'laser', at: 0.395, d: 0, period: 2, phase: 0.5, duty: 0.18 },
   ],
   landmarks: [
     // The core: beside the bypass, in view from the whole firewall corridor.
@@ -117,5 +120,5 @@ export const MIDNIGHT_MAINFRAME: KartTrackDef = {
     { kind: 'data-spire', at: 0.685, d: 26 },
   ],
   decorSeed: 6661,
-  parLapMs: 41_800,
+  parLapMs: 39_900,
 };

@@ -64,6 +64,13 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   const game = useLobbyGame();
   const catalog = GAME_CATALOG[gameId];
   const [tab, setTab] = useState<LobbyTab>('players');
+  // A game can open the phone lobby on its setup (the module loads lazily, so apply it once it's here).
+  const startTabApplied = useRef(false);
+  useEffect(() => {
+    if (startTabApplied.current || !module) return;
+    startTabApplied.current = true;
+    if (module.lobbyStartTab === 'setup' && module.PlayerSetup) setTab('setup');
+  }, [module]);
   const [confirmStart, setConfirmStart] = useState(false);
   const openModal = useApp((s) => s.openModal);
 
@@ -95,8 +102,8 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
         </>
       ),
     },
-    { value: 'settings', label: 'Settings' },
     ...(PlayerSetup ? [{ value: 'setup' as const, label: 'Your setup' }] : []),
+    { value: 'settings', label: 'Settings' },
     { value: 'chat', label: 'Chat' },
   ];
 
@@ -155,6 +162,14 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
             ) : null}
           </Panel>
 
+          {/* DOM order follows the layout (players, your setup, then settings) so Tab reaches your own
+              setup before the host settings; the grid areas place the panels. */}
+          {PlayerSetup ? (
+            <Panel className="lobby__setup" data-part="lobby-setup" data-section="setup" title="Your setup">
+              <PlayerSetup />
+            </Panel>
+          ) : null}
+
           <div className="lobby__settings" data-part="lobby-settings" data-section="settings">
             {SettingsPanel ? (
               <Panel
@@ -176,12 +191,6 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
               <TournamentButton gameId={gameId} label="Run a tournament" />
             </Panel>
           </div>
-
-          {PlayerSetup ? (
-            <Panel className="lobby__setup" data-part="lobby-setup" data-section="setup" title="Your setup">
-              <PlayerSetup />
-            </Panel>
-          ) : null}
 
           <Panel className="lobby__chat" data-part="lobby-chat" data-section="chat" title="Lobby chat" padded={false}>
             <ChatPanel />

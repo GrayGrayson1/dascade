@@ -9,6 +9,7 @@ import { MeshBuilder } from '../art/builder.ts';
 import { shadeInt } from '../art/palette.ts';
 import type { BiomeStyle, PropKind } from './biomes.ts';
 import { mulberry32 } from './rng.ts';
+import { container } from './kit.ts';
 import type { RoadPath } from './roads.ts';
 import type { DistanceField } from './terrain.ts';
 
@@ -120,9 +121,7 @@ const VARIANTS: Record<PropKind, Variant[]> = {
         const stack = 1 + Math.floor(r() * 3);
         for (let k = 0; k < stack; k++) {
           const cc = k === 0 ? c : [0xe8364f, 0x2563eb, 0xf97316, 0x22c55e][Math.floor(r() * 4)]!;
-          b.box(0, 1.3 + k * 2.6, 0, 6, 2.5, 2.4, cc);
-          for (let s = -2; s <= 2; s++) b.box(s * 1.2, 1.3 + k * 2.6, 1.22, 0.12, 2.3, 0.05, shadeInt(cc, -0.2)).box(s * 1.2, 1.3 + k * 2.6, -1.22, 0.12, 2.3, 0.05, shadeInt(cc, -0.2));
-          b.box(3.02, 1.3 + k * 2.6, 0, 0.05, 2.3, 2.2, shadeInt(cc, -0.25));
+          container(b, (r() - 0.5) * 0.3, 1.3 + k * 2.55, 0, cc, 6, 2.5, 2.4);
         }
       },
   ),
@@ -140,6 +139,18 @@ const VARIANTS: Record<PropKind, Variant[]> = {
       const h = 9;
       b.box(0, h / 2, 0, w, h, d, 0x8b9bb0);
       b.box(0, 0.4, 0, w + 0.2, 0.8, d + 0.2, 0x5d6b80);
+      // corrugated cladding on every wall, a gutter line and a painted number band
+      for (let x = -w / 2 + 0.6; x < w / 2; x += 1.1) {
+        b.box(x, h / 2 + 0.4, d / 2 + 0.03, 0.18, h - 0.8, 0.05, 0x72839a).box(x, h / 2 + 0.4, -d / 2 - 0.03, 0.18, h - 0.8, 0.05, 0x72839a);
+      }
+      for (let z = -d / 2 + 0.6; z < d / 2; z += 1.1) {
+        b.box(w / 2 + 0.03, h / 2 + 0.4, z, 0.05, h - 0.8, 0.18, 0x72839a).box(-w / 2 - 0.03, h / 2 + 0.4, z, 0.05, h - 0.8, 0.18, 0x72839a);
+      }
+      b.box(0, h - 0.1, 0, w + 0.3, 0.25, d + 0.3, 0x4b5563);
+      for (const sx of [-1, 1]) {
+        b.box(sx * (w / 2 + 0.06), h * 0.62, 0, 0.05, 1.6, d * 0.5, 0xffd23f, 0.2);
+        for (let k = 0; k < 3; k++) b.box(sx * (w / 2 + 0.08), 1.6, -d / 4 + k * (d / 4), 0.05, 3.2, 2.6, 0x3b4252);
+      }
       b.boxR(0, h + 1.6, 4, w, 0.4, 9, 'x', 0.35, 0x5d6b80).boxR(0, h + 1.6, -4, w, 0.4, 9, 'x', -0.35, 0x5d6b80);
       for (let k = -2; k <= 2; k++) b.box(k * 5, 2.5, d / 2 + 0.05, 3.4, 5, 0.1, 0x3b4252);
       b.box(0, h - 1, d / 2 + 0.1, w * 0.6, 1.2, 0.1, 0xffd23f, 0.3);
@@ -360,7 +371,9 @@ export function scatterProps(ctx: PropContext): Placement[] {
       return;
     }
     const span = rule.far - rule.near;
-    const count = Math.round(rule.density * ctx.density * (main.length * span * 2) / 1000);
+    // hero forests keep most of their density on medium (they carry the biome)
+    const dens = rule.cluster ? (ctx.density >= 0.7 ? 1 : Math.min(1, ctx.density * 1.35)) : ctx.density;
+    const count = Math.round(rule.density * dens * (main.length * span * 2) / 1000);
     const maxSlope = rule.slope ?? 1.8;
     const cloudy = rule.kind === 'cloud' || rule.kind === 'floatrock';
     const minDist = rule.near + ctx.clearance + (rule.kind === 'mesa' ? 20 : rule.kind === 'building' ? 8 : 1);

@@ -215,6 +215,17 @@ export class KartInputSampler {
     this.setDevice('touch');
   }
 
+  /**
+   * Gamepad Start → menu. Polled every animation frame (not only while driving), so Start also
+   * closes the menu and resumes a paused race.
+   */
+  pollMenu(): void {
+    const pad = this.gamepad();
+    const down = Boolean(pad?.menu);
+    if (down && !this.padMenuDown) this.onMenu?.();
+    this.padMenuDown = down;
+  }
+
   /** Touch ITEM released after a swipe: keep the aim for the release frame (a trailed item fires then). */
   latchAim(now: number, dir: 'back' | 'ahead', ms = 120): void {
     if (dir === 'back') this.backLatchUntil = now + ms;
@@ -241,10 +252,6 @@ export class KartInputSampler {
     this.lastSampleAt = now;
 
     const pad = this.gamepad();
-    if (pad) {
-      if (pad.menu && !this.padMenuDown) this.onMenu?.();
-      this.padMenuDown = pad.menu;
-    } else this.padMenuDown = false;
     if (!this.enabled) return { ...NEUTRAL_KART_INPUT };
     if (pad) {
       this.setDevice('gamepad');

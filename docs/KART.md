@@ -31,13 +31,23 @@ from `../detmath`. State is quantized every tick to its wire form (x/y float32, 
 under perturbed `Math.*`.
 
 **Feel.** Written down in `kart.ts` (header) and pinned by `kart.test.ts`. In short: velocity turns ~75 % with the
-nose and realigns at the grip rate (planted, 1–3° of slip); steering authority peaks at mid speed and eases to
-~50–60 % at top speed (handling), capped by a grip-stat lateral limit (grip turn radius ≈ 20 u at top speed);
-hop-drift is kinematic (steer picks the arc: inside ≈ 11 u, neutral ≈ 15 u, outside ≈ 60 u; the body holds 12–25°
-inside the arc); stages at ~0.6/1.3/2.2 s at neutral (faster tight, slower wide, ±6 % per handling point);
-mini-turbos kick +6/+8/+9 u/s; walls bounce at 35 %, keep ≥ 40 % of the speed along the wall on any non-head-on hit,
-set the nose along it and ignore steering back into it for 0.25 s (no pinning); falls respawn in 1.2 s with immunity;
-hits are a 1 s spin (the nose ends where it started) followed by 1.5 s of immunity.
+nose and realigns at the grip rate (planted, 1–3° of slip); steering authority peaks at mid speed and eases off at
+top speed (handling), capped by a grip-stat lateral limit; hop-drift is kinematic (steer picks the arc: inside ≈ 11 u,
+neutral ≈ 15 u, outside ≈ 60 u; the body holds 12–25° inside the arc) and charges by how much the kart actually turns
+(~47° of path rotation for stage 1, ~100° stage 2, ~170° stage 3 — 0.6/1.3/2.2 s on a neutral arc), so snaking down
+a straight earns nothing and a drift never exceeds grip top speed; mini-turbos kick +6/+8/+9 u/s; walls bounce at
+35 %, keep ≥ 40 % of the speed along the wall on a non-head-on hit, swing the nose along it over a few ticks
+(≤ 6 rad/s) and ignore steering back into it for 0.25 s; falls respawn in 1.2 s with immunity; item hits are a 1 s
+spin that exits at ~30 % speed (~1.05–1.35 s lost, by Accel), hazard hits a 0.5 s stumble (~0.45–0.6 s lost), each
+followed by immunity. Start: throttle held for 3–60 of your own applied frames before GO → boost (~+0.4 s; more for
+slow-accelerating racers), longer → a short wheelspin (~−0.15 s).
+
+**Stats** (`spec.ts`, `BALANCE`; stat 3 = nova everywhere): Speed → top speed (4 % spread Speed 2 → 5); Accel →
+thrust (0 → 95 % in ~2.1 s … ~4.1 s) and so recovery from every hit, bump and wall; Handling → yaw rate, drift
+tightness and charge speed; Grip → the lateral limit and steering authority at speed, off-road, ice; Weight → bump
+mass. Tuned against 8-kart hard-bot pack races over every track (`lab/pack.ts`): 512 races with and without items
+give mean places 4.14–4.89 and win rates 9–16 % per racer; `balance.test.ts` pins a seeded 64-race subset and the
+per-stat lap value (`lab/statvalue.ts`: speed ~4.3 %, handling ~2.6 %, grip ~1.9 %, accel ~0.9 % solo, stat 1 → 5).
 
 Feel lab: `pnpm exec tsx packages/game-core/src/kart/lab/run.ts` prints the handling numbers (speed curves, yaw,
 slip, turn/drift radius per steer, stage timing, mini-turbo gains, wall hits, hop).
@@ -61,7 +71,8 @@ and the tests. `buildTrack` throws a `KartTrackError` naming the problem: self-i
 (unless one passes ≥ 6 u above), curves too tight for the road width, slopes steeper than 0.4, features off the road,
 branches that don't leave/rejoin cleanly, ramps whose flight leaves the road, gaps without a ramp or too long to
 jump, grid overlapping a gap/branch. `bots.test.ts` checks that hard bots finish every track near `parLapMs`
-(par = the best clean solo hard-bot lap × 0.97: `pnpm exec tsx scripts/kart-track-preview.ts <id> --race --solo --no-png`).
+(par = the hard bot's best clean solo lap — nova, no items, no hazard hit or fall in that lap:
+`pnpm exec tsx packages/game-core/src/kart/lab/pars.ts [id…]`; a hard bot's median lap sits within ~1 % of it).
 Landmarks must sit clear of the road unless floating (`blimp`, `hot-air-balloon`, `z ≥ 8`) or spanning (`arch`,
 `mesa-arch` centred on it).
 
@@ -89,8 +100,10 @@ Landmarks must sit clear of the road unless floating (`blimp`, `hot-air-balloon`
   item-box bitset, 20 B display record per kart, 15 B per entity ≈ 0.65 KB at 30 karts) and `kart:own` =
   `sim.encodeOwn(slot)` sent to each racer (60 B: exact `KartState` + last applied seq).
 - **Prediction.** The client runs `KartPredictor.step()` at 60 Hz for its own kart (same `stepKart`, quantized
-  inputs) and on each `kart:own` calls `reconcile(state, ack, tick, racing)`: rewind to the server state, drop acked
-  frames, replay the rest. Uninterrupted, corrections are exactly 0 (`netcode.test.ts`); items rolled on the server
+  inputs) and on each `kart:own` calls `reconcile(state, ack, tick, racing, goSeq)`: rewind to the server state, drop
+  acked frames, replay the rest. Frames are locked on the grid by frame (`nextFrameLocked(goTick)`: the server applies
+  frame f at ≈ f + input delay), and the lights are timed by `framesToGo`, so the start boost the player sees is the one
+  the server gives at any latency (tested at 0/100/200 ms). Uninterrupted, corrections are exactly 0 (`netcode.test.ts`); items rolled on the server
   and hits from others arrive as small corrections the client smooths. Other karts are interpolated from `kart:snap`.
 - **Authority.** Positions, gates, laps, finish order, race time, item rolls, item hits and box pickups are decided by
   the sim only; clients only ever send inputs.
@@ -98,12 +111,23 @@ Landmarks must sit clear of the road unless floating (`blimp`, `hot-air-balloon`
 ## Testing
 
 ```sh
-pnpm vitest run packages/game-core/src/kart          # all engine tests (~150, ~5 s)
+pnpm vitest run packages/game-core/src/kart          # all engine tests (~170, ~15 s)
 pnpm vitest run packages/game-core/src/kart/kart.test.ts   # physics + feel targets
 pnpm exec tsx packages/game-core/src/kart/lab/run.ts        # feel lab report
 pnpm exec tsx packages/game-core/src/kart/lab/bots.ts hard  # every track: finishes, lap vs par, items, hazards
 pnpm exec tsx packages/game-core/src/kart/lab/balance-report.ts   # per-racer lap spread
 pnpm exec tsx packages/game-core/src/kart/lab/race.ts pixel-plaza normal 30   # one headless race + perf
+pnpm exec tsx packages/game-core/src/kart/lab/tiers.ts        # solo lap per bot skill vs par
+pnpm exec tsx packages/game-core/src/kart/lab/aborts.ts hard  # drift quality (aborted hops)
+pnpm exec tsx packages/game-core/src/kart/lab/hazards.ts      # hazard hits/lap: line follower vs bots
+pnpm exec tsx packages/game-core/src/kart/lab/pack.ts 16      # 8-kart pack balance (mean place, wins)
+pnpm exec tsx packages/game-core/src/kart/lab/packsearch.ts '{"accelPerAccel":[3,3.5]}' 16 [firstSeed]  # BALANCE grid, pack races
+pnpm exec tsx packages/game-core/src/kart/lab/solotune.ts --eval  # solo pace spread per racer (deterministic)
+pnpm exec tsx packages/game-core/src/kart/lab/statvalue.ts --curve  # lap value of each stat point
+pnpm exec tsx packages/game-core/src/kart/lab/pars.ts        # par = best clean hard-bot lap, hard mean/median vs par
+pnpm exec tsx packages/game-core/src/kart/lab/shortcuts.ts    # shortcut value with / without a turbo
+pnpm exec tsx packages/game-core/src/kart/lab/start.ts        # start boost / wheelspin cost
+pnpm exec tsx packages/game-core/src/kart/lab/hits.ts         # spin / stumble cost per racer
 pnpm --filter @dascade/game-core typecheck && pnpm lint
 ```
 

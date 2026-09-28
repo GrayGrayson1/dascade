@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AIM_OPEN,
   AIM_TIME,
+  IDLE_OPEN,
+  grabCause,
+  rigSureWin,
+  slipCause,
+  type GripReport,
+  type MissCause,
   BOX,
   CHUTE,
   CLAW,
@@ -354,7 +361,7 @@ describe('outcomes', () => {
     const wins = ev.filter((e) => e.type === 'win');
     expect(wins).toHaveLength(1);
     expect(sim.toys).toHaveLength(0);
-    expect(ev.find((e) => e.type === 'done')).toEqual({ type: 'done', result: 'win' });
+    expect(ev.find((e) => e.type === 'done')).toMatchObject({ type: 'done', result: 'win', cause: null });
     expect(sim.misses).toBe(0);
   });
 
@@ -433,5 +440,115 @@ describe('restock', () => {
     run(sim, 3);
     expect(sim.toys.every((t) => t.mode === 'pile')).toBe(true);
     expect(restock(sim, 22)).toBe(0);
+  });
+});
+
+describe('readability', () => {
+  it('hangs the prongs open while aiming (the footprint reads) and parks them shut', () => {
+    const sim = createSim(stockToys(1, 10), 1);
+    expect(sim.open).toBeCloseTo(IDLE_OPEN, 6);
+    insertToken(sim);
+    run(sim, 1);
+    expect(sim.open).toBeCloseTo(AIM_OPEN, 6);
+    cancelAim(sim);
+    run(sim, 1);
+    expect(sim.open).toBeCloseTo(IDLE_OPEN, 6);
+  });
+
+  it('never lets a tall pile jam the drop above the gantry', () => {
+    const toys = Array.from({ length: 12 }, (_, i) => toy(i + 1, 'bunny', 60, 30, i * 20));
+    const sim = createSim(toys, 1);
+    sim.gx = 60;
+    sim.gz = 30;
+    expect(contactHeight(sim)).toBeLessThan(GANTRY.topY);
+  });
+
+  const report = (over: Partial<GripReport>): GripReport => ({
+    toy: 1,
+    prongs: [0.8, 0.8, 0.8],
+    opposed: 2.4,
+    offset: 0.5,
+    buried: 0,
+    margin: 2,
+    quality: 'great',
+    onNeighbours: 0,
+    tipsHigh: false,
+    ...over,
+  });
+
+  it('names why a grab never came up', () => {
+    expect(grabCause(report({ toy: null, quality: 'none' }), 6)).toBe('nothing');
+    expect(grabCause(report({ toy: null, quality: 'none', onNeighbours: 2 }), 6)).toBe('neighbour');
+    expect(grabCause(report({ quality: 'nudge', opposed: 0 }), 6)).toBe('shove');
+    expect(grabCause(report({ buried: 0.8 }), 6)).toBe('buried');
+    expect(grabCause(report({ onNeighbours: 1, tipsHigh: true, prongs: [0.3, 0.3, 0.3] }), 6)).toBe('neighbour');
+    expect(grabCause(report({ offset: 4 }), 6)).toBe('offcentre');
+    expect(grabCause(report({}), 6)).toBe('weak');
+  });
+
+  it('names why a plush that was up came out', () => {
+    expect(slipCause('jolt', false)).toBe('shook');
+    expect(slipCause('swing', false)).toBe('swung');
+    expect(slipCause('slide', false)).toBe('slid');
+    expect(slipCause('weak', false)).toBe('dropped');
+    expect(slipCause('jolt', true)).toBe('chute');
+  });
+
+  it('explains every miss, and only misses', () => {
+    const causes: MissCause[] = [
+      'nothing',
+      'shove',
+      'neighbour',
+      'buried',
+      'offcentre',
+      'weak',
+      'shook',
+      'swung',
+      'slid',
+      'dropped',
+      'chute',
+    ];
+    const seen = new Set<string>();
+    const r = lcg(3);
+    for (let seed = 1; seed <= 8; seed++) {
+      const sim = createSim(stockToys(seed, 22), seed);
+      for (let i = 0; i < 15; i++) {
+        if (sim.toys.length < 10) restock(sim, 22);
+        const t = sim.toys[Math.floor(r() * sim.toys.length)]!;
+        const ev = tryAt(sim, t.x + (r() - 0.5) * 6, t.z + (r() - 0.5) * 6);
+        const done = ev.find((e) => e.type === 'done') as { result: string; cause: MissCause | null };
+        if (done.result === 'win') expect(done.cause).toBeNull();
+        else {
+          expect(causes).toContain(done.cause);
+          seen.add(done.cause!);
+        }
+      }
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('a failed grab stirs the pile, so the same drop twice faces a different pile', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const sim = createSim(stockToys(seed, 22), seed);
+      sim.strengthScale = 0.2;
+      const t = sim.toys.reduce((a, b) => (b.y + KINDS[b.kind].h > a.y + KINDS[a.kind].h ? b : a));
+      const before = sim.toys.map((x) => `${x.id}:${x.x.toFixed(2)},${x.z.toFixed(2)}`).join('|');
+      const ev = tryAt(sim, t.x, t.z);
+      expect(ev.some((e) => e.type === 'win')).toBe(false);
+      const after = sim.toys.map((x) => `${x.id}:${x.x.toFixed(2)},${x.z.toFixed(2)}`).join('|');
+      expect(after).not.toBe(before);
+    }
+  });
+
+  it('the test rig is a sure win on any stocked pile', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const sim = createSim(stockToys(seed * 31, 22), seed);
+      const events: ClawEvent[] = [];
+      insertToken(sim, events);
+      expect(rigSureWin(sim)).toBe(true);
+      stepClaw(sim, { x: 0, z: 0, drop: true }, events);
+      for (let i = 0; i < 40 / DT && sim.phase !== 'idle'; i++) stepClaw(sim, IDLE, events);
+      expect(sim.result, `seed ${seed}`).toBe('win');
+    }
   });
 });

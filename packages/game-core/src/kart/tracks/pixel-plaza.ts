@@ -59,7 +59,7 @@ export const PIXEL_PLAZA: KartTrackDef = {
     { kind: 'arch', at: f(0, 0.02), d: 0 },
   ],
   decorSeed: 1101,
-  parLapMs: 36_400,
+  parLapMs: 36_000,
 };
 
 /** Authoring aid: the piece fractions (see lab/probe.ts). */

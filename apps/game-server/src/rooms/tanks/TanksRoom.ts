@@ -97,12 +97,14 @@ export class TanksRoom extends BaseGameRoom<TanksState, TanksSettings> {
       playersOnly: true,
       silent: true,
       rate: TANKS_AIM_RATE,
+      maxNodes: 8, // schema maximum 4
     });
     this.handle(TANKS_MSG.move, TanksMoveSchema, (p, { dir }) => this.onMove(p, dir), {
       phases: ['PLAYING'],
       playersOnly: true,
       silent: true,
       rate: TANKS_MOVE_RATE,
+      maxNodes: 8, // schema maximum 2
     });
     this.handle(TANKS_MSG.fire, TanksFireSchema, (p, shot) => this.onFire(p, shot), {
       phases: ['PLAYING'],

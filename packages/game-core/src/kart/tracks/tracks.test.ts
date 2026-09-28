@@ -11,7 +11,14 @@ import { buildTrack, EDGE_DROP, groundAt, KART_GRID_SLOTS, pointAtS, type KartTr
 import type { KartTrackDef } from '../trackdef.ts';
 import { KART_PLACEHOLDER_TRACKS, KART_TRACK_DEFS } from './index.ts';
 
-const IDS = ['harbor-hairpins', 'frostbyte-pass', 'pinball-park', 'gearworks', 'skyway-sprint', 'midnight-mainframe'] as const satisfies readonly KartTrackId[];
+const IDS = [
+  'harbor-hairpins',
+  'frostbyte-pass',
+  'pinball-park',
+  'gearworks',
+  'skyway-sprint',
+  'midnight-mainframe',
+] as const satisfies readonly KartTrackId[];
 
 const built = new Map<KartTrackId, KartTrack>();
 function track(id: KartTrackId): KartTrack {
@@ -49,7 +56,8 @@ const FLOATING = new Set(['blimp', 'hot-air-balloon']);
 function clearance(t: KartTrack, x: number, y: number): number {
   let best = Infinity;
   for (let i = 0; i < t.n; i++) best = Math.min(best, Math.hypot(x - t.xs[i]!, y - t.ys[i]!) - Math.max(t.hwL[i]!, t.hwR[i]!) - t.shoulder);
-  for (const b of t.branches) for (let i = 0; i < b.n; i++) best = Math.min(best, Math.hypot(x - b.xs[i]!, y - b.ys[i]!) - b.hwL[i]! - t.shoulder);
+  for (const b of t.branches)
+    for (let i = 0; i < b.n; i++) best = Math.min(best, Math.hypot(x - b.xs[i]!, y - b.ys[i]!) - b.hwL[i]! - t.shoulder);
   return best;
 }
 
@@ -146,7 +154,12 @@ describe.each(IDS)('%s', (id) => {
     const racers: KartRacerId[] = ['nova', 'brick', 'quack'];
     const bests: number[] = [];
     for (const racer of racers) {
-      const sim = new KartSim(t, { laps: 2, items: false, collisions: false, finishWindowMs: 60_000, maxRaceMs: 240_000 }, createSeededRng(`${id}-${racer}`), 1);
+      const sim = new KartSim(
+        t,
+        { laps: 2, items: false, collisions: false, finishWindowMs: 60_000, maxRaceMs: 240_000 },
+        createSeededRng(`${id}-${racer}`),
+        1,
+      );
       const k = sim.addRacer(0, 'bot', racer, 'hard');
       sim.go();
       let falls = 0;
@@ -159,8 +172,8 @@ describe.each(IDS)('%s', (id) => {
       bests.push(k.progress.bestLapMs);
     }
     const best = Math.min(...bests);
-    // Par is set from a clean hard-bot lap × ~0.97 (hazards hit by the hazard-blind bot add a little; the band leaves
-    // room for physics tuning).
+    // Par is the hard bot's best clean lap (lab/pars.ts); the band leaves room for other racers, hazards and
+    // physics tuning.
     expect(best).toBeGreaterThan(def(id).parLapMs * 0.9);
     expect(best).toBeLessThan(def(id).parLapMs * 1.25);
   }, 60_000);
@@ -184,7 +197,8 @@ describe('track personalities', () => {
     expect((def('frostbyte-pass').zones ?? []).some((z) => z.kind === 'ice')).toBe(true);
     expect(kinds('frostbyte-pass', 'roller').length).toBeGreaterThanOrEqual(2);
     // Rollers roll down the climb: the road rises in the direction of travel under every roller.
-    for (const h of t.hazards.filter((hz) => hz.kind === 'roller')) expect(pointAtS(t, h.s).z).toBeGreaterThan(pointAtS(t, h.s - h.amp).z + 3);
+    for (const h of t.hazards.filter((hz) => hz.kind === 'roller'))
+      expect(pointAtS(t, h.s).z).toBeGreaterThan(pointAtS(t, h.s - h.amp).z + 3);
     expect(t.landmarks.some((l) => l.kind === 'frozen-joystick' || l.kind === 'ice-castle')).toBe(true);
   });
 
@@ -246,7 +260,11 @@ describe('track personalities', () => {
       for (let j = i + 1; j < profile.length; j++) {
         const a = profile[i]!;
         const b = profile[j]!;
-        const same = Math.abs(a.length - b.length) < 40 && Math.abs(a.hw - b.hw) < 0.75 && Math.abs(a.z - b.z) < 4 && Math.abs(a.drops - b.drops) < 0.1;
+        const same =
+          Math.abs(a.length - b.length) < 40 &&
+          Math.abs(a.hw - b.hw) < 0.75 &&
+          Math.abs(a.z - b.z) < 4 &&
+          Math.abs(a.drops - b.drops) < 0.1;
         expect(same, `${a.id} vs ${b.id}`).toBe(false);
       }
     }
