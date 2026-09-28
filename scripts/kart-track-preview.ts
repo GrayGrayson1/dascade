@@ -163,10 +163,13 @@ function sampleBranch(def: KartTrackDef, r: Ring, b: NonNullable<KartTrackDef['b
   return sampleChain(pts, false, 1);
 }
 
-/** Landmark footprint radii at scale 1 (render lane, .scratch/kart/LANDMARKS.md). */
+/**
+ * Landmark clearance radii at scale 1: conservative copies of the renderer's measured footprints
+ * (`landmarkFootprint`, apps/web/src/games/kart/render/landmarks.ts); see docs/KART.md § Landmarks.
+ */
 const LANDMARK_RADIUS: Record<string, number> = {
   'arcade-cabinet': 12, billboard: 9, tower: 10, arch: 18, 'radar-dish': 10, 'mesa-arch': 22, lighthouse: 7, crane: 12,
-  'cargo-ship': 30, 'ice-castle': 20, 'frozen-joystick': 9, 'ferris-wheel': 14, 'circus-tent': 16, gears: 16, smokestack: 8,
+  'cargo-ship': 30, 'ice-castle': 20, 'frozen-joystick': 9, 'ferris-wheel': 14, 'circus-tent': 16, gears: 21, smokestack: 8,
   blimp: 26, 'cpu-tower': 14, 'data-spire': 8, 'cloud-island': 20, 'hot-air-balloon': 7,
 };
 
@@ -268,7 +271,7 @@ function lint(def: KartTrackDef, r: Ring, branches: Ring[]): string[] {
     out.push(`branch ${bi} (${b.surface}) length ${br.length.toFixed(0)} u vs main ${mainSpan} u${bad.length ? ` OVERLAPS main at ${bad.slice(0, 5).join(', ')}` : ''}`);
   });
 
-  // Landmarks off the road: footprint (LANDMARKS.md) + shoulder + 4 u.
+  // Landmarks off the road: footprint (LANDMARK_RADIUS) + shoulder + 4 u.
   for (const lm of def.landmarks ?? []) {
     const foot = (LANDMARK_RADIUS[lm.kind] ?? 10) * (lm.scale ?? 1);
     const p = off(at(r, lm.at), lm.d);

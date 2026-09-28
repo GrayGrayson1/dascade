@@ -1,5 +1,5 @@
 /**
- * Input sequencing: every simulated tick gets the next sequence number and a packed 18-bit input
+ * Input sequencing: every simulated tick gets the next sequence number and a packed 19-bit input
  * frame. Frames go out in packets of `KART_SIM.inputEvery` (≤ `maxInputsPerPacket`), and stay in
  * `pending` until a snapshot acknowledges them (they are replayed on every reconciliation).
  */

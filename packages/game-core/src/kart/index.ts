@@ -8,7 +8,8 @@
  *    bots) with `encodeSnapshot()` (broadcast display records) and `encodeOwn(slot)` (exact state
  *    for that racer's predictor).
  *  - `decodeKartSnapshot` / `decodeKartOwn`, `KartPredictor`, ghosts, `KartBot`.
- * See .scratch/kart/API.md and docs/KART.md.
+ * Each file's header documents its part of the API; docs/KART.md is the engineer's guide (layout,
+ * networking model, room flow, adding tracks/items/racers, testing).
  */
 import type { KartTrackId } from '@dascade/shared/games/kart';
 import { buildTrack, type KartTrack } from './track.ts';

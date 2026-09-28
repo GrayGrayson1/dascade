@@ -1,5 +1,5 @@
 /**
- * Landmark models keyed by `Landmark.kind` (see .scratch/kart/LANDMARKS.md). Each is a merged static
+ * Landmark models keyed by `Landmark.kind` (see docs/KART.md § Landmarks). Each is a merged static
  * mesh plus up to a few animated parts (ferris wheel, lighthouse beam, gears, blimp, radar…), all on
  * the shared voxel material (vertex colours + glow). Models face local +Z; the renderer turns them
  * toward the road. Unknown kinds fall back to `tower`.

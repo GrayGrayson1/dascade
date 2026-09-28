@@ -105,7 +105,7 @@ Policy hooks:
 - `ratedOptIn()`: return true when a casual room of a `rated` game should change ratings. The boardroom kit returns its lobby **Rated** toggle.
 
 Helpers:
-- **Phases and timers:** `this.setPhase(phase, durationMs?)` publishes `phaseEndsAt` (server epoch ms); `this.setTimer(ms)`; `this.startMatch()` starts from code (e.g. instant solo); `this.returnToLobby()`; `this.promoteQueued()` seats queued late joiners between rounds or hands. `this.schedule(key, ms, fn)`, `this.cancel(key)`, `this.isScheduled(key)` and `this.clearAllTimers()` give you named timers that are cleaned up automatically.
+- **Phases and timers:** `this.setPhase(phase, durationMs?)` publishes `phaseEndsAt` (server epoch ms); `this.setTimer(ms)`; `this.startMatch()` starts from code (e.g. instant solo); `this.returnToLobby()`; `this.promoteQueued()` seats queued late joiners between rounds or hands. `this.schedule(key, ms, fn)`, `this.cancel(key)`, `this.isScheduled(key)` and `this.clearAllTimers()` give you named timers that are cleaned up automatically. `this.freezeTimers(true | false)` pauses and resumes every pending named timer with its remaining time (including the base countdown), e.g. for a solo pause; platform timers (reconnect grace, host migration, tournaments) never freeze, and shifting the wall-clock values you published (`phaseEndsAt`, deadlines) on resume is up to you (DASphalt GP's `kart:pause` is the reference).
 - **Players:** `this.seatedPlayers()` returns non-spectators including disconnected ones; `this.activePlayers()` returns connected non-spectators; `this.players` is the `Map<id, PlayerRecord>`; `this.isHost(player)`.
 - **Messaging:** `this.toast(player | 'all', kind, text)`; `this.systemChat(text)`.
 - **Settings:** `this.getSettings()`; `this.updateSettings(next)` lets game code mutate settings (for example, removing a wheel winner).
@@ -159,7 +159,7 @@ To make a game tournament-capable, add `tournament: { formats, bestOf, maxField,
 // apps/web/src/games/wheel/index.tsx
 import type { GameClientModule } from '../types.ts';
 import './wheel.css';
-const module: GameClientModule = { GameView: WheelView, SettingsPanel: WheelSettingsPanel, PlayerSetup?, lobbyPhases?, immersive?, ownCountdown?, musicMood? };
+const module: GameClientModule = { GameView: WheelView, SettingsPanel: WheelSettingsPanel, PlayerSetup?, lobbyPhases?, immersive?, ownCountdown?, lobbyStartTab?, musicMood? };
 export default module;
 ```
 - **GameView** renders for every phase except LOBBY (COUNTDOWN, PLAYING, INTERMISSION, RESULTS). Wrap it in `<GameStage gameId="wheel">` from `../../shell/common.tsx`, which applies your accent theme and backdrop. It sits under the shared 56px top bar, or fills the screen with a floating menu if `immersive`. `lobbyPhases: []` means your view renders in every phase (the tournament kiosk uses this).
@@ -171,7 +171,7 @@ export default module;
   - `useCountdown(state.phaseEndsAt)` returns ms remaining against the synced server clock.
   - `session.send(type, payload)`; `session.room` is the raw Colyseus room, for Phaser scenes that want to read `room.state` directly without React.
 - **SettingsPanel** gets `{ settings, canEdit, update(patch) }`. Render read-only when `!canEdit`, and in tournament match rooms (`tournamentJson` set). **Debounce** text inputs (about 400ms) before calling `update`, because settings messages are rate-limited to 5/s.
-- **PlayerSetup** is per-player lobby setup (car builder, hero pick, team pick). It sends its own game messages.
+- **PlayerSetup** is per-player lobby setup (car builder, hero pick, team pick). It sends its own game messages. On phones the lobby is tabbed and opens on Players; set `lobbyStartTab: 'setup'` to open on "Your setup" instead when picking comes first (DASphalt GP does).
 - Results screens: use `<ResultsActions />` from `../../shell/common.tsx`. It gives the host **Play again** and everyone **Back to cabinet** and **Leave**. Tournament rooms show `<TournamentBanner />` (series score, next game, Back to tournament) from the shell.
 - Reconnecting: the shell shows the RECONNECTING overlay, the RECONNECTED flash and the "Rejoin my seat" screen for every game (`shell/Reconnect.tsx`). Don't build your own.
 - Chat: `<ChatPanel />` (shared chat log) takes an optional `onSend` override and `renderMessage`.

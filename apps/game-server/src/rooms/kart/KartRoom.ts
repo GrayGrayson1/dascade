@@ -53,7 +53,7 @@ import { KartGpEntry, KartLook, KartRacer, KartState } from './KartState.ts';
 const META_EVERY = 12;
 /** …and the validated distance (2 Hz: it changes for every moving kart, so it dominates schema patches). */
 const DISTANCE_EVERY = 30;
-/** Snapshot cadence (ticks): 3 = 20 Hz at every grid size (measured affordable at 30 karts, see LOAD.md). */
+/** Snapshot cadence (ticks): 3 = 20 Hz at every grid size (measured affordable at 30 karts: docs/KART.md § Load results). */
 const SNAP_EVERY = 3;
 /** Grand Prix: time between races before the next one starts on its own. */
 const GP_INTERMISSION_MS = 15_000;
@@ -1009,7 +1009,7 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   }
 
   // ---------------------------------------------------------------------------
-  // Test hook (relaxed limits on a non-production server only; see SERVER_NOTES.md)
+  // Test hook (relaxed limits on a non-production server only; see docs/KART.md § Testing and ops)
   // ---------------------------------------------------------------------------
 
   private testHook(player: PlayerRecord, cmd: z.infer<typeof TestHookSchema>): void {

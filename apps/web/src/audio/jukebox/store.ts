@@ -1,7 +1,8 @@
 /**
  * Jukebox store (zustand). Lives at module scope — outside any React tree — so playback state
  * survives every route change. The UI reads it with `useJukebox(selector)`; only the engine
- * (engine.ts) writes to it. See .scratch/THEMES/CONTRACT.md §3 for the binding shape.
+ * (engine.ts) writes to it. The binding shape is `JukeboxState` below; README.md "Jukebox and audio"
+ * describes the behaviour.
  */
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import type { DjState, JukeboxTrack } from '@dascade/shared/jukebox';

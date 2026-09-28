@@ -294,7 +294,7 @@ describe('walls', () => {
   });
 });
 
-describe('hazards only hit karts on their own road (TRACK_NOTES #2)', () => {
+describe('hazards only hit karts on their own road', () => {
   it('a kart on a branch is not hit by a laser gate on the main road at the same progress', () => {
     const def: KartTrackDef = {
       ...LAB_DEF,
@@ -379,7 +379,7 @@ describe('walls: the nose never teleports', () => {
   });
 });
 
-describe('walls: no pinning (FEEL_NOTES #1)', () => {
+describe('walls: no pinning', () => {
   it('a drift held into the wall bounces off, slides along and keeps going (never grinds to a halt)', () => {
     const track = getKartTrack('pixel-plaza');
     let st = createKartState(track, 0);

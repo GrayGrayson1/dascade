@@ -32,6 +32,15 @@ async function walkUp(page: Page, isMobile: boolean): Promise<void> {
   else await machine(page).click();
   await expect(closeup(page)).toBeVisible();
   await hook(page);
+  // The machine zooms out of the one on the floor: wait for that (finite) animation before measuring
+  // anything (the marquee's endless chasers don't count).
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector('dialog[open]');
+    if (!dialog) return false;
+    return dialog
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity);
+  });
 }
 
 /** A drop straight after the token is ignored (a double click can't insert and drop at once). */

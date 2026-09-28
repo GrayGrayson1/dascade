@@ -245,7 +245,7 @@ describe('projection', () => {
   });
 });
 
-describe('junctions (TRACK_NOTES #3/#4)', () => {
+describe('junctions', () => {
   // A road branch that bulges 40 u out to the left of the bottom straight.
   const t = buildTrack(
     def({

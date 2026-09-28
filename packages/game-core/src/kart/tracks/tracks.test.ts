@@ -31,7 +31,11 @@ function track(id: KartTrackId): KartTrack {
 }
 const def = (id: KartTrackId): KartTrackDef => KART_TRACK_DEFS[id];
 
-/** Landmark footprints at scale 1 (render lane, LANDMARKS.md); floating kinds have none. */
+/**
+ * Landmark clearance footprints at scale 1: conservative copies of the renderer's measured footprints
+ * (`landmarkFootprint` in apps/web/src/games/kart/render/landmarks.ts; docs/KART.md § Landmarks).
+ * Floating kinds have none.
+ */
 const FOOTPRINT: Record<string, number> = {
   'arcade-cabinet': 12,
   billboard: 9,
@@ -44,7 +48,7 @@ const FOOTPRINT: Record<string, number> = {
   'frozen-joystick': 9,
   'ferris-wheel': 14,
   'circus-tent': 16,
-  gears: 16,
+  gears: 21,
   smokestack: 8,
   'cpu-tower': 14,
   'data-spire': 8,

@@ -11,7 +11,7 @@ packages/
   game-core/      Pure deterministic engines for every game, kit helpers (party, classics/shared), tournament engine, Elo rating
   ui/             Design system: layered theme tokens + theme API, CSS, React components, pixel icons, cards/chips
 e2e/              Playwright specs (chromium, firefox, webkit, mobile = Pixel 7, mobile-safari = iPhone 14)
-scripts/          Load simulation (load-test.ts, load-scenarios.ts, load/<party game>.ts, load-circuit.ts), dictionary build
+scripts/          Load simulation (load-test.ts, load-scenarios.ts, load/<party game>.ts, load-circuit.ts, load-kart.ts), kart track preview, dictionary build
 supabase/         Optional Postgres migrations 0001–0004 + RLS policies
 ```
 
@@ -87,6 +87,13 @@ DAS Ships uses its own room (`ShipsRoom` extends `BaseGameRoom`).
   - `Reconnect.tsx`, which shows the RECONNECTING overlay, a RECONNECTED flash, and a "Rejoin my seat" screen for every game;
   - `profile/`, the Profile and Stats tabs.
 - `arcade/` is the pixel-art arcade floor: a cover-flow lineup of the cabinets in `packages/shared/src/cabinets.ts` (spring-animated DOM transforms, math in `carousel.ts`), per-cabinet SVG art, the floor's tournament kiosk, and procedural attract-mode scenes (`attract.ts` + `scenes/`) that only animate for the centred cabinet and its neighbours. The floor never imports game modules. Cabinet variants (DASino tables) travel from the title screen into the room through `variantRequest.ts`.
+- **Claw machine** (`arcade/claw*`, `ClawMachine.tsx`, `ClawCloseup.tsx`): a local, cosmetic Easter egg with no server side.
+  - Pure model: `clawPile.ts` (case geometry, plush kinds, stacking and settling, fresh stock) is all the floor machine needs; `clawPhysics.ts` (gantry with mass, cable swing, drop, the prong grip model, lift and carry) runs only in the close-up on a fixed 120 Hz step. Randomness comes only from the state's own seed (mulberry32), so a seed plus inputs replays exactly.
+  - `ClawCloseup.tsx` (a native `<dialog>`, drawn by `clawRender.ts`) is lazy loaded when the machine is opened, and warmed on hover or focus. A failed chunk load stays inside the claw (its own boundary message) instead of triggering the app's stale-deploy reload. Closing before the drop returns the token; after it, the try is settled instantly (never lost or counted twice).
+  - Storage: `clawInventory.ts` keeps the pile and prize shelf in a zustand store shared by the floor machine and the close-up, persisted as `localStorage` `dascade:v2:claw`. Everything read back is validated and bounded (malformed data → a fresh machine; the v1 key migrates onto the shelf), and the pile is restocked on the next visit when it runs low.
+  - Test hooks: `?clawSeed=<int>` pins the machine's randomness and exposes `window.__dascadeClaw` (`state()`, `target()`, `rig()` for a guaranteed win) in the close-up.
+  - Audio (`clawAudio.ts`): the gantry motor and winch are one continuous voice on the shared SFX bus that holds the jukebox dip with `synth.hold('claw-motor', …)` while it runs and always releases it; everything else is short `sfx()`/`synth` blips.
+  - Tests: `clawPhysics.test.ts`, `clawInventory.test.ts`, `claw.test.ts`, `e2e/claw.spec.ts`. Theming hooks are in [`THEMING.md`](THEMING.md) (Skins).
 - `tournament/` is the Tournament Center (see above). Its dev-only bracket gallery (`/tournaments?gallery=…`) is tree-shaken from production.
 - `audio/` is procedural WebAudio SFX and music, unlocked on the first gesture.
 - `persistence/` is an adapter interface. `LocalPersistence` (localStorage) is the default. `SupabasePersistence` (anonymous auth, RLS tables) is used when `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are set.

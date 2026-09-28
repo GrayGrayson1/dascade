@@ -181,7 +181,7 @@ e2e/              Playwright specs     scripts/  load simulation, dictionary bui
 - **Presentation is separate from play.** Themes (tokens, materials, lazy skins) and the jukebox are purely client-side. Themes are never sent to the server, and Room DJ is an isolated, fault-tolerant add-on that can't affect game state.
 - **Kits.** Game families share tested toolkits: the **party kit** (DAStravaganza), the **boardroom kit** (two-player board games) and the **classics kit** (arcade quick-plays).
 
-For details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The game contract and kit reference are in [`docs/GAME_GUIDE.md`](docs/GAME_GUIDE.md), and theming is in [`docs/THEMING.md`](docs/THEMING.md).
+For details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The game contract and kit reference are in [`docs/GAME_GUIDE.md`](docs/GAME_GUIDE.md), and theming is in [`docs/THEMING.md`](docs/THEMING.md). DASphalt GP's engine, netcode, room flow and content pipeline (tracks, items, racers) are in [`docs/KART.md`](docs/KART.md).
 
 ## Dependencies worth knowing
 
