@@ -2,7 +2,7 @@
  * Themes are presentation only: switching theme (with the themed transition) mid-match must never
  * touch the game. For a representative set — chess mid-game, a party game mid-round, a Phaser game
  * mid-battle, a casino game mid-hand, a Classics run and a Tournament Center match — this cycles the
- * page through all eleven themes and proves:
+ * page through all twelve themes and proves:
  *  - the synchronized room state is identical before and after (and the private view, where shown);
  *  - the page sent the server nothing but its clock pings while switching;
  *  - same room, same session, same socket: no reconnect, no status flicker, no remounted game stage;
@@ -22,6 +22,7 @@ const THEMES = [
   'saturday-morning',
   'executive',
   'neon-noir',
+  'halloween-night',
   'delta-neon',
 ] as const;
 
@@ -119,7 +120,7 @@ async function readProbe(page: Page, stageSelector: string): Promise<ProbeResult
   }, stageSelector);
 }
 
-/** Cycles through all eleven themes with the transition and asserts nothing about the match moved. */
+/** Cycles through all twelve themes with the transition and asserts nothing about the match moved. */
 async function cycleThemesAndAssertUntouched(page: Page, opts: { stage: string; privateView?: string }): Promise<void> {
   const errors = watchErrors(page);
   const before = await roomState(page);
@@ -135,7 +136,7 @@ async function cycleThemesAndAssertUntouched(page: Page, opts: { stage: string; 
 
   const after = await roomState(page);
   const probe = await readProbe(page, opts.stage);
-  expect(after, 'synchronized state is untouched by eleven theme switches').toEqual(before);
+  expect(after, 'synchronized state is untouched by twelve theme switches').toEqual(before);
   if (opts.privateView) expect(await page.locator(opts.privateView).first().innerText()).toBe(privateBefore);
   expect(probe.sent, 'theme switching sends the server nothing').toEqual([]);
   expect(probe.statuses, 'no reconnect / status flicker').toEqual([]);
@@ -236,7 +237,7 @@ test.describe('theme switching never alters game state', () => {
 
   test('casino game mid-hand (DASjack 21 decision)', async ({ page }) => {
     test.setTimeout(150_000);
-    // Solo table with the longest decision timer: eleven themed transitions (slow on WebKit under
+    // Solo table with the longest decision timer: twelve themed transitions (slow on WebKit under
     // load) must finish before the server's auto-stand, or the hand legitimately moves on.
     await page.goto('/play/blackjack');
     await setName(page, 'Player');

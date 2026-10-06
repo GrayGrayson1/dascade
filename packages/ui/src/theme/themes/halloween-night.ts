@@ -121,7 +121,8 @@ export const HALLOWEEN_NIGHT: ThemeDefinition = {
   },
   copy: {
     'arcade.tagline': 'Trick-or-treat at the arcade',
-    'arcade.status': 'SPIRITS {online}|{cabinets} CABINETS HAUNTED|{rooms} ROOMS BOOKED|CAULDRON ON SIMMER|CANDY CORN: UNLIMITED|NO REAL SCARES, PROMISE',
+    'arcade.status':
+      'SPIRITS {online}|{cabinets} CABINETS HAUNTED|{rooms} ROOMS BOOKED|CAULDRON ON SIMMER|CANDY CORN: UNLIMITED|NO REAL SCARES, PROMISE',
     'arcade.badge': 'OPEN TIL MIDNIGHT',
     'cabinet.heading': 'Pick your potion',
     'lobby.title': 'The haunted parlor',

@@ -662,10 +662,13 @@ export function Avatar({
   offline?: boolean;
   title?: string;
 }) {
-  const rows = AVATAR_ART[avatar] ?? AVATAR_ART.rocket!;
+  // `data-avatar` lets a theme skin dress avatars per kind (e.g. Halloween hats); it doesn't paint anything.
+  const id = Object.hasOwn(AVATAR_ART, avatar) ? avatar : 'rocket';
+  const rows = AVATAR_ART[id]!;
   return (
     <span
       className="dc-avatar"
+      data-avatar={id}
       data-offline={offline ? 'true' : undefined}
       style={{ '--size': `${size}px`, '--player': color } as CSSProperties}
       title={title}

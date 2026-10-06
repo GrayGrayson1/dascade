@@ -1,4 +1,1091 @@
-/* Halloween Night — every rule is scoped under :root[data-theme='halloween-night'] (see cssScope.ts). */
+/* =====================================================================
+ * HALLOWEEN NIGHT — structural skin. Every rule is scoped under
+ * :root[data-theme='halloween-night'] (see cssScope.ts).
+ * A cozy haunted arcade: plum walls, a smiling moon, string lights, paper
+ * bats, cobwebs, candy corn and jack-o'-lanterns. Spooky-cute, never scary:
+ * slow fades only (no flashing), every loop gated on data-fx / reduced
+ * motion, and MINIMAL effects drop the glows.
+ * ===================================================================== */
+
+/* ---------- Local vars ---------- */
 :root[data-theme='halloween-night'] {
+  /* Creepster only on big fixed titles; digits keep the house digit face. */
   --hn-spooky: 'DASCADE Digits', 'Creepster', 'Tiny5', 'Silkscreen', fantasy;
+  --hn-candycorn: linear-gradient(90deg, #ffc93c 0 33%, #ff8a3d 33% 66%, #fff6e6 66%);
+  --hn-web: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 0L98.0 0.0M0 0L94.2 27.0M0 0L81.2 54.8M0 0L60.3 77.2M0 0L30.3 93.2M0 0L0.0 98.0M22.0 0.0Q17.9 2.5 21.1 6.1M21.1 6.1Q16.3 7.6 18.2 12.3M18.2 12.3Q13.2 12.3 13.5 17.3M13.5 17.3Q8.5 15.9 6.8 20.9M6.8 20.9Q2.8 17.8 0.0 22.0M44.0 0.0Q35.7 5.0 42.3 12.1M42.3 12.1Q32.7 15.2 36.5 24.6M36.5 24.6Q26.4 24.6 27.1 34.7M27.1 34.7Q16.9 31.9 13.6 41.8M13.6 41.8Q5.6 35.6 0.0 44.0M66.0 0.0Q53.6 7.5 63.4 18.2M63.4 18.2Q49.0 22.9 54.7 36.9M54.7 36.9Q39.6 36.9 40.6 52.0M40.6 52.0Q25.4 47.8 20.4 62.8M20.4 62.8Q8.5 53.5 0.0 66.0M88.0 0.0Q71.5 10.0 84.6 24.3M84.6 24.3Q65.4 30.5 73.0 49.2M73.0 49.2Q52.8 49.2 54.2 69.3M54.2 69.3Q33.9 63.7 27.2 83.7M27.2 83.7Q11.3 71.3 0.0 88.0' fill='none' stroke='%23efe3ff' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  --hn-hat-witch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 50'%3E%3Cellipse cx='30' cy='43' rx='28' ry='6' fill='%232a0a3a'/%3E%3Cpath d='M14 42C20 30 22 16 30 4c3 6 2 10 9 14 4 8 5 16 7 24z' fill='%234b0867'/%3E%3Cpath d='M30 4c3 6 2 10 9 14-4-1-7-1-9 2z' fill='%235a0f7a'/%3E%3Cpath d='M15 38c10 4 21 4 31 0l1 4c-11 4-22 4-33 0z' fill='%23ff8a3d'/%3E%3Crect x='26' y='36' width='8' height='7' rx='1.5' fill='none' stroke='%23ffc93c' stroke-width='2'/%3E%3C/svg%3E");
+  --hn-hat-pumpkin: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 50'%3E%3Cpath d='M8 44c0-16 10-26 22-26s22 10 22 26z' fill='%23e15c1f'/%3E%3Cpath d='M20 44c0-14 4-24 10-26 6 2 10 12 10 26z' fill='%23f7812a'/%3E%3Cpath d='M8 44h44' stroke='%236b2304' stroke-width='3'/%3E%3Cpath d='M29 19c0-6 2-10 6-12' fill='none' stroke='%233f6b1f' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M35 10c6-3 12-1 14 4-6 2-11 1-14-4z' fill='%235f9a2a'/%3E%3C/svg%3E");
+  --hn-hat-bat: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 50'%3E%3Cpath d='M30 30C24 18 12 16 2 22c6 2 8 6 8 12 4-3 8-3 11 1 2-4 6-5 9-5z' fill='%232c1240'/%3E%3Cpath d='M30 30c6-12 18-14 28-8-6 2-8 6-8 12-4-3-8-3-11 1-2-4-6-5-9-5z' fill='%232c1240'/%3E%3Ccircle cx='30' cy='30' r='5' fill='%23ff8a3d'/%3E%3Ccircle cx='27.5' cy='29' r='1.2' fill='%232a0a3a'/%3E%3Ccircle cx='32.5' cy='29' r='1.2' fill='%232a0a3a'/%3E%3C/svg%3E");
+  --hn-ghost: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 60'%3E%3Cpath d='M5 25C5 12 13 3 25 3s20 9 20 22v29q-2.5 4-5 0t-5 0-5 0-5 0-5 0-5 0-5 0-5 0z' fill='%23f8f4ff'/%3E%3Cellipse cx='18' cy='24' rx='3.2' ry='4.4' fill='%232a0a3a'/%3E%3Cellipse cx='32' cy='24' rx='3.2' ry='4.4' fill='%232a0a3a'/%3E%3Ccircle cx='12.5' cy='31' r='2.6' fill='%23ffb3cf'/%3E%3Ccircle cx='37.5' cy='31' r='2.6' fill='%23ffb3cf'/%3E%3Cellipse cx='25' cy='33.5' rx='2.4' ry='3' fill='%232a0a3a'/%3E%3C/svg%3E");
+}
+
+/* =====================================================================
+ * ENVIRONMENT — the haunted hall (Environment.tsx + scene.ts)
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .hn-env {
+  --hn-horizon: 56%;
+  --hn-lights-top: max(76px, 8.5%);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #120720;
+  contain: strict;
+  transition:
+    opacity 500ms ease,
+    filter 500ms ease;
+}
+:root[data-theme='halloween-night'] .hn-env > * {
+  position: absolute;
+  pointer-events: none;
+}
+/* Plum bat-damask wallpaper over a dark wainscot. */
+:root[data-theme='halloween-night'] .hn-env__wall {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--hn-horizon);
+  background:
+    linear-gradient(180deg, rgba(10, 3, 18, 0.6), rgba(10, 3, 18, 0) 24%),
+    linear-gradient(0deg, #160824 0 17%, #3a1a58 17% 17.6%, #2a1240 17.6% 18.4%, transparent 18.4%),
+    var(--hn-wall) 0 0 / 220px 220px repeat,
+    #1c0b2a;
+}
+/* The arched window with the big sleepy moon. */
+:root[data-theme='halloween-night'] .hn-env__window {
+  right: 8%;
+  top: calc(var(--hn-lights-top) + 34px);
+  width: clamp(110px, 12vw, 210px);
+  aspect-ratio: 200 / 260;
+  background: var(--hn-window) center / contain no-repeat;
+  filter: drop-shadow(0 0 18px rgba(255, 233, 176, 0.18));
+}
+:root[data-theme='halloween-night'] .hn-env__moonglow {
+  inset: 0;
+  background: radial-gradient(22% 32% at 86% 30%, rgba(255, 233, 176, 0.14), transparent 70%);
+  mix-blend-mode: screen;
+}
+:root[data-theme='halloween-night'] .hn-env[data-haunt='2'] .hn-env__moonglow {
+  background:
+    radial-gradient(22% 32% at 86% 30%, rgba(255, 214, 140, 0.2), transparent 70%),
+    radial-gradient(40% 30% at 50% 0%, rgba(181, 123, 255, 0.1), transparent 75%);
+}
+/* "Trick or Treat" neon over the cabinet row (floor only; decorative, the layer is aria-hidden). */
+:root[data-theme='halloween-night'] .hn-env__sign {
+  display: none;
+  left: 50%;
+  top: calc(var(--hn-lights-top) + 26px);
+  transform: translateX(-50%) rotate(-2deg);
+  font-family: var(--hn-spooky);
+  font-size: clamp(26px, 2.8vw, 48px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: #ff8a3d;
+  text-shadow:
+    0 0 6px rgba(255, 138, 61, 0.9),
+    0 0 22px rgba(255, 138, 61, 0.45),
+    0 3px 0 #2a0a3a;
+}
+:root[data-theme='halloween-night'] .hn-env__sign i {
+  font-style: normal;
+  font-size: 0.6em;
+  color: #b6f03c;
+  text-shadow:
+    0 0 6px rgba(182, 240, 60, 0.85),
+    0 2px 0 #2a0a3a;
+}
+:root[data-theme='halloween-night'] .hn-env[data-place='floor'] .hn-env__sign {
+  display: block;
+}
+/* Sagging string lights and paper bats along the top of the wall. */
+:root[data-theme='halloween-night'] .hn-env__lights {
+  left: 0;
+  right: 0;
+  top: var(--hn-lights-top);
+  height: 40px;
+  background: var(--hn-lights) 0 0 / 160px 40px repeat-x;
+  filter: drop-shadow(0 0 5px rgba(255, 170, 80, 0.55));
+}
+:root[data-theme='halloween-night'] .hn-env__bats {
+  left: 0;
+  right: 0;
+  top: calc(var(--hn-lights-top) + 18px);
+  height: 90px;
+  background: var(--hn-bats) 40px 0 / 300px 90px repeat-x;
+  opacity: 0.9;
+}
+/* The checkerboard floor receding to the wall. */
+:root[data-theme='halloween-night'] .hn-env__floor {
+  left: 0;
+  right: 0;
+  top: var(--hn-horizon);
+  bottom: 0;
+  overflow: hidden;
+  perspective: 700px;
+  perspective-origin: 50% 0%;
+}
+:root[data-theme='halloween-night'] .hn-env__floor-plane {
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  top: 0;
+  height: 190%;
+  transform-origin: 50% 0;
+  transform: rotateX(64deg);
+  background: var(--hn-checker) 50% 0 / 120px 120px repeat;
+}
+:root[data-theme='halloween-night'] .hn-env__floor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(14, 6, 20, 0.95) 0%,
+    rgba(14, 6, 20, 0.5) 30%,
+    rgba(14, 6, 20, 0.25) 65%,
+    rgba(14, 6, 20, 0.55) 100%
+  );
+}
+/* Candle, cauldron and moon light pooling on the floor. */
+:root[data-theme='halloween-night'] .hn-env__glow {
+  inset: 0;
+  background:
+    radial-gradient(30% 22% at 10% 88%, rgba(255, 138, 61, 0.2), transparent 70%),
+    radial-gradient(28% 20% at 90% 90%, rgba(125, 240, 74, 0.13), transparent 70%),
+    radial-gradient(42% 26% at 50% 72%, rgba(181, 123, 255, 0.12), transparent 70%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+:root[data-theme='halloween-night'] .hn-env[data-haunt='1'] .hn-env__glow {
+  opacity: 0.92;
+}
+:root[data-theme='halloween-night'] .hn-env[data-haunt='2'] .hn-env__glow {
+  opacity: 1;
+}
+:root[data-theme='halloween-night'] .hn-env__fx {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+:root[data-theme='halloween-night'] .hn-env__vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 90% 80% at 50% 46%, transparent 55%, rgba(6, 1, 12, 0.72) 100%);
+}
+/* Motion (FULL effects only, tab visible, not in games). */
+:root[data-theme='halloween-night'] .hn-env[data-animate='true'] .hn-env__lights {
+  animation: hn-breathe 3.6s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'] .hn-env[data-animate='true'] .hn-env__bats {
+  animation: hn-bob 4.2s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'] .hn-env[data-animate='true'] .hn-env__sign {
+  animation: hn-breathe 5.2s ease-in-out infinite alternate;
+}
+/* Places: the floor gets the full hall; panelled screens a quieter one; games stay calm. */
+:root[data-theme='halloween-night'] .hn-env[data-place='lobby'],
+:root[data-theme='halloween-night'] .hn-env[data-place='tournament'],
+:root[data-theme='halloween-night'] .hn-env[data-place='other'] {
+  filter: brightness(0.78);
+}
+:root[data-theme='halloween-night'] .hn-env[data-place='entry'],
+:root[data-theme='halloween-night'] .hn-env[data-place='cabinet'] {
+  filter: brightness(0.85);
+}
+:root[data-theme='halloween-night'] .hn-env[data-place='game'] {
+  opacity: 0.4;
+  filter: saturate(0.65);
+}
+:root[data-theme='halloween-night'] .hn-env[data-fx='low'] .hn-env__glow {
+  opacity: 0.7;
+}
+:root[data-theme='halloween-night'] .hn-env[data-fx='off'] .hn-env__glow,
+:root[data-theme='halloween-night'] .hn-env[data-fx='off'] .hn-env__moonglow {
+  display: none;
+}
+:root[data-theme='halloween-night'] .hn-env[data-fx='off'] :is(.hn-env__lights, .hn-env__window) {
+  filter: none;
+}
+:root[data-theme='halloween-night'] .hn-env[data-fx='off'] .hn-env__sign {
+  text-shadow: 0 3px 0 #2a0a3a;
+}
+:root[data-theme='halloween-night'] .hn-env[data-fx='off'] .hn-env__sign i {
+  text-shadow: 0 2px 0 #2a0a3a;
+}
+@media (max-width: 700px) {
+  :root[data-theme='halloween-night'] .hn-env {
+    --hn-horizon: 42%;
+    --hn-lights-top: 64px;
+  }
+  :root[data-theme='halloween-night'] .hn-env__window,
+  :root[data-theme='halloween-night'] .hn-env[data-place='floor'] .hn-env__sign {
+    display: none;
+  }
+}
+@media (max-height: 560px) {
+  :root[data-theme='halloween-night'] .hn-env {
+    --hn-horizon: 46%;
+  }
+  :root[data-theme='halloween-night'] .hn-env[data-place='floor'] .hn-env__sign {
+    display: none;
+  }
+}
+
+/* =====================================================================
+ * FLOOR PROPS (FloorDecor.tsx)
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .hn-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+:root[data-theme='halloween-night'] .hn-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+:root[data-theme='halloween-night'] .hn-prop {
+  position: absolute;
+  display: none;
+  height: auto;
+  overflow: visible;
+}
+:root[data-theme='halloween-night'] .hn-prop--web-l,
+:root[data-theme='halloween-night'] .hn-prop--web-r {
+  fill: none;
+  stroke: #efe3ff;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.3;
+}
+:root[data-theme='halloween-night'] .hn-thread {
+  stroke: #d6beff;
+  stroke-width: 1;
+  opacity: 0.5;
+}
+:root[data-theme='halloween-night'] .hn-spider,
+:root[data-theme='halloween-night'] .hn-peek,
+:root[data-theme='halloween-night'] .hn-bubble {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+:root[data-theme='halloween-night'] .hn-pool {
+  fill: rgba(4, 1, 8, 0.45);
+}
+/* Jack-o'-lantern faces glow softly by day, burn bright after dark. */
+:root[data-theme='halloween-night'] .hn-face {
+  fill: #ffb347;
+  filter: drop-shadow(0 0 3px rgba(255, 170, 60, 0.65));
+}
+:root[data-theme='halloween-night'] .hn-decor:is([data-haunt='1'], [data-haunt='2']) .hn-face {
+  fill: #ffd36b;
+  filter: drop-shadow(0 0 6px rgba(255, 190, 80, 0.95));
+}
+:root[data-theme='halloween-night'] .hn-eye {
+  fill: #b6f03c;
+}
+:root[data-theme='halloween-night'] .hn-decor:is([data-haunt='1'], [data-haunt='2']) .hn-eye {
+  filter: drop-shadow(0 0 3px rgba(182, 240, 60, 0.9));
+}
+:root[data-theme='halloween-night'] .hn-embers {
+  fill: #ff8a3d;
+  opacity: 0.55;
+  filter: blur(4px);
+}
+:root[data-theme='halloween-night'] .hn-brew {
+  fill: #7df04a;
+  filter: drop-shadow(0 0 8px rgba(125, 240, 74, 0.6));
+}
+:root[data-theme='halloween-night'] .hn-bubble {
+  fill: rgba(182, 240, 60, 0.25);
+  stroke: #b6f03c;
+  stroke-width: 1.5;
+}
+:root[data-theme='halloween-night'] .hn-extra {
+  display: none;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-haunt='2'] .hn-extra {
+  display: inline;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-fx='off'] :is(.hn-face, .hn-eye, .hn-brew, .hn-embers) {
+  filter: none;
+}
+/* Motion (FULL effects only). */
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-face {
+  animation: hn-flicker 2.2s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-spider,
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-peek {
+  animation: hn-bob 2.8s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-bubble {
+  animation: hn-bubble 2.6s ease-in infinite;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-bubble:nth-child(2) {
+  animation-delay: -0.9s;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-bubble:nth-child(3) {
+  animation-delay: -1.7s;
+}
+:root[data-theme='halloween-night'] .hn-decor[data-animate='true'] .hn-bubble:nth-child(4) {
+  animation-delay: -0.4s;
+}
+/* Cobwebs + spider just under the HUD on tablets and up. */
+@media (min-width: 700px) {
+  :root[data-theme='halloween-night'] .hn-prop--web-l,
+  :root[data-theme='halloween-night'] .hn-prop--web-r {
+    display: block;
+    top: 62px;
+    width: clamp(70px, 7vw, 120px);
+  }
+  :root[data-theme='halloween-night'] .hn-prop--web-l {
+    left: 0;
+  }
+  :root[data-theme='halloween-night'] .hn-prop--web-r {
+    right: 0;
+  }
+  :root[data-theme='halloween-night'] .hn-prop--spider {
+    display: block;
+    right: clamp(36px, 4vw, 66px);
+    top: 62px;
+    width: clamp(20px, 1.6vw, 28px);
+  }
+}
+/* The hay-bale patch and the cauldron live in the gutters beside the plaque on wide floors. */
+@media (min-width: 1560px) and (min-height: 760px) {
+  :root[data-theme='halloween-night'] .hn-prop--patch,
+  :root[data-theme='halloween-night'] .hn-prop--cauldron {
+    display: block;
+    bottom: 34px;
+    width: min(clamp(150px, calc((100vw - 1180px) / 2 - 48px), 300px), 26vh);
+  }
+  :root[data-theme='halloween-night'] .hn-prop--patch {
+    left: 16px;
+  }
+  :root[data-theme='halloween-night'] .hn-prop--cauldron {
+    right: 16px;
+  }
+}
+/* Where the claw machine stands at the row's right end on a short floor, the spider gives it room. */
+@media (max-height: 820px) {
+  :root[data-theme='halloween-night'] .af-floor:has(.af-lineup[data-claw='floor']) .hn-prop--spider {
+    display: none;
+  }
+}
+
+/* =====================================================================
+ * ARCADE FLOOR — HUD, lineup, cabinets, plaque, kiosk
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .af-floor,
+:root[data-theme='halloween-night'] .af-entry,
+:root[data-theme='halloween-night'] .cp {
+  --af-ink-0: #f8f4ff;
+  --af-ink-1: #e6daf7;
+  --af-ink-2: #c2aedd;
+  --af-ink-3: #ab97c9;
+}
+:root[data-theme='halloween-night'] .af-hud {
+  background: linear-gradient(180deg, rgba(14, 6, 20, 0.92), rgba(14, 6, 20, 0.55) 70%, rgba(14, 6, 20, 0));
+}
+:root[data-theme='halloween-night'] .af-hud__word {
+  filter: drop-shadow(0 0 4px rgba(255, 138, 61, 0.85)) drop-shadow(0 0 14px rgba(255, 138, 61, 0.4));
+}
+:root[data-theme='halloween-night'] .af-hud__word path:nth-child(1) {
+  stroke: #e15c1f;
+  stroke-opacity: 0.3;
+}
+:root[data-theme='halloween-night'] .af-hud__word path:nth-child(2) {
+  stroke: #ff8a3d;
+}
+:root[data-theme='halloween-night'] .af-hud__word path:nth-child(3) {
+  stroke: #fff1d6;
+}
+:root[data-theme='halloween-night'] .af-hud__sub {
+  color: #ffc93c;
+  text-shadow: 0 0 8px rgba(255, 201, 60, 0.45);
+}
+:root[data-theme='halloween-night'] .af-hud__badge {
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: #ff8a3d;
+  color: #1f0a00;
+  box-shadow:
+    0 0 0 2px #2a0a3a,
+    0 0 12px rgba(255, 138, 61, 0.4);
+}
+:root[data-theme='halloween-night'][data-fx='off'] .af-hud__word {
+  filter: none;
+}
+:root[data-theme='halloween-night'][data-fx='off'] :is(.af-hud__sub, .af-hud__badge) {
+  text-shadow: none;
+  box-shadow: 0 0 0 2px #2a0a3a;
+}
+:root[data-theme='halloween-night'] .af-hud__profile {
+  border-radius: 10px;
+}
+/* The spotlight on the centred cabinet: a moonbeam from above and a pool in its colour. */
+:root[data-theme='halloween-night'] .af-lineup::before {
+  background:
+    radial-gradient(34% 26% at 50% 94%, color-mix(in srgb, var(--sel, #ff8a3d) 28%, transparent), transparent 72%),
+    conic-gradient(from 180deg at 50% -8%, transparent 0 168deg, rgba(226, 214, 255, 0.08) 173deg 187deg, transparent 192deg);
+}
+/* Witch-stocking stripes on the side panels (pattern defined by FloorDecor); side art reads as a sticker. */
+:root[data-theme='halloween-night'] .af-cab__side > g > polygon:first-child {
+  fill: url(#hn-stripes) #1e0b2c;
+}
+:root[data-theme='halloween-night'] .af-cab__side > g > g {
+  opacity: 0.8;
+}
+:root[data-theme='halloween-night'] .af-cab__mold {
+  fill: #c9a46a;
+}
+/* A cobweb in the top-left corner of every screen's glass. */
+:root[data-theme='halloween-night'] .af-cab__glass::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32%;
+  aspect-ratio: 1;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  opacity: 0.42;
+  pointer-events: none;
+}
+/* A little pumpkin sits on the roof of the centred cabinet. */
+:root[data-theme='halloween-night'] .af-slot[data-active='true'] .af-cab__body::before {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: -5.5%;
+  width: 15%;
+  aspect-ratio: 6 / 5;
+  translate: -50% 0;
+  background: var(--hn-hat-pumpkin) 50% 100% / contain no-repeat;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+:root[data-theme='halloween-night'] .af-lineup__pager i {
+  border-radius: 50%;
+}
+:root[data-theme='halloween-night'] .af-lineup__arrow {
+  border-radius: 50%;
+  --btn-bg: #4b0867;
+  --btn-bg-2: #35054a;
+  --btn-edge: #ff8a3d;
+  --btn-fg: #fff;
+}
+
+/* ---------- Plaque: a candlelit spellbook card ---------- */
+:root[data-theme='halloween-night'] .af-plaque {
+  background:
+    linear-gradient(180deg, rgba(255, 186, 120, 0.05), rgba(255, 186, 120, 0) 30%),
+    linear-gradient(180deg, rgba(27, 14, 41, 0.96), rgba(16, 7, 26, 0.97));
+  border: 2px solid rgba(181, 123, 255, 0.4);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 180, 0.08),
+    0 0 26px rgba(255, 138, 61, 0.14),
+    0 22px 50px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme='halloween-night'] .af-plaque::before {
+  /* a candy-corn stripe along the top edge */
+  top: -2px;
+  left: 20px;
+  right: 20px;
+  width: auto;
+  height: 5px;
+  border: 0;
+  border-radius: 0 0 4px 4px;
+  background: var(--hn-candycorn);
+  filter: none;
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.45);
+}
+:root[data-theme='halloween-night'] .af-plaque::after {
+  /* a cobweb in the top-right corner */
+  top: 0;
+  right: 0;
+  bottom: auto;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  filter: none;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  transform: scaleX(-1);
+  opacity: 0.38;
+}
+:root[data-theme='halloween-night'][data-fx='off'] .af-plaque::before {
+  box-shadow: none;
+}
+:root[data-theme='halloween-night'] .af-plaque__kicker {
+  color: #ffc93c;
+}
+:root[data-theme='halloween-night'] .af-plaque__title {
+  --pw-ink: #ffc93c;
+  --pw-ink-2: #ff8a3d;
+  --pw-shadow: #2a0a3a;
+}
+:root[data-theme='halloween-night'] .af-plaque__games li {
+  border-radius: 8px;
+}
+
+/* ---------- Tournament kiosk: a friendly tombstone scoreboard ---------- */
+:root[data-theme='halloween-night'] .af-kiosk {
+  --k-led: #b6f03c;
+  --k-led-2: #ffc93c;
+  border: 2px solid #4a3f5c;
+  border-radius: 22px 22px 6px 6px;
+  background:
+    radial-gradient(circle, rgba(182, 240, 60, 0.08) 0 1px, transparent 1.5px) 0 0 / 4px 4px,
+    linear-gradient(180deg, #2a2236, #1a1424);
+  box-shadow:
+    inset 0 0 0 2px #0e0a14,
+    inset 0 0 18px rgba(182, 240, 60, 0.08),
+    0 0 18px rgba(182, 240, 60, 0.12),
+    0 8px 22px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme='halloween-night'] .af-kiosk:hover {
+  border-color: #b6f03c;
+}
+:root[data-theme='halloween-night'][data-fx='off'] .af-kiosk {
+  box-shadow:
+    inset 0 0 0 2px #0e0a14,
+    0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+/* =====================================================================
+ * CORE CHROME — panels, dialogs, controls, toasts, avatars
+ * ===================================================================== */
+/* Corner brackets become a cobweb in the top-left corner. */
+:root[data-theme='halloween-night'] .dc-panel--brackets::before {
+  top: 0;
+  left: 0;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  filter: none;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  opacity: 0.45;
+}
+:root[data-theme='halloween-night'] .dc-panel--brackets::after {
+  display: none;
+}
+:root[data-theme='halloween-night'] .dc-panel__header {
+  box-shadow: inset 0 -2px 0 rgba(255, 138, 61, 0.55);
+}
+/* The title marker is a tiny pumpkin with a green stem. */
+:root[data-theme='halloween-night'] .dc-panel__title::before {
+  border-radius: 46% 46% 50% 50%;
+  background: #ff8a3d;
+  box-shadow:
+    inset -2px -2px 0 rgba(107, 35, 4, 0.45),
+    0 -3px 0 -2px #5f9a2a;
+}
+/* Dialog titles in the dripping display face, big enough to stay legible. */
+:root[data-theme='halloween-night'] [data-part='dialog-frame'] > .dc-panel__header .dc-panel__title {
+  font-family: var(--hn-spooky);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+:root[data-theme='halloween-night'] .dc-modal::backdrop {
+  background: radial-gradient(ellipse at 80% 0%, rgba(255, 233, 176, 0.07), transparent 55%), rgba(10, 3, 18, 0.78);
+}
+:root[data-theme='halloween-night'] .dc-input--code {
+  color: #b6f03c;
+  background:
+    radial-gradient(circle, rgba(182, 240, 60, 0.1) 0 1px, transparent 1.4px) 0 0 / 4px 4px,
+    #0b0511;
+  text-shadow: 0 0 8px rgba(182, 240, 60, 0.5);
+}
+:root[data-theme='halloween-night'][data-fx='off'] .dc-input--code {
+  text-shadow: none;
+}
+:root[data-theme='halloween-night'] .dc-toggle__track {
+  border-radius: 14px;
+}
+:root[data-theme='halloween-night'] .dc-toggle__thumb {
+  border-radius: 50%;
+}
+:root[data-theme='halloween-night'] .dc-segmented__item,
+:root[data-theme='halloween-night'] .dc-badge {
+  border-radius: 6px;
+}
+:root[data-theme='halloween-night'] .dc-progress {
+  border-radius: 6px;
+}
+:root[data-theme='halloween-night'] .dc-progress::after {
+  background: repeating-linear-gradient(90deg, #ffc93c 0 6px, #ff8a3d 6px 12px, #fff6e6 12px 18px);
+}
+:root[data-theme='halloween-night'] .dc-toast {
+  border-radius: 12px;
+}
+:root[data-theme='halloween-night'] .dc-spinner i {
+  border-radius: 50%;
+  background: #ff8a3d;
+}
+:root[data-theme='halloween-night'] .dc-spinner i:nth-child(2) {
+  background: #b57bff;
+}
+:root[data-theme='halloween-night'] .dc-spinner i:nth-child(3) {
+  background: #7df04a;
+}
+
+/* ---------- Avatar costumes: a hat on every avatar ≥ 24px (just for you; nothing is shared) ---------- */
+:root[data-theme='halloween-night'] .dc-avatar::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: calc(var(--size) * -0.34);
+  /* 0 below 24px (too small to read), else 62% of the avatar — always inside its width */
+  width: clamp(0px, calc((var(--size) - 23.5px) * 999), calc(var(--size) * 0.62));
+  aspect-ratio: 6 / 5;
+  translate: -50% 0;
+  rotate: -9deg;
+  background: var(--hn-hat-witch) 50% 100% / contain no-repeat;
+  pointer-events: none;
+}
+:root[data-theme='halloween-night']
+  .dc-avatar:is(
+    [data-avatar='rocket'],
+    [data-avatar='robot'],
+    [data-avatar='alien'],
+    [data-avatar='cactus'],
+    [data-avatar='coffee'],
+    [data-avatar='pizza']
+  )::before {
+  background-image: var(--hn-hat-pumpkin);
+  rotate: 0deg;
+  top: calc(var(--size) * -0.3);
+}
+:root[data-theme='halloween-night']
+  .dc-avatar:is([data-avatar='crown'], [data-avatar='bolt'], [data-avatar='disk'], [data-avatar='joystick'])::before {
+  background-image: var(--hn-hat-bat);
+  rotate: 0deg;
+  top: calc(var(--size) * -0.26);
+}
+
+/* ---------- Top bar + room code chip ---------- */
+:root[data-theme='halloween-night'] .topbar::after {
+  height: 2px;
+  bottom: -2px;
+}
+:root[data-theme='halloween-night'] .code-chip__code {
+  color: #b6f03c;
+  text-shadow: 0 0 6px rgba(182, 240, 60, 0.45);
+}
+:root[data-theme='halloween-night'][data-fx='off'] .code-chip__code {
+  text-shadow: none;
+}
+
+/* =====================================================================
+ * LOBBY / ROOM
+ * ===================================================================== */
+/* The parlour is a corner of the haunted hall: let it show through, dimmed. */
+:root[data-theme='halloween-night'][data-place='lobby'] .dc-game-backdrop {
+  background: linear-gradient(180deg, rgba(14, 6, 20, 0.78), rgba(14, 6, 20, 0.9));
+}
+:root[data-theme='halloween-night'][data-fx='off'][data-place='lobby'] .dc-game-backdrop {
+  background: var(--bg-0);
+}
+/* Room code: candy-corn tiles with dark ink (7.3–15.5:1 across the bands). */
+:root[data-theme='halloween-night'] .lobby-code__value span {
+  border: 2px solid #2a0a3a;
+  border-radius: 12px 12px 5px 5px;
+  background: linear-gradient(180deg, #fff6e6 0 34%, #ffc93c 34% 67%, #ff8a3d 67%);
+  color: #2a0f3d;
+  text-shadow: none;
+  box-shadow:
+    inset 0 -3px 0 rgba(42, 10, 58, 0.22),
+    0 0 12px rgba(255, 138, 61, 0.3);
+}
+:root[data-theme='halloween-night'][data-fx='off'] .lobby-code__value span {
+  box-shadow: inset 0 -3px 0 rgba(42, 10, 58, 0.22);
+}
+:root[data-theme='halloween-night'] .player-list__item,
+:root[data-theme='halloween-night'] [data-part='player-row'] {
+  border-radius: 10px;
+}
+:root[data-theme='halloween-night'] .ready-pill {
+  border-radius: 999px;
+}
+
+/* =====================================================================
+ * TITLE SCREEN + CABINET PICKER
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .af-entry__card {
+  border-radius: 14px;
+}
+:root[data-theme='halloween-night'] .af-entry__card::before {
+  display: none;
+}
+:root[data-theme='halloween-night'] .af-entry__card::after {
+  /* a cobweb in the top-right corner of the coin door */
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: 72px;
+  height: 72px;
+  border: 0;
+  filter: none;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  transform: scaleX(-1);
+  opacity: 0.4;
+}
+:root[data-theme='halloween-night'] .af-entry__head::before,
+:root[data-theme='halloween-night'] .af-entry__details::before {
+  background: rgba(14, 6, 20, 0.76);
+  box-shadow: 0 0 44px 26px rgba(14, 6, 20, 0.76);
+}
+:root[data-theme='halloween-night'] .cp .cp-item {
+  border-radius: 10px;
+}
+:root[data-theme='halloween-night'] .cp .cp__preview,
+:root[data-theme='halloween-night'] .cp .cp-screen {
+  border-radius: 12px;
+}
+
+/* =====================================================================
+ * TOURNAMENT CENTER — the Haunted Hall of Champions
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .tc-hero::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 110px;
+  height: 110px;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  transform: scaleX(-1);
+  opacity: 0.35;
+  pointer-events: none;
+}
+:root[data-theme='halloween-night'] .tc-marquee__title {
+  font-family: var(--hn-spooky);
+  letter-spacing: 0.03em;
+  color: #ffc93c;
+  text-shadow:
+    0 3px 0 #2a0a3a,
+    0 0 16px rgba(255, 138, 61, 0.45);
+}
+:root[data-theme='halloween-night'][data-fx='off'] .tc-marquee__title {
+  text-shadow: 0 3px 0 #2a0a3a;
+}
+:root[data-theme='halloween-night'] .tc-marquee__kicker {
+  color: #b6f03c;
+}
+:root[data-theme='halloween-night'] [data-part='tournament-card'] {
+  border-radius: 12px;
+}
+
+/* =====================================================================
+ * RESULTS, LOADING, EMPTY, ERROR
+ * ===================================================================== */
+:root[data-theme='halloween-night'] .results-shell__title,
+:root[data-theme='halloween-night'] [data-part='results-title'],
+:root[data-theme='halloween-night'] .pk-results__title,
+:root[data-theme='halloween-night'] [data-part='notice-title'] {
+  font-family: var(--hn-spooky);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: #ff8a3d;
+}
+:root[data-theme='halloween-night'] .dc-empty__icon {
+  color: #b57bff;
+}
+:root[data-theme='halloween-night'] .notice-card,
+:root[data-theme='halloween-night'] .reconnect-card {
+  border-radius: 14px;
+}
+/* 404 / crash: a little "BOO!" sign pinned to the card (decorative, silent). */
+:root[data-theme='halloween-night'] [data-part='not-found-screen'] .notice-card::before,
+:root[data-theme='halloween-night'] [data-part='crash-screen'] .notice-card::before {
+  content: 'BOO!';
+  content: 'BOO!' / '';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  padding: 4px 14px;
+  transform: translateX(-50%) rotate(-3deg);
+  border-radius: 8px;
+  background: #fff6e6;
+  color: #4b0867;
+  font-family: var(--hn-spooky);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.08em;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* =====================================================================
+ * JUKEBOX — the Cauldron Jukebox
+ * ===================================================================== */
+:root[data-theme='halloween-night'] [data-jukebox] {
+  --jb-accent: #ff8a3d;
+  --jb-accent-2: #7df04a;
+  --jb-radius: 16px;
+  --jb-blur: none;
+  --jb-chrome-hi: #ffe9b8;
+  --jb-chrome-lo: #8a6a3a;
+  --jb-chrome-ink: #1c0a26;
+  --jb-vinyl: #140a18;
+  --jb-strip-bg: #fff3dc;
+  --jb-strip-fg: #2a0f3d;
+  --jb-strip-muted: #6b4f80;
+  --jb-strip-lit: #ffd36b;
+  --jb-strip-band: #e15c1f;
+  --jb-strip-band-2: #4b0867;
+}
+:root[data-theme='halloween-night'] [data-jukebox] .jb-titlebar__title {
+  font-family: var(--hn-spooky);
+  font-size: var(--fs-lg);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+/* A cobweb across the dome glass (player) and over the floor machine's dome. */
+:root[data-theme='halloween-night'] [data-jukebox] .jb-dome__glass::before {
+  content: '';
+  position: absolute;
+  left: 6%;
+  top: 10%;
+  width: 30%;
+  aspect-ratio: 1;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  opacity: 0.32;
+  pointer-events: none;
+}
+:root[data-theme='halloween-night'] .jb-floor {
+  --jbf-warm: #b6f03c;
+}
+:root[data-theme='halloween-night'] .jb-floor__machine::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: 6%;
+  top: 3%;
+  width: 34%;
+  aspect-ratio: 1;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  opacity: 0.38;
+  pointer-events: none;
+}
+/* Room for the candles on either side of the now-playing screen. */
+:root[data-theme='halloween-night'] [data-jukebox] [data-part='display'] {
+  padding-inline: 26px;
+}
+:root[data-theme='halloween-night'] [data-jukebox] .jb-player[data-layout='side'] [data-part='display'] {
+  padding-inline: 18px;
+}
+
+/* Decor inside the now-playing screen (JukeboxDecor.tsx). */
+:root[data-theme='halloween-night'] .hn-jb {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+:root[data-theme='halloween-night'] .hn-jb > i {
+  position: absolute;
+  display: block;
+}
+:root[data-theme='halloween-night'] .hn-jb__web {
+  top: 0;
+  width: 44px;
+  height: 44px;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  opacity: 0.42;
+}
+:root[data-theme='halloween-night'] .hn-jb__web--l {
+  left: 0;
+}
+:root[data-theme='halloween-night'] .hn-jb__web--r {
+  right: 0;
+  transform: scaleX(-1);
+}
+:root[data-theme='halloween-night'] .hn-jb__candle {
+  bottom: 6px;
+  width: 9px;
+  height: 26px;
+  border-radius: 3px 3px 2px 2px;
+  background: linear-gradient(180deg, #fff6e6, #e6d2b0);
+  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.15);
+}
+:root[data-theme='halloween-night'] .hn-jb__candle--l {
+  left: 8px;
+}
+:root[data-theme='halloween-night'] .hn-jb__candle--r {
+  right: 8px;
+}
+:root[data-theme='halloween-night'] .hn-jb__flame {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 8px;
+  height: 13px;
+  margin-left: -4px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 50% 70%, #fff6c8 0 25%, #ffc93c 45%, #ff8a3d 75%, transparent 76%);
+  opacity: var(--hn-jb-glow, 0.6);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 6px rgba(255, 170, 60, 0.8));
+}
+:root[data-theme='halloween-night'] .hn-jb__ghost {
+  right: 2px;
+  top: 40%;
+  width: 22px;
+  height: 26px;
+  background: var(--hn-ghost) center / contain no-repeat;
+  opacity: calc(var(--hn-jb-glow, 0.6) * 0.85);
+}
+:root[data-theme='halloween-night'] .hn-jb[data-animate='true'] .hn-jb__flame {
+  animation: hn-flicker 1.8s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'] .hn-jb[data-animate='true'] .hn-jb__ghost {
+  animation: hn-bob 2.6s ease-in-out infinite alternate;
+}
+:root[data-theme='halloween-night'][data-fx='off'] .hn-jb__flame {
+  filter: none;
+}
+
+/* =====================================================================
+ * CLAW MACHINE + WHEEL OF DASTINY (body/stage only; prizes and confetti
+ * come from the skin's claw/celebration data)
+ * ===================================================================== */
+:root[data-theme='halloween-night'] :is(.clw, .clwx) {
+  --clw-accent: #ff8a3d;
+}
+:root[data-theme='halloween-night'] [data-game='wheel'] .wh-stage::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  background: var(--hn-web) 0 0 / 100% 100% no-repeat;
+  transform: scaleX(-1);
+  opacity: 0.3;
+  pointer-events: none;
+}
+/* Pumpkin pointer, witchy pins. Set on .wh-pointer: wheel.css's
+   `:root[data-theme]:not([data-theme='delta-neon']) .wh` (0,4,0) outranks `.wh`. */
+:root[data-theme='halloween-night'] .wh-pointer {
+  --wh-pointer-1: #ffb27a;
+  --wh-pointer-2: #e15c1f;
+  --wh-pointer-3: #7a2a06;
+  --wh-pointer-edge: #2a0638;
+  --wh-pointer-glow: rgba(255, 138, 61, 0.5);
+  --wh-pin-1: #f0dcff;
+  --wh-pin-2: #b57bff;
+  --wh-pin-3: #4b0867;
+}
+/* While it spins the stage lights dim and fog pools at the wheel's base (behind the wheel). */
+:root[data-theme='halloween-night'] .wh-stage[data-spinning='true'] .wh-beam {
+  opacity: 0.32;
+}
+:root[data-theme='halloween-night'] .wh-stage__wheel::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 4%;
+  right: 4%;
+  bottom: 0;
+  height: 34%;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 70% at 30% 85%, rgba(214, 196, 255, 0.2), transparent 70%),
+    radial-gradient(55% 65% at 72% 90%, rgba(214, 196, 255, 0.16), transparent 70%);
+  filter: blur(10px);
+  opacity: 0;
+  transition: opacity var(--dur-4) var(--ease-in-out);
+}
+:root[data-theme='halloween-night'] .wh-stage[data-spinning='true'] .wh-stage__wheel::before {
+  opacity: 1;
+}
+:root[data-theme='halloween-night'][data-fx='high']:not([data-reduced-motion='true'])
+  .wh-stage[data-spinning='true']
+  .wh-stage__wheel::before {
+  animation: hn-wheel-fog 6s var(--ease-in-out) infinite alternate;
+}
+:root[data-theme='halloween-night'][data-fx='off'] .wh-stage__wheel::before {
+  display: none;
+}
+:root[data-theme='halloween-night'][data-reduced-motion='true'] .wh-stage__wheel::before {
+  transition: none;
+}
+
+/* ---------- Seasonal Exit control (the invite never shows while Halloween Night is on) ---------- */
+:root[data-theme='halloween-night'] .ssn-exit__trigger,
+:root[data-theme='halloween-night'] .ssn-exit--panel .ssn-pumpkin {
+  color: #ff8a3d;
+}
+:root[data-theme='halloween-night'][data-fx='high']:not([data-reduced-motion='true']) .ssn-exit__trigger .ssn-pumpkin {
+  filter: drop-shadow(0 0 6px rgba(255, 138, 61, 0.55));
+}
+:root[data-theme='halloween-night'] .ssn-exit__confirm {
+  border-color: rgba(255, 138, 61, 0.55);
+}
+
+/* =====================================================================
+ * KEYFRAMES (slow fades only — nothing flashes)
+ * ===================================================================== */
+@keyframes hn-breathe {
+  from {
+    opacity: 0.82;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hn-flicker {
+  0% {
+    opacity: 0.88;
+    transform: scale(1, 1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.04, 1.07);
+  }
+  70% {
+    opacity: 0.92;
+    transform: scale(0.98, 1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.02, 0.97);
+  }
+}
+@keyframes hn-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+@keyframes hn-wheel-fog {
+  from {
+    transform: translateX(-3%);
+  }
+  to {
+    transform: translateX(3%);
+  }
+}
+@keyframes hn-bubble {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-26px);
+    opacity: 0;
+  }
 }
