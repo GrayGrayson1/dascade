@@ -2,6 +2,7 @@
 import { Button, Modal } from '@dascade/ui';
 import { setThemePickerOpen } from './pickerStore.ts';
 import { ThemePicker } from './ThemePicker.tsx';
+import { ExitHalloweenButton } from './ExitHalloween.tsx';
 
 export default function ThemePickerSheet() {
   const close = () => setThemePickerOpen(false);
@@ -18,6 +19,7 @@ export default function ThemePickerSheet() {
         </Button>
       }
     >
+      <ExitHalloweenButton variant="panel" />
       <p className="tp-sheet__intro">
         Restyle the whole arcade. Themes are just for you — they never change a game, and other players keep their own.
       </p>

@@ -13,6 +13,26 @@ export type FxLevel = 'high' | 'low' | 'off';
 export type VisualizerPref = 'auto' | 'on' | 'off';
 export type GameMusicWithJukebox = 'duck' | 'mute' | 'keep';
 
+/** How Halloween Night got switched on: the October invite (reverts after Oct 31) or any other way. */
+export type HalloweenVia = 'invite' | 'picker';
+
+/** The October invite's bookkeeping (see themes/seasonal.ts). */
+export interface HalloweenPrefs {
+  /** Season (calendar year) the record refers to: when the invite was declined or accepted. */
+  year?: number;
+  /** The invite was declined (or Halloween exited) that season: don't invite again until next year. */
+  dismissed?: boolean;
+  /** While Halloween Night is on: how it was switched on, and the theme to go back to. */
+  via?: HalloweenVia;
+  prev?: string;
+}
+
+/** Seasonal-theme state, per season. Unknown seasons (a newer build's) are kept as they are. */
+export interface SeasonalPrefs {
+  halloween?: HalloweenPrefs;
+  [season: string]: unknown;
+}
+
 export interface AppSettings {
   masterVolume: number;
   sfxVolume: number;
@@ -31,9 +51,17 @@ export interface AppSettings {
   fx: FxLevel;
   /** Theme preference (a ThemeDefinition id). Unknown ids render as Delta Neon but are kept. */
   theme: string;
+  /**
+   * Seasonal invite bookkeeping (October's Halloween Night invite). Optional and validated on read;
+   * absent = nothing recorded. Added without a version bump: there is nothing to migrate.
+   */
+  seasonal?: SeasonalPrefs;
 }
 
-/** v1 = the original shape (no version stamp); v2 adds `theme`; v3 adds the jukebox audio fields. */
+/**
+ * v1 = the original shape (no version stamp); v2 adds `theme`; v3 adds the jukebox audio fields. The
+ * optional `seasonal` field came later without a bump (absent = nothing recorded; nothing to migrate).
+ */
 export const SETTINGS_VERSION = 3;
 export const DEFAULT_THEME_PREF = 'delta-neon';
 
@@ -43,6 +71,30 @@ const THEME_ID_RE = /^[a-z][a-z0-9-]{1,39}$/;
 
 const unit = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback);
 const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function parseHalloween(v: unknown): HalloweenPrefs | undefined {
+  if (!isRecord(v)) return undefined;
+  const out: HalloweenPrefs = {};
+  if (typeof v.year === 'number' && Number.isInteger(v.year) && v.year >= 2000 && v.year <= 9999) out.year = v.year;
+  if (typeof v.dismissed === 'boolean') out.dismissed = v.dismissed;
+  if (v.via === 'invite' || v.via === 'picker') out.via = v.via;
+  if (typeof v.prev === 'string' && THEME_ID_RE.test(v.prev)) out.prev = v.prev;
+  return out;
+}
+
+/**
+ * Validates stored seasonal prefs field by field (a bad field is dropped, the rest kept). Seasons this
+ * build doesn't know are kept untouched; anything that isn't an object reads as "nothing recorded".
+ */
+export function parseSeasonal(v: unknown): SeasonalPrefs | undefined {
+  if (!isRecord(v)) return undefined;
+  const out: SeasonalPrefs = { ...v };
+  const halloween = parseHalloween(v.halloween);
+  if (halloween) out.halloween = halloween;
+  else delete out.halloween;
+  return out;
+}
 
 /** Upgrades any stored settings object to the current version. */
 export function migrateSettings(stored: unknown, defaults: AppSettings): StoredSettings {
@@ -70,6 +122,8 @@ export function migrateSettings(stored: unknown, defaults: AppSettings): StoredS
         ? raw.gameMusicWithJukebox
         : defaults.gameMusicWithJukebox,
     theme: typeof raw.theme === 'string' && THEME_ID_RE.test(raw.theme) ? raw.theme : defaults.theme,
+    // Seasonal invite bookkeeping (optional, no version bump: absent = nothing recorded).
+    seasonal: parseSeasonal(raw.seasonal),
     // A settings blob written by a newer build keeps its (higher) version.
     settingsVersion: Math.max(version, SETTINGS_VERSION),
   };

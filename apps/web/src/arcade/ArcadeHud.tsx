@@ -12,6 +12,7 @@ import { NeonWord } from './NeonWord.tsx';
 import { CABINET_LIST } from '@dascade/shared';
 import { fill, tickerItems, useThemeCopy, useThemeFlavour } from '../themes/copy.ts';
 import { ThemeButton } from '../themes/ThemeButton.tsx';
+import { ExitHalloweenButton } from '../themes/ExitHalloween.tsx';
 
 export type ServerStatus = { state: 'checking' | 'online' | 'offline'; rooms: number };
 
@@ -152,6 +153,8 @@ export const ArcadeHeader = memo(function ArcadeHeader({ status, kiosk }: { stat
             onClick={() => updateSettings({ reducedMotion: !reducedMotion })}
           />
           <ThemeButton className="af-hud__theme" />
+          {/* Only while Halloween Night is on (wide floors; seasonal.css): the way back from the costume party. */}
+          <ExitHalloweenButton variant="hud" />
           <IconButton icon="gear" label="Settings" onClick={() => open('settings')} />
           <IconButton icon="help" label="Help and how to play" onClick={() => open('help')} />
         </span>

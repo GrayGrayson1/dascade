@@ -20,7 +20,7 @@ function isModal(dialog: HTMLDialogElement): boolean {
  * backdrop and is inert (toasts would be dimmed, undismissable and hidden from screen readers), so
  * the toast stack renders inside it — in the top layer — until it closes.
  */
-function useTopModalDialog(): HTMLDialogElement | null {
+export function useTopModalDialog(): HTMLDialogElement | null {
   const [host, setHost] = useState<HTMLDialogElement | null>(null);
   useEffect(() => {
     if (typeof MutationObserver === 'undefined') return;
