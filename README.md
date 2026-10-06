@@ -65,7 +65,7 @@ DASCADE ships **twelve themes**. Pick one from the palette button on the floor o
 | **Saturday Morning** | `saturday-morning` | A loud 90s game-show set: sunbursts, bulbs, buzzers, confetti (competitive boards stay calm) |
 | **Executive Edition** | `executive` | Mahogany, brass and banker lamps; "Match Performance Review" and the "Strategic Putting Division" |
 | **Neon Noir** | `neon-noir` | The serious one: a rainy pixel city, wet reflections, glass HUDs |
-| **Halloween Night** | `halloween-night` | Spookily adorable: jack-o'-lanterns, friendly ghosts, cobwebs and a bubbling cauldron under a smiling moon; costumed claw prizes, a Trick-or-Treat wheel and spooky-cute sounds |
+| **Halloween Night** | `halloween-night` | Spookily adorable: jack-o'-lanterns, friendly ghosts, cobwebs and a bubbling cauldron under a smiling moon; costumed claw prizes, a haunted-carnival Wheel of DAStiny (jack-o'-lantern hub, ghost pointer, a reaction for every Trick-or-Treat slice) and spooky-cute sounds |
 
 **Halloween Night is seasonal:** every October the arcade floor invites each player to try it (one click; "Not now" stops the invites for the year). Leave it any time with the pumpkin button next to the theme button, in **Settings → Display** or at the top of the Themes sheet. If you switched it on from the invite, it switches back on its own after October 31. It stays in the picker all year for anyone who wants Halloween in March. Like every theme it's personal: nobody else's arcade changes.
 

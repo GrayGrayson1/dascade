@@ -29,6 +29,12 @@
   overflow: hidden;
   pointer-events: none;
 }
+/* Inside the stage wheel. No z-index (no stacking context): the decor layers itself around the wheel. */
+.theme-wheel-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 
 /* ---------- Transition overlay ---------- */
 .theme-xfade {

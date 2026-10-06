@@ -118,26 +118,27 @@ export const BUILTIN_PRESETS: BuiltinPreset[] = [
   {
     id: 'builtin:trick-or-treat',
     name: 'Trick or Treat',
-    description: 'Treats and harmless party tricks. The Pumpkin Jackpot is rare.',
+    description: 'Treats, harmless tricks and Halloween creatures. The Pumpkin Jackpot is ultra rare.',
     suggestFor: ['halloween-night'],
     build: () => ({
       title: 'Trick or treat?',
       sliceMode: 'weighted',
       afterSpin: 'keep',
       repeats: 'allow',
-      // Readable labels on every slice (≥ 4.5:1 with the renderer's text colour), no near-black slices
-      // (the slice colour also marks the readout and history), neighbours distinct all the way round.
+      // Weights are relative odds (candy corn 20 … jackpot 1, out of 90). Readable labels on every slice
+      // (≥ 4.5:1 with the renderer's text colour), no near-black slices (the slice colour also marks the
+      // readout and history), neighbours distinct all the way round. Under Halloween Night each slice's
+      // emoji/name also picks its landing show (themes/halloween-night/wheelReactions.ts).
       segments: [
-        seg('Treat: raid the candy bowl', '🍬', '#e15c1f', 6),
-        seg('Do your best witch cackle', '🧙', '#8e44d6', 4),
+        seg('Candy Corn: grab a treat', '🍬', '#ff8a3d', 20),
+        seg("Witch's Brew: cackle!", '🧪', '#7ed957', 15),
+        seg('Trick: talk tiny for a round', '🤏', '#ffb020', 6),
+        seg('Friendly Ghost: tell a ghost story', '👻', '#f2ecff', 15),
+        seg('Trick: BOO someone!', '😱', '#ff6fa8', 8),
+        seg('Black Cat: your best meow', '🐈\u200d⬛', '#b07cf0', 10),
         seg('Pumpkin Jackpot', '🎃', '#ffd23f', 1),
-        seg('Spin again', '🔁', '#2ec4b6', 4),
-        seg('Tell a 30-second ghost story', '👻', '#f2ecff', 3),
-        seg('Treat: first pick of the snacks', '🍪', '#ffb020', 5),
-        seg('Bat-dance break', '🦇', '#b07cf0', 3),
-        seg('Treat: a round of applause', '👏', '#7ed957', 4),
-        seg("Say 'Good evening' like a vampire", '🧛', '#ff6fa8', 3),
-        seg('Howl like a friendly werewolf', '🐺', '#7aa2ff', 3),
+        seg('Skeleton Dance: dance break!', '💀', '#2ec4b6', 10),
+        seg('Monster Surprise: ROAR!', '🐺', '#7aa2ff', 5),
       ],
     }),
   },

@@ -220,9 +220,10 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   and `--wh-pin-1..3` recolour the pointer — set them on `.wh-pointer` (wheel.css's
   `:root[data-theme]:not([data-theme='delta-neon']) .wh` outranks `.wh`). The stage carries
   `[data-spinning='true']` while a spin runs and `[data-revealed='true']` while the result shows. Slice colours
-  never theme.
+  never theme. Scale or move `.wh-wheel`, never `.wh-wheel-box`: the box is what the wheel measures to size
+  itself, so a transform there makes it re-size to the transformed size. For decor and sounds, see `wheel` below.
 
-### Optional data hooks: claw costume, celebration, sounds
+### Optional data hooks: claw costume, celebration, sounds, wheel
 
 A skin may also export plain data (no DOM, no state) that the app reads only while that theme is active
 (`activeSkin()` / `useActiveSkin()` in `themes/registry.ts`). Leave a hook out and everything stays exactly as
@@ -243,6 +244,16 @@ it is in Delta Neon.
   DAStiny landings and claw wins. Without it the built-in confetti runs with the same random sequence.
   `celebrationProblems()` validates it (`skinExtras.test.ts`).
 - **`sounds?: SfxVoices`** (`audio/voices.ts`): see **Sounds** below.
+- **`wheel?: WheelSkin`** (`themes/wheelSkin.ts`) dresses the Wheel of DAStiny stage:
+  - **`Decor`** renders inside the stage wheel (`[data-part="wheel-decor"]`; never the lobby's preview), with the
+    `--wh-*` geometry vars in scope. It gets `phase` (the spin's phase on the server clock), `sample()` (the
+    wheel's live rotation and speed, the renderer's own maths, cheap per frame) and `landing` (a fresh landing
+    every screen is celebrating, keyed per spin; never for late joiners). The slot makes no stacking context:
+    `z-index: -1` paints behind the wheel, 1–4 between the wheel and the result card. It reacts to what everyone
+    already sees and never changes the wheel, its timing or the room.
+  - **`voices`** re-voice the wheel's `launch`, peg `tick` (≤ ~35 a second, keep it under 50 ms) and landing
+    `reveal(slice)` with the sfx kit (on `synth`, so mute, volume and the jukebox dip apply).
+  - `wheelSkinProblems()` validates both (`skinExtras.test.ts`).
 
 ### Sounds
 
@@ -267,6 +278,16 @@ component unmounts; nothing at module top touches the DOM.
   reduced motion (`hauntBudget`). One shared timer re-checks at 06:00 / 18:00 / midnight; nothing reads the
   clock per frame.
 - **Avatar hats** (witch hat, pumpkin cap, bat bow by avatar kind) through `.dc-avatar[data-avatar]`.
+- **The haunted-carnival wheel** (`WheelDecor.tsx`, `wheelReactions.ts`, `wheelSounds.ts`, `wheelArt.tsx`): a
+  jack-o'-lantern hub carved around the star, a ghost in a witch's hat as the pointer, jack-o'-lanterns at the
+  wheel's feet and (after dark) a friendly ghost peeking over the rim. While it spins the stage dims, the camera
+  leans in and ghostly wisps chase the rim (longer the faster it turns). The axle creaks on launch and the pegs
+  knock like bones. Each landing gets a reaction picked from the winning slice — its emoji first, then words in
+  its name: candy rain, a witch's brew, the ghost waving, a black cat's claw marks, a dancing skeleton, "BOO!",
+  a shrink spell, a werewolf, a bat swarm or the crowned Pumpkin Jackpot. Each one has its own sting and a
+  closed caption for it (`[thunder rumbles, fanfare]`). The caption also shows at MINIMAL effects and with
+  reduced motion, when only the caption and the sound remain. The **Trick or Treat** preset (pre-selected,
+  never auto-applied) has one slice per reaction, with odds from candy corn 20 to the jackpot 1 out of 90.
 - **`haunt` transition** into the theme; Creepster (`@fontsource/creepster`, OFL) only on a few big fixed titles
   through the skin's `--hn-spooky` (never on tokens, so buttons and body text stay in the house faces).
 
