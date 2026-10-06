@@ -162,8 +162,14 @@ function PanelExit() {
     } finally {
       setBusy(false);
     }
-    // This row is gone with Halloween: focus the newly selected theme in the picker below it.
-    dialog?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.focus();
+    // This row is gone with Halloween: focus the newly selected theme in the picker below it (its option,
+    // not the first checked radio — Visual effects' segments are radios too), once more after a frame
+    // in case the picker was still catching up.
+    const picked = () => dialog?.querySelector<HTMLElement>('[data-theme-option][aria-checked="true"]');
+    picked()?.focus();
+    requestAnimationFrame(() => {
+      if (!dialog?.contains(document.activeElement)) picked()?.focus();
+    });
   };
 
   return (
