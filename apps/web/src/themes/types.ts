@@ -16,6 +16,7 @@ import type { ComponentType } from 'react';
 import type { ClawCostume } from '../arcade/clawArt.ts';
 import type { SfxVoices } from '../audio/voices.ts';
 import type { SkinCelebration } from './celebration.ts';
+import type { WheelSkin } from './wheelSkin.ts';
 
 export interface SkinRenderContext {
   /** Settings mirror: 'high' | 'low' | 'off' (FULL / REDUCED / MINIMAL). */
@@ -62,6 +63,8 @@ export interface ThemeSkin {
   celebration?: SkinCelebration;
   /** Optional re-voiced sfx() sounds while this theme is active (see audio/voices.ts). */
   sounds?: SfxVoices;
+  /** Optional Wheel of DAStiny decor (inside the stage wheel) and wheel sounds (see wheelSkin.ts). */
+  wheel?: WheelSkin;
 }
 
 export type ThemePlace = SkinRenderContext['place'];

@@ -1,7 +1,7 @@
 import type { CelebrationSprite, SkinCelebration } from '../celebration.ts';
 
 // prettier-ignore
-const BAT: CelebrationSprite = {
+export const BAT: CelebrationSprite = {
   rows: [
     'a.......a',
     'aa.a.a.aa',
@@ -13,7 +13,7 @@ const BAT: CelebrationSprite = {
 };
 
 // prettier-ignore
-const CANDY_CORN: CelebrationSprite = {
+export const CANDY_CORN: CelebrationSprite = {
   rows: [
     '..w..',
     '.www.',
@@ -25,7 +25,7 @@ const CANDY_CORN: CelebrationSprite = {
 };
 
 // prettier-ignore
-const MINI_PUMPKIN: CelebrationSprite = {
+export const MINI_PUMPKIN: CelebrationSprite = {
   rows: [
     '...g...',
     '.oodoo.',
@@ -34,6 +34,32 @@ const MINI_PUMPKIN: CelebrationSprite = {
     '.oodoo.',
   ],
   ink: { g: '#4f9a3a', o: '#ff8a3d', d: '#c2601f' },
+};
+
+// prettier-ignore
+export const WRAPPED_CANDY: CelebrationSprite = {
+  rows: [
+    'p.......p',
+    'pp.owo.pp',
+    'ppooooopp',
+    'pp.ooo.pp',
+    'p.......p',
+  ],
+  ink: { p: '#b57bff', o: '#ff8a3d', w: '#fff6e6' },
+};
+
+// prettier-ignore
+export const LOLLIPOP: CelebrationSprite = {
+  rows: [
+    '.ooo.',
+    'oyoyo',
+    'oyyyo',
+    '.ooo.',
+    '..w..',
+    '..w..',
+    '..w..',
+  ],
+  ink: { o: '#7ed957', y: '#ffc93c', w: '#fff6e6' },
 };
 
 /** Halloween confetti: candy colours plus a sprinkle of bats, candy corn and mini pumpkins. */

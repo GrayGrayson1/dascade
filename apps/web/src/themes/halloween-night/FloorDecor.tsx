@@ -30,7 +30,7 @@ const WEB = (() => {
 })();
 
 /** A jack-o'-lantern centred on (0, 0), about 52 × 44 before scaling. */
-function Pumpkin({ x, y, s, tilt = 0 }: { x: number; y: number; s: number; tilt?: number }) {
+export function Pumpkin({ x, y, s, tilt = 0 }: { x: number; y: number; s: number; tilt?: number }) {
   return (
     <g className="hn-pumpkin" transform={`translate(${x} ${y}) rotate(${tilt}) scale(${s})`}>
       <ellipse rx="26" ry="20" fill="#d9541a" />

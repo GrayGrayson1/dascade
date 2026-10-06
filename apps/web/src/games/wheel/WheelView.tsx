@@ -7,7 +7,7 @@
  * the same winner at the same moment.
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { computeArcs, initialRotation, normalizeSegments } from '@dascade/game-core/wheel';
+import { SPIN_PEAK_VELOCITY, computeArcs, initialRotation, normalizeSegments, rotationAt, spinProgressAt, spinVelocity } from '@dascade/game-core/wheel';
 import { WHEEL_MSG, type WheelPublicState, type WheelSettings, type WheelSnapshotSegment } from '@dascade/shared/games/wheel';
 import { Button, IconButton, Kbd, Modal, PixelIcon, Tabs, cx } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
@@ -15,6 +15,8 @@ import { sfx } from '../../audio/audio.ts';
 import { serverNow, session, useCountdown, useGame } from '../../net/hooks.ts';
 import { ChatPanel, GameStage } from '../../shell/common.tsx';
 import { activeSkin } from '../../themes/registry.ts';
+import { WheelDecorSlot } from '../../themes/ThemeHost.tsx';
+import type { WheelDecorContext } from '../../themes/wheelSkin.ts';
 import { ConfettiLayer, type ConfettiHandle } from './Confetti.tsx';
 import { ReadOnlyWheel, WheelEditor } from './Editor.tsx';
 import { BehaviourBadges } from './Legend.tsx';
@@ -98,6 +100,22 @@ function PlayView() {
   );
   const spinPhase = useSpinPhase(renderSpin);
   const winnerIndex = spin?.winnerIndex ?? -1;
+
+  // For a theme's wheel decor: the live rotation/speed (the renderer's own maths) and the fresh landing.
+  const sampleRef = useRef<{ spin: RenderSpin | null; rest: number }>({ spin: null, rest: 0 });
+  const sample = useCallback<WheelDecorContext['sample']>(() => {
+    const { spin: s, rest: r } = sampleRef.current;
+    const now = serverNow();
+    if (!s) return { rotation: r, speed: 0 };
+    if (now < s.startAt) return { rotation: s.fromRotation, speed: 0 };
+    if (now >= s.startAt + s.durationMs) return { rotation: s.toRotation, speed: 0 };
+    if (useApp.getState().settings.reducedMotion) return { rotation: s.fromRotation, speed: 0 };
+    return { rotation: rotationAt(s, now), speed: spinVelocity(spinProgressAt(s, now)) / SPIN_PEAK_VELOCITY };
+  }, []);
+  const landing = useMemo<WheelDecorContext['landing']>(
+    () => (reveal ? { key: reveal.key, label: reveal.seg.label, emoji: reveal.seg.emoji, color: reveal.seg.color } : null),
+    [reveal],
+  );
   const spunByName = spin?.spunByName ?? '';
   const spinId = spin?.spinId ?? 0;
 
@@ -121,7 +139,7 @@ function PlayView() {
     const late = serverNow() - (renderSpin.startAt + renderSpin.durationMs);
     if (late > REVEAL_FRESH_MS) return;
     setReveal({ key: renderSpin.key, seg, spunBy: spunByName, spinNo: spinId });
-    spinReveal();
+    spinReveal(seg);
     const { fx: fxNow, reducedMotion: reduced } = useApp.getState().settings;
     if (!reduced && fxNow !== 'off') {
       const layer = stageRef.current?.getBoundingClientRect();
@@ -232,6 +250,7 @@ function PlayView() {
     !!snapshot && !!renderSpin && (spinPhase === 'lead' || spinPhase === 'spinning' || spin.status === 'spinning' || reveal?.key === renderSpin.key);
   const layout: WheelLayout = showSnapshot && snapshot ? snapshot : settingsLayout;
   const rest = spin.spinId === 0 ? initialRotation(computeArcs(settingsLayout.segments, settingsLayout.sliceMode)) : state.restRotation;
+  sampleRef.current = { spin: renderSpin, rest };
   const highlight = reveal && showSnapshot ? { id: reveal.seg.id, color: reveal.seg.color } : null;
   const wheelLabel = `Prize wheel with ${layout.segments.length} option${layout.segments.length === 1 ? '' : 's'}${
     layout.segments.length ? `: ${layout.segments.slice(0, 12).map((s) => s.label || s.emoji).join(', ')}${layout.segments.length > 12 ? '…' : ''}` : ''
@@ -304,6 +323,7 @@ function PlayView() {
               onPointer={onPointer}
               hoverLabels
             >
+              <WheelDecorSlot phase={spinPhase === 'none' ? 'idle' : spinPhase} sample={sample} landing={landing} />
               {reducedMotion && inFlight && renderSpin ? <ReducedSpinBadge spin={renderSpin} /> : null}
               {reveal ? <ResultCard reveal={reveal} onClose={() => setReveal(null)} /> : null}
             </WheelDisplay>

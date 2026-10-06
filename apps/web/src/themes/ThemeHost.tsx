@@ -23,6 +23,7 @@ import { SkinBoundary } from './SkinBoundary.tsx';
 import { ThemeTransition } from './ThemeTransition.tsx';
 import { useThemePickerOpen } from './pickerStore.ts';
 import type { SkinRenderContext } from './types.ts';
+import type { WheelDecorContext } from './wheelSkin.ts';
 import './host.css';
 
 const ThemePickerSheet = lazy(() => import('./ThemePickerSheet.tsx'));
@@ -83,6 +84,25 @@ export function FloorDecorSlot() {
     <div className="theme-floor-decor" data-part="floor-decor" aria-hidden>
       <SkinBoundary skinId={skin.id}>
         <FloorDecor fx={ctx.fx} reducedMotion={ctx.reducedMotion} place={ctx.place} />
+      </SkinBoundary>
+    </div>
+  );
+}
+
+/**
+ * The Wheel of DAStiny's decor slot: the active skin's `wheel.Decor`, rendered inside the stage wheel so
+ * its geometry vars are in scope. Nothing at all without one (Delta Neon).
+ */
+export function WheelDecorSlot(props: Pick<WheelDecorContext, 'phase' | 'sample' | 'landing'>) {
+  const themeId = useThemeId();
+  const skin = useSkin(themeId);
+  const ctx = useSkinContext();
+  const Decor = skin?.wheel?.Decor;
+  if (!Decor) return null;
+  return (
+    <div className="theme-wheel-decor" data-part="wheel-decor" aria-hidden>
+      <SkinBoundary skinId={skin.id}>
+        <Decor fx={ctx.fx} reducedMotion={ctx.reducedMotion} place={ctx.place} {...props} />
       </SkinBoundary>
     </div>
   );

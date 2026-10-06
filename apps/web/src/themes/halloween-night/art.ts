@@ -19,7 +19,7 @@ function prng(seed: number): () => number {
 }
 
 /** A little bat silhouette, 28 × 10, centred on (0, 0). */
-const BAT_PATH =
+export const BAT_PATH =
   'M-14 -1C-11 -4 -7 -4 -5 -1C-4 -3 -3 -4 -2 -3L-1 -5L0 -3L1 -5L2 -3C3 -4 4 -3 5 -1C7 -4 11 -4 14 -1C11 0 9 2 8 5C6 3 4 3 3 5C2 3 -2 3 -3 5C-4 3 -6 3 -8 5C-9 2 -11 0 -14 -1Z';
 
 const star = (x: number, y: number, r: number) =>
