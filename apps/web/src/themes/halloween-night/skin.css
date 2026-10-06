@@ -811,6 +811,14 @@
   position: absolute;
   top: -16px;
   left: 50%;
+  /* this is also the panel's bracket pseudo (a 42px cobweb above): undo its box */
+  width: auto;
+  height: auto;
+  border: 0;
+  opacity: 1;
+  filter: none;
+  white-space: nowrap;
+  line-height: 1.2;
   padding: 4px 14px;
   transform: translateX(-50%) rotate(-3deg);
   border-radius: 8px;
