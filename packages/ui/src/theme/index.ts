@@ -1,6 +1,6 @@
 /**
  * DASCADE theme architecture (see docs/THEMING.md).
- * Eleven shipped themes (Delta Neon is the default): tokens + materials + effects + copy.
+ * Twelve shipped themes (Delta Neon is the default): tokens + materials + effects + copy.
  */
 export * from './tokens.ts';
 export * from './materials.ts';

@@ -346,6 +346,40 @@
   animation-delay: calc((5 - var(--i)) * 22ms);
 }
 
+/* ---- haunt: the lights dim once while a friendly ghost swoops across (no flashing) ---- */
+.theme-xfade[data-style='haunt'] {
+  background:
+    radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--xf-c) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--xf-b) 38%, var(--xf-ink));
+}
+.theme-xfade[data-style='haunt'][data-phase='cover'] {
+  animation-name: xf-opacity-in;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+}
+.theme-xfade[data-style='haunt'][data-phase='reveal'] {
+  animation-name: xf-opacity-out;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+}
+.theme-xfade[data-style='haunt'] > .theme-xfade__glow {
+  left: 0;
+  right: auto;
+  top: 34%;
+  width: clamp(72px, 11vw, 150px);
+  height: auto;
+  aspect-ratio: 5 / 6;
+  box-shadow: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 60'%3E%3Cpath d='M5 25C5 12 13 3 25 3s20 9 20 22v29q-2.5 4-5 0t-5 0-5 0-5 0-5 0-5 0-5 0-5 0z' fill='%23f8f4ff'/%3E%3Cellipse cx='18' cy='24' rx='3.2' ry='4.4' fill='%232a0a3a'/%3E%3Cellipse cx='32' cy='24' rx='3.2' ry='4.4' fill='%232a0a3a'/%3E%3Ccircle cx='12.5' cy='31' r='2.6' fill='%23ffb3cf'/%3E%3Ccircle cx='37.5' cy='31' r='2.6' fill='%23ffb3cf'/%3E%3Cellipse cx='25' cy='33.5' rx='2.4' ry='3' fill='%232a0a3a'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  filter: drop-shadow(0 0 16px rgba(248, 244, 255, 0.35));
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+}
+.theme-xfade[data-style='haunt'][data-phase='cover'] > .theme-xfade__glow {
+  animation-name: xf-haunt-swoop-in;
+}
+.theme-xfade[data-style='haunt'][data-phase='reveal'] > .theme-xfade__glow {
+  animation-name: xf-haunt-swoop-out;
+}
+
 /* ---------- keyframes ---------- */
 @keyframes xf-opacity-in {
   from {
@@ -707,6 +741,29 @@
   to {
     opacity: 1;
     transform: translateX(120%) skewX(-14deg);
+  }
+}
+@keyframes xf-haunt-swoop-in {
+  from {
+    opacity: 0;
+    transform: translate(-25vw, 22vh) rotate(-14deg) scale(0.8);
+  }
+  60% {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0.95;
+    transform: translate(44vw, 0) rotate(5deg) scale(1);
+  }
+}
+@keyframes xf-haunt-swoop-out {
+  from {
+    opacity: 0.95;
+    transform: translate(44vw, 0) rotate(5deg) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(112vw, -20vh) rotate(16deg) scale(1.05);
   }
 }
 

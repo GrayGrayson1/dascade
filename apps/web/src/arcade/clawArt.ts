@@ -104,3 +104,40 @@ export function spriteSize(kind: ToyKind): { w: number; h: number } {
   const rows = SPRITES[kind];
   return { w: rows[0]!.length, h: rows.length };
 }
+
+/** One kind's look in a costume. Fields left out keep the machine's own art. */
+export interface PlushCostume {
+  /** Sprite rows: EXACTLY the base sprite's width × height and visible bounding box; letters `. a d e w k p`. */
+  rows?: readonly string[];
+  /** Body / shade / light colours: exactly TOY_COLORS (6) entries each (stored colour indexes are 0–5). */
+  colors?: readonly string[];
+  shades?: readonly string[];
+  lights?: readonly string[];
+  /** Per-kind override of the fixed letters (eye white, pupil, cheek). */
+  ink?: Partial<Record<'w' | 'k' | 'p', string>>;
+  /** Lower-case display name for status/LED/shelf text ("ghost" → "You won a ghost plush!"). */
+  name?: string;
+}
+
+/**
+ * A costume for the plushies and the inside of the glass (ThemeSkin.claw): the same four kinds at the
+ * same sprite sizes, so saved prize shelves, the pile and the physics never see it.
+ */
+export interface ClawCostume {
+  /** Cache key (use the theme id). */
+  id: string;
+  plush?: Partial<Record<ToyKind, PlushCostume>>;
+  /** Close-up backdrop and floor-machine glass colours (#rrggbb) and the neon sign's text. */
+  interior?: {
+    neon?: string;
+    bg?: readonly [string, string, string];
+    wall?: readonly [string, string];
+    floor?: readonly [string, string];
+    sign?: string;
+    light?: string;
+    winLight?: string;
+    glass?: readonly [string, string];
+  };
+  /** Flavour text (functional labels such as "INSERT TOKEN" stay plain). */
+  copy?: { plate?: string; restock?: string; floorWon?: string };
+}

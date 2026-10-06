@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BUILT_IN_THEMES, getTheme, listThemes } from '@dascade/ui';
 import { DEFAULT_THEME_PREF, migrateSettings, peekStoredTheme, type AppSettings } from '../app/settings.ts';
@@ -14,6 +17,9 @@ import {
 import { placeFromPath, resolvePlace } from './place.ts';
 import { fill, themeCopy, tickerItems } from './copy.ts';
 import { PREVIEW_STYLE_ID, acquirePreviewStyles, allPreviewCss, previewCss, previewRefCount } from './preview.ts';
+
+/** Every style the transition layer implements (host.css `.theme-xfade[data-style=…]`). */
+const TRANSITION_STYLES = ['power', 'boot', 'shutter', 'fluorescent', 'tracking', 'warp', 'crt-off', 'wipe', 'haunt', 'fade'];
 
 afterEach(() => {
   vi.useRealTimers();
@@ -179,9 +185,13 @@ describe('theme switcher (transition layer)', () => {
   });
 
   it('every built-in theme maps to an implemented transition style', () => {
-    const styles = ['power', 'boot', 'shutter', 'fluorescent', 'tracking', 'warp', 'crt-off', 'wipe', 'fade'];
-    for (const t of BUILT_IN_THEMES) expect(styles).toContain(transitionStyleFor(t.id));
+    for (const t of BUILT_IN_THEMES) expect(TRANSITION_STYLES).toContain(transitionStyleFor(t.id));
     expect(transitionStyleFor('not-a-theme')).toBe(transitionStyleFor('delta-neon'));
+  });
+
+  it('every transition style has its own rules in host.css', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'host.css'), 'utf8');
+    for (const style of TRANSITION_STYLES) expect(css, style).toContain(`.theme-xfade[data-style='${style}']`);
   });
 });
 

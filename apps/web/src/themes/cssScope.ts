@@ -27,6 +27,7 @@ export const KEYFRAME_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'saturday-morning': ['satm-', 'sm-'],
   executive: ['exec-', 'ex-'],
   'neon-noir': ['nn-'],
+  'halloween-night': ['hn-'],
 };
 
 export function keyframePrefixes(themeId: string): string[] {

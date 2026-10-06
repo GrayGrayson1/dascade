@@ -22,6 +22,7 @@
     'saturday-morning': ['#2233b8', '#2233b8', 'dark'],
     executive: ['#160b07', '#160b07', 'dark'],
     'neon-noir': ['#030407', '#030407', 'dark'],
+    'halloween-night': ['#0e0614', '#0e0614', 'dark'],
   };
   try {
     var raw = localStorage.getItem('dascade:v1:settings');

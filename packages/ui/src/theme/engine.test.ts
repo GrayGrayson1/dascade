@@ -34,6 +34,7 @@ const CONTRACT_IDS = [
   'saturday-morning',
   'executive',
   'neon-noir',
+  'halloween-night',
 ];
 
 const VISUALIZERS: ThemeEffects['visualizer'][] = [
@@ -58,6 +59,7 @@ const TRANSITIONS: ThemeEffects['transition'][] = [
   'warp',
   'crt-off',
   'wipe',
+  'haunt',
   'fade',
 ];
 const AMBIENT: ThemeEffects['ambient'][] = ['none', 'rain', 'stars', 'dust', 'confetti', 'fog', 'sparkle'];
@@ -70,10 +72,10 @@ afterEach(() => {
 });
 
 describe('registration', () => {
-  it('registers exactly the eleven contract ids, in picker order, with valid unique kebab ids', () => {
+  it('registers exactly the twelve contract ids, in picker order, with valid unique kebab ids', () => {
     expect(BUILT_IN_THEMES.map((t) => t.id)).toEqual(CONTRACT_IDS);
     for (const t of BUILT_IN_THEMES) expect(t.id).toMatch(/^[a-z][a-z0-9-]{1,39}$/);
-    expect(new Set(BUILT_IN_THEMES.map((t) => t.name)).size).toBe(11);
+    expect(new Set(BUILT_IN_THEMES.map((t) => t.name)).size).toBe(12);
   });
 
   it('defaults and falls back to Delta Neon', () => {

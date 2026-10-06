@@ -10,6 +10,7 @@ import { useApp, type AppSettings } from '../app/store.ts';
 import { installJukebox } from './jukebox/engine.ts';
 import { mixer } from './mixer.ts';
 import { SFX_DUCK_MIN_GAIN, type MixSettings } from './mixPolicy.ts';
+import { playSfxVoice, type SfxKit } from './voices.ts';
 
 export type SfxName =
   | 'hover'
@@ -144,11 +145,25 @@ function tone({ type = 'square', freq, to, start = 0, dur, gain = 0.2, attack = 
   osc.stop(t0 + dur + 0.05);
 }
 
-function noise({ start = 0, dur, gain = 0.2, freq = 2000, q = 1, type = 'bandpass' as BiquadFilterType, to }: { start?: number; dur: number; gain?: number; freq?: number; q?: number; type?: BiquadFilterType; to?: number }): void {
+interface NoiseOpts {
+  start?: number;
+  dur: number;
+  gain?: number;
+  freq?: number;
+  q?: number;
+  type?: BiquadFilterType;
+  to?: number;
+  /** Fade-in time in seconds (default: starts at full gain). */
+  attack?: number;
+  /** Destination (default: the SFX bus). */
+  bus?: GainNode | null;
+}
+
+function noise({ start = 0, dur, gain = 0.2, freq = 2000, q = 1, type = 'bandpass', to, attack, bus }: NoiseOpts): void {
   const ctx = ctxNow();
-  const sfxBus = mixer.buses()?.sfx;
+  const out = bus ?? mixer.buses()?.sfx;
   const noiseBuffer = mixer.noiseBuffer();
-  if (!ctx || !sfxBus || !noiseBuffer) return;
+  if (!ctx || !out || !noiseBuffer) return;
   const t0 = ctx.currentTime + start;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer;
@@ -158,9 +173,12 @@ function noise({ start = 0, dur, gain = 0.2, freq = 2000, q = 1, type = 'bandpas
   if (to) filter.frequency.exponentialRampToValueAtTime(to, t0 + dur);
   filter.Q.value = q;
   const g = ctx.createGain();
-  g.gain.setValueAtTime(gain, t0);
+  if (attack) {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+  } else g.gain.setValueAtTime(gain, t0);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(filter).connect(g).connect(sfxBus);
+  src.connect(filter).connect(g).connect(out);
   src.start(t0);
   src.stop(t0 + dur + 0.05);
 }
@@ -230,6 +248,9 @@ const SOUNDS: Record<SfxName, () => void> = {
   message: () => tone({ type: 'sine', freq: NOTE(84), dur: 0.08, gain: 0.05 }),
 };
 
+/** What a theme voice (voices.ts) plays with: the same primitives, always on the SFX bus. */
+const SFX_KIT: SfxKit = { tone: (o) => tone(o), noise: (o) => noise(o), note: NOTE };
+
 const lastPlayed = new Map<SfxName, number>();
 /** UI chatter that must not pump the jukebox (see mixPolicy.ts, policy 3). */
 const QUIET_SFX: ReadonlySet<SfxName> = new Set(['hover', 'tick', 'message', 'click']);
@@ -244,7 +265,7 @@ export function sfx(name: SfxName, minGapMs = 30): void {
   lastPlayed.set(name, now);
   try {
     if (!QUIET_SFX.has(name)) mixer.sfxPriority();
-    SOUNDS[name]();
+    playSfxVoice(name, SOUNDS, SFX_KIT);
   } catch {
     /* never let audio break gameplay */
   }
@@ -257,9 +278,9 @@ export const synth = {
     if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN && (!opts.bus || opts.bus === mixer.buses()?.sfx)) mixer.sfxPriority();
     tone(opts);
   },
-  noise: (opts: Parameters<typeof noise>[0]) => {
+  noise: (opts: NoiseOpts) => {
     if (!unlocked || !liveCtx()) return;
-    if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN) mixer.sfxPriority();
+    if ((opts.gain ?? 0.2) >= SFX_DUCK_MIN_GAIN && (!opts.bus || opts.bus === mixer.buses()?.sfx)) mixer.sfxPriority();
     noise(opts);
   },
   /** Sustained sound (engine hum, loops): hold a gentle jukebox dip while `on` (mixPolicy 3b). */
