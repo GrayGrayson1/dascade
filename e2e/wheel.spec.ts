@@ -137,6 +137,40 @@ async function onlySlice(page: Page, label: string, emoji: string): Promise<void
   await expect.poll(() => segmentLabels(page)).toEqual([label, label]);
 }
 
+/**
+ * Records the Halloween wheel's reaction in the page the moment its caption appears. A show lasts only
+ * 2–3.4 s, so assertions polled from the test could miss it entirely on a slow machine.
+ */
+async function recordReaction(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __hnReaction: unknown };
+    w.__hnReaction = null;
+    const observer = new MutationObserver(() => {
+      const cc = document.querySelector<HTMLElement>('.hn-wd__cc');
+      if (w.__hnReaction || !cc) return;
+      observer.disconnect();
+      w.__hnReaction = {
+        react: document.querySelector('[data-part="wheel-decor"] .hn-wd')?.getAttribute('data-react') ?? null,
+        caption: cc.textContent,
+        // The caption stays up for the whole show (not a fixed fade), so it outlasts the sound.
+        captionRun: getComputedStyle(cc).animationDuration,
+        jackpot: document.querySelectorAll('.hn-wd__jackpot').length,
+        show: document.querySelectorAll('.hn-wd__show, .hn-wd__cat, .hn-wd__monster').length,
+        // Real motion only: reduced motion squeezes every animation and transition to 1 ms (base.css),
+        // so count what loops or runs longer than 50 ms, like theme-a11y.spec's motion check.
+        running: document.getAnimations().filter((a) => {
+          const t = a.effect?.getComputedTiming();
+          const long = t?.iterations === Infinity || (typeof t?.duration === 'number' && t.duration > 50);
+          return a.playState === 'running' && long && ((a.effect as KeyframeEffect | null)?.target as Element | null)?.closest('.hn-wd');
+        }).length,
+      };
+    });
+    observer.observe(document.body, { subtree: true, childList: true });
+  });
+}
+
+const recordedReaction = (page: Page) => page.evaluate(() => (window as unknown as { __hnReaction: unknown }).__hnReaction);
+
 test('Halloween Night dresses the wheel and reacts to the landing; a Delta Neon guest sees the plain wheel', async ({ page, browser }) => {
   await presetTheme(page, 'halloween-night');
   const code = await createRoom(page, 'wheel', 'Host');
@@ -151,14 +185,15 @@ test('Halloween Night dresses the wheel and reacts to the landing; a Delta Neon 
   await expect(decor).toHaveAttribute('data-phase', 'idle', { timeout: 30_000 });
   await expect(guest.locator('[data-part="wheel-decor"]')).toHaveCount(0);
 
+  await recordReaction(page);
   await page.getByRole('button', { name: 'Spin the wheel' }).click();
   await Promise.all([
     expect(page.getByTestId('wheel-result')).toHaveText('Pumpkin Jackpot', { timeout: 15_000 }),
     expect(guest.getByTestId('wheel-result')).toHaveText('Pumpkin Jackpot', { timeout: 15_000 }),
   ]);
-  await expect(decor).toHaveAttribute('data-react', 'jackpot');
-  await expect(page.locator('.hn-wd__jackpot')).toBeVisible();
-  await expect(page.locator('.hn-wd__cc')).toHaveText('[thunder rumbles, fanfare]');
+  await expect
+    .poll(() => recordedReaction(page), { timeout: 10_000 })
+    .toMatchObject({ react: 'jackpot', caption: '[thunder rumbles, fanfare]', captionRun: '3.4s', jackpot: 1 });
   await expect(guest.locator('.hn-wd')).toHaveCount(0);
 
   // Closing the result card ends the show.
@@ -181,18 +216,12 @@ test('Halloween Night wheel with reduced motion: the caption without the show', 
   await expect(decor).toHaveAttribute('data-phase', 'idle', { timeout: 30_000 });
   await expect(decor).not.toHaveAttribute('data-motion', /.+/);
 
+  await recordReaction(page);
   await page.getByRole('button', { name: 'Spin the wheel' }).click();
   await expect(page.getByTestId('wheel-result')).toHaveText('Black Cat: your best meow', { timeout: 15_000 });
-  await expect(decor).toHaveAttribute('data-react', 'cat');
-  await expect(page.locator('.hn-wd__cc')).toHaveText('[a cat meows]');
-  await expect(page.locator('.hn-wd__show, .hn-wd__cat')).toHaveCount(0);
-  const running = await page.evaluate(
-    () =>
-      document
-        .getAnimations()
-        .filter((a) => a.playState === 'running' && ((a.effect as KeyframeEffect | null)?.target as Element | null)?.closest('.hn-wd'))
-        .length,
-  );
-  expect(running).toBe(0);
+  // The caption (shown for the whole run, without a fade) and nothing that moves.
+  await expect
+    .poll(() => recordedReaction(page), { timeout: 10_000 })
+    .toMatchObject({ react: 'cat', caption: '[a cat meows]', jackpot: 0, show: 0, running: 0 });
   await leaveRoom(page);
 });
