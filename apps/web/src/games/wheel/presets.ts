@@ -22,6 +22,8 @@ export interface BuiltinPreset {
   id: string;
   name: string;
   description: string;
+  /** Theme ids under which the editor pre-selects this preset. It is never applied automatically. */
+  suggestFor?: readonly string[];
   build: (ctx: { playerNames: string[] }) => Partial<WheelPresetData> & { segments: WheelSegment[] };
 }
 
@@ -113,7 +115,38 @@ export const BUILTIN_PRESETS: BuiltinPreset[] = [
       ],
     }),
   },
+  {
+    id: 'builtin:trick-or-treat',
+    name: 'Trick or Treat',
+    description: 'Treats and harmless party tricks. The Pumpkin Jackpot is rare.',
+    suggestFor: ['halloween-night'],
+    build: () => ({
+      title: 'Trick or treat?',
+      sliceMode: 'weighted',
+      afterSpin: 'keep',
+      repeats: 'allow',
+      // Readable labels on every slice (≥ 4.5:1 with the renderer's text colour), no near-black slices
+      // (the slice colour also marks the readout and history), neighbours distinct all the way round.
+      segments: [
+        seg('Treat: raid the candy bowl', '🍬', '#e15c1f', 6),
+        seg('Do your best witch cackle', '🧙', '#8e44d6', 4),
+        seg('Pumpkin Jackpot', '🎃', '#ffd23f', 1),
+        seg('Spin again', '🔁', '#2ec4b6', 4),
+        seg('Tell a 30-second ghost story', '👻', '#f2ecff', 3),
+        seg('Treat: first pick of the snacks', '🍪', '#ffb020', 5),
+        seg('Bat-dance break', '🦇', '#b07cf0', 3),
+        seg('Treat: a round of applause', '👏', '#7ed957', 4),
+        seg("Say 'Good evening' like a vampire", '🧛', '#ff6fa8', 3),
+        seg('Howl like a friendly werewolf', '🐺', '#7aa2ff', 3),
+      ],
+    }),
+  },
 ];
+
+/** The built-in preset the editor pre-selects under a theme (Lunch spot unless one suggests itself). */
+export function suggestedPresetId(themeId: string): string {
+  return (BUILTIN_PRESETS.find((p) => p.suggestFor?.includes(themeId)) ?? BUILTIN_PRESETS[0]!).id;
+}
 
 /**
  * Merges preset data over the current settings, assigns fresh ids and validates.

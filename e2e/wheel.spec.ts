@@ -70,3 +70,53 @@ test('wheel smoke: bulk paste, join, spin together, same winner, leave', async (
   await leaveRoom(page);
   await expect(page).toHaveURL(/\/$/);
 });
+
+/** Starts this tab in a theme (once per tab, before any app script runs). */
+async function presetTheme(page: Page, theme: string): Promise<void> {
+  await page.addInitScript((id) => {
+    try {
+      if (!sessionStorage.getItem('wheel-theme-preset')) {
+        const key = 'dascade:v1:settings';
+        const prev = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+        localStorage.setItem(key, JSON.stringify({ ...prev, theme: id, settingsVersion: 3 }));
+        sessionStorage.setItem('wheel-theme-preset', '1');
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, theme);
+}
+
+/** The pointer body's first gradient stop, as computed (themes may recolour it via --wh-pointer-*). */
+async function pointerStopColor(page: Page): Promise<string> {
+  const stop = page.locator('[data-part="wheel-pointer"] linearGradient stop').first();
+  await expect(stop).toBeAttached();
+  return stop.evaluate((el) => getComputedStyle(el).stopColor);
+}
+
+test('the wheel pointer keeps its own colours in the default theme', async ({ page }) => {
+  await createRoom(page, 'wheel', 'Host');
+  await openSettings(page);
+  expect(await pointerStopColor(page)).toBe('rgb(255, 157, 189)');
+  await leaveRoom(page);
+});
+
+test('Halloween Night pre-selects the Trick or Treat preset; the room only changes on Load', async ({ page }) => {
+  await presetTheme(page, 'halloween-night');
+  await createRoom(page, 'wheel', 'Host');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
+  await openSettings(page);
+
+  const before = await segmentLabels(page);
+  expect(before.length).toBeGreaterThan(0);
+  expect(before).not.toContain('Pumpkin Jackpot');
+  await expect(page.getByRole('combobox', { name: 'Presets' })).toHaveValue('builtin:trick-or-treat');
+  expect(await segmentLabels(page)).toEqual(before);
+
+  await page.getByRole('button', { name: 'Load', exact: true }).click();
+  await expect.poll(() => segmentLabels(page)).toContain('Pumpkin Jackpot');
+  const settings = JSON.parse((await roomState(page)).settingsJson);
+  expect(settings.sliceMode).toBe('weighted');
+  expect(settings.segments.find((s: { label: string }) => s.label === 'Pumpkin Jackpot')).toMatchObject({ weight: 1, emoji: '🎃' });
+  await leaveRoom(page);
+});

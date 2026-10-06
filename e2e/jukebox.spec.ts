@@ -3,7 +3,8 @@
  * the audio engine in every build like window.__DASCADE__), never through audible output:
  *  - the library loads the manifest; open → play → next → seek work from the UI;
  *  - floor → cabinet → title screen → lobby → back keeps the SAME <audio> element playing
- *    (currentTime keeps increasing — no restart), and a theme switch neither restarts nor clears the queue;
+ *    (currentTime keeps increasing — no restart), and a theme switch (incl. Halloween Night's re-voiced sound
+ *    effects) neither restarts nor clears the queue;
  *  - a reload restores the track + approximate position (resuming after a gesture);
  *  - the collapsed dock never overlaps key controls on phones (bounding boxes), hides in immersive games;
  *  - the visualizer canvas count stays 1;
@@ -271,12 +272,23 @@ test.describe('jukebox', () => {
     t = await expectContinuous(page, t);
     expect((await snap(page)).queue).toEqual(queued);
 
+    // Halloween Night re-voices a few sound effects; the music never notices.
+    await page.evaluate(() => (window as any).__DASCADE_THEME__.setTheme('halloween-night'));
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
+    await expect.poll(() => page.evaluate(() => (window as any).__DASCADE_THEME__.skinLoaded('halloween-night'))).toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => [...(window as any).__DASCADE_AUDIO__.voices()].sort()))
+      .toEqual(['bigwin', 'coin', 'ding', 'join', 'pop', 'win']);
+    t = await expectContinuous(page, t);
+    expect((await snap(page)).queue).toEqual(queued);
+
     // Back out of the room (browser back), still the same playback.
     await page.goBack();
     await page.waitForURL((url) => !/\/room\//.test(url.pathname));
     t = await expectContinuous(page, t);
     await page.evaluate(() => (window as any).__DASCADE_THEME__.setTheme('delta-neon'));
     await expectContinuous(page, t);
+    await expect.poll(() => page.evaluate(() => (window as any).__DASCADE_AUDIO__.voices())).toEqual([]);
     const census = await page.evaluate(() => (window as any).__audioCensus);
     expect(census.elements).toBe(1);
     expect(census.contexts).toBeLessThanOrEqual(1);
