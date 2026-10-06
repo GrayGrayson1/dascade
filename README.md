@@ -1,6 +1,6 @@
 # DASCADE — Delta Alpha Sierra Arcade
 
-A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **25 games**, plus a **Tournament Center** for brackets and Swiss events, **eleven themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
+A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **25 games**, plus a **Tournament Center** for brackets and Swiss events, **twelve themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
 
 > All casino-style games use meaningless **virtual chips**. There is no real-money wagering, purchasing, deposits or cash-out of any kind.
 
@@ -50,7 +50,7 @@ Other routes: `/room/:code` and `/r/:code` join a room, and `/tournaments` opens
 
 ## Themes
 
-DASCADE ships **eleven themes**. Pick one from the palette button on the floor or in a room's top bar, or from **Settings → Display**. A theme restyles the whole arcade: floor, cabinets, pickers, title screens, lobbies, dialogs, the Tournament Center, results, the jukebox and every game's playfield. It never changes rules, timing, networking or scores. The choice is local to each player (people in one room can use different themes) and is remembered per browser (and on the Supabase profile when signed in).
+DASCADE ships **twelve themes**. Pick one from the palette button on the floor or in a room's top bar, or from **Settings → Display**. A theme restyles the whole arcade: floor, cabinets, pickers, title screens, lobbies, dialogs, the Tournament Center, results, the jukebox and every game's playfield. It never changes rules, timing, networking or scores. The choice is local to each player (people in one room can use different themes) and is remembered per browser (and on the Supabase profile when signed in).
 
 | Theme | id | The idea |
 |---|---|---|
@@ -65,6 +65,9 @@ DASCADE ships **eleven themes**. Pick one from the palette button on the floor o
 | **Saturday Morning** | `saturday-morning` | A loud 90s game-show set: sunbursts, bulbs, buzzers, confetti (competitive boards stay calm) |
 | **Executive Edition** | `executive` | Mahogany, brass and banker lamps; "Match Performance Review" and the "Strategic Putting Division" |
 | **Neon Noir** | `neon-noir` | The serious one: a rainy pixel city, wet reflections, glass HUDs |
+| **Halloween Night** | `halloween-night` | Spookily adorable: jack-o'-lanterns, friendly ghosts, cobwebs and a bubbling cauldron under a smiling moon; costumed claw prizes, a Trick-or-Treat wheel and spooky-cute sounds |
+
+**Halloween Night is seasonal:** every October the arcade floor invites each player to try it (one click; "Not now" stops the invites for the year). Leave it any time with the pumpkin button next to the theme button, in **Settings → Display** or at the top of the Themes sheet. If you switched it on from the invite, it switches back on its own after October 31. It stays in the picker all year for anyone who wants Halloween in March. Like every theme it's personal: nobody else's arcade changes.
 
 Switching plays a short transition in the new theme's style (a quick fade with reduced motion) without reloading, so rooms, games, tournaments and music carry on untouched. **Visual effects: Full / Reduced / Minimal** and **Reduce motion** scale every theme's particles, backgrounds, blur and animation.
 
@@ -116,7 +119,7 @@ Then open http://localhost:5173. `pnpm dev` runs the Colyseus game server on :25
 | `pnpm test` | Vitest: engine unit tests, kit and platform tests, server integration tests |
 | `pnpm test:e2e` | Playwright projects `chromium`, `firefox`, `webkit`, `mobile` (Pixel 7) and `mobile-safari` (iPhone 14). Builds and boots the production server automatically. |
 | `pnpm load` | Protocol-level load simulation against a running server (see below) |
-| `pnpm test:e2e` themes/audio | `e2e/theme.spec.ts` (all 11 themes, switching, persistence), `e2e/theme-state.spec.ts` (switching themes mid-game never changes room state), `e2e/theme-a11y.spec.ts` (reduced motion, phone layout, focus), `e2e/jukebox.spec.ts` (playback, route persistence, reload restore, two-client Room DJ) |
+| `pnpm test:e2e` themes/audio | `e2e/theme.spec.ts` (all 12 themes, switching, persistence), `e2e/theme-state.spec.ts` (switching themes mid-game never changes room state), `e2e/theme-a11y.spec.ts` (reduced motion, phone layout, focus), `e2e/jukebox.spec.ts` (playback, route persistence, reload restore, two-client Room DJ) |
 | `pnpm music:index` | Report what the jukebox sees in `apps/web/public/audio/jukebox/` (tracks, durations, duplicates, rejects, total size). Read-only; `--json` prints the manifest. |
 
 Focused work:
@@ -170,7 +173,7 @@ apps/web          React 19 + Vite client: arcade floor, cabinet pickers, shell &
 apps/game-server  Colyseus 0.18 authoritative rooms + Express (/api/*, static client) + platform services
 packages/shared   Protocol, catalog, cabinets, tournament contract, Zod schemas, sanitation, RNG, rate limits
 packages/game-core Pure deterministic engines (every game), party/classics helpers, tournament engine, Elo
-packages/ui       Design system: theme tokens, materials + theme API (11 theme definitions), components, pixel icons, playing cards and chips
+packages/ui       Design system: theme tokens, materials + theme API (12 theme definitions), components, pixel icons, playing cards and chips
 e2e/              Playwright specs     scripts/  load simulation, dictionary build     supabase/  optional schema + RLS
 ```
 

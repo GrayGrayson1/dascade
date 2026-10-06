@@ -3,6 +3,7 @@
  * low fog, friendly ghosts), jack-o'-lantern floor props, costumed claw prizes, spooky-cute sounds and
  * Halloween confetti. Token/material data lives in packages/ui/src/theme/themes/halloween-night.ts.
  */
+import '@fontsource/creepster/latin-400.css';
 import './skin.css';
 import type { ThemeSkin } from '../types.ts';
 import { HALLOWEEN_CELEBRATION } from './celebration.ts';

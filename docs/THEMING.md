@@ -1,8 +1,9 @@
 # Theming DASCADE
 
-DASCADE ships **eleven themes**. Delta Neon (`delta-neon`) is the default and the house style; the
+DASCADE ships **twelve themes**. Delta Neon (`delta-neon`) is the default and the house style; the
 others (Shareware Casino '97, Corporate Desktop '98, Cyber Café 2001, Mall Arcade '92, VHS After Dark,
-Space Casino 2088, Basement LAN Party, Saturday Morning, Executive Edition, Neon Noir) restyle the
+Space Casino 2088, Basement LAN Party, Saturday Morning, Executive Edition, Neon Noir, and the seasonal
+Halloween Night) restyle the
 **whole** arcade: floor, cabinets, pickers, title screens, lobbies, dialogs, Tournament Center, results,
 the jukebox, game chrome and playfield materials.
 
@@ -57,7 +58,8 @@ apps/web/src/app/settings.ts             settings.theme + versioned, fail-safe m
 
 The transition overlay is a manual **popover** (top layer, above open dialogs), `pointer-events: none`.
 Styles implemented: `power` · `boot` · `shutter` · `fluorescent` · `tracking` · `warp` · `crt-off` · `wipe`
-· `fade`; each tints itself from the target theme's `meta.swatches`.
+· `haunt` (the screen dims once while a friendly ghost swoops across) · `fade`; each tints itself from the
+target theme's `meta.swatches`. `themes/engine.test.ts` checks every style has rules in `host.css`.
 
 ## Layering
 
@@ -200,15 +202,102 @@ export default { id: 'lan-party', Environment, FloorDecor, JukeboxDecor, arcadeR
   dome's `--jb-arch` rather than overriding colours on the parts. The quick control (`[data-part=mini-open]`,
   `[data-part=mini]`) is the small button in the floor HUD, top bar or shell menu.
 - **The claw machine** stands at the right end of the row (`[data-part=claw-machine]`, `.clw-*`,
-  `apps/web/src/arcade/claw.css`): body from `--cabinet-*`, marquee and trim from `--clw-accent`. Its close-up
-  (`[data-part=claw-closeup]`, `.clwx*`, `clawCloseup.css`) uses the same tokens for its cabinet; the inside of
-  the glass (the plushies, the claw) is fixed printed/lit art like the cabinets' screens. Where the floor has no
-  room for the machine, a quick Claw button (`[data-part=claw-quick]`) sits in the HUD or the phone extras row.
+  `apps/web/src/arcade/claw.css`): body from `--cabinet-*`, marquee and trim from `--clw-accent` (set it on
+  `.clw, .clwx`, where it's declared). Its close-up (`[data-part=claw-closeup]`, `.clwx*`, `clawCloseup.css`)
+  uses the same tokens for its cabinet; the inside of the glass (the plushies, the claw) is fixed printed/lit
+  art like the cabinets' screens — **except** that a skin may dress it in a costume (`ThemeSkin.claw`, below).
+  Where the floor has no room for the machine, a quick Claw button (`[data-part=claw-quick]`) sits in the
+  HUD or the phone extras row.
 - **Keep the row's ends free for them.** On floors wide enough for the machines, the lineup carries
   `data-jukebox="floor"` / `data-claw="floor"`; a FloorDecor prop that would stand in the same spot steps
   aside with `:root[data-theme='<id>'] .af-floor:has(.af-lineup[data-claw='floor']) .<prop> { display: none }`
   (see Mall Arcade '92 and VHS After Dark), and still shows where the machines don't fit.
 - Decor components are wrapped in an error boundary: a crash renders nothing instead of breaking the app.
+- **Avatars** carry `data-avatar="<id>"` on `.dc-avatar` (no paint of its own), so a skin can dress them per
+  kind with a pseudo-element (Halloween Night's hats). Keep it inside the avatar's width and hide it on tiny
+  avatars; it's local decoration, nobody else sees it.
+- **Wheel of DAStiny**: `--wh-pointer-1/-2/-3` (pointer gradient), `--wh-pointer-edge`, `--wh-pointer-glow`
+  and `--wh-pin-1..3` recolour the pointer — set them on `.wh-pointer` (wheel.css's
+  `:root[data-theme]:not([data-theme='delta-neon']) .wh` outranks `.wh`). The stage carries
+  `[data-spinning='true']` while a spin runs and `[data-revealed='true']` while the result shows. Slice colours
+  never theme.
+
+### Optional data hooks: claw costume, celebration, sounds
+
+A skin may also export plain data (no DOM, no state) that the app reads only while that theme is active
+(`activeSkin()` / `useActiveSkin()` in `themes/registry.ts`). Leave a hook out and everything stays exactly as
+it is in Delta Neon.
+
+- **`claw?: ClawCostume`** (`apps/web/src/arcade/clawArt.ts`) dresses the claw machine's plushies and the inside
+  of its glass: per kind, new sprite rows (**exactly** the base sprite's width × height and visible bounding box,
+  letters `. a d e w k p`; only rows with a `w` blink, so keep mouths off eye rows), six colours/shades/lights,
+  eye/pupil/cheek inks and a display name (lower case, no leading vowel, ≤ 10 characters: "You won a ghost
+  plush!"); the close-up's case/wall/floor colours, neon, optional `webs`, a sign of ≤ 14 capitals (shrunk to fit),
+  the floor machine's glass and plate/restock/floor-tag flavour. It is the same four kinds at the same sizes, so
+  saved prize shelves (`dascade:v2:claw`), the pile and the physics never see it — never add kinds (a stored pile
+  with an unknown kind is discarded, shelf included). The claw itself (chrome, grip tips, aim marks) and
+  functional text ("INSERT TOKEN", miss reasons, the shelf count) stay fixed. `clawCostumeProblems()` validates
+  a costume; invalid fields fall back to the machine's own art one by one.
+- **`celebration?: SkinCelebration`** (`themes/celebration.ts`): `{ colors, sprites?, spriteShare? }` — confetti
+  colours (`#rrggbb`, after the winner's own colour) and ≤ 12×12 pixel sprites with an `ink` map for Wheel of
+  DAStiny landings and claw wins. Without it the built-in confetti runs with the same random sequence.
+  `celebrationProblems()` validates it (`skinExtras.test.ts`).
+- **`sounds?: SfxVoices`** (`audio/voices.ts`): see **Sounds** below.
+
+### Sounds
+
+A skin may re-voice `sfx()` names with recipes built only from the kit (`tone`, `noise`, `note`). They play on
+the SFX bus, and `sfx()` still applies mute, volume, the rate limit and the jukebox dip exactly as for the
+built-in sounds. Only the active skin's voices play (ThemeHost registers them); a theme switch never touches the
+jukebox or music. Keep each voice's length, loudness and meaning close to the built-in sound, and leave quiet UI
+chatter (hover, click, tick, message) and functional cues alone. Sounds games play directly through `synth` are
+not re-voiced. QA: `window.__DASCADE_AUDIO__.voices()` lists the active theme's re-voiced names.
+
+**Ambient sound** belongs to the Environment and plays on the floor only: after a gesture has unlocked audio,
+with the tab visible, not muted, SFX and master volume above 0 and the jukebox not audible; on its own GainNode
+on `synth.sfxBus`, every gain below 0.04 so it never dips or holds the jukebox; noise layers ≤ 0.9 s (the shared
+noise buffer is 1 s and doesn't loop); timers, not animation frames; full clean-up when the place changes or the
+component unmounts; nothing at module top touches the DOM.
+
+### Halloween Night extras
+
+- **Progressive haunting** (`halloween-night/haunt.ts`): by the player's local clock the hall is calm by day,
+  spookier after dark (18:00–06:00) and peaks on Halloween night (Oct 31 until dawn on Nov 1) — more ghosts and
+  bats, thicker fog, brighter jack-o'-lanterns, a peeking ghost and a candy bucket — always capped by fx and
+  reduced motion (`hauntBudget`). One shared timer re-checks at 06:00 / 18:00 / midnight; nothing reads the
+  clock per frame.
+- **Avatar hats** (witch hat, pumpkin cap, bat bow by avatar kind) through `.dc-avatar[data-avatar]`.
+- **`haunt` transition** into the theme; Creepster (`@fontsource/creepster`, OFL) only on a few big fixed titles
+  through the skin's `--hn-spooky` (never on tokens, so buttons and body text stay in the house faces).
+
+## Seasonal themes (Halloween Night)
+
+Halloween Night (`halloween-night`) is a normal theme — in the picker all year — plus a small seasonal layer:
+`themes/seasonal.ts` (pure logic with an injectable clock), `themes/seasonalController.ts` (wiring),
+`SeasonalHost.tsx` and `ExitHalloween.tsx` (UI). Like every theme it is local and never reaches the server.
+
+- **Invite:** in October (the device's local date) a floor-only `<aside data-part="seasonal-invite">` appears
+  1.2 s after the floor settles. It is not a dialog and doesn't take focus, and it never shows in cabinets,
+  lobbies, games or the Tournament Center, or while a modal, the claw close-up, the expanded jukebox, the theme
+  picker or a theme transition is open. "Turn on Halloween" calls `switchTheme()`; "Not now" ends invites for
+  the season.
+- **Exit** (`[data-part="exit-halloween"]`): a HUD pumpkin at ≥ 1024 × 541 px, plus a row in Settings → Display
+  and at the top of the Themes sheet everywhere. It confirms "Back to <theme>?" and returns to the remembered
+  theme (Delta Neon if that theme is gone).
+- **Season's end:** an invite-activated Halloween Night reverts after October 31 — checked when settings are
+  ready and when the tab becomes visible, never mid-match. A hand-picked one stays. An invite from an earlier
+  year seen in a later October moves to that season instead of reverting.
+- **State:** `AppSettings.seasonal.halloween = { year?, dismissed?, via?: 'invite' | 'picker', prev? }`,
+  validated by `parseSeasonal` (no settings-version bump; it roams with the Supabase profile). One store
+  subscription on `settings.theme` writes `via`/`prev`; unknown seasons are kept.
+- **QA:** `?season=off|live|halloween|YYYY-MM-DD[THH:MM]` (local time; noon when no time is given) is copied to
+  `sessionStorage['dascade:qa:season']`; `localStorage['dascade:qa:season']` works too. Precedence: URL ›
+  sessionStorage › localStorage › the real clock. `seasonClock()` gives seasonal visuals the same date (the
+  haunting in `halloween-night/haunt.ts`). `[data-part="seasonal-status"][data-state=off|idle|ineligible|waiting|blocked|shown]`
+  is always present for tests.
+- **E2E:** `playwright.config.ts` seeds `dascade:qa:season=off` into every browser context, so no spec meets
+  October's invite by accident; `e2e/seasonal.spec.ts` opts in with `?season=…`. A spec that passes its own
+  `storageState` must add that entry.
 
 ## Adding a theme end to end
 
@@ -247,4 +336,4 @@ The fx setting is labelled **FULL / REDUCED / MINIMAL** (stored as `'high' | 'lo
 
 `window.__DASCADE_THEME__`: `listThemes`, `registerTheme` (runtime test themes), `activeThemeId`,
 `setTheme(id)` (instant), `switchTheme(id)` (animated, what the picker does), `skinLoaded(id)`,
-`readThemeTokens(el)`.
+`readThemeTokens(el)`. `window.__DASCADE_AUDIO__.voices()`: the sfx names the active theme re-voices.

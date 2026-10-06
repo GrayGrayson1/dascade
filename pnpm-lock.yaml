@@ -132,6 +132,9 @@ importers:
       '@fontsource/audiowide':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource/creepster':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/kalam':
         specifier: 5.3.0
         version: 5.3.0
@@ -611,6 +614,9 @@ packages:
 
   '@fontsource/audiowide@5.3.0':
     resolution: {integrity: sha512-ECBdWgQPaCSuwlFyeXzV0i2DAGq0SKID7jxD1oHhYTObx3wz26YKs3F9Ic/EO369Anzld9IqxflRukJm6nVxpw==}
+
+  '@fontsource/creepster@5.3.0':
+    resolution: {integrity: sha512-k1Y03cPd2QnoVBygqfYd/y1Byx1Rl3vDLuq3TrmujwaSgFh8hFy2e1ar7/zhillaaCwweLDI9AlvhIBA+VlsWg==}
 
   '@fontsource/kalam@5.3.0':
     resolution: {integrity: sha512-FDkVoDfPDCSN/eO81FOYtUI67eMgpVBJmjBtAqSL0PmEhJyeFY2biC+CR+yEttksgXR9+swpFdYmQTyjwBq80Q==}
@@ -2481,6 +2487,8 @@ snapshots:
   '@fontsource-variable/space-grotesk@5.3.0': {}
 
   '@fontsource/audiowide@5.3.0': {}
+
+  '@fontsource/creepster@5.3.0': {}
 
   '@fontsource/kalam@5.3.0': {}
 
