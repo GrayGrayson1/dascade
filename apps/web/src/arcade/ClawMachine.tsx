@@ -8,14 +8,16 @@
  * into the close-up (ClawCloseup.tsx, lazy loaded), where you operate it. The pile is shared
  * (clawInventory.ts): what you win there is missing here, and the prize door shows it for a moment.
  *
- * Cosmetic and local only (the pile and your prize shelf are kept in this browser).
+ * Cosmetic and local only (the pile and your prize shelf are kept in this browser). The active skin may
+ * dress the plushies and the glass up (ThemeSkin.claw, resolved in clawArt.ts).
  */
 import { Component, Suspense, lazy, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CLAW_ART, FLOOR_HOME_X, FLOOR_PLUSH_SCALE, floorOrder, floorPlacement } from './claw.ts';
-import { spritePaths, spriteColor, spriteSize } from './clawArt.ts';
+import { clawCopy, interiorOf, plushArt, spritePaths, spriteColor, spriteSize, type PlushArt } from './clawArt.ts';
 import { pileToToys, shelfTotal, useClaw, type ClawOpener } from './clawInventory.ts';
 import type { ToyKind } from './clawPile.ts';
 import { sfx } from '../audio/audio.ts';
+import { useActiveSkin } from '../themes/registry.ts';
 import './claw.css';
 
 /**
@@ -171,16 +173,16 @@ export function ClawQuickButton({ className }: { className?: string }) {
 type Display = 'idle' | 'playing' | 'won';
 const MARQUEE: Record<Display, string> = { idle: 'CLAW', playing: 'CLAW', won: 'WINNER!' };
 
-/** A floor-art plush (1 art unit a pixel), bottom-centre at (x, y). */
-const FloorPlush = memo(function FloorPlush({ kind, color, x, y }: { kind: ToyKind; color: number; x: number; y: number }) {
+/** A floor-art plush (1 art unit a pixel), bottom-centre at (x, y). `art` is stable per kind and costume. */
+const FloorPlush = memo(function FloorPlush({ kind, color, x, y, art }: { kind: ToyKind; color: number; x: number; y: number; art: PlushArt }) {
   const { w, h } = spriteSize(kind);
   return (
     <g
       className="clw-toy"
       transform={`translate(${(x - (w * FLOOR_PLUSH_SCALE) / 2).toFixed(2)} ${(y - h * FLOOR_PLUSH_SCALE).toFixed(2)}) scale(${FLOOR_PLUSH_SCALE})`}
     >
-      {spritePaths(kind).map(({ ch, d }) => (
-        <path key={ch} d={d} fill={spriteColor(ch, color) ?? 'none'} />
+      {spritePaths(kind, art.rows).map(({ ch, d }) => (
+        <path key={ch} d={d} fill={spriteColor(ch, color, art) ?? 'none'} />
       ))}
     </g>
   );
@@ -192,6 +194,7 @@ export const ClawMachine = memo(function ClawMachine() {
   const floor = useClaw((s) => s.floor);
   const prize = useClaw((s) => s.lastPrize);
   const isOpen = useClaw((s) => s.open !== null);
+  const costume = useActiveSkin()?.claw ?? null;
   const uid = `clw${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const machineRef = useRef<HTMLSpanElement>(null);
 
@@ -226,7 +229,7 @@ export const ClawMachine = memo(function ClawMachine() {
     >
       <span className="clw__machine" ref={machineRef}>
         <svg className="clw-art" viewBox={`0 0 ${CLAW_ART.w} ${CLAW_ART.h}`} aria-hidden focusable="false">
-          <ClawDefs uid={uid} />
+          <ClawDefs uid={uid} glass={interiorOf(costume).glass} />
           <ClawBody uid={uid} />
 
           {/* marquee */}
@@ -247,7 +250,7 @@ export const ClawMachine = memo(function ClawMachine() {
             <rect x="24" y="104" width="30" height="44" fill="#fff" opacity=".04" />
             {toys.map((t) => {
               const p = floorPlacement(t);
-              return <FloorPlush key={t.id} kind={t.kind} color={t.color} x={p.x} y={p.y} />;
+              return <FloorPlush key={t.id} kind={t.kind} color={t.color} x={p.x} y={p.y} art={plushArt(t.kind, costume)} />;
             })}
             <g transform={`translate(${FLOOR_HOME_X.toFixed(2)} 0)`}>
               <rect x="-7" y="38.4" width="14" height="5.6" rx="1" fill="#c9c3e6" />
@@ -293,7 +296,7 @@ export const ClawMachine = memo(function ClawMachine() {
           <g clipPath={url('door')}>
             {showPrize ? (
               <g className="clw-prize">
-                <FloorPlush kind={prize.kind} color={prize.color} x={46} y={212} />
+                <FloorPlush kind={prize.kind} color={prize.color} x={46} y={212} art={plushArt(prize.kind, costume)} />
               </g>
             ) : null}
             <rect
@@ -311,14 +314,14 @@ export const ClawMachine = memo(function ClawMachine() {
       </span>
       <span className="clw__tag" aria-hidden>
         <span className="clw__name">Claw machine</span>
-        <span className="clw__line">{display === 'won' ? 'You won a plush!' : won ? `Prizes won: ${won}` : 'Step up and play'}</span>
+        <span className="clw__line">{display === 'won' ? clawCopy(costume).floorWon : won ? `Prizes won: ${won}` : 'Step up and play'}</span>
       </span>
     </button>
   );
 });
 
-/** Gradients, patterns and clips (static). */
-const ClawDefs = memo(function ClawDefs({ uid }: { uid: string }) {
+/** Gradients, patterns and clips (static; `glass` is stable per costume). */
+const ClawDefs = memo(function ClawDefs({ uid, glass }: { uid: string; glass: readonly [string, string] }) {
   const id = (k: string) => `${uid}-${k}`;
   return (
     <defs>
@@ -338,8 +341,8 @@ const ClawDefs = memo(function ClawDefs({ uid }: { uid: string }) {
         <stop offset="1" style={{ stopColor: 'color-mix(in srgb, var(--clw-accent) 70%, #000)' }} />
       </linearGradient>
       <linearGradient id={id('glassfill')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#141b4a" />
-        <stop offset="1" stopColor="#070a22" />
+        <stop offset="0" stopColor={glass[0]} />
+        <stop offset="1" stopColor={glass[1]} />
       </linearGradient>
       <linearGradient id={id('metal')} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stopColor="#4a4668" />

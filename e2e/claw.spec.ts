@@ -7,6 +7,7 @@
  * coil — a guaranteed win).
  */
 import { expect, test, type Page } from '@playwright/test';
+import { presetSettings } from './helpers.ts';
 
 const CABINETS = 11;
 
@@ -46,14 +47,14 @@ async function walkUp(page: Page, isMobile: boolean): Promise<void> {
 /** A drop straight after the token is ignored (a double click can't insert and drop at once). */
 const settle = (page: Page) => page.waitForTimeout(450);
 
-async function winOnce(page: Page): Promise<void> {
+async function winOnce(page: Page, won = /^You won a (blob|bunny|star|cube bot) plush!/): Promise<void> {
   await go(page).click();
   await expect(go(page)).toHaveAttribute('data-mode', 'drop');
   expect(await rig(page)).toBe(true);
   await settle(page);
   await go(page).click();
   await expect(page.locator('[data-part="claw-prize"]')).toBeVisible({ timeout: 30_000 });
-  await expect(status(page)).toHaveText(/^You won a (blob|bunny|star|cube bot) plush!/);
+  await expect(status(page)).toHaveText(won);
   await expect(closeup(page)).toHaveAttribute('data-phase', 'idle', { timeout: 15_000 });
 }
 
@@ -131,6 +132,38 @@ test.describe('the claw machine', () => {
     await page.reload();
     await walkUp(page, isMobile);
     await expect(page.locator('[data-part="claw-shelf"]')).toHaveAttribute('aria-label', 'Prize shelf: 1 plush won');
+    expect((await stored(page)).pile).toHaveLength(21);
+  });
+
+  test('Halloween Night dresses the plushies up; underneath they are the same plushies', async ({ page, isMobile }) => {
+    const theme = (id: string) => page.evaluate((t) => (window as any).__DASCADE_THEME__.setTheme(t), id);
+    const shelfNames = () =>
+      page.locator('[data-part="claw-shelf"] [role="img"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')!.split(':')[0]));
+    await presetSettings(page, { theme: 'halloween-night' });
+    await openFloor(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
+    await expect.poll(() => page.evaluate(() => (window as any).__DASCADE_THEME__?.skinLoaded('halloween-night') ?? false)).toBe(true);
+    await walkUp(page, isMobile);
+    expect(await shelfNames()).toEqual(['ghost', 'black cat', 'candy', 'pumpkin']);
+    if (!isMobile) await expect(page.locator('.clwx__plate-big')).toHaveText('TREAT!');
+    await expect(page.locator('[data-part="claw-sign"]')).toHaveText('INSERT TOKEN');
+    await winOnce(page, /^You won a (ghost|black cat|candy|pumpkin) plush!/);
+    await expect(page.locator('[data-part="claw-shelf"]')).toHaveAttribute('aria-label', 'Prize shelf: 1 plush won');
+    // Back to the house theme with the machine still open: the same plushies, in their own clothes.
+    await theme('delta-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'delta-neon');
+    await expect.poll(shelfNames).toEqual(['blob', 'bunny', 'star', 'cube bot']);
+    await expect(page.locator('[data-part="claw-shelf"]')).toHaveAttribute('aria-label', 'Prize shelf: 1 plush won');
+    const inv = await stored(page);
+    expect(inv.won).toBe(1);
+    expect(inv.pile).toHaveLength(21);
+    // Dressed up again, across a reload: the win is kept.
+    await theme('halloween-night');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
+    await walkUp(page, isMobile);
+    await expect(page.locator('[data-part="claw-shelf"]')).toHaveAttribute('aria-label', 'Prize shelf: 1 plush won');
+    expect(await shelfNames()).toEqual(['ghost', 'black cat', 'candy', 'pumpkin']);
     expect((await stored(page)).pile).toHaveLength(21);
   });
 

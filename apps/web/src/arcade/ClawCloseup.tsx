@@ -6,7 +6,8 @@
  * The machine is the interface: the joystick and the big button on its control deck ARE the controls
  * (arrow keys / WASD, Space / Enter and a gamepad work too). The physics is clawPhysics.ts on a fixed
  * 120 Hz step; clawRender.ts draws the inside of the glass; the chrome (marquee, bulbs, deck, prize
- * door, shelf) is HTML/SVG styled with the cabinet tokens (clawCloseup.css).
+ * door, shelf) is HTML/SVG styled with the cabinet tokens (clawCloseup.css). The active skin may dress
+ * the plushies and the glass up (ThemeSkin.claw) and bring its own confetti (ThemeSkin.celebration).
  *
  * Closing rule: before you drop, closing hands the token back (nothing happened). Once you've dropped,
  * the try plays out — closing just settles it instantly (the same steps, not drawn), so a prize is
@@ -24,10 +25,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useApp } from '../app/store.ts';
-import { spritePaths, spriteColor, spriteSize } from './clawArt.ts';
+import { clawCopy, interiorOf, plushArt, plushName, spritePaths, spriteColor, spriteSize, type ClawCostume, type PlushArt } from './clawArt.ts';
 import { ClawMotor, clawSound } from './clawAudio.ts';
 import { ClawConfetti } from './ClawConfetti.tsx';
-import { STOCK, kindName, needsRestock, pileToToys, shelfTotal, urlClawSeed, useClaw, type Shelf } from './clawInventory.ts';
+import { STOCK, needsRestock, pileToToys, shelfTotal, urlClawSeed, useClaw, type Shelf } from './clawInventory.ts';
 import {
   AIM_TIME,
   DT,
@@ -52,6 +53,7 @@ import {
   type ToyKind,
 } from './clawPhysics.ts';
 import { VIEW, ageLife, burstBits, drawClawScene, invalidateBackdrop, lifeOf, type RenderFx } from './clawRender.ts';
+import { useActiveSkin } from '../themes/registry.ts';
 import './clawCloseup.css';
 
 type Lights = 'idle' | 'aim' | 'tense' | 'win' | 'sad' | 'restock';
@@ -131,6 +133,12 @@ export default function ClawCloseup() {
   const reduced = useApp((s) => s.settings.reducedMotion);
   const fxLevel = useApp((s) => s.settings.fx);
   const titleId = useId();
+  // The active skin may dress the machine up (ThemeSkin.claw) and bring its own confetti. Callbacks and
+  // the frame loop read it through a ref, so a theme switch never restarts the loop (or resets a try).
+  const skin = useActiveSkin();
+  const costume = skin?.claw ?? null;
+  const skinRef = useRef(skin);
+  skinRef.current = skin;
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const machineRef = useRef<HTMLDivElement>(null);
@@ -155,7 +163,7 @@ export default function ClawCloseup() {
     const sim = createSim(toys, urlClawSeed() ?? inv.seed ?? 1, inv.misses);
     simRef.current = sim;
   }
-  const fxRef = useRef<RenderFx>({ motion: 1, time: 0, life: new Map(), shake: 0, light: 1, lightTint: '#ffe9b0', focus: 0, bits: [] });
+  const fxRef = useRef<RenderFx>({ motion: 1, time: 0, life: new Map(), shake: 0, light: 1, lightTint: interiorOf(costume).light, focus: 0, bits: [] });
   const input = useRef({
     keys: new Map<string, [number, number]>(),
     stick: [0, 0] as [number, number],
@@ -213,13 +221,14 @@ export default function ClawCloseup() {
       later(4200, () => setPrize((p) => (p?.key === key ? null : p)));
       flash({ word: 'WINNER!', lights: 'win' }, 4200);
       fxRef.current.light = 1.6;
-      fxRef.current.lightTint = '#ffd23f';
+      fxRef.current.lightTint = interiorOf(skinRef.current?.claw).winLight;
       const fx = settings().fx;
       if (!settings().reducedMotion && fx !== 'off') setBurst((n) => n + 1);
       clawSound.door();
       later(150, () => clawSound.win());
-      setSaid(`You won a ${kindName(toy.kind)} plush! It's on your shelf.`);
-      setLed(`WINNER! A ${kindName(toy.kind).toUpperCase()} FOR YOUR SHELF`);
+      const name = plushName(toy.kind, skinRef.current?.claw);
+      setSaid(`You won a ${name} plush! It's on your shelf.`);
+      setLed(`WINNER! A ${name.toUpperCase()} FOR YOUR SHELF`);
     },
     [commit, flash, later],
   );
@@ -232,7 +241,7 @@ export default function ClawCloseup() {
     useClaw.getState().restocked(sim.toys, sim.seed);
     clawSound.restock();
     flash({ word: 'RESTOCKED!', lights: 'restock' }, 2200);
-    setLed('FRESH PLUSHIES!');
+    setLed(clawCopy(skinRef.current?.claw).restock);
     setSaid('The attendant restocked the machine with fresh plushies.');
   }, [flash]);
 
@@ -273,7 +282,7 @@ export default function ClawCloseup() {
             break;
           case 'grip': {
             const t = e.report.toy !== null ? sim.toys.find((x) => x.id === e.report.toy) : undefined;
-            setSaid(GRIP_LINE[e.report.quality](t ? kindName(t.kind) : 'plush'));
+            setSaid(GRIP_LINE[e.report.quality](t ? plushName(t.kind, skinRef.current?.claw) : 'plush'));
             setLed(GRIP_LED[e.report.quality]);
             if (t && e.report.quality === 'nudge') lifeOf(fx, t.id).wobble = 1;
             break;
@@ -322,7 +331,7 @@ export default function ClawCloseup() {
             lifeOf(fx, e.toy).happy = 3;
             {
               const t = sim.toys.find((x) => x.id === e.toy);
-              if (t) burstBits(fx, t.x, 2, t.z, 'sparkle', 14);
+              if (t) burstBits(fx, t.x, 2, t.z, 'sparkle', 14, skinRef.current?.celebration?.colors);
             }
             break;
           case 'win':
@@ -340,7 +349,7 @@ export default function ClawCloseup() {
             } else commit();
             later(1600, () => {
               fx.light = 1;
-              fx.lightTint = '#ffe9b0';
+              fx.lightTint = interiorOf(skinRef.current?.claw).light;
             });
             // Nearly cleaned out: the attendant tops it up.
             if (sim.toys.length < 3) {
@@ -588,7 +597,7 @@ export default function ClawCloseup() {
         }
       }
       ageLife(fx, dt);
-      drawClawScene(ctx, sim, fx, scale);
+      drawClawScene(ctx, sim, fx, scale, skinRef.current?.claw);
 
       // The joystick shows where it's pushed (pointer, keys or pad).
       const vx = Math.max(-1, Math.min(1, inp.x));
@@ -772,7 +781,16 @@ export default function ClawCloseup() {
             <span className="clwx__glass" aria-hidden />
             <span className="clwx__post clwx__post--l" aria-hidden />
             <span className="clwx__post clwx__post--r" aria-hidden />
-            {burst && confetti ? <ClawConfetti key={burst} amount={confetti} originY={0.02} /> : null}
+            {burst && confetti ? (
+              <ClawConfetti
+                key={burst}
+                amount={confetti}
+                originY={0.02}
+                colors={skin?.celebration?.colors}
+                sprites={skin?.celebration?.sprites}
+                spriteShare={skin?.celebration?.spriteShare}
+              />
+            ) : null}
           </div>
 
           {/* control deck */}
@@ -832,7 +850,7 @@ export default function ClawCloseup() {
             <span className="clwx__door-hole" aria-hidden>
               {prize ? (
                 <span className="clwx__prize" key={prize.key} data-part="claw-prize">
-                  <PlushSvg kind={prize.kind} color={prize.color} />
+                  <PlushSvg kind={prize.kind} color={prize.color} art={plushArt(prize.kind, costume)} />
                 </span>
               ) : null}
               <span className="clwx__flap" />
@@ -840,7 +858,7 @@ export default function ClawCloseup() {
           </div>
           <div className="clwx__plate" data-area="plate" aria-hidden>
             <span className="clwx__plate-top">WIN A</span>
-            <span className="clwx__plate-big">PLUSH!</span>
+            <span className="clwx__plate-big">{clawCopy(costume).plate}</span>
           </div>
           <div
             className="clwx__shelf"
@@ -849,7 +867,7 @@ export default function ClawCloseup() {
             aria-label={`Prize shelf: ${total} plush${total === 1 ? '' : 'ies'} won`}
             role="group"
           >
-            <ShelfRow shelf={shelf} colors={shelfColors} />
+            <ShelfRow shelf={shelf} colors={shelfColors} costume={costume} />
           </div>
         </div>
 
@@ -900,18 +918,18 @@ function Bulbs() {
   );
 }
 
-export function PlushSvg({ kind, color, className }: { kind: ToyKind; color: number; className?: string }) {
+export function PlushSvg({ kind, color, className, art }: { kind: ToyKind; color: number; className?: string; art?: PlushArt }) {
   const { w, h } = spriteSize(kind);
   return (
     <svg className={className ?? 'clwx-plush'} viewBox={`0 0 ${w} ${h}`} shapeRendering="crispEdges" aria-hidden focusable="false">
-      {spritePaths(kind).map(({ ch, d }) => (
-        <path key={ch} d={d} fill={spriteColor(ch, color) ?? 'none'} />
+      {spritePaths(kind, art?.rows).map(({ ch, d }) => (
+        <path key={ch} d={d} fill={spriteColor(ch, color, art) ?? 'none'} />
       ))}
     </svg>
   );
 }
 
-function ShelfRow({ shelf, colors }: { shelf: Shelf; colors: Shelf }) {
+function ShelfRow({ shelf, colors, costume }: { shelf: Shelf; colors: Shelf; costume: ClawCostume | null }) {
   return (
     <>
       <span className="clwx__shelf-title" aria-hidden>
@@ -923,10 +941,10 @@ function ShelfRow({ shelf, colors }: { shelf: Shelf; colors: Shelf }) {
             key={k}
             className="clwx__shelf-item"
             data-has={shelf[k] > 0 ? 'true' : undefined}
-            aria-label={`${kindName(k)}: ${shelf[k]}`}
+            aria-label={`${plushName(k, costume)}: ${shelf[k]}`}
             role="img"
           >
-            <PlushSvg kind={k} color={shelf[k] > 0 ? colors[k] : i} />
+            <PlushSvg kind={k} color={shelf[k] > 0 ? colors[k] : i} art={plushArt(k, costume)} />
             <span className="clwx__shelf-n">×{shelf[k]}</span>
           </span>
         ))}
