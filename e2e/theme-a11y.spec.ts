@@ -21,6 +21,7 @@ const THEMES = [
   'saturday-morning',
   'executive',
   'neon-noir',
+  'halloween-night',
 ] as const;
 
 const SETTINGS_KEY = 'dascade:v1:settings';
@@ -200,7 +201,7 @@ test('themed decoration never changes the floor heading or the plaque text for a
       .join('\n')
       .replace(/\d+/g, 'N');
   const base = await names();
-  for (const id of ['corporate-98', 'executive', 'vhs-after-dark']) {
+  for (const id of ['corporate-98', 'executive', 'vhs-after-dark', 'halloween-night']) {
     await page.evaluate((t) => (window as any).__DASCADE_THEME__.setTheme(t), id);
     await themed(page, id);
     expect(await names(), id).toBe(base);

@@ -7,10 +7,16 @@ import './skin.css';
 import type { ThemeSkin } from '../types.ts';
 import { HALLOWEEN_CELEBRATION } from './celebration.ts';
 import { HALLOWEEN_CLAW } from './claw.ts';
+import { HalloweenEnvironment } from './Environment.tsx';
+import { HalloweenFloorDecor } from './FloorDecor.tsx';
+import { HalloweenJukeboxDecor } from './JukeboxDecor.tsx';
 import { HALLOWEEN_SOUNDS } from './sounds.ts';
 
 const skin: ThemeSkin = {
   id: 'halloween-night',
+  Environment: HalloweenEnvironment,
+  FloorDecor: HalloweenFloorDecor,
+  JukeboxDecor: HalloweenJukeboxDecor,
   arcadeRoom: 'hide',
   claw: HALLOWEEN_CLAW,
   celebration: HALLOWEEN_CELEBRATION,

@@ -1,6 +1,6 @@
 /**
  * Themes end to end:
- *  - all eleven shipped themes render the core shell (floor, a cabinet picker, a title screen, a lobby,
+ *  - all twelve shipped themes render the core shell (floor, a cabinet picker, a title screen, a lobby,
  *    Settings) with their data-theme + structural skin and no console errors;
  *  - switching through the picker never reloads the page and never leaks styles/overlays/environments;
  *  - switching mid-lobby keeps the connection, room and state; the choice persists across a reload;
@@ -22,6 +22,7 @@ const THEMES = [
   'saturday-morning',
   'executive',
   'neon-noir',
+  'halloween-night',
 ] as const;
 
 const SETTINGS_KEY = 'dascade:v1:settings';
@@ -354,4 +355,63 @@ test('a registered theme restyles shell, lobby, buttons, dialogs and the cabinet
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'delta-neon');
   expect(await css(page, 'body', 'background-color')).toBe('rgb(5, 4, 11)');
   await expect(page.locator('#dc-theme')).toHaveCount(0);
+});
+
+/** Resolves with the transition overlay's data-style as soon as one appears (null if none within 5 s). */
+function nextTransitionStyle(page: Page): Promise<string | null> {
+  return page.evaluate(
+    () =>
+      new Promise<string | null>((resolve) => {
+        const found = () => document.querySelector('.theme-xfade')?.getAttribute('data-style') ?? null;
+        const obs = new MutationObserver(() => {
+          const style = found();
+          if (!style) return;
+          obs.disconnect();
+          resolve(style);
+        });
+        obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-style'] });
+        setTimeout(() => {
+          obs.disconnect();
+          resolve(found());
+        }, 5_000);
+      }),
+  );
+}
+
+test('Halloween Night arrives with the haunt transition (a plain fade under reduced motion)', async ({ page }) => {
+  await page.goto('/');
+  await expectThemed(page, 'delta-neon');
+  const style = nextTransitionStyle(page);
+  await page.evaluate(() => (window as any).__DASCADE_THEME__.switchTheme('halloween-night'));
+  expect(await style).toBe('haunt');
+  await expectThemed(page, 'halloween-night');
+  await expect(page.locator('.theme-xfade')).toHaveCount(0, { timeout: 5_000 });
+
+  // Reduced motion: the switch is a short fade, never the ghost swoop.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'true');
+  await page.evaluate(() => (window as any).__DASCADE_THEME__.setTheme('delta-neon'));
+  await expectThemed(page, 'delta-neon');
+  const calm = nextTransitionStyle(page);
+  await page.evaluate(() => (window as any).__DASCADE_THEME__.switchTheme('halloween-night'));
+  expect(await calm).toBe('fade');
+});
+
+test('Halloween Night puts a little hat on avatars, within the avatar width (and in no other theme)', async ({ page }) => {
+  await page.goto('/');
+  await expectThemed(page, 'delta-neon');
+  const avatar = page.locator('[data-part="arcade-header"] .dc-avatar').first();
+  await expect(avatar).toBeVisible();
+  const hat = () =>
+    avatar.evaluate((el) => {
+      const s = getComputedStyle(el, '::before');
+      return { content: s.content, width: parseFloat(s.width) || 0, size: el.getBoundingClientRect().width };
+    });
+  expect((await hat()).content).toBe('none');
+  await page.evaluate(() => (window as any).__DASCADE_THEME__.setTheme('halloween-night'));
+  await expectThemed(page, 'halloween-night');
+  const dressed = await hat();
+  expect(dressed.content).not.toBe('none');
+  expect(dressed.width).toBeGreaterThan(0);
+  expect(dressed.width).toBeLessThanOrEqual(dressed.size);
 });
