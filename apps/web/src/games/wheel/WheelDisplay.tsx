@@ -176,9 +176,10 @@ export function WheelDisplay({
           <svg viewBox="0 0 60 100" className="wh-pointer__svg">
             <defs>
               <linearGradient id={`${gradientId}-body`} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stopColor="#ff9dbd" />
-                <stop offset="0.45" stopColor="#ff4f81" />
-                <stop offset="1" stopColor="#a80f45" />
+                {/* Themeable (--wh-pointer-*); the fallbacks are the pointer's own colours. */}
+                <stop offset="0" style={{ stopColor: 'var(--wh-pointer-1, #ff9dbd)' }} />
+                <stop offset="0.45" style={{ stopColor: 'var(--wh-pointer-2, #ff4f81)' }} />
+                <stop offset="1" style={{ stopColor: 'var(--wh-pointer-3, #a80f45)' }} />
               </linearGradient>
               <radialGradient id={`${gradientId}-pin`} cx="0.35" cy="0.3" r="0.8">
                 <stop offset="0" style={{ stopColor: 'var(--wh-pin-1, #fff6d8)' }} />
@@ -186,7 +187,13 @@ export function WheelDisplay({
                 <stop offset="1" style={{ stopColor: 'var(--wh-pin-3, #8a4a00)' }} />
               </radialGradient>
             </defs>
-            <path d="M30 97 L12 42 A19 19 0 1 1 48 42 Z" fill={`url(#${gradientId}-body)`} stroke="#3b0016" strokeWidth="3.5" strokeLinejoin="round" />
+            <path
+              d="M30 97 L12 42 A19 19 0 1 1 48 42 Z"
+              fill={`url(#${gradientId}-body)`}
+              style={{ stroke: 'var(--wh-pointer-edge, #3b0016)' }}
+              strokeWidth="3.5"
+              strokeLinejoin="round"
+            />
             <path d="M22 40 L30 84 L27 44 Z" fill="rgba(255,255,255,0.45)" />
             <circle cx="30" cy="20" r="11" fill={`url(#${gradientId}-pin)`} stroke="#3b1800" strokeWidth="3" />
             <rect x="26" y="19" width="8" height="2.4" fill="#3b1800" />

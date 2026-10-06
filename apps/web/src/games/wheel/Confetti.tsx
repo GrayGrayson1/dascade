@@ -2,15 +2,24 @@
  * Celebration particles: chunky pixel squares and ribbons that burst from the
  * pointer, arc under gravity and flutter out. The rAF loop only runs while
  * particles are alive. Counts scale with the fx setting; nothing runs when
- * effects are off or reduced motion is on.
+ * effects are off or reduced motion is on. A theme's celebration can mix in
+ * tiny pixel sprites (bats, candy corn…).
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { useApp } from '../../app/store.ts';
+import { celebrationSpriteCanvas, type CelebrationSprite } from '../../themes/celebration.ts';
 import { uiRng } from './model.ts';
+
+export interface ConfettiExtras {
+  /** Pixel sprites drawn for a share of the particles. */
+  sprites?: readonly CelebrationSprite[];
+  /** Share of particles drawn as sprites, 0–0.5 (default 0.25). */
+  share?: number;
+}
 
 export interface ConfettiHandle {
   /** Burst from a point given as fractions of the layer (0..1). */
-  burst: (colors: string[], origin?: { x: number; y: number }) => void;
+  burst: (colors: string[], origin?: { x: number; y: number }, extras?: ConfettiExtras) => void;
 }
 
 interface Particle {
@@ -22,7 +31,8 @@ interface Particle {
   vr: number;
   size: number;
   color: string;
-  shape: 'pixel' | 'ribbon';
+  shape: 'pixel' | 'ribbon' | 'sprite';
+  sprite: HTMLCanvasElement | null;
   life: number;
   ttl: number;
   wobble: number;
@@ -37,7 +47,7 @@ export const ConfettiLayer = forwardRef<ConfettiHandle, { className?: string }>(
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
   useImperativeHandle(ref, () => ({
-    burst(colors, origin = { x: 0.5, y: 0.12 }) {
+    burst(colors, origin = { x: 0.5, y: 0.12 }, extras) {
       const { fx, reducedMotion } = useApp.getState().settings;
       if (fx === 'off' || reducedMotion) return;
       const canvas = canvasRef.current;
@@ -51,6 +61,8 @@ export const ConfettiLayer = forwardRef<ConfettiHandle, { className?: string }>(
       const ox = origin.x * rect.width;
       const oy = origin.y * rect.height;
       const palette = colors.length ? colors : ['#ffb020', '#ff4f81'];
+      const sprites = (extras?.sprites ?? []).map(celebrationSpriteCanvas).filter((c): c is HTMLCanvasElement => c !== null);
+      const share = Math.max(0, Math.min(0.5, extras?.share ?? 0.25));
       const r = () => uiRng.next();
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (r() - 0.5) * Math.PI * 1.25;
@@ -64,7 +76,10 @@ export const ConfettiLayer = forwardRef<ConfettiHandle, { className?: string }>(
           vr: (r() - 0.5) * 14,
           size: (5 + r() * 7) * scale,
           color: palette[i % palette.length] as string,
-          shape: r() < 0.62 ? 'pixel' : 'ribbon',
+          // Without sprites the random sequence is exactly the plain confetti's.
+          ...(sprites.length && r() < share
+            ? { shape: 'sprite' as const, sprite: sprites[i % sprites.length]! }
+            : { shape: r() < 0.62 ? ('pixel' as const) : ('ribbon' as const), sprite: null }),
           life: 0,
           ttl: 2.1 + r() * 1.4,
           wobble: r() * Math.PI * 2,
@@ -107,7 +122,15 @@ export const ConfettiLayer = forwardRef<ConfettiHandle, { className?: string }>(
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
-      if (p.shape === 'pixel') {
+      if (p.shape === 'sprite' && p.sprite) {
+        // Crisp pixel art, about a third of the particle size per cell; sprites flutter (±0.35 rad) instead of tumbling.
+        const cell = Math.max(2, Math.round(p.size / 3));
+        const w = p.sprite.width * cell;
+        const sh = p.sprite.height * cell;
+        ctx.rotate(Math.sin(p.rot) * 0.35 - p.rot);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(p.sprite, -w / 2, -sh / 2, w, sh);
+      } else if (p.shape === 'pixel') {
         const s = Math.round(p.size);
         ctx.fillRect(-s / 2, -s / 2, s, s);
         ctx.fillStyle = 'rgba(255,255,255,0.35)';

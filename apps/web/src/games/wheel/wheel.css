@@ -362,7 +362,7 @@
   left: calc(50% - var(--wh-rw) * 0.1);
   top: calc(var(--wh-cy) - var(--wh-rw) * 1.1);
   transform-origin: 50% 20%;
-  filter: drop-shadow(0 calc(var(--wh-rw) * 0.02) calc(var(--wh-rw) * 0.02) rgba(0, 0, 0, 0.55)) drop-shadow(0 0 10px rgba(255, 79, 129, 0.5));
+  filter: drop-shadow(0 calc(var(--wh-rw) * 0.02) calc(var(--wh-rw) * 0.02) rgba(0, 0, 0, 0.55)) drop-shadow(0 0 10px var(--wh-pointer-glow, rgba(255, 79, 129, 0.5)));
   pointer-events: none;
 }
 :root[data-fx='off'] .wh-pointer {

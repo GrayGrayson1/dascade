@@ -17,7 +17,7 @@ import {
   type WheelSettings,
 } from '@dascade/shared/games/wheel';
 import { assignColors, computeArcs, formatBulkLine, initialRotation, normalizeSegments, parseBulkSegments } from '@dascade/game-core/wheel';
-import { Badge, Button, ColorSwatches, IconButton, PixelIcon, Segmented, Select, Slider, TextArea, TextInput, cx } from '@dascade/ui';
+import { Badge, Button, ColorSwatches, IconButton, PixelIcon, Segmented, Select, Slider, TextArea, TextInput, cx, useThemeId } from '@dascade/ui';
 import type { Preset } from '../../persistence/index.ts';
 import { useApp } from '../../app/store.ts';
 import { useRoomSelector } from '../../net/hooks.ts';
@@ -25,7 +25,7 @@ import { sfx } from '../../audio/audio.ts';
 import type { SettingsPanelProps } from '../types.ts';
 import { BehaviourBadges, WheelLegend, useChances } from './Legend.tsx';
 import { formatDuration, formatPercent, formatWeight, makeSegment, rebaseServerToggles, uiRng, withFreshIds } from './model.ts';
-import { BUILTIN_PRESETS, applyPreset, deleteUserPreset, listSavedPresets, saveUserPreset, type WheelPresetData } from './presets.ts';
+import { BUILTIN_PRESETS, applyPreset, deleteUserPreset, listSavedPresets, saveUserPreset, suggestedPresetId, type WheelPresetData } from './presets.ts';
 import { WheelDisplay } from './WheelDisplay.tsx';
 
 const TEXT_DEBOUNCE = 400;
@@ -289,7 +289,17 @@ function TitleField({ value, disabled, onChange }: { value: string; disabled: bo
 
 function PresetBar({ draft, disabled, onApply }: { draft: WheelSettings; disabled: boolean; onApply: (next: Partial<WheelSettings>, name: string) => void }) {
   const [saved, setSaved] = useState<Array<Preset<Partial<WheelPresetData>>>>([]);
-  const [selected, setSelected] = useState(BUILTIN_PRESETS[0]!.id);
+  // A theme may suggest a built-in (Halloween Night → Trick or Treat). Pre-selected only: loading it is
+  // still the host's choice, because the room's settings are shared and a theme is personal.
+  const suggested = suggestedPresetId(useThemeId());
+  const [selected, setSelected] = useState(suggested);
+  const lastSuggested = useRef(suggested);
+  useEffect(() => {
+    const prev = lastSuggested.current;
+    if (prev === suggested) return;
+    lastSuggested.current = suggested;
+    setSelected((cur) => (cur === prev ? suggested : cur));
+  }, [suggested]);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
   const playerNames = useSeatedNames();
@@ -333,7 +343,7 @@ function PresetBar({ draft, disabled, onApply }: { draft: WheelSettings; disable
     try {
       await deleteUserPreset(selectedSaved.id);
       toast('info', `Deleted preset “${selectedSaved.name}”`);
-      setSelected(BUILTIN_PRESETS[0]!.id);
+      setSelected(suggested);
       refresh();
     } catch {
       toast('error', 'Could not delete the preset.');

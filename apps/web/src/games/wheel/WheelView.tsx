@@ -14,6 +14,7 @@ import { useApp } from '../../app/store.ts';
 import { sfx } from '../../audio/audio.ts';
 import { serverNow, session, useCountdown, useGame } from '../../net/hooks.ts';
 import { ChatPanel, GameStage } from '../../shell/common.tsx';
+import { activeSkin } from '../../themes/registry.ts';
 import { ConfettiLayer, type ConfettiHandle } from './Confetti.tsx';
 import { ReadOnlyWheel, WheelEditor } from './Editor.tsx';
 import { BehaviourBadges } from './Legend.tsx';
@@ -129,7 +130,11 @@ function PlayView() {
         layer && wheel && layer.width > 0 && layer.height > 0
           ? { x: (wheel.left + wheel.width / 2 - layer.left) / layer.width, y: (wheel.top + wheel.height * 0.1 - layer.top) / layer.height }
           : undefined;
-      confettiRef.current?.burst([seg.color, '#ffb020', '#ff4f81', '#fff4d6'], origin);
+      // A theme's celebration (Halloween Night: candy colours + bats/candy corn) joins the winner's colour.
+      const celebration = activeSkin()?.celebration;
+      const colors = celebration?.colors.length ? [seg.color, ...celebration.colors] : [seg.color, '#ffb020', '#ff4f81', '#fff4d6'];
+      const extras = celebration?.sprites?.length ? { sprites: celebration.sprites, share: celebration.spriteShare } : undefined;
+      confettiRef.current?.burst(colors, origin, extras);
     }
     if (!reduced && fxNow === 'high' && stageRef.current) {
       const el = stageRef.current;
