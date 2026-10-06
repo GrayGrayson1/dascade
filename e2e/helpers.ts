@@ -7,6 +7,27 @@ export async function setName(page: Page, name: string): Promise<void> {
   await input.blur();
 }
 
+/**
+ * Presets this browser's settings (theme, reduced motion…) before the app boots — once per tab, so a
+ * reload keeps whatever the page changed since (a theme switched in the test stays switched).
+ */
+export async function presetSettings(page: Page, patch: Record<string, unknown>): Promise<void> {
+  await page.addInitScript(
+    ([key, settings]) => {
+      try {
+        if (!sessionStorage.getItem('dascade-e2e-settings-preset')) {
+          const prev = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+          localStorage.setItem(key, JSON.stringify({ ...prev, ...settings, settingsVersion: 3 }));
+          sessionStorage.setItem('dascade-e2e-settings-preset', '1');
+        }
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    ['dascade:v1:settings', patch] as const,
+  );
+}
+
 /** Opens a cabinet and creates a room. Returns the room code. */
 export async function createRoom(page: Page, gameId: string, name = 'Host', opts: { solo?: boolean } = {}): Promise<string> {
   await page.goto(`/play/${gameId}`);

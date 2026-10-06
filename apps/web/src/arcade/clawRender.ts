@@ -7,9 +7,10 @@
  *
  * Canvas drawing only — the machine's state comes from clawPhysics.ts and is never changed here.
  * Colours are the machine's own printed/lit materials (fixed, like the floor machine's glass and plush
- * art); the chrome around the canvas takes the theme's cabinet tokens in CSS.
+ * art) unless the active skin dresses the machine up (ThemeSkin.claw, resolved in clawArt.ts); the
+ * chrome around the canvas takes the theme's cabinet tokens in CSS.
  */
-import { SPRITES, spriteColor } from './clawArt.ts';
+import { interiorOf, plushArt, spriteColor, type ClawCostume, type ClawInterior, type PlushArt } from './clawArt.ts';
 import {
   BOX,
   CHUTE,
@@ -80,9 +81,20 @@ export interface Bit {
   size: number;
 }
 
-/** Throws a few bits from a point (world units). `kind` picks dust or sparkles. */
-export function burstBits(fx: RenderFx, x: number, y: number, z: number, kind: 'dust' | 'sparkle', n: number): void {
+const SPARKLES = ['#ffd23f', '#ffffff', '#ff4fd8', '#22d3ee'] as const;
+
+/** Throws a few bits from a point (world units). `kind` picks dust or sparkles (in `palette`, if given). */
+export function burstBits(
+  fx: RenderFx,
+  x: number,
+  y: number,
+  z: number,
+  kind: 'dust' | 'sparkle',
+  n: number,
+  palette?: readonly string[],
+): void {
   if (fx.motion <= 0) return;
+  const sparkles = palette?.length ? palette : SPARKLES;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * 6.283 + fx.time * 3.1;
     const sp = kind === 'dust' ? 10 + ((i * 37) % 10) : 14 + ((i * 53) % 16);
@@ -94,7 +106,7 @@ export function burstBits(fx: RenderFx, x: number, y: number, z: number, kind: '
       vz: Math.sin(a) * sp * 0.6,
       vy: kind === 'dust' ? 6 + (i % 3) * 4 : 30 + (i % 4) * 12,
       life: kind === 'dust' ? 0.45 : 0.9,
-      color: kind === 'dust' ? 'rgba(230,220,255,0.55)' : ['#ffd23f', '#ffffff', '#ff4fd8', '#22d3ee'][i % 4]!,
+      color: kind === 'dust' ? 'rgba(230,220,255,0.55)' : sparkles[i % sparkles.length]!,
       size: kind === 'dust' ? 2 : 2.5,
     });
   }
@@ -145,8 +157,7 @@ const SHADES = [0.16, 0.07, 0] as const;
 const shadeFor = (y: number) => (y < 2.5 ? 0 : y < 9 ? 1 : 2);
 const spriteCache = new Map<string, HTMLCanvasElement>();
 
-function faceRows(kind: ToyKind, face: Face): readonly string[] {
-  const rows = SPRITES[kind];
+function faceRows(rows: readonly string[], face: Face): readonly string[] {
   if (face === 'open') return rows;
   return rows.map((row) => {
     if (!row.includes('w')) return row;
@@ -155,12 +166,12 @@ function faceRows(kind: ToyKind, face: Face): readonly string[] {
   });
 }
 
-function sprite(kind: ToyKind, color: number, face: Face, shade = 2): HTMLCanvasElement | null {
-  const key = `${kind}:${color}:${face}:${shade}`;
+function sprite(kind: ToyKind, color: number, face: Face, shade: number, art: PlushArt): HTMLCanvasElement | null {
+  const key = `${art.key}${kind}:${color}:${face}:${shade}`;
   let c = spriteCache.get(key);
   if (c) return c;
   if (typeof document === 'undefined') return null;
-  const rows = faceRows(kind, face);
+  const rows = faceRows(art.rows, face);
   c = document.createElement('canvas');
   c.width = rows[0]!.length;
   c.height = rows.length;
@@ -168,7 +179,7 @@ function sprite(kind: ToyKind, color: number, face: Face, shade = 2): HTMLCanvas
   if (!ctx) return null;
   rows.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
-      const fill = spriteColor(row[x]!, color);
+      const fill = spriteColor(row[x]!, color, art);
       if (!fill) continue;
       ctx.fillStyle = fill;
       ctx.fillRect(x, y, 1, 1);
@@ -192,7 +203,7 @@ function sprite(kind: ToyKind, color: number, face: Face, shade = 2): HTMLCanvas
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Static backdrop (cached per canvas size): walls, floor, the chute hole, the rails.
+// Static backdrop (cached per canvas size and interior): walls, floor, the chute hole, the rails.
 
 let backdrop: { key: string; canvas: HTMLCanvasElement } | null = null;
 
@@ -201,7 +212,7 @@ export function invalidateBackdrop(): void {
   backdrop = null;
 }
 
-function drawBackdrop(ctx: CanvasRenderingContext2D): void {
+function drawBackdrop(ctx: CanvasRenderingContext2D, I: ClawInterior): void {
   const fl = (x: number, z: number) => project(x, 0, z);
   const tp = (x: number, z: number) => project(x, TOP, z);
   const quad = (pts: { x: number; y: number }[]) => {
@@ -211,22 +222,22 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   };
   // The case: deep blue, lit from the top.
   const bg = ctx.createLinearGradient(0, 0, 0, VIEW.h);
-  bg.addColorStop(0, '#1b2360');
-  bg.addColorStop(0.55, '#0f1440');
-  bg.addColorStop(1, '#070a22');
+  bg.addColorStop(0, I.bg[0]);
+  bg.addColorStop(0.55, I.bg[1]);
+  bg.addColorStop(1, I.bg[2]);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, VIEW.w, VIEW.h);
 
   // Back wall, with the machine's star print.
   quad([tp(0, BOX.d), tp(BOX.w, BOX.d), fl(BOX.w, BOX.d), fl(0, BOX.d)]);
   const wall = ctx.createLinearGradient(0, tp(0, BOX.d).y, 0, fl(0, BOX.d).y);
-  wall.addColorStop(0, '#2a1d5c');
-  wall.addColorStop(1, '#171046');
+  wall.addColorStop(0, I.wall[0]);
+  wall.addColorStop(1, I.wall[1]);
   ctx.fillStyle = wall;
   ctx.fill();
   ctx.save();
   ctx.clip();
-  ctx.fillStyle = 'rgba(255,79,216,0.16)';
+  ctx.fillStyle = `rgba(${I.neonRgb},0.16)`;
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 13; col++) {
       const x = 4 + col * 7.8 + (row % 2) * 3.9;
@@ -246,22 +257,36 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
       ctx.fill();
     }
   }
+  if (I.webs) {
+    drawWeb(ctx, tp(0, BOX.d), 1);
+    drawWeb(ctx, tp(BOX.w, BOX.d), -1);
+  }
   ctx.restore();
 
   // A neon sign on the back wall.
   {
     const c = project(BOX.w / 2, 44, BOX.d);
     ctx.save();
-    ctx.font = `${Math.round(30 * c.s)}px Silkscreen, monospace`;
+    let size = Math.round(30 * c.s);
+    ctx.font = `${size}px Silkscreen, monospace`;
+    if (I.signFit) {
+      // A costume's sign shrinks to fit the wall (the machine's own sign is drawn as it always was).
+      const room = (project(BOX.w, 44, BOX.d).x - project(0, 44, BOX.d).x) * 0.88;
+      const width = ctx.measureText(I.sign).width;
+      if (width > room) {
+        size = Math.max(10, Math.floor((size * room) / width));
+        ctx.font = `${size}px Silkscreen, monospace`;
+      }
+    }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = '#ff4fd8';
+    ctx.shadowColor = I.neon;
     ctx.shadowBlur = 16;
-    ctx.fillStyle = 'rgba(255,120,230,0.55)';
-    ctx.fillText('PLUSH PARADE', c.x, c.y);
+    ctx.fillStyle = I.signGlow;
+    ctx.fillText(I.sign, c.x, c.y);
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,220,250,0.55)';
-    ctx.fillText('PLUSH PARADE', c.x, c.y);
+    ctx.fillStyle = I.signCore;
+    ctx.fillText(I.sign, c.x, c.y);
     ctx.restore();
   }
 
@@ -269,8 +294,8 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   for (const x of [0, BOX.w]) {
     quad([tp(x, BOX.d), tp(x, 0), fl(x, 0), fl(x, BOX.d)]);
     const side = ctx.createLinearGradient(tp(x, 0).x, 0, tp(x, BOX.d).x, 0);
-    side.addColorStop(0, 'rgba(8,10,36,0.95)');
-    side.addColorStop(1, 'rgba(30,26,80,0.9)');
+    side.addColorStop(0, I.side[0]);
+    side.addColorStop(1, I.side[1]);
     ctx.fillStyle = side;
     ctx.fill();
   }
@@ -278,8 +303,8 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   // Floor: plum felt with a faint weave.
   quad([fl(0, BOX.d), fl(BOX.w, BOX.d), fl(BOX.w, 0), fl(0, 0)]);
   const floor = ctx.createLinearGradient(0, fl(0, BOX.d).y, 0, fl(0, 0).y);
-  floor.addColorStop(0, '#2b1450');
-  floor.addColorStop(1, '#40195e');
+  floor.addColorStop(0, I.floor[0]);
+  floor.addColorStop(1, I.floor[1]);
   ctx.fillStyle = floor;
   ctx.fill();
   ctx.save();
@@ -315,15 +340,15 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   for (let i = 1; i <= 3; i++) {
     const k = i * 1.6;
     quad([fl(CHUTE.x0 + k, CHUTE.z1 - k), fl(CHUTE.x1 - k, CHUTE.z1 - k), fl(CHUTE.x1 - k, CHUTE.z0 + k), fl(CHUTE.x0 + k, CHUTE.z0 + k)]);
-    ctx.strokeStyle = `rgba(255,79,216,${(0.18 - i * 0.04).toFixed(2)})`;
+    ctx.strokeStyle = `rgba(${I.neonRgb},${(0.18 - i * 0.04).toFixed(2)})`;
     ctx.lineWidth = 1;
     ctx.stroke();
   }
   quad([fl(CHUTE.x0, CHUTE.z1), fl(CHUTE.x1, CHUTE.z1), fl(CHUTE.x1, CHUTE.z0), fl(CHUTE.x0, CHUTE.z0)]);
   ctx.save();
-  ctx.shadowColor = '#ff4fd8';
+  ctx.shadowColor = I.neon;
   ctx.shadowBlur = 8;
-  ctx.strokeStyle = 'rgba(255,120,230,0.8)';
+  ctx.strokeStyle = I.rim;
   ctx.lineWidth = 1.6;
   ctx.stroke();
   ctx.restore();
@@ -353,13 +378,52 @@ function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+/** A cobweb in a top corner of the back wall (`dir` 1: the left corner, spreading right; -1: the right one). */
+function drawWeb(ctx: CanvasRenderingContext2D, corner: { x: number; y: number }, dir: 1 | -1): void {
+  const R = 46;
+  const spokes = 5;
+  const at = (i: number, r: number) => {
+    const a = (i / (spokes - 1)) * (Math.PI / 2);
+    return { x: corner.x + dir * Math.cos(a) * r, y: corner.y + Math.sin(a) * r };
+  };
+  ctx.save();
+  ctx.strokeStyle = 'rgba(232,224,255,0.2)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (let i = 0; i < spokes; i++) {
+    const p = at(i, R);
+    ctx.moveTo(corner.x, corner.y);
+    ctx.lineTo(p.x, p.y);
+  }
+  // The rings sag a little between spokes.
+  for (const r of [R * 0.36, R * 0.62, R * 0.9]) {
+    for (let i = 0; i < spokes - 1; i++) {
+      const a = at(i, r);
+      const b = at(i + 1, r);
+      const m = at(i + 0.5, r * 0.86);
+      if (i === 0) ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(m.x, m.y, b.x, b.y);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------------------------------------------
 // The frame
 
 type Drawable = { z: number; y: number; draw: () => void };
 
-export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, scale: number): void {
-  const key = `${ctx.canvas.width}x${ctx.canvas.height}`;
+/** One frame of the glass's inside. `costume`: the active skin's (ThemeSkin.claw), if any. */
+export function drawClawScene(
+  ctx: CanvasRenderingContext2D,
+  sim: ClawSim,
+  fx: RenderFx,
+  scale: number,
+  costume?: ClawCostume | null,
+): void {
+  const I = interiorOf(costume);
+  const key = `${I.key}${ctx.canvas.width}x${ctx.canvas.height}`;
   if (!backdrop || backdrop.key !== key) {
     const c = document.createElement('canvas');
     c.width = ctx.canvas.width;
@@ -367,7 +431,7 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
     const b = c.getContext('2d');
     if (b) {
       b.setTransform(scale, 0, 0, scale, 0, 0);
-      drawBackdrop(b);
+      drawBackdrop(b, I);
     }
     backdrop = { key, canvas: c };
   }
@@ -396,18 +460,18 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
 
   for (const t of sim.toys) {
     if (t.mode === 'held') continue; // drawn with the claw
-    items.push({ z: t.z, y: t.y, draw: () => drawToy(ctx, t, fx, sim) });
+    items.push({ z: t.z, y: t.y, draw: () => drawToy(ctx, t, fx, costume) });
     if (t.mode === 'fall') {
       const ground = surfaceAt(sim.toys, t.x, t.z, t.id);
       items.push({ z: t.z + 3, y: ground, draw: () => drawDropShadow(ctx, t.x, ground, t.z, KINDS[t.kind].r, t.y - ground) });
     }
   }
   // The chute's clear walls stand between the pile and the glass.
-  items.push({ z: CHUTE.z1 - 0.5, y: 0, draw: () => drawChuteWalls(ctx) });
+  items.push({ z: CHUTE.z1 - 0.5, y: 0, draw: () => drawChuteWalls(ctx, I) });
   items.sort((a, b) => b.z - a.z || a.y - b.y);
 
   // The bridge rides over everything at the top.
-  drawBridge(ctx, sim);
+  drawBridge(ctx, sim, I);
   // Everything behind the claw (and the toys it's over), then its shadow on them — the depth cue —
   // then the claw with whatever it holds, then everything nearer the glass.
   const split = head.z - 6;
@@ -418,7 +482,7 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
   const marks = aimMarks(sim);
   drawClawShadow(ctx, head.x, surf, head.z, sim.hubY - CLAW.prong - surf);
   if (marks) drawAimMarks(ctx, marks, 1);
-  drawClaw(ctx, sim, fx);
+  drawClaw(ctx, sim, fx, costume);
   let infront = false;
   for (const it of items) {
     if (it.z >= split) continue;
@@ -430,7 +494,7 @@ export function drawClawScene(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: R
     if (marks) drawAimMarks(ctx, marks, 0.45);
     if (sim.hubY < 40) {
       ctx.globalAlpha = 0.28;
-      drawClaw(ctx, sim, fx, true);
+      drawClaw(ctx, sim, fx, costume, true);
       ctx.globalAlpha = 1;
     }
   }
@@ -619,7 +683,7 @@ function drawAimMarks(ctx: CanvasRenderingContext2D, m: AimMarks, alpha: number)
   ctx.globalAlpha = 1;
 }
 
-function drawChuteWalls(ctx: CanvasRenderingContext2D): void {
+function drawChuteWalls(ctx: CanvasRenderingContext2D, I: ClawInterior): void {
   const w = CHUTE.wall;
   const pts = (a: [number, number], b: [number, number]) => [
     project(a[0], 0, a[1]),
@@ -632,7 +696,7 @@ function drawChuteWalls(ctx: CanvasRenderingContext2D): void {
     p.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
     ctx.closePath();
     const g = ctx.createLinearGradient(0, p[3]!.y, 0, p[0]!.y);
-    g.addColorStop(0, 'rgba(255,170,240,0.16)');
+    g.addColorStop(0, I.chutePanel);
     g.addColorStop(1, 'rgba(191,233,255,0.06)');
     ctx.fillStyle = g;
     ctx.fill();
@@ -651,20 +715,20 @@ function drawChuteWalls(ctx: CanvasRenderingContext2D): void {
   panel(pts([CHUTE.x1, CHUTE.z1], [CHUTE.x1, CHUTE.z0]));
   // PRIZE label on the chute's side
   const lab = project((CHUTE.x0 + CHUTE.x1) / 2, w * 0.45, CHUTE.z1);
-  ctx.fillStyle = 'rgba(255,79,216,0.7)';
+  ctx.fillStyle = `rgba(${I.neonRgb},0.7)`;
   ctx.font = `${Math.round(9 * lab.s)}px Silkscreen, monospace`;
   ctx.textAlign = 'center';
   ctx.fillText('PRIZE', lab.x, lab.y + 3);
 }
 
-function drawBridge(ctx: CanvasRenderingContext2D, sim: ClawSim): void {
+function drawBridge(ctx: CanvasRenderingContext2D, sim: ClawSim, I: ClawInterior): void {
   const a = project(0, TOP, sim.gz);
   const b = project(BOX.w, TOP, sim.gz);
   // The bridge's carriages on the side rails (where along the depth it is).
   for (const p of [project(1.2, TOP, sim.gz), project(BOX.w - 1.2, TOP, sim.gz)]) {
     ctx.fillStyle = '#1a1830';
     ctx.fillRect(p.x - 7 * p.s, p.y - 5 * p.s, 14 * p.s, 10 * p.s);
-    ctx.fillStyle = '#ff4fd8';
+    ctx.fillStyle = I.neon;
     ctx.fillRect(p.x - 6 * p.s, p.y - 4 * p.s, 12 * p.s, 3 * p.s);
     ctx.fillStyle = '#6f6a8e';
     ctx.fillRect(p.x - 6 * p.s, p.y - 1 * p.s, 12 * p.s, 5 * p.s);
@@ -721,7 +785,7 @@ function pixelLine(
 
 const CHROME = { outline: '#141225', dark: '#6f6a8e', mid: '#c9c3e6', light: '#f4f1ff', back: '#8f88b3' } as const;
 
-function drawClaw(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, ghost = false): void {
+function drawClaw(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, costume: ClawCostume | null | undefined, ghost = false): void {
   const head = headPos(sim);
   // Trolley on the bridge.
   const tr = project(sim.gx, TOP, sim.gz);
@@ -773,7 +837,7 @@ function drawClaw(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, gho
   // Back prong, the prize (tucked up under the hub), the hub, then the front prongs.
   prong(0);
   const held = !ghost && sim.held ? sim.toys.find((t) => t.id === sim.held!.id) : undefined;
-  if (held) drawToy(ctx, held, fx, sim);
+  if (held) drawToy(ctx, held, fx, costume);
   const x0 = hub.x - hubW / 2;
   const y0 = hub.y - hubH;
   blk(ctx, x0 - P * 0.5, y0 - P * 0.5, hubW + P, hubH + P, CHROME.outline);
@@ -781,19 +845,19 @@ function drawClaw(ctx: CanvasRenderingContext2D, sim: ClawSim, fx: RenderFx, gho
   blk(ctx, x0, y0, P, hubH, CHROME.light);
   blk(ctx, x0 + hubW - P, y0, P, hubH, CHROME.dark);
   blk(ctx, x0, y0 + hubH - P * 0.8, hubW, P * 0.8, CHROME.dark);
-  // A pink band and a little status light.
-  blk(ctx, x0, y0 + hubH * 0.45, hubW, P * 0.7, '#ff4fd8');
+  // A band in the machine's neon and a little status light.
+  blk(ctx, x0, y0 + hubH * 0.45, hubW, P * 0.7, interiorOf(costume).neon);
   blk(ctx, hub.x - P * 0.5, y0 + P * 0.5, P, P, sim.phase === 'close' || sim.held ? '#2de38f' : '#ffd23f');
   prong(1);
   prong(2);
 }
 
-function drawToy(ctx: CanvasRenderingContext2D, t: ClawToy, fx: RenderFx, sim: ClawSim): void {
+function drawToy(ctx: CanvasRenderingContext2D, t: ClawToy, fx: RenderFx, costume: ClawCostume | null | undefined): void {
   const k = KINDS[t.kind];
   const life = fx.life.get(t.id);
   const blinkCycle = (fx.time + t.id * 0.77) % (3.2 + (t.id % 5) * 0.6);
   const face: Face = life && life.happy > 0 ? 'happy' : blinkCycle < 0.12 ? 'blink' : 'open';
-  const img = sprite(t.kind, t.color, face, t.mode === 'pile' ? shadeFor(t.y) : 2);
+  const img = sprite(t.kind, t.color, face, t.mode === 'pile' ? shadeFor(t.y) : 2, plushArt(t.kind, costume));
   if (!img) return;
   const p = project(t.x, t.y, t.z);
   const px = (2 * k.r * KX * p.s * SPRITE_SCALE) / img.width;
@@ -833,5 +897,4 @@ function drawToy(ctx: CanvasRenderingContext2D, t: ClawToy, fx: RenderFx, sim: C
     ctx.fillRect(Math.round(dx - px * 0.5), Math.round(dy + px), Math.round(px * 2), Math.round(px));
   }
   ctx.restore();
-  void sim;
 }
