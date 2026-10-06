@@ -10,7 +10,7 @@
  * Presentation only, and the same on every screen (it follows the server's spin plan and landing).
  * Effects OFF or reduced motion: no motion at all — the lanterns and the caption only.
  */
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { celebrationSpriteCanvas } from '../celebration.ts';
 import type { WheelDecorContext } from '../wheelSkin.ts';
 import { useDocVisible } from './art.ts';
@@ -300,7 +300,7 @@ export function HalloweenWheelDecor({ fx, reducedMotion, phase, sample, landing 
         </div>
       ) : null}
       {react ? (
-        <p className="hn-wd__cc" key={`cc-${react.key}`}>
+        <p className="hn-wd__cc" key={`cc-${react.key}`} style={{ '--hn-cc-ms': `${REACTIONS[react.kind].ms}ms` } as CSSProperties}>
           {REACTIONS[react.kind].caption}
         </p>
       ) : null}

@@ -63,8 +63,9 @@ describe('Halloween Night wheel sounds', () => {
       sting(r.kit);
       expectSane(r, kind);
       expect(span(r), kind).toBeLessThanOrEqual(3);
-      // The show outlasts its sound, so the caption is up the whole time it plays.
-      expect(span(r) * 1000, kind).toBeLessThanOrEqual(REACTIONS[kind as keyof typeof REACTIONS].ms);
+      // The caption runs for the whole show and starts fading at 92% of it (skin.css, hn-wd-cc), so it is
+      // fully up the whole time its sound plays.
+      expect(span(r) * 1000, kind).toBeLessThanOrEqual(0.92 * REACTIONS[kind as keyof typeof REACTIONS].ms);
     }
   });
 
