@@ -6,6 +6,7 @@
 import { JUKEBOX_MANIFEST_URL } from '@dascade/shared/jukebox';
 import { useApp } from '../../app/store.ts';
 import { mixer } from '../mixer.ts';
+import { activeSfxVoices } from '../voices.ts';
 import { createJukeboxEngine, type JukeboxEngine, type MediaSessionLike } from './core.ts';
 import { installRoomDj } from './roomDj.ts';
 import { useJukebox } from './store.ts';
@@ -79,11 +80,12 @@ export function installJukebox(): void {
   // Dev: the jukebox Vite plugin announces music-folder changes (no full reload).
   if (import.meta.hot) import.meta.hot.on('dascade:jukebox', () => jukebox.reloadLibrary());
   // QA / E2E introspection (same pattern as window.__DASCADE__).
-  window.__DASCADE_AUDIO__ = { jukebox, store: useJukebox, mixer };
+  window.__DASCADE_AUDIO__ = { jukebox, store: useJukebox, mixer, voices: () => Object.keys(activeSfxVoices() ?? {}) };
 }
 
 declare global {
   interface Window {
-    __DASCADE_AUDIO__?: { jukebox: JukeboxEngine; store: typeof useJukebox; mixer: typeof mixer };
+    /** `voices()`: the sfx names the active theme re-voices (ThemeSkin.sounds). */
+    __DASCADE_AUDIO__?: { jukebox: JukeboxEngine; store: typeof useJukebox; mixer: typeof mixer; voices: () => string[] };
   }
 }

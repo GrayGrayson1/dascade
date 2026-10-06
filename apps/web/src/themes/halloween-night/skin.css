@@ -1,0 +1,4 @@
+/* Halloween Night — every rule is scoped under :root[data-theme='halloween-night'] (see cssScope.ts). */
+:root[data-theme='halloween-night'] {
+  --hn-spooky: 'DASCADE Digits', 'Creepster', 'Tiny5', 'Silkscreen', fantasy;
+}

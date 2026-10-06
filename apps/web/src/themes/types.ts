@@ -13,6 +13,9 @@
  * that games depend on (foundation tokens: --fs-*, --sp-*, --z-*, --topbar-h, --safe-*).
  */
 import type { ComponentType } from 'react';
+import type { ClawCostume } from '../arcade/clawArt.ts';
+import type { SfxVoices } from '../audio/voices.ts';
+import type { SkinCelebration } from './celebration.ts';
 
 export interface SkinRenderContext {
   /** Settings mirror: 'high' | 'low' | 'off' (FULL / REDUCED / MINIMAL). */
@@ -50,6 +53,15 @@ export interface ThemeSkin {
    * `--arcade-floor-bg`. Default 'keep'.
    */
   arcadeRoom?: 'keep' | 'hide';
+  /**
+   * Optional costume for the claw machine's plushies and the inside of its glass (same four kinds at
+   * the same sprite sizes, so saved prize shelves and the physics are untouched). See clawArt.ts.
+   */
+  claw?: ClawCostume;
+  /** Optional confetti colours/sprites for celebrations (Wheel of DAStiny landings, claw wins). */
+  celebration?: SkinCelebration;
+  /** Optional re-voiced sfx() sounds while this theme is active (see audio/voices.ts). */
+  sounds?: SfxVoices;
 }
 
 export type ThemePlace = SkinRenderContext['place'];

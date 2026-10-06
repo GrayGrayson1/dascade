@@ -118,7 +118,7 @@ afterEach(() => {
 });
 
 describe('registry', () => {
-  it('ships the eleven themes, Delta Neon first and default', () => {
+  it('ships the twelve themes, Delta Neon first and default', () => {
     expect(BUILT_IN_THEMES.map((t) => t.id)).toEqual([
       'delta-neon',
       'shareware-97',
@@ -131,6 +131,7 @@ describe('registry', () => {
       'saturday-morning',
       'executive',
       'neon-noir',
+      'halloween-night',
     ]);
     expect(DELTA_NEON.name).toBe('Delta Neon');
     expect(DEFAULT_THEME_ID).toBe('delta-neon');

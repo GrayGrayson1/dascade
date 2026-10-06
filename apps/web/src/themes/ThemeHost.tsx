@@ -16,6 +16,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { useThemeId } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
+import { setSfxVoices } from '../audio/voices.ts';
 import { useThemePlace } from './place.ts';
 import { useSkin } from './registry.ts';
 import { SkinBoundary } from './SkinBoundary.tsx';
@@ -43,6 +44,12 @@ export function ThemeHost() {
     const root = document.documentElement;
     if (root.dataset.place !== ctx.place) root.dataset.place = ctx.place;
   }, [ctx.place]);
+
+  // The active skin's re-voiced sound effects (if any). Never touches the jukebox or music.
+  useEffect(() => {
+    setSfxVoices(skin?.sounds ?? null);
+    return () => setSfxVoices(null);
+  }, [skin]);
 
   const pickerOpen = useThemePickerOpen();
   const Environment = skin?.Environment;

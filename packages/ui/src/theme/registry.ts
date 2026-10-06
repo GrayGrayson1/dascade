@@ -1,5 +1,5 @@
 /**
- * Theme registry. DASCADE ships eleven themes (Delta Neon is the default). More can be added to
+ * Theme registry. DASCADE ships twelve themes (Delta Neon is the default). More can be added to
  * BUILT_IN_THEMES (or registered at runtime with registerTheme()); unknown or removed ids always
  * fall back to Delta Neon, so a stored preference can never break the app.
  */
@@ -18,6 +18,7 @@ import { LAN_PARTY } from './themes/lan-party.ts';
 import { SATURDAY_MORNING } from './themes/saturday-morning.ts';
 import { EXECUTIVE } from './themes/executive.ts';
 import { NEON_NOIR } from './themes/neon-noir.ts';
+import { HALLOWEEN_NIGHT } from './themes/halloween-night.ts';
 
 export const DEFAULT_THEME_ID = 'delta-neon';
 
@@ -34,6 +35,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   SATURDAY_MORNING,
   EXECUTIVE,
   NEON_NOIR,
+  HALLOWEEN_NIGHT,
 ];
 
 const registry = new Map<string, ThemeDefinition>(BUILT_IN_THEMES.map((t) => [t.id, t]));

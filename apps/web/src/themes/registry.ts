@@ -1,5 +1,5 @@
 /**
- * Lazy skin registry. Token data for all eleven themes is tiny and eager (`@dascade/ui`); the
+ * Lazy skin registry. Token data for all twelve themes is tiny and eager (`@dascade/ui`); the
  * structural skins (CSS + environment components) load on demand and are cached, so the
  * default bundle only carries the active theme's skin.
  *
@@ -9,7 +9,7 @@
  * theme, ever.
  */
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_THEME_ID, getTheme } from '@dascade/ui';
+import { DEFAULT_THEME_ID, activeThemeId, getTheme, useThemeId } from '@dascade/ui';
 import type { ThemeSkin } from './types.ts';
 
 type SkinModule = { default: ThemeSkin };
@@ -27,6 +27,7 @@ const BUILT_IN_LOADERS: Record<string, Loader> = {
   'saturday-morning': () => import('./saturday-morning/index.ts'),
   executive: () => import('./executive/index.ts'),
   'neon-noir': () => import('./neon-noir/index.ts'),
+  'halloween-night': () => import('./halloween-night/index.ts'),
 };
 
 const LOADERS: Record<string, Loader> = { ...BUILT_IN_LOADERS };
@@ -133,6 +134,16 @@ export function useSkin(id: string): ThemeSkin | null {
     if (failed === undefined || nowMs() - failed >= SKIN_RETRY_MS) void loadThemeSkin(id);
   }
   return skin;
+}
+
+/** The active theme's skin if it has loaded (sync, for non-React code such as canvas renderers). */
+export function activeSkin(): ThemeSkin | null {
+  return loadedSkin(activeThemeId());
+}
+
+/** React: the active theme's skin; re-renders on a theme switch and when a skin finishes loading. */
+export function useActiveSkin(): ThemeSkin | null {
+  return useSkin(useThemeId());
 }
 
 /** Test/QA hook: register a loader for a runtime-registered theme (e.g. e2e's throwaway theme). */
