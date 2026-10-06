@@ -1,0 +1,157 @@
+/* =====================================================================
+ * Seasonal invite + "Exit Halloween" (themes/seasonal.ts). Generic tokens only: the invite renders in
+ * whatever theme the player is using; the Halloween skin may dress [data-part=exit-halloween] further.
+ * Reuses the shared dc-pop-in / dc-fade-in keyframes (no new animation names outside skins).
+ * ===================================================================== */
+
+/* ---------- The October invite: a banner under the floor HUD, over the decorative sign band ---------- */
+.ssn-invite {
+  position: fixed;
+  z-index: var(--z-overlay);
+  top: var(--ssn-top, calc(var(--safe-top) + 76px));
+  left: 50%;
+  translate: -50% 0;
+  box-sizing: border-box;
+  width: min(660px, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 14px 12px 16px;
+  background: var(--panel-bg-opaque);
+  color: var(--text-0);
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-left: 4px solid var(--ssn-accent, #ff8a3d);
+  border-radius: min(var(--panel-radius), 12px);
+  box-shadow: var(--toast-shadow);
+  animation: dc-pop-in var(--dur-3) var(--ease-out) both;
+}
+.ssn-invite__glyph {
+  color: var(--ssn-accent, #ff8a3d);
+  flex: none;
+}
+.ssn-invite__text {
+  min-width: 0;
+}
+.ssn-invite__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.25;
+  color: var(--text-0);
+}
+.ssn-invite__body {
+  margin: 3px 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  color: var(--text-1);
+}
+.ssn-invite__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ssn-invite__actions .dc-btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+/* Hidden while the floor zooms into a cabinet (view transition). */
+:root[data-vt] .ssn-invite {
+  visibility: hidden;
+}
+
+/* Phones: full width under the HUD, buttons share a row. */
+@media (max-width: 699px) {
+  .ssn-invite {
+    left: calc(12px + var(--safe-left));
+    right: calc(12px + var(--safe-right));
+    width: auto;
+    translate: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+  }
+  .ssn-invite__actions {
+    grid-column: 1 / -1;
+  }
+  .ssn-invite__actions .dc-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+/* Short landscape phones: keep it compact. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .ssn-invite {
+    width: min(600px, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
+    padding-block: 8px;
+  }
+  .ssn-invite__body {
+    display: none;
+  }
+}
+
+/* ---------- Exit Halloween ---------- */
+.ssn-exit--hud {
+  position: relative;
+  display: inline-flex;
+}
+.ssn-exit__confirm {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel-bg-opaque);
+  color: var(--text-0);
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-radius: min(var(--panel-radius), 12px);
+  box-shadow: var(--toast-shadow);
+  animation: dc-fade-in var(--dur-2) var(--ease-out) both;
+}
+.ssn-exit__question {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-0);
+}
+.ssn-exit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ssn-exit__actions .dc-btn,
+.ssn-exit__start {
+  min-height: 44px;
+}
+.ssn-exit--panel .ssn-exit__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ssn-exit__note {
+  color: var(--text-1);
+}
+/* The floor HUD is full below 1024 px (and on short landscape screens): there the theme button opens
+   the Themes sheet, which has the panel variant. Keep in sync with COMPACT_HUD_QUERY. */
+@media (max-width: 1023px), (max-height: 540px) {
+  .af-hud__icons .ssn-exit--hud {
+    display: none;
+  }
+}
+
+:root[data-reduced-motion='true'] .ssn-invite,
+:root[data-fx='off'] .ssn-invite,
+:root[data-reduced-motion='true'] .ssn-exit__confirm,
+:root[data-fx='off'] .ssn-exit__confirm {
+  animation: none;
+}

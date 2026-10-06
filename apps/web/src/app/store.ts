@@ -53,6 +53,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reducedMotion: prefersReducedMotion(),
   fx: 'high',
   theme: DEFAULT_THEME_PREF,
+  // Listed (as undefined) so SETTINGS_KEYS / pickSettings / reconcile treat it as a setting, not an extra.
+  seasonal: undefined,
 };
 
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;
@@ -171,6 +173,11 @@ interface AppState {
   toasts: Toast[];
   modal: ModalName;
   helpGameId: string | null;
+  /**
+   * true once hydrate() has reconciled the stored copy (local or remote) — or failed. Features that
+   * act on stored state at boot (the seasonal invite) wait for it so a remote value can't flicker them.
+   */
+  settingsReady: boolean;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateProfile: (patch: Partial<Omit<Profile, 'guestId'>>) => void;
   setNameDraft: (text: string | null) => void;
@@ -206,6 +213,7 @@ export const useApp = create<AppState>((set, get) => ({
   toasts: [],
   modal: null,
   helpGameId: null,
+  settingsReady: false,
 
   updateSettings(patch) {
     const settings = { ...get().settings, ...patch };
@@ -274,7 +282,7 @@ export const useApp = create<AppState>((set, get) => ({
     const needsSave = changedBeforeHydrate.size > 0 || (storedSettings !== null && storedVersion !== loaded.extras.settingsVersion);
     hydrated = true;
     changedBeforeHydrate.clear();
-    set({ settings, profile, profileConfirmed: profile.name.length > 0 });
+    set({ settings, profile, profileConfirmed: profile.name.length > 0, settingsReady: true });
     applyDocumentSettings(settings);
     if (needsSave) saveSettings(settings);
     if (profileChangedBeforeHydrate) void p.saveProfile({ name: profile.name, avatar: profile.avatar }).catch(() => undefined);

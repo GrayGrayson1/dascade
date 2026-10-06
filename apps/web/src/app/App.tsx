@@ -6,6 +6,7 @@ import { ArcadeFloor } from '../arcade/ArcadeFloor.tsx';
 import { Toasts } from '../shell/Toasts.tsx';
 import { ThemeHost } from '../themes/ThemeHost.tsx';
 import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
+import { SeasonalHost } from '../themes/SeasonalHost.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { useApp } from './store.ts';
 
@@ -100,6 +101,10 @@ export function App() {
         </Suspense>
         <Modals />
       </RouteBoundary>
+      {/* October's Halloween invite + the season's end (themes/seasonal.ts). After the routes in tab order. */}
+      <QuietBoundary>
+        <SeasonalHost />
+      </QuietBoundary>
       <QuietBoundary>
         <Toasts />
       </QuietBoundary>

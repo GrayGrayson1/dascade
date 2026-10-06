@@ -21,6 +21,7 @@ import { crumbCabinet } from './crumbs.ts';
 import { ProfileTabs } from './profile/ProfileTabs.tsx';
 import { ThemePicker } from '../themes/ThemePicker.tsx';
 import { ThemedText } from '../themes/ThemedText.tsx';
+import { ExitHalloweenButton } from '../themes/ExitHalloween.tsx';
 
 export function GlobalModals() {
   const modal = useApp((s) => s.modal);
@@ -103,6 +104,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
               />
               <span className="dc-field__hint">Scales particles, glow, backgrounds and theme ambience. Lower it on older laptops.</span>
             </div>
+            <ExitHalloweenButton variant="panel" />
             <div className="dc-field" data-part="settings-theme">
               <span className="dc-field__label" id="settings-theme-label">
                 Theme

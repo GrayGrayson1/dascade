@@ -15,6 +15,7 @@ import { initPersistence } from './persistence/index.ts';
 import { installAudio } from './audio/audio.ts';
 import { loadThemeSkinWithin, loadedSkin } from './themes/registry.ts';
 import { switchTheme } from './themes/controller.ts';
+import { installSeasonal } from './themes/seasonalController.ts';
 
 // A tab left open across a deploy asks for chunk hashes that no longer exist: reload once to pick
 // up the new build instead of crashing on the next lazy screen (see app/chunkReload.ts).
@@ -25,6 +26,9 @@ installChunkReload();
 // apply from the first frame — hydrate() only reconciles with the remote copy later).
 applyDocumentSettings(useApp.getState().settings);
 installAudio();
+// October's Halloween invite: remembers how Halloween Night got switched on and reverts it after the
+// season (themes/seasonal.ts). Local and cosmetic, like every theme.
+installSeasonal();
 
 // Theme hook for QA / E2E (e2e/theme.spec.ts): register a throwaway theme and switch to it.
 // Themes are purely cosmetic and local to this browser.
@@ -55,7 +59,8 @@ window.__DASCADE_THEME__ = {
 
 void initPersistence()
   .then(() => useApp.getState().hydrate())
-  .catch(() => undefined);
+  // A failed hydrate keeps the locally stored settings; features waiting on them still start.
+  .catch(() => useApp.setState({ settingsReady: true }));
 
 function missingFeatures(): string[] {
   const missing: string[] = [];

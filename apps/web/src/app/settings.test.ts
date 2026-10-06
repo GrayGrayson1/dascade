@@ -5,6 +5,7 @@ import {
   SETTINGS_VERSION,
   migrateSettings,
   motionChoice,
+  parseSeasonal,
   peekStoredSettings,
   peekStoredTheme,
   reconcileSettings,
@@ -191,5 +192,42 @@ describe('reconcileSettings', () => {
     const out = reconcileSettings(loaded, current, new Set<keyof AppSettings>(['muted', 'masterVolume']));
     expect(out).toEqual({ ...loaded, muted: true, masterVolume: 0.1 });
     expect(reconcileSettings(loaded, current, new Set())).toEqual(loaded);
+  });
+});
+
+describe('seasonal prefs (October invite bookkeeping)', () => {
+  it('reads junk as nothing recorded', () => {
+    for (const junk of [undefined, null, 'x', 3, [], ['halloween'], true]) expect(parseSeasonal(junk)).toBeUndefined();
+    expect(parseSeasonal({ halloween: 5 })).toEqual({});
+    expect(parseSeasonal({ halloween: [] })).toEqual({});
+  });
+
+  it('round-trips a valid record', () => {
+    const v = { halloween: { year: 2026, dismissed: true, via: 'invite', prev: 'neon-noir' } };
+    expect(parseSeasonal(v)).toEqual(v);
+  });
+
+  it('drops bad fields one at a time and keeps the rest', () => {
+    expect(parseSeasonal({ halloween: { year: 2026.5, dismissed: true } })).toEqual({ halloween: { dismissed: true } });
+    expect(parseSeasonal({ halloween: { year: 2026, via: 'x' } })).toEqual({ halloween: { year: 2026 } });
+    expect(parseSeasonal({ halloween: { prev: '<script>', via: 'picker' } })).toEqual({ halloween: { via: 'picker' } });
+    expect(parseSeasonal({ halloween: { year: 1999, dismissed: 'yes', junk: 1 } })).toEqual({ halloween: {} });
+  });
+
+  it('keeps seasons this build does not know', () => {
+    expect(parseSeasonal({ christmas: { year: 2026, x: 1 } })).toEqual({ christmas: { year: 2026, x: 1 } });
+  });
+
+  it('migrateSettings validates it, is idempotent and does not bump the version', () => {
+    const once = migrateSettings({ settingsVersion: 3, seasonal: { halloween: { year: 2026, via: 'invite', prev: 'lan-party', junk: 1 } } }, DEFAULTS);
+    expect(once.seasonal).toEqual({ halloween: { year: 2026, via: 'invite', prev: 'lan-party' } });
+    expect(migrateSettings(once, DEFAULTS)).toEqual(once);
+    expect(once.settingsVersion).toBe(3);
+    expect(migrateSettings({ seasonal: 'nope' }, DEFAULTS).seasonal).toBeUndefined();
+  });
+
+  it('a seasonal change made before hydrate wins over the stored copy', () => {
+    const current: AppSettings = { ...DEFAULTS, seasonal: { halloween: { year: 2026, dismissed: true } } };
+    expect(reconcileSettings({ ...DEFAULTS }, current, new Set<keyof AppSettings>(['seasonal'])).seasonal).toEqual(current.seasonal);
   });
 });
