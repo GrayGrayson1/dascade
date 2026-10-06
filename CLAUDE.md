@@ -1,6 +1,6 @@
 # DASCADE — repository guide
 
-DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 25 games, a Tournament Center, 11 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
+DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 25 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
 
 ## Commands
 - `pnpm install` — install (Node ≥ 22.12, pnpm via corepack)
@@ -14,7 +14,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 ## Layout and boundaries
 - `packages/shared` — isomorphic protocol, `catalog.ts` (games), `cabinets.ts` (floor lineup), tournament/stats/party contracts, Zod schemas, sanitation, RNG, rate limits. No Node/DOM-only APIs.
 - `packages/game-core` — pure deterministic engines; take an injected `Rng`; never `Math.random()`; no Colyseus/DOM. Also party and classics helpers, the tournament engine and Elo rating.
-- `packages/ui` — design system and theme tokens/API (`src/styles/tokens.css`, `src/theme/`): 11 theme definitions (tokens + materials + effects + copy). No app/network code.
+- `packages/ui` — design system and theme tokens/API (`src/styles/tokens.css`, `src/theme/`): 12 theme definitions (tokens + materials + effects + copy). No app/network code.
 - `apps/game-server` — every game room extends `rooms/BaseGameRoom.ts` directly or through a kit room; register client messages only via `this.handle()` (validated + rate limited). Server decides every outcome with `this.rng` (crypto). Platform services (ratings, stats, tournaments) live in `src/platform/`.
 - `apps/web` — `net/session.ts` is the single Colyseus client; UIs use `net/hooks.ts`. Games live in `src/games/<id>/` (lazy loaded; DASphalt GP `kart` is a three.js game whose renderer and art are in `src/games/kart/render|art/` — three.js must stay inside that folder — see `docs/KART.md`); shared shell in `src/shell/`; arcade floor in `src/arcade/` (incl. the playable claw machine: `clawPile.ts` + `clawPhysics.ts` pure model, `ClawCloseup.tsx` lazy close-up, `clawInventory.ts` shared pile); Tournament Center in `src/tournament/`; theme skins + engine in `src/themes/`; audio mixer + jukebox engine in `src/audio/`; jukebox UI (the floor machine, the quick control, the player) in `src/jukebox/`; music manifest Vite plugin in `vite/`.
 
@@ -43,5 +43,6 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 - Rooms: integration tests in `apps/game-server/test/` via `bootTestServer([...games])` (tournaments: `test/tournament-helpers.ts`).
 - E2E: `e2e/<id>.spec.ts` smoke path per game using `e2e/helpers.ts`; must pass on chromium, mobile and mobile-safari. Themes/audio: `theme.spec.ts`, `theme-state.spec.ts`, `theme-a11y.spec.ts`, `jukebox.spec.ts`. The shared Vite dev server reloads on edits — for trustworthy full runs, test a production build (`pnpm build`, then `NODE_ENV=production PORT=<p> DASCADE_RELAXED_LIMITS=1 node apps/game-server/dist/index.js`, `E2E_BASE_URL=http://127.0.0.1:<p>`). `e2e/kart.spec.ts` drives races through the server's `kart:test` hook, which exists only without `NODE_ENV=production`: run the built server as `SERVE_WEB=1 DASCADE_RELAXED_LIMITS=1 PORT=<p> node apps/game-server/dist/index.js` for it.
 - Party games: a 30-client scenario in `scripts/load/<id>.ts`.
+- Seasonal invite: every Playwright context starts with `localStorage['dascade:qa:season']='off'` (config `use.storageState`), so no spec meets October's Halloween invite by accident; opt in with `?season=YYYY-MM-DD[THH:MM]` (see `e2e/seasonal.spec.ts`). A spec passing its own `storageState` must re-add it.
 
 See `README.md`, `docs/ARCHITECTURE.md`, `docs/GAME_GUIDE.md` (per-game contract + kit reference) and `docs/THEMING.md`.
