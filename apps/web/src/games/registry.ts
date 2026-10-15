@@ -20,6 +20,7 @@ export const GAME_MODULES: Record<GameId, () => Promise<{ default: GameClientMod
   masterpiece: () => import('./masterpiece/index.tsx'),
   words: () => import('./words/index.tsx'),
   survey: () => import('./survey/index.tsx'),
+  showdown: () => import('./showdown/index.tsx'),
   putt: () => import('./putt/index.tsx'),
   tanks: () => import('./tanks/index.tsx'),
   paddle: () => import('./paddle/index.tsx'),

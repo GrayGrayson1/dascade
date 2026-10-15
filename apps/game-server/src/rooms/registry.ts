@@ -23,6 +23,7 @@ export const ROOM_LOADERS: Record<GameId, () => Promise<AnyGameRoom>> = {
   masterpiece: async () => (await import('./masterpiece/MasterpieceRoom.ts')).MasterpieceRoom,
   words: async () => (await import('./words/WordsRoom.ts')).WordsRoom,
   survey: async () => (await import('./survey/SurveyRoom.ts')).SurveyRoom,
+  showdown: async () => (await import('./showdown/ShowdownRoom.ts')).ShowdownRoom,
   putt: async () => (await import('./putt/PuttRoom.ts')).PuttRoom,
   tanks: async () => (await import('./tanks/TanksRoom.ts')).TanksRoom,
   paddle: async () => (await import('./paddle/PaddleRoom.ts')).PaddleRoom,
