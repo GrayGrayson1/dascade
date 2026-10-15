@@ -155,6 +155,7 @@ test.describe('arcade lineup', () => {
       'DASterpiece',
       'DASwords',
       'DAS Survey',
+      'DAS Survey Showdown',
     ]);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
