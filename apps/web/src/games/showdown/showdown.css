@@ -1894,6 +1894,13 @@
 .sd-stage[data-fx='off'] .sd-fog {
   display: none;
 }
+/* Effects off (without reduced motion) still stops the remaining loops: the host's chatter, the
+   drumroll/suspense backdrop pulse and the console's LIVE dot. */
+.sd-stage[data-motion='off'] .sd-host__mouth,
+.sd-stage[data-motion='off'] .sd-backdrop,
+:root[data-fx='off'] .sd-live i {
+  animation: none;
+}
 
 /* =====================================================================
  * Surfaces: stage window, big screen, room
@@ -2866,6 +2873,15 @@ details.sd-panel > summary::after {
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   color: var(--team);
+  overflow-wrap: anywhere;
+}
+/* Team names run to 22 characters: on a 360 px phone the two pick buttons wrap instead of
+   pushing the page sideways. */
+.sd-teamcard .sd-teambtn {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
 }
 .sd-guess .sd-panel__title {
   justify-content: space-between;
@@ -3138,7 +3154,7 @@ details.sd-panel > summary::after {
 }
 .sd-teampick {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
 }
 .sd-teampick__card {
@@ -3168,6 +3184,7 @@ details.sd-panel > summary::after {
   font-size: var(--fs-lg);
   color: var(--team);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 .sd-teampick__count {
   font-size: var(--fs-xs);
