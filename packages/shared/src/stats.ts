@@ -113,6 +113,9 @@ export const STAT_EXTRA_LABELS: Record<string, string> = {
   questsCompleted: 'Quests completed',
   checksPassed: 'Checks passed',
   crits: 'Critical rolls',
+  // DAS Survey Showdown
+  calls: 'Answers called',
+  bestCallPoints: 'Best Survey Sayer score',
 };
 
 /** Extras whose key ends in `Ms` are durations in milliseconds (e.g. `minLapMs`). */
@@ -143,6 +146,7 @@ export const STAT_GAME_DISPLAY: Partial<Record<GameId, StatGameDisplay>> = {
   circuit: { scoreLabel: 'Best race time', scoreFormat: 'ms' },
   kart: { scoreLabel: 'Best race time', scoreFormat: 'ms' },
   quest: { scoreLabel: 'Best party score', coop: true },
+  showdown: { scoreLabel: 'Best team score' },
 };
 
 export function statExtraLabel(key: string): string {

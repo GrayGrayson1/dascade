@@ -124,11 +124,11 @@ export const CABINETS: Record<CabinetId, CabinetDef> = {
     title: 'DAStravaganza',
     marquee: 'DASTRAVAGANZA',
     family: 'Party Games',
-    tagline: 'Five party games for three to thirty players.',
+    tagline: 'Six party games, from three players to the whole office.',
     description:
-      'The game-night machine: a trivia show, a social-deduction thriller, a comedy writing contest, word games and a survey of your own group. Works for a small team or the whole office.',
+      'The game-night machine: a trivia show, a social-deduction thriller, a comedy writing contest, word games, a survey of your own group and a presenter-run survey showdown for the big screen. Works for a small team or the whole office.',
     accent: { primary: '#ff4f81', secondary: '#ffd23f', deep: '#2a0718' },
-    games: [g('trivia'), g('deception'), g('masterpiece'), g('words'), g('survey')],
+    games: [g('trivia'), g('deception'), g('masterpiece'), g('words'), g('survey'), g('showdown')],
   },
   putt: {
     id: 'putt',

@@ -1,6 +1,6 @@
 # DASCADE — Delta Alpha Sierra Arcade
 
-A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **25 games**, plus a **Tournament Center** for brackets and Swiss events, **twelve themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
+A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **26 games**, plus a **Tournament Center** for brackets and Swiss events, **twelve themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
 
 > All casino-style games use meaningless **virtual chips**. There is no real-money wagering, purchasing, deposits or cash-out of any kind.
 
@@ -22,6 +22,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | DASterpiece (`masterpiece`) | 3–30 | Comedy writing contest with anonymous voting and head-to-head showdowns |
 | | DASwords (`words`) | 1–30 | Letter Grid, Anagram Sprint, Word Chain and Forbidden Letter against a local dictionary |
 | | DAS Survey (`survey`) | 3–30 | Answer anonymously, then predict how your own group answered |
+| | DAS Survey Showdown (`showdown`) | 1–60 | Presenter-run survey game show for the big screen: hidden-answer board, strikes, steals, a phone audience; Halloween and Showtime looks ([docs/SHOWDOWN.md](docs/SHOWDOWN.md)) |
 | **DAS Putt** | DAS Putt (`putt`) | 1–12 | Neon mini golf on an original nine-hole course, server-simulated strokes |
 | **DAS Tanks** | DAS Tanks (`tanks`) | 1–8 | Turn-based artillery with destructible terrain, six weapons, teams and CPU gunners |
 | **DAScade Classics** | Pixel Paddle (`paddle`) | 1–2 | Paddle duel against the house AI or a coworker |
@@ -151,7 +152,7 @@ LOAD_URL=http://localhost:2567 CLIENTS=30 pnpm load
 The party games have their own 30-client scenarios in `scripts/load/<id>.ts`. They aren't in the default set, so name them explicitly:
 
 ```bash
-LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=trivia,deception,masterpiece,words,words-chain,survey pnpm load
+LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=trivia,deception,masterpiece,words,words-chain,survey,showdown pnpm load
 ```
 
 | Scenario | Exercises |
@@ -161,6 +162,7 @@ LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=trivia,deception,masterpiece,words
 | `masterpiece` | Writing and voting bursts with duplicate submissions and votes that must not double-count; authors stay anonymous until scoring |
 | `words`, `words-chain` | Letter Grid word bursts (invalid and duplicate words included, no double scoring, no early reveal); one Word Chain link answered by everyone at once |
 | `survey` | Answer and prediction bursts including duplicates; nobody ever receives another player's answer |
+| `showdown` | 29 audience clients guess (with duplicates) and cheer while the presenter double-sends every reveal; no hidden answer or answer sheet reaches the audience, callers score once |
 | `dj` | Room DJ with 30 clients in one room: host scrubs/pauses while everyone queues, a skip vote at the exact strict majority (with duplicate votes), 8 leave and 8 join, then the host leaves; every client must end on the identical DJ state |
 
 `pnpm load` exits non-zero when any scenario fails its thresholds. Racing has a separate scripted-input bot runner, which prints a `RESULT:` health line: `LOAD_URL=http://localhost:2567 pnpm exec tsx scripts/load-circuit.ts --bots 20` (see its header for `--laps`, `--track`, `--spectators` and more). DASphalt GP has its own: `LOAD_URL=http://localhost:2567 pnpm load:kart -- --clients 30` (the server needs `DASCADE_RELAXED_LIMITS=1`; see its header for `--bots`, `--mode gp`, `--churn`, `--spikes`, `--hostile` and more).

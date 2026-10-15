@@ -18,6 +18,7 @@ import { deception, masterpiece, survey, trivia, words } from './scenes/party.ts
 import { putt, tanks } from './scenes/sports.ts';
 import { asteroids, blocks, bricks, memory, paddle, snake } from './scenes/classics.ts';
 import { kart } from './scenes/kart.ts';
+import { showdown } from './scenes/showdown.ts';
 
 export type { AttractFrame, Scene } from './attractKit.ts';
 
@@ -41,6 +42,7 @@ export const SCENES = {
   masterpiece,
   words,
   survey,
+  showdown,
   putt,
   tanks,
   paddle,
@@ -60,7 +62,7 @@ export const CABINET_PLAYLISTS: Record<CabinetId, readonly SceneId[]> = {
   wheel: ['wheel'],
   dasino: ['slots', 'holdem', 'roulette', 'blackjack', 'highlow'],
   boardroom: ['chess', 'ships', 'checkers'],
-  stravaganza: ['trivia', 'deception', 'words', 'masterpiece', 'survey'],
+  stravaganza: ['trivia', 'deception', 'words', 'masterpiece', 'survey', 'showdown'],
   putt: ['putt'],
   tanks: ['tanks'],
   classics: ['snake', 'bricks', 'paddle', 'asteroids', 'blocks', 'memory'],

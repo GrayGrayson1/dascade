@@ -1,6 +1,6 @@
 # DASCADE — repository guide
 
-DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 25 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
+DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 26 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
 
 ## Commands
 - `pnpm install` — install (Node ≥ 22.12, pnpm via corepack)
@@ -8,7 +8,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 - `pnpm build` — web build + bundled server (`apps/game-server/dist`, incl. `dist/words-data/`)
 - `pnpm start` — production server (sets NODE_ENV=production and serves the built client on the same port)
 - `pnpm lint` · `pnpm typecheck` · `pnpm test` (Vitest: unit + server integration) · `pnpm test:e2e` (Playwright: chromium, firefox, webkit, mobile, mobile-safari)
-- `pnpm load` — 30-client load simulation against a running server (`LOAD_URL=http://localhost:2567`, server started with `DASCADE_RELAXED_LIMITS=1`). Party games aren't in the default set: `LOAD_SCENARIOS=trivia,deception,masterpiece,words,words-chain,survey`.
+- `pnpm load` — 30-client load simulation against a running server (`LOAD_URL=http://localhost:2567`, server started with `DASCADE_RELAXED_LIMITS=1`). Party games aren't in the default set: `LOAD_SCENARIOS=trivia,deception,masterpiece,words,words-chain,survey,showdown`.
 - Focused: `pnpm vitest run packages/game-core/src/<id> apps/game-server/test/<id>.test.ts` · `DASCADE_ONLY_GAMES=<id> pnpm --filter @dascade/game-server dev` · `E2E_BASE_URL=http://localhost:<web> pnpm exec playwright test e2e/<id>.spec.ts --project=chromium`
 
 ## Layout and boundaries

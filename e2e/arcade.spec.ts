@@ -39,6 +39,7 @@ const GAME_DIRS = [
   'masterpiece',
   'words',
   'survey',
+  'showdown',
   'putt',
   'tanks',
   'paddle',
