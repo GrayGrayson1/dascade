@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
 import type { GameOutcome, WelcomePayload } from '@dascade/shared';
+import { GAME_CATALOG } from '@dascade/shared';
 import {
   SHOWDOWN_MSG,
   type ShowdownActPayload,
@@ -185,6 +186,19 @@ describe('DAS Survey Showdown — presenter role and secrecy', () => {
       expect(c.contents.filter(Boolean)).toEqual([]);
       expect(c.sheets.filter(Boolean)).toEqual([]);
     }
+  });
+
+  it('seats a full house: every joiner plays, so a 60-strong audience needs no lobby tweak', async () => {
+    const t = await setup({ custom: false });
+    expect(t.server.state.maxPlayers).toBe(GAME_CATALOG.showdown.capacity.maxPlayersLimit);
+    const crowd: Client[] = [];
+    for (let i = 0; i < 58; i++) crowd.push(await t.join(`Fan ${i}`));
+    const audience = [t.a, t.b, ...crowd];
+    await waitFor(() => audience.every((c) => t.server.state.teams.get(c.id()) !== undefined), 5000, 'everyone on a team');
+    expect(audience.every((c) => !t.server.state.players.get(c.id()).spectator)).toBe(true);
+    const sizes = [0, 0];
+    for (const c of audience) sizes[t.server.state.teams.get(c.id())]++;
+    expect(sizes).toEqual([30, 30]);
   });
 
   it('never sends hidden answers to the audience — only revealed ones reach their board', async () => {

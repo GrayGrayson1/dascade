@@ -64,6 +64,9 @@ The presenter sees the audience's most popular guesses live.
 - Every presenter command carries the board revision it was made against. A stale or double-clicked
   command is ignored, and reveals are idempotent by slot. Undo restores the previous engine state, and
   the revision keeps rising.
+- **Room size:** up to 100 seats, and the default is the limit, so everyone who joins plays. The
+  presenter and each big screen take a seat too; anyone past the limit watches as a spectator. The
+  load scenario passes with 61 and 100 clients.
 - **Disconnects:** the seat is held for 180 s (`reconnectGraceSeconds`). If the presenter is gone for
   10 minutes mid-show, the show ends with the scores as they stand, so the room never stalls.
 - Outcomes: `reportOutcome` places the winning team's members first and the other team second (one

@@ -22,7 +22,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | DASterpiece (`masterpiece`) | 3–30 | Comedy writing contest with anonymous voting and head-to-head showdowns |
 | | DASwords (`words`) | 1–30 | Letter Grid, Anagram Sprint, Word Chain and Forbidden Letter against a local dictionary |
 | | DAS Survey (`survey`) | 3–30 | Answer anonymously, then predict how your own group answered |
-| | DAS Survey Showdown (`showdown`) | 1–60 | Presenter-run survey game show for the big screen: hidden-answer board, strikes, steals, a phone audience; Halloween and Showtime looks ([docs/SHOWDOWN.md](docs/SHOWDOWN.md)) |
+| | DAS Survey Showdown (`showdown`) | 1–100 | Presenter-run survey game show for the big screen: hidden-answer board, strikes, steals, a phone audience; Halloween and Showtime looks ([docs/SHOWDOWN.md](docs/SHOWDOWN.md)) |
 | **DAS Putt** | DAS Putt (`putt`) | 1–12 | Neon mini golf on an original nine-hole course, server-simulated strokes |
 | **DAS Tanks** | DAS Tanks (`tanks`) | 1–8 | Turn-based artillery with destructible terrain, six weapons, teams and CPU gunners |
 | **DAScade Classics** | Pixel Paddle (`paddle`) | 1–2 | Paddle duel against the house AI or a coworker |
