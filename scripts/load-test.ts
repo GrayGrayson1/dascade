@@ -104,7 +104,14 @@ async function createBots(gameId: string, count: number, keep: string[] = [], cr
 }
 
 async function leaveAll(bots: Bot[]): Promise<void> {
-  await Promise.all(bots.map((b) => b.room.leave(true).catch(() => undefined)));
+  // Behind Render's proxy the server frees the seat at once but the close never reaches the client, so
+  // leave() would hang while the SDK retries (~6 min). Same guard as the web client (net/session.ts).
+  await Promise.all(
+    bots.map((b) => {
+      b.room.reconnection.maxRetries = 0;
+      return Promise.race([b.room.leave(true).catch(() => undefined), sleep(1500)]);
+    }),
+  );
 }
 
 function playerCount(room: Room): number {
