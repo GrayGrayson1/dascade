@@ -708,7 +708,7 @@ export function PlayerChip({
       <Avatar avatar={avatar} color={color} size={size} offline={!connected} />
       <div style={{ minWidth: 0 }}>
         <div className="dc-row" style={{ gap: 6 }}>
-          <span className="dc-player__name" style={{ color: connected ? 'var(--text-0)' : 'var(--text-3)' }}>
+          <span className="dc-player__name" title={name} style={{ color: connected ? 'var(--text-0)' : 'var(--text-3)' }}>
             {name}
           </span>
           {isHost ? <PixelIcon name="crown" title="Host" style={{ color: 'var(--yellow)' }} /> : null}

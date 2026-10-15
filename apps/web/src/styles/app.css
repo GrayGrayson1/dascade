@@ -630,7 +630,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  /* One line: a long nickname shortens (ellipsis) instead of pushing the ready pill or gear down. */
+  flex-wrap: nowrap;
   gap: var(--sp-2);
   padding: 8px 10px;
   background: var(--surface-raised);
@@ -660,6 +661,10 @@
 .player-list__item.is-away {
   background: transparent;
   border-style: dashed;
+}
+/* The host's open player menu (Make host / Remove) may take a line of its own. */
+.player-list__item:has(> .player-list__manage) {
+  flex-wrap: wrap;
 }
 .player-list__manage {
   display: flex;
