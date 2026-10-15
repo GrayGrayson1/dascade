@@ -623,9 +623,11 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     accent: { primary: '#ffb020', secondary: '#ff4fd8', deep: '#1a0b2e' },
     capacity: {
       minPlayers: 1,
-      defaultMaxPlayers: 40,
-      maxPlayersLimit: 60,
-      maxRoomSize: 70,
+      // An audience show: everyone who walks in plays, so the default is the limit (presenter and
+      // big screens take seats too).
+      defaultMaxPlayers: 100,
+      maxPlayersLimit: 100,
+      maxRoomSize: 120,
       supportsSpectators: true,
       lateJoinAsPlayer: true,
       supportsSolo: false,
