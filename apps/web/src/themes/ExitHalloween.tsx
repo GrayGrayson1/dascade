@@ -98,7 +98,11 @@ function HudExit() {
         close();
       }}
       onBlur={(e) => {
-        if (open && !rootRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
+        // Only when focus moved to something else (Tab away); clicks outside close via pointerdown.
+        // A blur with no new target is a click on a button Safari won't focus (or on the confirm's
+        // text): closing then would unmount "Exit" before its click lands.
+        const next = e.relatedTarget as Node | null;
+        if (open && next && !rootRef.current?.contains(next)) setOpen(false);
       }}
     >
       <button
