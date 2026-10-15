@@ -25,6 +25,8 @@ interface Guess {
   key: string;
   /** Matching slot on that round's board (-1 = none). Secret until that slot is revealed. */
   slot: number;
+  /** Another spelling of an answer this player already guessed: shown, but never scored or counted twice. */
+  repeat: boolean;
   at: number;
 }
 
@@ -71,9 +73,10 @@ export class GuessBook {
     const slot = matchSlot(def, text);
     if (slot >= 0 && revealed[slot]) return { ok: false, reason: 'revealed' };
     if (mine.length >= SHOWDOWN_LIMITS.guessesPerRound) return { ok: false, reason: 'limit' };
-    // One guess per answer: a second spelling of the same hidden answer would just double-count.
-    if (slot >= 0 && mine.some((g) => g.slot === slot)) return { ok: false, reason: 'duplicate' };
-    mine.push({ text, key, slot, at: ++this.clock });
+    // A second spelling of the same hidden answer is locked in like any guess (refusing it would tell
+    // the player their earlier guess is on the board), but it never scores or counts twice.
+    const repeat = slot >= 0 && mine.some((g) => g.slot === slot);
+    mine.push({ text, key, slot, repeat, at: ++this.clock });
     byPlayer.set(playerId, mine);
     return { ok: true, slot };
   }
@@ -89,7 +92,7 @@ export class GuessBook {
   matchesPerSlot(round: number, slots: number): number[] {
     const out = Array.from({ length: slots }, () => 0);
     for (const list of this.rounds.get(round)?.values() ?? []) {
-      for (const g of list) if (g.slot >= 0 && g.slot < slots) out[g.slot]!++;
+      for (const g of list) if (!g.repeat && g.slot >= 0 && g.slot < slots) out[g.slot]!++;
     }
     return out;
   }
@@ -104,6 +107,7 @@ export class GuessBook {
     const groups = new Map<string, ShowdownGuessCloudEntry & { first: number }>();
     for (const list of this.rounds.get(round)?.values() ?? []) {
       for (const g of list) {
+        if (g.repeat) continue;
         const id = g.slot >= 0 ? `slot:${g.slot}` : `key:${g.key}`;
         const entry = groups.get(id);
         if (entry) {
@@ -144,8 +148,8 @@ export class GuessBook {
       const def = rounds[round];
       const view = list.map((g): ShowdownMyGuess => {
         const called = g.slot >= 0 && revealed[g.slot] === true && def !== undefined;
-        const pts = called ? (def.answers[g.slot]?.points ?? 0) : 0;
-        if (called) {
+        const pts = called && !g.repeat ? (def.answers[g.slot]?.points ?? 0) : 0;
+        if (called && !g.repeat) {
           points += pts;
           calls++;
         }

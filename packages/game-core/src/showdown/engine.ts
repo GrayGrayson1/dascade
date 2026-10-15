@@ -257,7 +257,7 @@ function next(state: ShowState): StepResult {
   const entered = enterRound(closed, state.round + 1);
   const rev = entered.rev + 1;
   const round = entered.rounds[entered.round]!;
-  return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: entered.round, multiplier: round.multiplier }] };
+  return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: entered.round, multiplier: round.multiplier, answers: round.answers.length }] };
 }
 
 /** Applies one presenter command. Pure: `state` is never modified. */
@@ -268,7 +268,8 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
       if (state.rounds.length === 0) return fail('not_allowed', 'This show has no rounds.');
       const entered = enterRound(state, 0);
       const rev = entered.rev + 1;
-      return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: 0, multiplier: entered.rounds[0]!.multiplier }] };
+      const first = entered.rounds[0]!;
+      return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: 0, multiplier: first.multiplier, answers: first.answers.length }] };
     }
     case 'question': {
       if (state.stage !== 'title') return fail(state.stage === 'intro' ? 'wrong_stage' : 'noop', state.stage === 'intro' ? 'Start round 1 first.' : 'The question is already up.');

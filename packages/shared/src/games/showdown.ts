@@ -358,8 +358,19 @@ export const ShowdownActSchema = z.discriminatedUnion('a', [
   z.object({ a: z.literal('begin'), rev }).strict(),
   z.object({ a: z.literal('question'), rev }).strict(),
   z.object({ a: z.literal('control'), rev, team }).strict(),
-  /** Reveals are idempotent by slot, so they don't need the board revision. */
-  z.object({ a: z.literal('reveal'), slot: z.number().int().min(0).max(SHOWDOWN_LIMITS.answersMax - 1) }).strict(),
+  /**
+   * Reveals are idempotent by slot, so they don't need the board revision (a fast presenter can flip
+   * several before the board catches up). `round` is the round the console was showing: a reveal that
+   * arrives after the show moved on (e.g. "Reveal the rest" racing "Next round") is ignored instead of
+   * flipping a tile of the next board. Optional for consoles loaded before it existed.
+   */
+  z
+    .object({
+      a: z.literal('reveal'),
+      slot: z.number().int().min(0).max(SHOWDOWN_LIMITS.answersMax - 1),
+      round: z.number().int().min(-1).max(1000).optional(),
+    })
+    .strict(),
   z.object({ a: z.literal('strike'), rev }).strict(),
   z.object({ a: z.literal('award'), rev, team }).strict(),
   z
@@ -560,7 +571,8 @@ export interface ShowdownMe {
 
 export type ShowdownEvent =
   | { type: 'intro'; rev: number }
-  | { type: 'round'; rev: number; round: number; multiplier: number }
+  /** `answers` = tiles on the new board (the event can arrive before the board itself). */
+  | { type: 'round'; rev: number; round: number; multiplier: number; answers: number }
   | { type: 'question'; rev: number }
   | { type: 'control'; rev: number; team: TeamIndex }
   | {
