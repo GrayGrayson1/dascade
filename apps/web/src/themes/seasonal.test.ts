@@ -165,7 +165,7 @@ describe('parseSeasonOverride', () => {
 });
 
 // ---------------------------------------------------------------------------
-function harness(init: { theme?: string; seasonal?: SeasonalPrefs; now?: Date | null; retarget?: string } = {}) {
+function harness(init: { theme?: string; seasonal?: SeasonalPrefs; now?: Date | null; retarget?: string; retargetAway?: string } = {}) {
   let state: SeasonalSlice = { theme: init.theme ?? 'delta-neon', seasonal: init.seasonal };
   let now: Date | null = init.now === undefined ? OCT15 : init.now;
   const listeners = new Set<(next: SeasonalSlice, prev: SeasonalSlice) => void>();
@@ -188,7 +188,7 @@ function harness(init: { theme?: string; seasonal?: SeasonalPrefs; now?: Date | 
     // A switch can be retargeted by the switcher (another pick during the transition).
     switchTheme: async (id) => {
       switched.push(id);
-      set({ theme: init.retarget && id === HN ? init.retarget : id });
+      set({ theme: init.retarget && id === HN ? init.retarget : init.retargetAway && id !== HN ? init.retargetAway : id });
     },
     hasTheme: (id) => known.has(id),
     themeName: (id) => id.toUpperCase(),
@@ -265,6 +265,21 @@ describe('seasonal controller', () => {
     expect(h.toasts.at(-1)).toMatch(/^Back to NEON-NOIR\./);
     const g = harness({ theme: HN, seasonal: { halloween: { via: 'invite', year: 2026, prev: 'retired' } } });
     expect(await g.ctrl.exit()).toBe('delta-neon');
+  });
+
+  it('exit() and the season end stay quiet when another pick retargeted the switch', async () => {
+    const h = harness({ theme: HN, seasonal: { halloween: { via: 'picker', prev: 'neon-noir' } }, retargetAway: 'lan-party' });
+    await h.ctrl.exit();
+    expect(h.get().theme).toBe('lan-party');
+    expect(h.toasts).toEqual([]);
+    const g = harness({
+      theme: HN,
+      seasonal: { halloween: { via: 'invite', year: 2026, prev: 'neon-noir' } },
+      now: at(2026, 11, 1, 0, 1),
+      retargetAway: 'lan-party',
+    });
+    await g.ctrl.checkSeasonEnd();
+    expect(g.toasts).toEqual([]);
   });
 
   it('checkSeasonEnd(): reverts an invite-activated Halloween Night once October is over', async () => {

@@ -253,6 +253,8 @@ export function createSeasonalController(d: SeasonalDeps): SeasonalController {
     async exit() {
       const target = exitTarget();
       await d.switchTheme(target);
+      // Another theme was picked while this switch ran: don't announce one that isn't on.
+      if (d.get().theme !== target) return target;
       d.toast('success', `Back to ${d.themeName(target)}. Halloween Night stays in Themes if you miss it. 🎃`);
       return target;
     },
@@ -274,6 +276,7 @@ export function createSeasonalController(d: SeasonalDeps): SeasonalController {
         if (!shouldRevert(cur.seasonal, now, cur.theme)) return;
         const target = restoreTarget(cur.seasonal, d.hasTheme);
         await d.switchTheme(target);
+        if (d.get().theme !== target) return;
         d.toast('info', `Halloween’s over — the arcade is back to ${d.themeName(target)}.`);
       } finally {
         checking = false;
