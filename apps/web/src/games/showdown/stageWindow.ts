@@ -168,13 +168,19 @@ export function useStageWindow(): StageWindowState {
   );
 }
 
+/** The Fullscreen API is usable here (not on iPhone Safari, where the button is hidden). */
+export function canFullscreen(): boolean {
+  return typeof document !== 'undefined' && document.fullscreenEnabled === true;
+}
+
 /** Fullscreen for the document an element lives in (works inside the stage window too). */
 export function toggleFullscreen(el: HTMLElement): void {
   const doc = el.ownerDocument;
   try {
-    if (doc.fullscreenElement) void doc.exitFullscreen();
-    else void doc.documentElement.requestFullscreen();
+    const done = doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen();
+    // Refused (no user gesture, not allowed): nothing to do, but don't leave a rejection unhandled.
+    void done.catch(() => undefined);
   } catch {
-    /* fullscreen not available (iOS Safari) */
+    /* fullscreen not available */
   }
 }

@@ -88,6 +88,17 @@ export function setScreenMode(code: string, on: boolean): void {
   } catch {
     /* storage unavailable: lasts until reload */
   }
+  // Leaving big-screen mode sticks: drop `?screen=1`, or a refresh would switch it straight back on.
+  if (!on && typeof location !== 'undefined' && new URLSearchParams(location.search).has('screen')) {
+    try {
+      const params = new URLSearchParams(location.search);
+      params.delete('screen');
+      const query = params.toString();
+      history.replaceState(history.state, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+    } catch {
+      /* keep the address */
+    }
+  }
   version++;
   for (const l of [...listeners]) l();
 }

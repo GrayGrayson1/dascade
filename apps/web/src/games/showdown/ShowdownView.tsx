@@ -11,13 +11,15 @@
  * every stage on this device reads, sounds play once here, and a presenter link (#presenter=…) or a
  * pass remembered in this browser reclaims the presenter role.
  */
-import { useCallback, useEffect, useRef, type ComponentType } from 'react';
+import { useCallback, useEffect, useRef, type ComponentType, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
+  SHOWDOWN_TEAMS,
   teamName,
   type ShowdownCue,
   type ShowdownEvent,
+  type ShowdownFinale,
   type ShowdownLook,
   type ShowdownPublicState,
   type ShowdownReactions,
@@ -32,12 +34,12 @@ import { Lobby } from '../../shell/Lobby.tsx';
 import type { GameClientModule, SettingsPanelProps } from '../types.ts';
 import { AudienceView, switchToScreen } from './Audience.tsx';
 import { PresenterConsole } from './Console.tsx';
-import { ShowdownPlayerSetup, ShowdownSettingsPanel } from './Lobby.tsx';
+import { ShowdownPlayerSetup, ShowdownSettingsPanel, TakeoverCard } from './Lobby.tsx';
 import { Stage } from './Stage.tsx';
 import { lineForCue, lineForEvent } from './look.ts';
 import { showFeed } from './fx.ts';
 import { CUE_SOUND, playShowSound, type ShowdownSound } from './sounds.ts';
-import { closeStageWindow, toggleFullscreen, useStageWindow } from './stageWindow.ts';
+import { canFullscreen, closeStageWindow, toggleFullscreen, useStageWindow } from './stageWindow.ts';
 import { rememberPass, storedPass, takeHashPass, useScreenMode } from './access.ts';
 import { useBoard, useFinale, useLook, useMe, useMotion, usePass, useRole, useShowSounds, useShowdownSettings, type RoleInfo } from './state.ts';
 
@@ -84,7 +86,10 @@ export function ShowdownView() {
       : null;
 
   let body;
-  if (role.role === 'screen') body = <BigScreen look={look} settings={settings} code={code} />;
+  // The presenter's own browser opened the big-screen link: that tab took the presenter's seat (seats are
+  // per browser), and the console it would show carries the answers. Never put that on a big screen.
+  if (role.role === 'presenter' && screen) body = <PresenterScreenGuard code={code} />;
+  else if (role.role === 'screen') body = <BigScreen look={look} settings={settings} code={code} />;
   else if (phase === 'LOBBY' || phase === 'COUNTDOWN') body = <Lobby gameId="showdown" module={LOBBY_MODULE} />;
   else if (phase === 'RESULTS') body = <Results look={look} settings={settings} role={role} />;
   else if (role.role === 'presenter')
@@ -109,6 +114,7 @@ export function ShowdownView() {
 }
 
 function FullscreenButton() {
+  if (!canFullscreen()) return null;
   return (
     <IconButton
       icon="maximize"
@@ -118,6 +124,28 @@ function FullscreenButton() {
       className="sd-fullscreen"
       onClick={(e) => toggleFullscreen(e.currentTarget)}
     />
+  );
+}
+
+function PresenterScreenGuard({ code }: { code: string }) {
+  return (
+    <GameStage gameId="showdown" className="sd-room">
+      <section className="sd-panel sd-guard" role="alert" data-part="showdown-screen-guard">
+        <h2 className="sd-panel__title">
+          <PixelIcon name="eye" /> This browser is the presenter’s
+        </h2>
+        <p>
+          This tab took over your presenter seat, so it won’t show the big screen: your console (with the answers) would end up on it.
+        </p>
+        <p>
+          For a second screen on this computer, press <b>Stage window</b> in the console. For a TV or projector computer, open the big-screen link on
+          that device.
+        </p>
+        <Button variant="primary" icon="crown" onClick={() => switchToScreen(code, false)}>
+          Use this tab as the presenter console
+        </Button>
+      </section>
+    </GameStage>
   );
 }
 
@@ -153,6 +181,7 @@ function Results({ look, settings, role }: { look: ShowdownLook; settings: Showd
         <Stage look={look} settings={settings} variant="preview" />
       </div>
       <div className="sd-results__below">
+        {finale ? <FinaleSummary finale={finale} /> : null}
         {role.role === 'audience' && me ? (
           <p className="sd-results__me">
             <PixelIcon name="star" /> You called <span className="dc-num">{me.calls}</span> answer{me.calls === 1 ? '' : 's'} for{' '}
@@ -160,9 +189,39 @@ function Results({ look, settings, role }: { look: ShowdownLook; settings: Showd
             {finale && role.team !== null && finale.winner === role.team ? ' — your team won!' : ''}
           </p>
         ) : null}
+        {/* The presenter left for good: someone has to be able to run the next show. */}
+        {role.presenterId === '' && role.role !== 'screen' ? <TakeoverCard /> : null}
         <ResultsActions />
       </div>
     </GameStage>
+  );
+}
+
+/** The final scores as plain text, for phones: the 16:9 finale is too small to read at 360 px (CSS shows it there only). */
+function FinaleSummary({ finale }: { finale: ShowdownFinale }) {
+  return (
+    <section className="sd-panel sd-finalesum" aria-label="Final scores">
+      <p className="sd-finalesum__winner">{finale.winner === -1 ? 'It’s a tie!' : `${finale.names[finale.winner]} wins!`}</p>
+      <ul className="sd-finalesum__teams">
+        {([0, 1] as const).map((t) => (
+          <li key={t} data-won={finale.winner === t ? 'true' : undefined} style={{ '--team': SHOWDOWN_TEAMS[t].color } as CSSProperties}>
+            <span className="sd-finalesum__name">{finale.names[t]}</span>
+            <span className="dc-num">{finale.scores[t]}</span>
+          </li>
+        ))}
+      </ul>
+      {finale.callers.length ? (
+        <p className="sd-finalesum__callers">
+          Top Survey Sayers:{' '}
+          {finale.callers.slice(0, 3).map((c, i) => (
+            <span key={c.playerId}>
+              {i > 0 ? ' · ' : ''}
+              {c.name} <span className="dc-num">{c.points}</span>
+            </span>
+          ))}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

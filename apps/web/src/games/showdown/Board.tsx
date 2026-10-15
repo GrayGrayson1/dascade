@@ -88,6 +88,7 @@ export function StrikeLamps({ strikes, stealFailed }: { strikes: number; stealFa
 export function Rolling({ value, motion, className }: { value: number; motion: boolean; className?: string }) {
   const [shown, setShown] = useState(value);
   const from = useRef(value);
+  const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!motion) {
       from.current = value;
@@ -96,7 +97,10 @@ export function Rolling({ value, motion, className }: { value: number; motion: b
     }
     const start = from.current;
     if (start === value) return;
-    const t0 = performance.now();
+    // Animate on the window this number is drawn in: in the stage window, the console's frames stop
+    // whenever the console is hidden (another tab, minimised, covered by the fullscreen stage).
+    const win = ref.current?.ownerDocument.defaultView ?? window;
+    const t0 = win.performance.now();
     const ms = Math.min(1200, 380 + Math.abs(value - start) * 6);
     let raf = 0;
     const tick = (now: number) => {
@@ -105,13 +109,13 @@ export function Rolling({ value, motion, className }: { value: number; motion: b
       const v = Math.round(start + (value - start) * eased);
       setShown(v);
       from.current = v;
-      if (k < 1) raf = requestAnimationFrame(tick);
+      if (k < 1) raf = win.requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    raf = win.requestAnimationFrame(tick);
+    return () => win.cancelAnimationFrame(raf);
   }, [value, motion]);
   return (
-    <span className={cx('sd-num', className)} aria-label={String(value)}>
+    <span ref={ref} className={cx('sd-num', className)} aria-label={String(value)}>
       {shown}
     </span>
   );

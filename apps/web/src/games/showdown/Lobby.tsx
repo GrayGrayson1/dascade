@@ -341,7 +341,7 @@ export function ShowdownPlayerSetup() {
   );
 }
 
-function TakeoverCard() {
+export function TakeoverCard() {
   return (
     <div className="sd-takeover" role="status">
       <p>

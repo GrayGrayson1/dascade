@@ -40,13 +40,29 @@ describe('GuessBook', () => {
     expect(book.submit('a', 0, ROUND, 'Stapler', none)).toEqual({ ok: true, slot: -1 });
     expect(book.submit('a', 0, ROUND, 'stapler!', none)).toEqual({ ok: false, reason: 'duplicate' });
     expect(book.submit('a', 0, ROUND, 'mug', none)).toEqual({ ok: true, slot: 0 });
-    expect(book.submit('a', 0, ROUND, 'coffee cup', none)).toEqual({ ok: false, reason: 'duplicate' }); // same answer
     expect(book.submit('a', 0, ROUND, 'Lamp', none)).toEqual({ ok: true, slot: -1 });
     expect(book.submit('a', 0, ROUND, 'Papers', none)).toEqual({ ok: false, reason: 'limit' });
     expect(book.submit('a', 0, ROUND, '   ', none)).toEqual({ ok: false, reason: 'empty' });
     expect(book.count(0)).toBe(3);
     // A new round has a fresh allowance.
     expect(book.submit('a', 1, OTHER, 'Pepperoni', none)).toEqual({ ok: true, slot: 0 });
+  });
+
+  it('locks in a second spelling of the same hidden answer (no leak) but never scores or counts it twice', () => {
+    const book = new GuessBook();
+    expect(book.submit('a', 0, ROUND, 'mug', none)).toEqual({ ok: true, slot: 0 });
+    // Answered exactly like a guess that isn't on the board: refusing it would reveal that "mug" is.
+    expect(book.submit('a', 0, ROUND, 'coffee cup', none)).toEqual({ ok: true, slot: 0 });
+    expect(book.submit('b', 0, ROUND, 'coffee mugs', none)).toEqual({ ok: true, slot: 0 });
+    expect(book.count(0)).toBe(3);
+    expect(book.matchesPerSlot(0, 3)).toEqual([2, 0, 0]);
+    expect(book.cloud(0, ROUND)).toEqual([{ text: 'Coffee mugs', count: 2, slot: 0 }]);
+    const after = book.me('a', 0, [ROUND], () => [true, false, false]);
+    expect(after.guesses).toEqual([
+      { text: 'mug', slot: 0, points: 26 },
+      { text: 'coffee cup', slot: 0, points: 0 },
+    ]);
+    expect(after).toMatchObject({ points: 26, calls: 1 });
   });
 
   it('refuses a guess for an answer that is already on the board', () => {

@@ -88,3 +88,22 @@ test('DAS Survey Showdown: a big-screen device shows the stage and joins no team
   await leaveRoom(tv);
   await leaveRoom(page);
 });
+
+test('DAS Survey Showdown: the big-screen link opened in the presenter’s own browser never shows the console', async ({ page }) => {
+  const code = await createRoom(page, 'showdown', 'Host');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await page.getByRole('button', { name: 'Start round 1' }).first().click();
+  await page.getByRole('button', { name: /Show the question/ }).first().click();
+  await expect(page.locator('.sd-answer').first()).toBeVisible();
+  // Same browser = same seat: this tab takes over the presenter's seat, but must not put the answers up.
+  const tab = await page.context().newPage();
+  await tab.goto(`/room/${code}?screen=1`);
+  await expect(tab.locator('[data-part="showdown-screen-guard"]')).toBeVisible();
+  expect(await tab.locator('.sd-answer, .sd-console').count()).toBe(0);
+  // Choosing to run the show from here brings the console back (and the choice sticks).
+  await tab.getByRole('button', { name: 'Use this tab as the presenter console' }).click();
+  await expect(tab.locator('.sd-answer').first()).toBeVisible();
+  expect(new URL(tab.url()).searchParams.has('screen')).toBe(false);
+  await leaveRoom(tab);
+});

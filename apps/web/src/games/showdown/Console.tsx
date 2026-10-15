@@ -45,13 +45,18 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
   const [revealing, setRevealing] = useState(false);
   const boardRef = useRef(board);
   boardRef.current = board;
+  const confirmRef = useRef(confirm);
+  confirmRef.current = confirm;
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   const title = settings ? showTitle(settings) : 'DAS Survey Showdown';
 
   const act = useCallback(<K extends ShowdownActPayload['a']>(a: K, body?: ActBody[K]) => {
     const b = boardRef.current;
     if (!b) return;
-    const payload = a === 'reveal' ? { a, ...body } : { a, rev: b.rev, ...body };
+    // Reveals name the round on screen (not the revision): a late one never flips the next board.
+    const payload = a === 'reveal' ? { a, round: b.round, ...body } : { a, rev: b.rev, ...body };
+    // Any other command (Undo, Next…) stops a "Reveal the rest" sweep instead of racing it.
+    if (a !== 'reveal') setRevealing(false);
     session.send(SHOWDOWN_MSG.act, payload);
   }, []);
 
@@ -65,7 +70,8 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
   const next = () => {
     if (!board) return;
     if (board.stage === 'intro') return act('begin');
-    if (!decided && board.bank > 0) return setConfirm('skip');
+    // Moving on from an undecided round loses its bank; on the last round it also ends the show for good.
+    if (!decided && (board.bank > 0 || lastRound)) return setConfirm('skip');
     act('next');
   };
 
@@ -85,9 +91,12 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
   // Keyboard shortcuts (ignored while typing or with modifiers other than Shift).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return;
+      // Held keys don't auto-repeat show commands (a resting finger on N would skip whole rounds).
+      if (e.defaultPrevented || e.repeat || e.altKey || e.metaKey || e.ctrlKey) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('dialog[open]'))) return;
+      if (t && (t.closest('input, textarea, select') || t.isContentEditable || t.closest('dialog[open]'))) return;
+      // A dialog is up (End show, skip): keys never act behind it, even if focus fell to the page.
+      if (confirmRef.current || document.querySelector('dialog[open]')) return;
       const b = boardRef.current;
       if (!b) return;
       const k = e.key.toLowerCase();
@@ -238,12 +247,20 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
           </>
         }
       >
-        <p>The scores stand as they are{decided || board.bank === 0 ? '' : ` — the bank of ${board.bank} isn’t awarded`}. Everyone sees the winner and the final results.</p>
+        <p>The scores stand as they are. Everyone sees the winner and the final results.</p>
+        {decided || board.bank === 0 ? null : (
+          <p>
+            <strong>
+              The <span className="dc-num">{board.bank}</span> points in the bank haven’t been awarded and won’t count.
+            </strong>{' '}
+            If a team earned them, choose Keep going and award the bank first.
+          </p>
+        )}
       </Modal>
       <Modal
         open={confirm === 'skip'}
         onClose={() => setConfirm(null)}
-        title={lastRound ? 'Finish without awarding the bank?' : 'Skip ahead without awarding the bank?'}
+        title={board.bank === 0 ? 'Finish the show now?' : lastRound ? 'Finish without awarding the bank?' : 'Skip ahead without awarding the bank?'}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirm(null)}>
@@ -261,9 +278,13 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
           </>
         }
       >
-        <p>
-          There are <span className="dc-num">{board.bank}</span> points in the bank that nobody has won yet. Award them first from the controls, or move on and they’re lost.
-        </p>
+        {board.bank === 0 ? (
+          <p>Round {board.round + 1} hasn’t been decided yet. Finishing now ends the show with the scores as they stand, and it can’t be undone.</p>
+        ) : (
+          <p>
+            There are <span className="dc-num">{board.bank}</span> points in the bank that nobody has won yet. Award them first from the controls, or move on and they’re lost.
+          </p>
+        )}
       </Modal>
     </div>
   );
@@ -625,8 +646,10 @@ function Rundown({ sheet, current }: { sheet: ShowdownSheet | null; current: num
 export function PresenterTools({ code, pass }: { code: string; pass: string | null }) {
   const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players);
   const me = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId);
+  const screens = useRoomSelector<ShowdownPublicState, Record<string, boolean>>((s) => s.screens);
   const [target, setTarget] = useState('');
-  const candidates = Object.values(players ?? {}).filter((p) => p.id !== me && p.connected);
+  // Big screens never present (the server refuses): the answers would go up on the stage.
+  const candidates = Object.values(players ?? {}).filter((p) => p.id !== me && p.connected && !screens?.[p.id]);
   return (
     <details className="sd-panel sd-tools">
       <summary className="sd-panel__title">

@@ -99,6 +99,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private readonly playedNames = new Map<string, string>();
   private readonly lastMe = new Map<string, string>();
   private lastSheet = '';
+  /** Audience guesses changed the presenter's sheet (cloud, matches): sent on the next tick, not per guess. */
+  private sheetDirty = false;
   private hype: [number, number] = [0, 0];
   private reactions: ShowdownReactions = emptyReactions();
   private reactionsPending = false;
@@ -274,7 +276,20 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       if (this.phase !== 'PLAYING' || this.presenterOnline()) return;
       this.systemChat('The presenter did not come back — the show ends with the scores as they stand.');
       this.finishShow('presenter_left');
+      this.releasePresenter();
     });
+  }
+
+  /**
+   * The presenter is gone (their seat may still be held): free the role so someone in the room can run
+   * the next show (Become the presenter). Their pass keeps working until a takeover changes it.
+   */
+  private releasePresenter(): void {
+    const gone = this.presenterId ? this.getPlayer(this.presenterId) : undefined;
+    if (gone?.client) return;
+    this.presenterId = '';
+    this.state.presenterId = '';
+    if (gone && this.hostRecord === gone) this.assignHost(null);
   }
 
   private setPresenter(next: PlayerRecord, announce = true): void {
@@ -332,6 +347,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (!target || !target.client || target === player) {
       return this.reject(player, SHOWDOWN_MSG.handover, 'not_allowed', 'Pick someone who is in the room right now.');
     }
+    // A big screen shows the stage to everyone: it must never receive the answer sheet.
+    if (this.state.screens.get(target.id)) return this.reject(player, SHOWDOWN_MSG.handover, 'not_allowed', 'A big screen can’t present — pick a person.');
     this.setPresenter(target);
   }
 
@@ -358,6 +375,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (!show) return;
     // Made against an older board (double click, or the console hadn't caught up): ignore quietly.
     if ('rev' in payload && payload.rev !== show.rev) return;
+    if (payload.a === 'reveal' && payload.round !== undefined && payload.round !== show.round) return;
     if (payload.a === 'undo') return this.undo(player);
     if (payload.a === 'finish') return this.finishShow('presenter');
     const result = step(show, payload as ShowCommand);
@@ -542,7 +560,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (!result.ok) return this.reject(player, type, 'not_allowed', GUESS_REJECTION_TEXT[result.reason]);
     this.state.guessesIn = this.guesses.count(show.round);
     this.refreshMe(player);
-    this.refreshSheet();
+    // A crowd locks in hundreds of guesses in seconds: the sheet (with the whole rundown) follows at
+    // most once per tick instead of once per guess.
+    this.sheetDirty = true;
   }
 
   private react(player: PlayerRecord, kind: number): void {
@@ -558,6 +578,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   /** Reactions go out in small batches; hype drains while nobody cheers. */
   private tick(): void {
+    if (this.sheetDirty) this.refreshSheet();
     if (this.reactionsPending) {
       this.broadcast(SHOWDOWN_MSG.reactions, this.reactions);
       this.reactions = emptyReactions();
@@ -576,6 +597,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   // ===========================================================================
 
   private refreshSheet(): void {
+    this.sheetDirty = false;
     const presenter = this.presenterId ? this.getPlayer(this.presenterId) : undefined;
     if (!presenter?.client) return;
     const show = this.show;

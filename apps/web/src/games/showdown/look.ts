@@ -167,7 +167,8 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
     case 'intro':
       return { key, text: pick(book.intro, e.rev), mood: 'cheer' };
     case 'round': {
-      const k = b?.slots.length ?? 0;
+      // From the event: it arrives before the patch that carries the new board.
+      const k = e.answers;
       const text = e.multiplier > 1 ? `${fill(pick(book.round, e.rev), { n: e.round + 1, k })} ${fill(pick(book.double, e.rev), { m: e.multiplier })}` : fill(pick(book.round, e.rev), { n: e.round + 1, k });
       return { key, text, mood: 'happy' };
     }

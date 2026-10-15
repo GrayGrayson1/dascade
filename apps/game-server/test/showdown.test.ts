@@ -286,6 +286,26 @@ describe('DAS Survey Showdown — the round', () => {
     expect(t.host.errors[0]!.message).toMatch(/already been decided/);
   });
 
+  it('ignores a reveal made for a round the show has left ("Reveal the rest" racing "Next round")', async () => {
+    const t = await setup();
+    await start(t);
+    await live(t);
+    await act(t, { a: 'reveal', slot: 0, round: 0 });
+    await act(t, { a: 'award', team: 0 });
+    await act(t, { a: 'next' });
+    expect(board(t.host)).toMatchObject({ round: 1, stage: 'title' });
+    const rev = t.server.state.rev;
+    // Sent from a console still showing round 1's board: it must not flip round 2's top answer.
+    t.host.room.send(SHOWDOWN_MSG.act, { a: 'reveal', slot: 0, round: 0 });
+    await sleep(150);
+    expect(t.server.state.rev).toBe(rev);
+    expect(board(t.host)).toMatchObject({ stage: 'title', prompt: '' });
+    expect(board(t.host).slots.every((s) => !s.revealed)).toBe(true);
+    expect(t.host.errors).toEqual([]);
+    await act(t, { a: 'reveal', slot: 0, round: 1 });
+    expect(board(t.host).slots[0]).toMatchObject({ revealed: true, text: 'Pepperoni' });
+  });
+
   it('undo restores the board exactly (scores, strikes, called-it points) and revisions keep rising', async () => {
     const t = await setup();
     await start(t);
@@ -404,6 +424,12 @@ describe('DAS Survey Showdown — audience', () => {
     expect(t.a.mes.at(-1)!.guesses[0]).toEqual({ text: 'mug', slot: 0, points: 40 });
     expect(board(t.a).slots[0]!.callers).toBe(2);
     expect(t.a.events.find((e) => e.type === 'reveal')).toMatchObject({ callers: 2 });
+    // Another spelling of a hidden answer you already guessed is locked in like any guess (refusing it
+    // would tell you your first guess is on the board) and never scores twice.
+    t.b.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'post-its' });
+    t.b.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'sticky note' });
+    await waitFor(() => (t.b.mes.at(-1)?.guesses.length ?? 0) === 3, 2000, 'second spelling locked in');
+    expect(t.b.errors).toEqual([]);
     // Already on the board → refused; the per-round limit holds.
     t.b.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'coffee mug' });
     t.a.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'Lamp' });
@@ -527,6 +553,38 @@ describe('DAS Survey Showdown — keeping the show running', () => {
     await waitFor(() => t.a.contents.at(-1)?.rounds.length === 0, 2000, 'clean slate');
     t.b.room.send(SHOWDOWN_MSG.takeover, {});
     await waitFor(() => t.b.errors.some((e) => /already has a presenter/.test(e.message)), 2000, 'second takeover refused');
+  });
+
+  it('a presenter whose connection dropped for good frees the role when the show ends, so the room can go on', async () => {
+    const t = await setup();
+    // As in a real show, the seat's reconnect window (180 s) runs out well before the show gives up (10 min).
+    t.server.reconnectGraceSeconds = 0.1;
+    t.server.presenterAwayMs = 800;
+    await start(t);
+    await live(t);
+    // A dead laptop, not a goodbye: the seat is held (away), it isn't removed.
+    t.host.room.reconnection.enabled = false;
+    (t.host.room.connection as unknown as { transport: { ws: { close(code: number): void } } }).transport.ws.close(4010);
+    await waitFor(() => t.server.state.phase === 'RESULTS', 4000, 'auto-finished');
+    expect(t.server.state.players.get(t.host.id())).toBeDefined();
+    // Nobody is stuck waiting for a host who will never press Play again.
+    await waitFor(() => json(t.a).presenterId === '' && json(t.a).hostId === '', 2000, 'role released');
+    t.a.room.send(SHOWDOWN_MSG.takeover, {});
+    await waitFor(() => json(t.b).presenterId === t.a.id() && json(t.b).hostId === t.a.id(), 2000, 'takeover in results');
+    t.a.room.send('lobby:toLobby', {});
+    await waitFor(() => t.server.state.phase === 'LOBBY', 2000, 'next show');
+  });
+
+  it('never hands the show to a big screen', async () => {
+    const t = await setup();
+    const tv = await t.join('Big screen');
+    tv.room.send(SHOWDOWN_MSG.screen, { on: true });
+    await waitFor(() => json(t.host).screens[tv.id()] === true, 2000, 'screen');
+    t.host.room.send(SHOWDOWN_MSG.handover, { playerId: tv.id() });
+    await waitFor(() => t.host.errors.some((e) => /big screen/i.test(e.message)), 2000, 'refused');
+    expect(json(t.a).presenterId).toBe(t.host.id());
+    expect(tv.sheets.filter(Boolean)).toEqual([]);
+    expect(tv.passes.filter(Boolean)).toEqual([]);
   });
 
   it('presenter cues reach every screen', async () => {
