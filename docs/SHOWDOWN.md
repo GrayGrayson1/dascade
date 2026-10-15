@@ -39,7 +39,8 @@ scores and audience points.
 While a question is up, every audience member can lock in up to 3 **private** guesses. A guess is
 matched on the server (typo-tolerant, plus hidden alternative spellings), but the match stays secret.
 The guesser only learns they "called it" when that answer flips for everyone, and then scores its
-survey points. Taps on the cheer pad float emoji over the stage and fill the team's **hype** meter.
+survey points. Another spelling of an answer you already guessed is locked in like any guess (refusing
+it would tell you the first one is on the board), but it never scores or counts twice. Taps on the cheer pad float emoji over the stage and fill the team's **hype** meter.
 The presenter sees the audience's most popular guesses live.
 
 ## Roles and secrecy
@@ -62,13 +63,20 @@ The presenter sees the audience's most popular guesses live.
 - Guesses are private (`showdown:me` goes to the guesser only). Before a reveal, the public state has
   only the aggregate `guessesIn` count; after it, `callers` per revealed slot.
 - Every presenter command carries the board revision it was made against. A stale or double-clicked
-  command is ignored, and reveals are idempotent by slot. Undo restores the previous engine state, and
-  the revision keeps rising.
+  command is ignored. Reveals are idempotent by slot and carry the round instead of the revision (a
+  fast presenter can flip several before the board catches up), so a late one, e.g. *Reveal the rest*
+  racing *Next round*, never flips a tile of the next board. Held keys don't auto-repeat commands.
+  Undo restores the previous engine state, and the revision keeps rising.
 - **Room size:** up to 100 seats, and the default is the limit, so everyone who joins plays. The
   presenter and each big screen take a seat too; anyone past the limit watches as a spectator. The
   load scenario passes with 61 and 100 clients.
 - **Disconnects:** the seat is held for 180 s (`reconnectGraceSeconds`). If the presenter is gone for
-  10 minutes mid-show, the show ends with the scores as they stand, so the room never stalls.
+  10 minutes mid-show, the show ends with the scores as they stand and the role is freed, so the room
+  never stalls: anyone can *Become the presenter* from the results screen or the lobby (the old pass
+  still works until then).
+- **Big screens never present:** a hand-over to a stage display is refused. A big-screen link opened in
+  the presenter's own browser takes the presenter's seat (seats are per browser), so that tab shows a
+  notice (use the stage window instead) rather than the console with the answers.
 - Outcomes: `reportOutcome` places the winning team's members first and the other team second (one
   group for a tie). The presenter and big screens aren't placed. A show ended before round 1 reports
   nothing. Stats extras: `calls` (answers called) and `bestCallPoints`.
@@ -98,6 +106,10 @@ Notes:
   devices use the big-screen link, which joins as a normal connection marked `screen`.
 - **Show feed** (`fx.ts`): one per-device store of the latest event, host line, cue and reactions.
   Every stage on the device animates from it, and sounds play once per device.
+- **Crowd load:** reactions go out in 250 ms batches, and while guesses pour in the presenter's sheet
+  (cloud, matches, rundown) follows at most once per batch, not once per guess. Profiled with 100
+  clients (3 cheers a second each, 3 guesses each per round): the server's time goes to fanning state
+  patches and reaction batches out to 100 sockets; the show's own logic is a few per cent of it.
 
 ## Looks and themes
 

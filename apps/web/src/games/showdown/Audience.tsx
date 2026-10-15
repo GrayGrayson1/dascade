@@ -103,6 +103,10 @@ function MiniBoard({ board, names, look }: { board: ShowdownBoardView; names: [s
       <p className="sd-mini__prompt">{board.prompt || (board.stage === 'intro' ? 'The show is about to begin…' : board.stage === 'title' ? `Round ${board.round + 1} — get ready!` : copy.waiting)}</p>
       {stealer !== -1 ? <p className="sd-mini__steal">Steal! {names[stealer]} get one guess.</p> : null}
       {board.slots.length ? <Board board={board} compact /> : null}
+      {/* Phones have no stage (and so no host): screen readers hear the host's line for each event. */}
+      <p className="visually-hidden" aria-live="polite">
+        {feed.line?.text ?? ''}
+      </p>
       {strike && ev?.e.type === 'strike' ? (
         <div key={ev.e.rev} className="sd-mini__x" aria-hidden>
           {'✕'.repeat(ev.e.stealFailed ? 1 : Math.max(1, ev.e.strikes))}

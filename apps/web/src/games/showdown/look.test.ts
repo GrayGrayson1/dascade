@@ -22,7 +22,7 @@ const board: ShowdownBoardView = {
 
 const EVENTS: ShowdownEvent[] = [
   { type: 'intro', rev: 1 },
-  { type: 'round', rev: 2, round: 1, multiplier: 2 },
+  { type: 'round', rev: 2, round: 1, multiplier: 2, answers: 7 },
   { type: 'question', rev: 3 },
   { type: 'control', rev: 4, team: 1 },
   { type: 'reveal', rev: 5, slot: 0, text: 'Pepperoni', points: 39, top: true, late: false, callers: 2, cleared: false },
@@ -55,6 +55,14 @@ describe('host lines', () => {
     const e: ShowdownEvent = { type: 'question', rev: 42 };
     const ctx = { look: 'showtime' as const, board, teamNames: ['A', 'B'] as [string, string] };
     expect(lineForEvent(e, ctx)).toEqual(lineForEvent(e, ctx));
+  });
+
+  it('a round line counts the new board from the event (the old board may still be showing)', () => {
+    for (let rev = 0; rev < 6; rev++) {
+      const line = lineForEvent({ type: 'round', rev, round: 2, multiplier: 1, answers: 7 }, { look: 'showtime', board, teamNames: ['A', 'B'] });
+      expect(line!.text).not.toContain(`${board.slots.length} answers`);
+      if (/answers/.test(line!.text)) expect(line!.text).toContain('7 answers');
+    }
   });
 
   it('the steal line names the other team', () => {

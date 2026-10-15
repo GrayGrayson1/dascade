@@ -131,6 +131,8 @@ export function ContentEditor({ onClose }: { onClose: () => void }) {
     <Modal
       open
       wide
+      // Esc or a stray click outside must not throw away rounds being typed: Cancel and Save close it.
+      dismissible={false}
       onClose={onClose}
       title="Your survey rounds"
       footer={
