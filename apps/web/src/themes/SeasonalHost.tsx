@@ -3,13 +3,14 @@
  * tab order). Two jobs (logic in seasonal.ts):
  *
  *   - the season's end: an invite-activated Halloween Night goes back to the previous theme once
- *     October is over (checked when settings are ready and whenever the tab comes back; never mid-match);
+ *     October is over (checked when settings are ready, at local midnight and whenever the tab comes
+ *     back; never mid-match);
  *   - October's invite on the arcade floor: a small card (not a dialog, no autofocus) that waits until
  *     nothing else is open — modals, the claw close-up, the expanded jukebox, the theme picker, a theme
  *     transition — and appears a moment after the floor settles.
  *
- * An always-present, visually hidden status line announces the invite once and exposes its state
- * (`data-state`) so tests can wait for it deterministically.
+ * An always-present, visually hidden status line announces the invite once per offer (not again on each
+ * return to the floor) and exposes its state (`data-state`) so tests can wait for it deterministically.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, getTheme, hasTheme } from '@dascade/ui';
@@ -22,7 +23,7 @@ import { useThemeTransition } from './controller.ts';
 import { PumpkinGlyph } from './ExitHalloween.tsx';
 import { useThemePlace } from './place.ts';
 import { useThemePickerOpen } from './pickerStore.ts';
-import { HALLOWEEN_THEME_ID, shouldInvite } from './seasonal.ts';
+import { HALLOWEEN_THEME_ID, inviteAnnounced, shouldInvite, watchSeasonClock } from './seasonal.ts';
 import { seasonNow, seasonal } from './seasonalController.ts';
 import './seasonal.css';
 
@@ -69,19 +70,33 @@ export function SeasonalHost() {
   const [announced, setAnnounced] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
 
+  // Re-read the clock when the season can change (local midnight; at least every 5 minutes) and when the
+  // tab comes back, so an idle floor drops the invite on November 1 and the season's end still runs. A
+  // pinned QA date doesn't move: re-reading it changes nothing.
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const tick = () => setClockTick((n) => n + 1);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    const stop = watchSeasonClock(tick);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   // The season's end (an invite-activated Halloween Night goes back), never in the middle of a match.
   useEffect(() => {
     if (!ready || place === 'game') return;
     void seasonal.checkSeasonEnd().catch(() => undefined);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void seasonal.checkSeasonEnd().catch(() => undefined);
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [ready, place]);
+  }, [ready, place, clockTick]);
 
   const now = seasonNow();
-  const eligible = ready && now !== null && !accepted && hasTheme(HALLOWEEN_THEME_ID) && shouldInvite(prefs, now, place, theme);
+  // On offer = it would show on the floor; eligible = on offer, and the player is on the floor now.
+  const offered = ready && now !== null && !accepted && hasTheme(HALLOWEEN_THEME_ID) && shouldInvite(prefs, now, 'floor', theme);
+  const eligible = offered && place === 'floor';
   const blocked = modal !== null || pickerOpen || clawOpen || jukeboxOpen || transitioning || topModal;
 
   useEffect(() => {
@@ -94,9 +109,11 @@ export function SeasonalHost() {
   }, [eligible, blocked]);
 
   const shown = visible && eligible && !blocked;
+  // Once per offer: the line keeps its text while the player wanders off the floor and back (so it isn't
+  // read again) and clears when the offer ends, so a real comeback is announced afresh.
   useEffect(() => {
-    if (shown) setAnnounced(true);
-  }, [shown]);
+    setAnnounced((was) => inviteAnnounced(was, shown, offered));
+  }, [shown, offered]);
 
   const top = useHeaderBottom(shown);
   const state: InviteState =
@@ -112,7 +129,7 @@ export function SeasonalHost() {
   return (
     <>
       <div className="visually-hidden" role="status" aria-live="polite" data-part="seasonal-status" data-state={state}>
-        {announced && state !== 'ineligible' && state !== 'off' ? ANNOUNCEMENT : ''}
+        {announced && offered ? ANNOUNCEMENT : ''}
       </div>
       {shown ? (
         <aside
