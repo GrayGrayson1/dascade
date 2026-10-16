@@ -118,6 +118,7 @@ export function Stage({ look, settings, variant, corner }: StageProps) {
 function TopRow({ board, settings, code, look }: { board: ShowdownBoardView; settings: ShowdownSettings | null; code: string; look: ShowdownLook }) {
   const join = joinAddress(code);
   const mult = board.multiplier > 1;
+  const title = settings ? showTitle(settings).replace(/^DAS\s+/i, '') : 'Survey Showdown';
   return (
     <header className="sd-top">
       <div className="sd-top__round">
@@ -136,7 +137,9 @@ function TopRow({ board, settings, code, look }: { board: ShowdownBoardView; set
       </div>
       <div className="sd-top__logo" aria-hidden>
         <span className="sd-logo-badge">DAS</span>
-        <span className="sd-top__title">{settings ? showTitle(settings).replace(/^DAS\s+/i, '') : 'Survey Showdown'}</span>
+        <span className="sd-top__title" style={{ '--len': Array.from(title).length } as CSSProperties}>
+          {title}
+        </span>
       </div>
       <div className="sd-top__join">
         <span className="sd-top__label">Play along</span>
@@ -168,7 +171,8 @@ function Arena({
   const stealer: TeamIndex | null = board.stage === 'steal' && board.control !== -1 ? (board.control === 0 ? 1 : 0) : null;
   const promptShown = board.prompt !== '';
   return (
-    <main className="sd-arena">
+    // A div, not <main>: the stage already sits inside the page's <main> (GameStage).
+    <div className="sd-arena">
       {([0, 1] as const).map((team) => (
         <Podium
           key={team}
@@ -219,7 +223,7 @@ function Arena({
           </div>
         </footer>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -261,7 +265,9 @@ function Podium({
     >
       <div className="sd-podium__plate">
         <PixelIcon name={def.icon} />
-        <span className="sd-podium__name">{name}</span>
+        <span className="sd-podium__name" style={{ '--len': Array.from(name).length } as CSSProperties}>
+          {name}
+        </span>
       </div>
       <div className="sd-podium__score">
         <Rolling value={score} motion={motion.motion} />
@@ -300,7 +306,7 @@ function IntroCard({
   return (
     <section className="sd-intro" data-waiting={waiting ? 'true' : undefined}>
       <div className="sd-intro__rays" aria-hidden />
-      <h1 className="sd-marquee" aria-label={title}>
+      <h2 className="sd-marquee" aria-label={title}>
         <span className="sd-logo-badge sd-logo-badge--big" aria-hidden>
           DAS
         </span>
@@ -309,7 +315,7 @@ function IntroCard({
             {w}
           </span>
         ))}
-      </h1>
+      </h2>
       <p className="sd-intro__tagline">{LOOK_COPY[look].tagline}</p>
       <div className="sd-versus">
         {([0, 1] as const).map((team) => (
@@ -386,17 +392,18 @@ function AwardFlight({ team, points, name }: { team: TeamIndex; points: number; 
 
 function FinaleCard({ finale, look, motion }: { finale: ShowdownFinale; look: ShowdownLook; motion: MotionPrefs }) {
   const winner = finale.winner;
+  const winnerText = winner === -1 ? 'It’s a tie!' : finale.names[winner];
   return (
     <section className="sd-finale" data-winner={winner === -1 ? 'tie' : SHOWDOWN_TEAMS[winner].id}>
       <div className="sd-intro__rays" aria-hidden />
       <p className="sd-finale__kicker">{LOOK_COPY[look].winner}</p>
-      <h1
+      <h2
         className="sd-finale__winner"
-        style={winner === -1 ? undefined : ({ '--team': SHOWDOWN_TEAMS[winner].color } as CSSProperties)}
+        style={{ '--len': Array.from(winnerText).length, ...(winner === -1 ? {} : { '--team': SHOWDOWN_TEAMS[winner].color }) } as CSSProperties}
         data-motion={motion.motion ? 'on' : 'off'}
       >
-        {winner === -1 ? 'It’s a tie!' : finale.names[winner]}
-      </h1>
+        {winnerText}
+      </h2>
       <div className="sd-finale__scores">
         {([0, 1] as const).map((team) => (
           <div key={team} className="sd-finale__team" data-team={SHOWDOWN_TEAMS[team].id} data-won={winner === team ? 'true' : undefined} style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}>

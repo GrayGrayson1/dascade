@@ -457,10 +457,16 @@
   display: flex;
   align-items: center;
   gap: 1cqw;
+  min-width: 0;
+  max-width: 50cqw;
 }
 .sd-top__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--sd-title-font);
-  font-size: 3.4cqh;
+  /* Full size up to ~26 characters, then smaller so a 48-character title still fits the middle. */
+  font-size: clamp(2cqh, calc(88cqh / var(--len, 20)), 3.4cqh);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--sd-ink);
@@ -908,6 +914,8 @@
   grid-row: 1;
   align-self: start;
   display: grid;
+  /* Never wider than its column: a long team name wraps instead of pushing the score under the board. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1cqh;
   padding: 1.8cqh 1.2cqw;
   border-radius: 2cqh;
@@ -948,6 +956,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.6cqw;
+  min-width: 0;
   color: var(--team);
   font-family: var(--sd-title-font);
   font-size: 2.4cqh;
@@ -960,9 +969,16 @@
   height: 2.6cqh;
 }
 .sd-podium__name {
+  /* A little smaller past ~15 characters (22 is the limit), in up to three balanced lines, then an ellipsis. */
+  display: -webkit-box;
+  font-size: clamp(1.6cqh, calc(36cqh / var(--len, 10)), 2.4cqh);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 .sd-podium__score {
   padding: 1cqh 0.4cqw;
@@ -1721,9 +1737,13 @@
 }
 .sd-finale__winner {
   margin: 0;
+  max-width: 92cqw;
   font-family: var(--sd-title-font);
   font-weight: 400;
-  font-size: 13cqh;
+  /* A long team name (up to 22 characters) shrinks and may take two balanced lines. */
+  font-size: clamp(7cqh, calc(150cqh / var(--len, 10)), 13cqh);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
   line-height: 1;
   text-transform: uppercase;
   color: var(--team, var(--sd-gold));
@@ -1822,7 +1842,7 @@
   .sd-podium {
     grid-column: auto;
     padding: 1cqh 1.2cqw;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     text-align: left;
   }
