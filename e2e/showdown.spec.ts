@@ -19,6 +19,25 @@ const board = async (page: import('@playwright/test').Page) => {
   return s?.boardJson ? JSON.parse(s.boardJson) : null;
 };
 
+test('DAS Survey Showdown: shortcuts only send what the stage allows, and quick score adjusts all count', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'The presenter console is driven from a keyboard on a laptop.');
+  await createRoom(page, 'showdown', 'Host');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await page.getByRole('button', { name: 'Start round 1' }).first().click();
+  await expect.poll(async () => (await board(page))?.stage).toBe('title');
+  // On the round title, ← / → / X can't apply: no refusal toast (and beep) for each press.
+  for (const key of ['ArrowLeft', 'ArrowRight', 'x']) await page.keyboard.press(key);
+  await page.waitForTimeout(600);
+  await expect(page.locator('[data-part="toast"][data-kind="error"]')).toHaveCount(0);
+  // Three quick +5s before the board catches up: each one lands (they used to be dropped as stale).
+  await page.locator('.sd-adjust summary').click();
+  const plus5 = page.getByRole('button', { name: 'Add 5 points to Team Delta' });
+  for (let i = 0; i < 3; i++) await plus5.click({ delay: 0 });
+  await expect.poll(async () => (await board(page))?.scores?.[0]).toBe(15);
+  await leaveRoom(page);
+});
+
 test('DAS Survey Showdown: the presenter runs a round, the audience only ever sees revealed answers', async ({ page, browser }, testInfo) => {
   const host = page;
   const code = await createRoom(host, 'showdown', 'Host');

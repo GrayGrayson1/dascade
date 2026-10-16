@@ -50,7 +50,8 @@ export function useRoomSelector<T extends BaseRoomView, R>(selector: (state: T) 
   return useSyncExternalStore(subscribeState, getSnapshot, () => null);
 }
 
-function playersEqual(a: Record<string, PlayerView> | undefined, b: Record<string, PlayerView> | undefined): boolean {
+/** Player maps by value (pass to useRoomSelector): each patch rebuilds the snapshot's player objects. */
+export function playersEqual(a: Record<string, PlayerView> | undefined, b: Record<string, PlayerView> | undefined): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
   const ka = Object.keys(a);
