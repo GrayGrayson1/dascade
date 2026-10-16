@@ -108,6 +108,30 @@ test('DAS Survey Showdown: a big-screen device shows the stage and joins no team
   await leaveRoom(page);
 });
 
+test('DAS Survey Showdown: a big screen that rejoins without a tap asks for one to get sound', async ({ page, browser }, testInfo) => {
+  const code = await createRoom(page, 'showdown', 'Host');
+  const ctx = await browser.newContext(device(testInfo));
+  const tv = await ctx.newPage();
+  await tv.goto(`/room/${code}?screen=1`);
+  await tv.getByPlaceholder('Pick a nickname').fill('Big Screen');
+  await tv.getByRole('button', { name: 'Join game' }).click();
+  await expect(tv.locator('[data-part="showdown-screen"] .sd-stage')).toBeVisible();
+  // Joining took a click, so audio is on.
+  await expect(tv.locator('[data-part="showdown-sound-prompt"]')).toHaveCount(0);
+  // Reloaded (a TV that rejoined on its own): no gesture yet, so it says where to click.
+  await tv.reload();
+  await expect(tv.locator('[data-part="showdown-screen"] .sd-stage')).toBeVisible();
+  const prompt = tv.locator('[data-part="showdown-sound-prompt"]');
+  await expect(prompt).toBeVisible();
+  // A real click where it sits (the prompt goes away on pointerdown, as audio unlocks, which a locator click
+  // reports as "intercepted"). A synthetic event wouldn't do: it grants no user activation.
+  const box = (await prompt.boundingBox())!;
+  await tv.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(prompt).toHaveCount(0);
+  await leaveRoom(tv);
+  await leaveRoom(page);
+});
+
 test('DAS Survey Showdown: the big-screen link opened in the presenter’s own browser never shows the console', async ({ page }) => {
   const code = await createRoom(page, 'showdown', 'Host');
   await startGame(page);

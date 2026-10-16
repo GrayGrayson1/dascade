@@ -1945,6 +1945,41 @@ body.sd-window {
     opacity: 0.6;
   }
 }
+/* Audio waits for a first click or tap: until then a big screen says where to give it. */
+.sd-soundprompt {
+  position: absolute;
+  left: 50%;
+  bottom: max(12px, 2.4vh);
+  z-index: 40;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.55em 1.1em;
+  border: 1px solid var(--sd-panel-edge);
+  border-radius: 999px;
+  background: var(--sd-panel);
+  color: var(--sd-ink);
+  font: inherit;
+  font-size: clamp(14px, 1.5vw, 24px);
+  cursor: pointer;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--sd-gold) 55%, transparent);
+  animation: sd-soundprompt 2.4s ease-out infinite;
+}
+.sd-soundprompt:focus-visible {
+  outline: 2px solid var(--sd-gold);
+  outline-offset: 3px;
+}
+@keyframes sd-soundprompt {
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--sd-gold) 0%, transparent);
+  }
+}
+:root[data-reduced-motion='true'] .sd-soundprompt,
+:root[data-fx='off'] .sd-soundprompt {
+  animation: none;
+}
 .sd-room {
   padding: 12px clamp(8px, 2vw, 20px) calc(16px + var(--safe-bottom));
 }
