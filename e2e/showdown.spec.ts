@@ -107,3 +107,40 @@ test('DAS Survey Showdown: the big-screen link opened in the presenter’s own b
   expect(new URL(tab.url()).searchParams.has('screen')).toBe(false);
   await leaveRoom(tab);
 });
+
+test('DAS Survey Showdown: the stage window keeps its stylesheets through head edits and comes back after a reload', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'The stage window is a desktop pop-up.');
+  await createRoom(page, 'showdown', 'Host');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  const [stage] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Stage window', exact: true }).click()]);
+  await expect(stage.locator('.sd-stage')).toBeVisible();
+  type Marked = HTMLElement & { _e2e?: number };
+  const marked = await stage.evaluate(() => {
+    const nodes = [...document.querySelectorAll<Marked>('[data-sd-copy]')];
+    nodes.forEach((n) => (n._e2e = 1));
+    return nodes.length;
+  });
+  expect(marked).toBeGreaterThan(0);
+  const stillMarked = () => stage.evaluate(() => [...document.querySelectorAll<Marked>('[data-sd-copy]')].filter((n) => n._e2e === 1).length);
+  const copiedText = () => stage.evaluate(() => [...document.querySelectorAll('style[data-sd-copy]')].map((s) => s.textContent ?? '').join('\n'));
+  // A theme switch edits a <style> in the head: only that sheet is re-copied, every other copy stays put.
+  await page.evaluate(() => {
+    const s = document.createElement('style');
+    s.id = 'e2e-sheet';
+    s.textContent = '.e2e-a { color: red; }';
+    document.head.appendChild(s);
+  });
+  await expect.poll(copiedText).toContain('.e2e-a');
+  await page.evaluate(() => (document.getElementById('e2e-sheet')!.textContent = '.e2e-b { color: blue; }'));
+  await expect.poll(copiedText).toContain('.e2e-b');
+  expect(await copiedText()).not.toContain('.e2e-a');
+  expect(await stillMarked()).toBe(marked);
+  // Reloading the stage window used to leave it blank while the console said it was open.
+  await stage.reload();
+  await expect(stage.locator('.sd-stage')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stage window open' })).toBeVisible();
+  await stage.close();
+  await expect(page.getByRole('button', { name: 'Stage window', exact: true })).toBeVisible();
+  await leaveRoom(page);
+});
