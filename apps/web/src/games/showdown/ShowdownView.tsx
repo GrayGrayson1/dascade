@@ -11,7 +11,7 @@
  * every stage on this device reads, sounds play once here, and a presenter link (#presenter=…) or a
  * pass remembered in this browser reclaims the presenter role.
  */
-import { useCallback, useEffect, useRef, type ComponentType, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
@@ -29,6 +29,8 @@ import { Button, GameTheme, IconButton, PixelIcon } from '@dascade/ui';
 import { GAME_CATALOG } from '@dascade/shared';
 import { session, useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
+import { useApp } from '../../app/store.ts';
+import { audioReady, onAudioReadyChange } from '../../audio/audio.ts';
 import { GameStage, LeaveButton, ResultsActions } from '../../shell/common.tsx';
 import { Lobby } from '../../shell/Lobby.tsx';
 import type { GameClientModule, SettingsPanelProps } from '../types.ts';
@@ -127,6 +129,23 @@ function FullscreenButton() {
   );
 }
 
+/**
+ * Browsers start audio only after a click or tap on the page. A big screen that joined (or reloaded)
+ * on its own would stay silent all show without anyone noticing: say so until the first tap.
+ */
+function SoundPrompt() {
+  const [sounds] = useShowSounds('screen');
+  const muted = useApp((s) => s.settings.muted);
+  const ready = useSyncExternalStore(onAudioReadyChange, audioReady, () => true);
+  if (!sounds || muted || ready) return null;
+  return (
+    // Any click on the page unlocks audio (installAudio's gesture listener); this is where to click.
+    <button type="button" className="sd-soundprompt" data-part="showdown-sound-prompt">
+      <PixelIcon name="sound-on" /> Click or tap here for the show’s sound
+    </button>
+  );
+}
+
 function PresenterScreenGuard({ code }: { code: string }) {
   return (
     <GameStage gameId="showdown" className="sd-room">
@@ -152,7 +171,8 @@ function PresenterScreenGuard({ code }: { code: string }) {
 /** A device showing the stage full-window (TV, projector PC). */
 function BigScreen({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
   return (
-    <div className="sd-screen" data-part="showdown-screen">
+    <div className="sd-screen" data-part="showdown-screen" data-look={look}>
+      <SoundPrompt />
       <Stage
         look={look}
         settings={settings}
@@ -336,16 +356,19 @@ function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings:
     lastCalls.current = { calls: me.calls, points: me.points };
     if (!prev || me.calls <= prev.calls || me.points <= prev.points) return;
     showFeed.called(me.points - prev.points);
-    playShowSound('calledIt', ctx.current.look);
+    // Phones default to show sounds off: a room of them chiming with the stage's clang is the echo that avoids.
+    if (ctx.current.sounds) playShowSound('calledIt', ctx.current.look);
   }, [me]);
 
-  // The finale: fanfare + applause once per show on this device.
-  const finaleKey = useRef('');
+  // The finale: fanfare + applause once per show on this device, as the show ends. A device that
+  // joins (or reloads) on the results screen hears nothing: the first finale it sees is already over.
+  const finaleKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!finale) return;
-    const key = JSON.stringify(finale.scores) + finale.results.length;
-    if (finaleKey.current === key) return;
+    if (!loaded) return;
+    const key = finale ? JSON.stringify(finale.scores) + finale.results.length : '';
+    const prev = finaleKey.current;
     finaleKey.current = key;
+    if (prev === null || !key || key === prev) return;
     play([['finale', 250]]);
-  }, [finale, play]);
+  }, [finale, loaded, play]);
 }

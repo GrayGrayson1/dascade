@@ -275,7 +275,8 @@ component unmounts; nothing at module top touches the DOM.
 - **Progressive haunting** (`halloween-night/haunt.ts`): by the player's local clock the hall is calm by day,
   spookier after dark (18:00–06:00) and peaks on Halloween night (Oct 31 until dawn on Nov 1) — more ghosts and
   bats, thicker fog, brighter jack-o'-lanterns, a peeking ghost and a candy bucket — always capped by fx and
-  reduced motion (`hauntBudget`). One shared timer re-checks at 06:00 / 18:00 / midnight; nothing reads the
+  reduced motion (`hauntBudget`). One shared timer re-checks at the next 06:00 / 18:00 / midnight and at least
+  every 5 minutes in between (`msUntilHauntCheck`), plus whenever the tab becomes visible; nothing reads the
   clock per frame.
 - **Avatar hats** (witch hat, pumpkin cap, bat bow by avatar kind) through `.dc-avatar[data-avatar]`.
 - **The haunted-carnival wheel** (`WheelDecor.tsx`, `wheelReactions.ts`, `wheelSounds.ts`, `wheelArt.tsx`): a
@@ -287,7 +288,9 @@ component unmounts; nothing at module top touches the DOM.
   a shrink spell, a werewolf, a bat swarm or the crowned Pumpkin Jackpot. Each one has its own sting and a
   closed caption for it (`[thunder rumbles, fanfare]`). The caption also shows at MINIMAL effects and with
   reduced motion, when only the caption and the sound remain. The **Trick or Treat** preset (pre-selected,
-  never auto-applied) has one slice per reaction, with odds from candy corn 20 to the jackpot 1 out of 90.
+  never auto-applied) has nine slices, each with a different reaction — every one but the bat swarm, which a
+  🦇 / 🧛 slice or "bat" / "vampire" in a label brings on — with odds from candy corn 20 to the jackpot 1 out
+  of 90.
 - **`haunt` transition** into the theme; Creepster (`@fontsource/creepster`, OFL) only on a few big fixed titles
   through the skin's `--hn-spooky` (never on tokens, so buttons and body text stay in the house faces).
 
@@ -301,13 +304,16 @@ Halloween Night (`halloween-night`) is a normal theme — in the picker all year
   1.2 s after the floor settles. It is not a dialog and doesn't take focus, and it never shows in cabinets,
   lobbies, games or the Tournament Center, or while a modal, the claw close-up, the expanded jukebox, the theme
   picker or a theme transition is open. "Turn on Halloween" calls `switchTheme()`; "Not now" ends invites for
-  the season.
+  the season. `SeasonalHost` re-reads the clock at local midnight (and at least every 5 minutes,
+  `watchSeasonClock`) and when the tab becomes visible, so an idle floor drops the invite on November 1. Its
+  status line announces the invite once per offer: leaving the floor and coming back doesn't repeat it.
 - **Exit** (`[data-part="exit-halloween"]`): a HUD pumpkin at ≥ 1024 × 541 px, plus a row in Settings → Display
   and at the top of the Themes sheet everywhere. It confirms "Back to <theme>?" and returns to the remembered
   theme (Delta Neon if that theme is gone).
 - **Season's end:** an invite-activated Halloween Night reverts after October 31 — checked when settings are
-  ready and when the tab becomes visible, never mid-match. A hand-picked one stays. An invite from an earlier
-  year seen in a later October moves to that season instead of reverting.
+  ready, on each change of place, on that same clock re-check (so an idle floor reverts at midnight) and when
+  the tab becomes visible, never mid-match. A hand-picked one stays. An invite from an earlier year seen in a
+  later October moves to that season instead of reverting.
 - **State:** `AppSettings.seasonal.halloween = { year?, dismissed?, via?: 'invite' | 'picker', prev? }`,
   validated by `parseSeasonal` (no settings-version bump; it roams with the Supabase profile). One store
   subscription on `settings.theme` writes `via`/`prev`; unknown seasons are kept.

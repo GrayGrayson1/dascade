@@ -3,7 +3,7 @@
  * and the cheer pad that fills your team's hype meter on the big screen. Wide screens get the full
  * stage next to the controls.
  */
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import {
   SHOWDOWN_LIMITS,
   SHOWDOWN_MSG,
@@ -14,8 +14,9 @@ import {
   type ShowdownSettings,
   type TeamIndex,
 } from '@dascade/shared/games/showdown';
+import { SYS, type ActionErrorPayload } from '@dascade/shared';
 import { Button, PixelIcon, TextInput, Toggle, cx } from '@dascade/ui';
-import { session } from '../../net/hooks.ts';
+import { session, useRoomMessage } from '../../net/hooks.ts';
 import { Board, Rolling, StrikeLamps } from './Board.tsx';
 import { Stage, useRecent } from './Stage.tsx';
 import { LOOK_COPY } from './look.ts';
@@ -53,13 +54,17 @@ export function AudienceView({ look, settings, code, role }: { look: ShowdownLoo
 
 /** matchMedia as a hook (false on the server / in tests). */
 export function useMedia(query: string): boolean {
-  return useSyncExternalStore(
-    (fn) => {
+  const subscribe = useCallback(
+    (fn: () => void) => {
       if (typeof matchMedia === 'undefined') return () => undefined;
       const mq = matchMedia(query);
       mq.addEventListener('change', fn);
       return () => mq.removeEventListener('change', fn);
     },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
     () => (typeof matchMedia === 'undefined' ? false : matchMedia(query).matches),
     () => false,
   );
@@ -157,11 +162,23 @@ function GuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLoo
   const mine = me && me.round === board.round ? me.guesses : [];
   const left = SHOWDOWN_LIMITS.guessesPerRound - mine.length;
   const flash = useRecent(feed.calledAt || undefined, 2600);
+  /** The guess on its way to the server: a refused one (rate limit, the round just moved on) comes back to the box. */
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    sent.current = null;
+  }, [mine.length]);
+  useRoomMessage<ActionErrorPayload>(SYS.error, (p) => {
+    if (p.type !== SHOWDOWN_MSG.guess || sent.current === null) return;
+    const back = sent.current;
+    sent.current = null;
+    setText((t) => t || back);
+  });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const clean = text.trim();
     if (!clean || !open || left <= 0) return;
     session.send(SHOWDOWN_MSG.guess, { round: board.round, text: clean });
+    sent.current = clean;
     playShowSound('tap', look);
     setText('');
   };

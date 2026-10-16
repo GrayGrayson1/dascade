@@ -20,6 +20,11 @@ export interface StageWindowState {
 }
 
 let win: Window | null = null;
+/** The stage window's document the stage was built in (a reload of that window replaces it). */
+let doc: Document | null = null;
+let title = '';
+/** Sent the window to a fresh about:blank once (its page couldn't be reached); reset by a build. */
+let renavigated = false;
 let state: StageWindowState = { container: null, open: false };
 const listeners = new Set<() => void>();
 let cleanup: (() => void) | null = null;
@@ -31,90 +36,175 @@ function emit(next: StageWindowState): void {
 }
 
 const COPY_ATTR = 'data-sd-copy';
+const SHEETS = 'link[rel="stylesheet"], style';
 
-function copyRootAttributes(doc: Document): void {
+function copyRootAttributes(target: Document): void {
   const src = document.documentElement;
-  const dst = doc.documentElement;
+  const dst = target.documentElement;
   for (const attr of [...dst.attributes]) if (!src.hasAttribute(attr.name)) dst.removeAttribute(attr.name);
   for (const attr of [...src.attributes]) dst.setAttribute(attr.name, attr.value);
 }
 
-function copyStyles(doc: Document): void {
-  for (const old of [...doc.head.querySelectorAll(`[${COPY_ATTR}]`)]) old.remove();
-  for (const node of document.head.querySelectorAll('link[rel="stylesheet"], style')) appendStyle(doc, node);
+/**
+ * Mirrors the page's stylesheets into the stage window one node at a time. Only what changed is
+ * touched: re-copying every sheet (as a theme preview's <style> edit used to) reloaded each <link>,
+ * and the projector flashed unstyled.
+ */
+function mirrorStyles(target: Document): (changed?: ReadonlySet<Node>) => void {
+  const copies = new Map<Node, HTMLElement>();
+  for (const old of [...target.head.querySelectorAll(`[${COPY_ATTR}]`)]) old.remove();
+  return (changed = new Set()) => {
+    const sources = [...document.head.querySelectorAll<HTMLElement>(SHEETS)];
+    const live = new Set<Node>(sources);
+    for (const [src, copy] of copies) {
+      if (live.has(src)) continue;
+      copy.remove();
+      copies.delete(src);
+    }
+    // Back to front, so a new copy goes in front of the next sheet's copy: the cascade order holds.
+    let next: HTMLElement | null = null;
+    for (let i = sources.length - 1; i >= 0; i--) {
+      const src = sources[i]!;
+      const old = copies.get(src);
+      if (old && !changed.has(src)) {
+        next = old;
+        continue;
+      }
+      const copy = target.importNode(src, true);
+      copy.setAttribute(COPY_ATTR, '');
+      target.head.insertBefore(copy, old ?? next);
+      if (old) retire(old, copy);
+      copies.set(src, copy);
+      next = copy;
+    }
+  };
 }
 
-function appendStyle(doc: Document, node: Node): void {
-  if (!(node instanceof HTMLElement)) return;
-  if (!(node.tagName === 'STYLE' || (node.tagName === 'LINK' && (node as HTMLLinkElement).rel === 'stylesheet'))) return;
-  const copy = doc.importNode(node, true) as HTMLElement;
-  copy.setAttribute(COPY_ATTR, '');
-  doc.head.appendChild(copy);
+/** Drops a replaced copy once its successor applies: a <style> at once, a <link> when it has loaded. */
+function retire(old: HTMLElement, fresh: HTMLElement): void {
+  if (fresh.tagName !== 'LINK') return old.remove();
+  const done = () => old.remove();
+  fresh.addEventListener('load', done, { once: true });
+  fresh.addEventListener('error', done, { once: true });
+  setTimeout(done, 5000);
 }
 
-function prepare(w: Window, title: string): HTMLElement {
-  const doc = w.document;
-  doc.title = title;
-  if (!doc.head.querySelector('base')) {
-    const base = doc.createElement('base');
+function prepare(w: Window): HTMLElement {
+  const target = w.document;
+  target.title = title;
+  if (!target.head.querySelector('base')) {
+    const base = target.createElement('base');
     base.href = `${location.origin}/`;
-    doc.head.prepend(base);
+    target.head.prepend(base);
   }
-  if (!doc.head.querySelector('meta[name="viewport"]')) {
-    const meta = doc.createElement('meta');
+  if (!target.head.querySelector('meta[name="viewport"]')) {
+    const meta = target.createElement('meta');
     meta.name = 'viewport';
     meta.content = 'width=device-width, initial-scale=1';
-    doc.head.appendChild(meta);
+    target.head.appendChild(meta);
   }
-  copyRootAttributes(doc);
-  copyStyles(doc);
-  doc.body.replaceChildren();
-  doc.body.className = 'sd-window';
-  const root = doc.createElement('div');
+  copyRootAttributes(target);
+  target.body.replaceChildren();
+  target.body.className = 'sd-window';
+  const root = target.createElement('div');
   root.className = 'sd-window__root';
-  doc.body.appendChild(root);
+  target.body.appendChild(root);
   return root;
 }
 
 /** A notice left in the stage window when the console page goes away (reload, navigation). */
 function orphan(w: Window): void {
   try {
-    const doc = w.document;
-    const note = doc.createElement('div');
+    const target = w.document;
+    const note = target.createElement('div');
     note.className = 'sd-window__orphan';
     note.textContent = 'The presenter console was closed or reloaded. Press “Stage window” in the console to reconnect this screen.';
-    doc.body.replaceChildren(note);
+    target.body.replaceChildren(note);
   } catch {
     /* the window is gone */
   }
 }
 
 function watch(w: Window): () => void {
+  const sync = mirrorStyles(w.document);
+  sync();
   const headObserver = new MutationObserver((records) => {
-    // Removed sheets (a theme's skin when switching) or edited ones (dev hot reload): resync the set.
-    if (records.some((r) => r.type === 'characterData' || r.removedNodes.length > 0 || r.target !== document.head)) {
-      copyStyles(w.document);
-      return;
+    // Added and removed sheets show up in the walk; an edited one (a theme's <style>, dev hot reload) is re-copied.
+    const changed = new Set<Node>();
+    for (const r of records) {
+      if (r.target === document.head) continue;
+      let node: Node | null = r.target;
+      while (node && node.parentNode !== document.head) node = node.parentNode;
+      if (node) changed.add(node);
     }
-    for (const r of records) for (const node of r.addedNodes) appendStyle(w.document, node);
+    sync(changed);
   });
-  headObserver.observe(document.head, { childList: true, subtree: true, characterData: true });
+  headObserver.observe(document.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'media', 'rel', 'disabled'] });
   const rootObserver = new MutationObserver(() => copyRootAttributes(w.document));
   rootObserver.observe(document.documentElement, { attributes: true });
   const onUnload = () => orphan(w);
   window.addEventListener('pagehide', onUnload);
+  // The stage window itself unloads: closed (dropped at once) or reloaded (rebuilt in its new page).
+  const onStageHide = () => {
+    setTimeout(check, 50);
+    setTimeout(check, 400);
+  };
+  w.addEventListener('pagehide', onStageHide);
   return () => {
     headObserver.disconnect();
     rootObserver.disconnect();
     window.removeEventListener('pagehide', onUnload);
+    try {
+      w.removeEventListener('pagehide', onStageHide);
+    } catch {
+      /* closed or navigated away */
+    }
   };
+}
+
+/** Builds the stage in the window's current page. False when that page can't be reached (yet). */
+function build(w: Window): boolean {
+  try {
+    const container = prepare(w);
+    cleanup?.();
+    cleanup = watch(w);
+    doc = w.document;
+    renavigated = false;
+    emit({ container, open: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Keeps the stage window attached: drops it once closed, and rebuilds the stage after it reloads. */
+function check(): void {
+  if (!win) return;
+  if (win.closed) return closeStageWindow(false);
+  let current: Document | null = null;
+  try {
+    current = win.document;
+  } catch {
+    /* a page from another origin */
+  }
+  if (current && current === doc) return;
+  if (current && build(win)) return;
+  if (state.container) emit({ container: null, open: true });
+  if (renavigated) return;
+  // Whatever page the window ended up on, a fresh about:blank opened from here is ours to build in.
+  renavigated = true;
+  try {
+    win.location.replace('about:blank');
+  } catch {
+    /* refused: the next check tries again */
+  }
 }
 
 /**
  * Opens (or re-attaches to) the stage window. Must run inside a click: browsers block pop-ups that
  * don't come from a user gesture. Returns false when the window was blocked.
  */
-export function openStageWindow(code: string, title: string): boolean {
+export function openStageWindow(code: string, showTitle: string): boolean {
   const name = `dascade-showdown-stage-${code}`;
   let w: Window | null;
   try {
@@ -123,16 +213,13 @@ export function openStageWindow(code: string, title: string): boolean {
     w = null;
   }
   if (!w) return false;
-  cleanup?.();
   win = w;
-  const container = prepare(w, `${title} — Stage`);
-  cleanup = watch(w);
+  title = `${showTitle} — Stage`;
+  doc = null;
+  renavigated = false;
+  if (!build(w)) check();
   if (poll) clearInterval(poll);
-  poll = setInterval(() => {
-    if (!win || win.closed) closeStageWindow(false);
-  }, 1000);
-  w.addEventListener('pagehide', () => setTimeout(() => (win?.closed ? closeStageWindow(false) : undefined), 50));
-  emit({ container, open: true });
+  poll = setInterval(check, 1000);
   try {
     w.focus();
   } catch {
@@ -154,6 +241,7 @@ export function closeStageWindow(closeIt = true): void {
     }
   }
   win = null;
+  doc = null;
   if (state.open) emit({ container: null, open: false });
 }
 

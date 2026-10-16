@@ -1,13 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getTheme } from '@dascade/ui';
 import type { SeasonalPrefs } from '../app/settings.ts';
 import type { ThemePlace } from './types.ts';
 import {
   FALLBACK_THEME_ID,
   HALLOWEEN_THEME_ID,
+  SEASON_RECHECK_MAX_MS,
   carryOver,
   createSeasonalController,
   inHalloweenSeason,
+  inviteAnnounced,
+  msUntilSeasonCheck,
   onActivated,
   onDeactivated,
   onDismissed,
@@ -17,6 +20,7 @@ import {
   shouldInvite,
   shouldRevert,
   stripActivation,
+  watchSeasonClock,
   type SeasonalSlice,
 } from './seasonal.ts';
 
@@ -62,6 +66,21 @@ describe('shouldInvite', () => {
 
   it('a decline from last year does not count this year', () => {
     expect(shouldInvite({ halloween: { year: 2025, dismissed: true } }, OCT15, 'floor', 'delta-neon')).toBe(true);
+  });
+});
+
+describe('inviteAnnounced', () => {
+  it('once per offer: not again on each return to the floor; afresh when the offer ends and comes back', () => {
+    let said = false;
+    const step = (shown: boolean, offered: boolean) => (said = inviteAnnounced(said, shown, offered));
+    expect(step(false, true)).toBe(false); // waiting on the floor: nothing yet
+    expect(step(true, true)).toBe(true); // the card shows: announced
+    expect(step(false, true)).toBe(true); // off to a cabinet: the line keeps its text (not read again)
+    expect(step(false, true)).toBe(true); // back on the floor, waiting
+    expect(step(true, true)).toBe(true); // shown again: same text, still not read again
+    expect(step(false, false)).toBe(false); // accepted / declined / season over / QA off: cleared
+    expect(step(false, true)).toBe(false); // on offer again (next October): quiet until it shows
+    expect(step(true, true)).toBe(true);
   });
 });
 
@@ -338,5 +357,75 @@ describe('seasonal controller', () => {
     h.dispose();
     h.set({ theme: HN });
     expect(h.halloween()).toBeUndefined();
+  });
+});
+
+describe('the midnight re-check', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('msUntilSeasonCheck: the next local midnight, between 1 s and 5 min away', () => {
+    expect(msUntilSeasonCheck(at(2026, 10, 31, 23, 58))).toBe(2 * 60_000);
+    expect(msUntilSeasonCheck(new Date(2026, 9, 31, 23, 59, 59, 500))).toBe(1000);
+    expect(msUntilSeasonCheck(at(2026, 9, 30, 23, 57))).toBe(3 * 60_000);
+    expect(msUntilSeasonCheck(OCT15)).toBe(SEASON_RECHECK_MAX_MS);
+    expect(msUntilSeasonCheck(at(2026, 11, 1, 0, 0))).toBe(SEASON_RECHECK_MAX_MS);
+    expect(msUntilSeasonCheck(new Date(Number.NaN))).toBe(SEASON_RECHECK_MAX_MS);
+  });
+
+  it('watchSeasonClock: ticks at midnight, re-arms, and stops when disposed', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(2026, 10, 31, 23, 58));
+    const ticks: Date[] = [];
+    const stop = watchSeasonClock(() => ticks.push(new Date()));
+    vi.advanceTimersByTime(2 * 60_000 - 1);
+    expect(ticks).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(ticks.map((d) => d.getTime())).toEqual([at(2026, 11, 1, 0, 0).getTime()]);
+    // What an idle floor re-reads then: the invite it showed at 23:58 is gone.
+    expect(shouldInvite(undefined, at(2026, 10, 31, 23, 58), 'floor', 'delta-neon')).toBe(true);
+    expect(shouldInvite(undefined, ticks[0]!, 'floor', 'delta-neon')).toBe(false);
+    vi.advanceTimersByTime(SEASON_RECHECK_MAX_MS);
+    expect(ticks).toHaveLength(2);
+    stop();
+    stop(); // idempotent
+    vi.advanceTimersByTime(24 * 60 * 60_000);
+    expect(ticks).toHaveLength(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('an idle floor at 23:59 on October 31 reverts on the midnight tick', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(2026, 10, 31, 23, 59));
+    const h = harness({ theme: HN, seasonal: { halloween: { via: 'invite', year: 2026, prev: 'neon-noir' } }, now: new Date() });
+    await h.ctrl.checkSeasonEnd();
+    expect(h.switched).toEqual([]);
+    const checks: Array<Promise<void>> = [];
+    const stop = watchSeasonClock(() => {
+      h.setNow(new Date());
+      checks.push(h.ctrl.checkSeasonEnd());
+    });
+    vi.advanceTimersByTime(60_000);
+    await Promise.all(checks);
+    expect(h.switched).toEqual(['neon-noir']);
+    expect(h.toasts.at(-1)).toBe('Halloween’s over — the arcade is back to NEON-NOIR.');
+    stop();
+  });
+
+  it('a pinned QA date never rolls over by itself', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(2026, 10, 31, 23, 59));
+    const pinned = parseSeasonOverride('2026-10-31T23:58');
+    expect(pinned).toBeInstanceOf(Date);
+    const h = harness({ theme: HN, seasonal: { halloween: { via: 'invite', year: 2026, prev: 'neon-noir' } }, now: pinned as Date });
+    const checks: Array<Promise<void>> = [];
+    const stop = watchSeasonClock(() => checks.push(h.ctrl.checkSeasonEnd()));
+    vi.advanceTimersByTime(60 * 60_000);
+    await Promise.all(checks);
+    expect(checks.length).toBeGreaterThan(0);
+    expect(h.switched).toEqual([]);
+    expect(shouldInvite(undefined, pinned as Date, 'floor', 'delta-neon')).toBe(true);
+    stop();
   });
 });

@@ -35,6 +35,36 @@ export function seasonEnd(year: number): Date {
   return new Date(year, 10, 1);
 }
 
+/** The longest wait between season re-checks (a sleeping device's timers pause, so a midnight can slip by). */
+export const SEASON_RECHECK_MAX_MS = 5 * 60_000;
+
+/** Milliseconds until the season can next change (the next local midnight), clamped to [1 s, 5 min]. */
+export function msUntilSeasonCheck(now: Date): number {
+  if (!Number.isFinite(now.getTime())) return SEASON_RECHECK_MAX_MS;
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return Math.min(SEASON_RECHECK_MAX_MS, Math.max(1000, midnight.getTime() - now.getTime()));
+}
+
+/**
+ * Calls `tick` whenever the season can next change (local midnight, and at least every 5 minutes), re-arming
+ * itself until the returned disposer runs. `clock` is the real one: a pinned QA date never moves, so a tick
+ * just re-reads the same date.
+ */
+export function watchSeasonClock(tick: () => void, clock: () => Date = () => new Date()): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const arm = () => {
+    timer = setTimeout(() => {
+      arm();
+      tick();
+    }, msUntilSeasonCheck(clock()));
+  };
+  arm();
+  return () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+}
+
 export function halloweenOf(prefs: SeasonalPrefs | undefined): HalloweenPrefs {
   return prefs?.halloween ?? {};
 }
@@ -46,6 +76,15 @@ export function shouldInvite(prefs: SeasonalPrefs | undefined, now: Date, place:
   if (place !== 'floor' || theme === HALLOWEEN_THEME_ID || !inHalloweenSeason(now)) return false;
   const h = halloweenOf(prefs);
   return !(h.dismissed && h.year === seasonYear(now));
+}
+
+/**
+ * Does the invite's status line hold its announcement? From the first time the card shows until the offer
+ * itself ends (accepted, declined, Halloween Night on, the season over, QA off). Unchanged text in a live
+ * region isn't read again, so leaving the floor and coming back doesn't repeat it.
+ */
+export function inviteAnnounced(was: boolean, shown: boolean, offered: boolean): boolean {
+  return offered && (was || shown);
 }
 
 /** Season over for an invite-activated Halloween Night: switch back (picked by hand = stays). */

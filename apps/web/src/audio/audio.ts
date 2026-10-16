@@ -72,6 +72,22 @@ const liveCtx = (): AudioContext | null => {
 
 let audioInstalled = false;
 
+const readyListeners = new Set<() => void>();
+const notifyReady = () => {
+  for (const l of [...readyListeners]) l();
+};
+
+/** Sounds can play right now: unlocked by a gesture, and the context runs (not OS-suspended). */
+export function audioReady(): boolean {
+  return unlocked && liveCtx() !== null;
+}
+
+/** Called whenever audioReady() may have changed (the first unlock, a suspend or resume). */
+export function onAudioReadyChange(cb: () => void): () => void {
+  readyListeners.add(cb);
+  return () => readyListeners.delete(cb);
+}
+
 /** Call once at startup: unlocks audio on the first gesture, tracks settings, boots the jukebox. */
 export function installAudio(): void {
   if (audioInstalled) return;
@@ -87,6 +103,7 @@ export function installAudio(): void {
     void mixer.resume().then((running) => {
       if (!running || unlocked) return;
       unlocked = true;
+      notifyReady();
       if (useApp.getState().settings.musicEnabled) music.start();
     });
   };
@@ -103,6 +120,7 @@ export function installAudio(): void {
   };
   document.addEventListener('visibilitychange', wake);
   window.addEventListener('pageshow', wake);
+  mixer.onStateChange(notifyReady);
   useApp.subscribe((state, prev) => {
     if (state.settings === prev.settings) return;
     mixer.setSettings(mixSettings(state.settings));

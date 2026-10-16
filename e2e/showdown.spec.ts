@@ -19,6 +19,25 @@ const board = async (page: import('@playwright/test').Page) => {
   return s?.boardJson ? JSON.parse(s.boardJson) : null;
 };
 
+test('DAS Survey Showdown: shortcuts only send what the stage allows, and quick score adjusts all count', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'The presenter console is driven from a keyboard on a laptop.');
+  await createRoom(page, 'showdown', 'Host');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await page.getByRole('button', { name: 'Start round 1' }).first().click();
+  await expect.poll(async () => (await board(page))?.stage).toBe('title');
+  // On the round title, ← / → / X can't apply: no refusal toast (and beep) for each press.
+  for (const key of ['ArrowLeft', 'ArrowRight', 'x']) await page.keyboard.press(key);
+  await page.waitForTimeout(600);
+  await expect(page.locator('[data-part="toast"][data-kind="error"]')).toHaveCount(0);
+  // Three quick +5s before the board catches up: each one lands (they used to be dropped as stale).
+  await page.locator('.sd-adjust summary').click();
+  const plus5 = page.getByRole('button', { name: 'Add 5 points to Team Delta' });
+  for (let i = 0; i < 3; i++) await plus5.click({ delay: 0 });
+  await expect.poll(async () => (await board(page))?.scores?.[0]).toBe(15);
+  await leaveRoom(page);
+});
+
 test('DAS Survey Showdown: the presenter runs a round, the audience only ever sees revealed answers', async ({ page, browser }, testInfo) => {
   const host = page;
   const code = await createRoom(host, 'showdown', 'Host');
@@ -73,6 +92,22 @@ test('DAS Survey Showdown: the presenter runs a round, the audience only ever se
   await leaveRoom(host);
 });
 
+test('DAS Survey Showdown: a lobby title keeps the space just typed when the server echoes it', async ({ page }) => {
+  await createRoom(page, 'showdown', 'Host');
+  // Phones show one lobby section at a time.
+  const settingsTab = page.getByRole('tab', { name: 'Settings' });
+  if (await settingsTab.isVisible()) await settingsTab.click();
+  const title = page.getByRole('textbox', { name: 'Show title' });
+  await title.click();
+  await title.pressSequentially('Spooky ');
+  // The server stores "Spooky" (trimmed) and echoes it back while the field still shows "Spooky ".
+  await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson || '{}').title).toBe('Spooky');
+  await title.pressSequentially('Show');
+  await expect(title).toHaveValue('Spooky Show');
+  await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson || '{}').title).toBe('Spooky Show');
+  await leaveRoom(page);
+});
+
 test('DAS Survey Showdown: a big-screen device shows the stage and joins no team', async ({ page, browser }, testInfo) => {
   const code = await createRoom(page, 'showdown', 'Host');
   const ctx = await browser.newContext(device(testInfo));
@@ -85,6 +120,30 @@ test('DAS Survey Showdown: a big-screen device shows the stage and joins no team
   expect(Object.keys((await roomState(page)).teams ?? {})).toEqual([]);
   // The waiting marquee shows the room code for the audience.
   await expect(tv.locator('.sd-joincard__code')).toHaveAttribute('aria-label', `Room code ${code}`);
+  await leaveRoom(tv);
+  await leaveRoom(page);
+});
+
+test('DAS Survey Showdown: a big screen that rejoins without a tap asks for one to get sound', async ({ page, browser }, testInfo) => {
+  const code = await createRoom(page, 'showdown', 'Host');
+  const ctx = await browser.newContext(device(testInfo));
+  const tv = await ctx.newPage();
+  await tv.goto(`/room/${code}?screen=1`);
+  await tv.getByPlaceholder('Pick a nickname').fill('Big Screen');
+  await tv.getByRole('button', { name: 'Join game' }).click();
+  await expect(tv.locator('[data-part="showdown-screen"] .sd-stage')).toBeVisible();
+  // Joining took a click, so audio is on.
+  await expect(tv.locator('[data-part="showdown-sound-prompt"]')).toHaveCount(0);
+  // Reloaded (a TV that rejoined on its own): no gesture yet, so it says where to click.
+  await tv.reload();
+  await expect(tv.locator('[data-part="showdown-screen"] .sd-stage')).toBeVisible();
+  const prompt = tv.locator('[data-part="showdown-sound-prompt"]');
+  await expect(prompt).toBeVisible();
+  // A real click where it sits (the prompt goes away on pointerdown, as audio unlocks, which a locator click
+  // reports as "intercepted"). A synthetic event wouldn't do: it grants no user activation.
+  const box = (await prompt.boundingBox())!;
+  await tv.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(prompt).toHaveCount(0);
   await leaveRoom(tv);
   await leaveRoom(page);
 });
@@ -106,4 +165,41 @@ test('DAS Survey Showdown: the big-screen link opened in the presenter’s own b
   await expect(tab.locator('.sd-answer').first()).toBeVisible();
   expect(new URL(tab.url()).searchParams.has('screen')).toBe(false);
   await leaveRoom(tab);
+});
+
+test('DAS Survey Showdown: the stage window keeps its stylesheets through head edits and comes back after a reload', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'The stage window is a desktop pop-up.');
+  await createRoom(page, 'showdown', 'Host');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  const [stage] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Stage window', exact: true }).click()]);
+  await expect(stage.locator('.sd-stage')).toBeVisible();
+  type Marked = HTMLElement & { _e2e?: number };
+  const marked = await stage.evaluate(() => {
+    const nodes = [...document.querySelectorAll<Marked>('[data-sd-copy]')];
+    nodes.forEach((n) => (n._e2e = 1));
+    return nodes.length;
+  });
+  expect(marked).toBeGreaterThan(0);
+  const stillMarked = () => stage.evaluate(() => [...document.querySelectorAll<Marked>('[data-sd-copy]')].filter((n) => n._e2e === 1).length);
+  const copiedText = () => stage.evaluate(() => [...document.querySelectorAll('style[data-sd-copy]')].map((s) => s.textContent ?? '').join('\n'));
+  // A theme switch edits a <style> in the head: only that sheet is re-copied, every other copy stays put.
+  await page.evaluate(() => {
+    const s = document.createElement('style');
+    s.id = 'e2e-sheet';
+    s.textContent = '.e2e-a { color: red; }';
+    document.head.appendChild(s);
+  });
+  await expect.poll(copiedText).toContain('.e2e-a');
+  await page.evaluate(() => (document.getElementById('e2e-sheet')!.textContent = '.e2e-b { color: blue; }'));
+  await expect.poll(copiedText).toContain('.e2e-b');
+  expect(await copiedText()).not.toContain('.e2e-a');
+  expect(await stillMarked()).toBe(marked);
+  // Reloading the stage window used to leave it blank while the console said it was open.
+  await stage.reload();
+  await expect(stage.locator('.sd-stage')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stage window open' })).toBeVisible();
+  await stage.close();
+  await expect(page.getByRole('button', { name: 'Stage window', exact: true })).toBeVisible();
+  await leaveRoom(page);
 });

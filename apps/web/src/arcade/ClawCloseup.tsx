@@ -164,6 +164,8 @@ export default function ClawCloseup() {
     simRef.current = sim;
   }
   const fxRef = useRef<RenderFx>({ motion: 1, time: 0, life: new Map(), shake: 0, light: 1, lightTint: interiorOf(costume).light, focus: 0, bits: [] });
+  /** Which of the skin's lights is on: the win glow from a win until the try settles, else the normal one. */
+  const lightKind = useRef<'light' | 'winLight'>('light');
   const input = useRef({
     keys: new Map<string, [number, number]>(),
     stick: [0, 0] as [number, number],
@@ -221,6 +223,7 @@ export default function ClawCloseup() {
       later(4200, () => setPrize((p) => (p?.key === key ? null : p)));
       flash({ word: 'WINNER!', lights: 'win' }, 4200);
       fxRef.current.light = 1.6;
+      lightKind.current = 'winLight';
       fxRef.current.lightTint = interiorOf(skinRef.current?.claw).winLight;
       const fx = settings().fx;
       if (!settings().reducedMotion && fx !== 'off') setBurst((n) => n + 1);
@@ -349,6 +352,7 @@ export default function ClawCloseup() {
             } else commit();
             later(1600, () => {
               fx.light = 1;
+              lightKind.current = 'light';
               fx.lightTint = interiorOf(skinRef.current?.claw).light;
             });
             // Nearly cleaned out: the attendant tops it up.
@@ -476,6 +480,14 @@ export default function ClawCloseup() {
   }, [closing, settleNow]);
 
   closeRef.current = close;
+
+  // ---- a theme switch while it's open (the picker, November's revert, another device) ----
+  // The frame loop reads the skin through skinRef every frame; only the light's tint is cached in fx, so
+  // re-tint it from the new skin (useActiveSkin re-renders on the switch and again once that skin has
+  // loaded). The try, the glow's brightness and the loop carry on untouched.
+  useEffect(() => {
+    fxRef.current.lightTint = interiorOf(costume)[lightKind.current];
+  }, [costume]);
 
   // ---- the loop: fixed-step physics, draw, motor, knob ----
   useEffect(() => {

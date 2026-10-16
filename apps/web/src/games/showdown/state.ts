@@ -21,7 +21,7 @@ import {
   type TeamIndex,
   type TeamSlot,
 } from '@dascade/shared/games/showdown';
-import { useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
+import { playersEqual, useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
@@ -95,7 +95,8 @@ export function useMe(): ShowdownMe | null {
 /** Team rosters (names), from the synchronized team map. */
 export function useRosters(): [string[], string[]] {
   const teams = useRoomSelector<ShowdownPublicState, Record<string, number>>((s) => s.teams);
-  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players);
+  // By value: the 4 Hz hype patches would otherwise rebuild every roster on every stage.
+  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
   return useMemo(() => {
     const out: [string[], string[]] = [[], []];
     const ordered = Object.entries(teams ?? {}).sort(([a], [b]) => (players?.[a]?.joinOrder ?? 0) - (players?.[b]?.joinOrder ?? 0));
@@ -159,14 +160,13 @@ function readSoundPref(): 'on' | 'off' | null {
  * presenter console default to on; audience phones default to off so a room full of phones doesn't
  * echo the stage (their own taps still click). Local mute/volume always win on top of this.
  */
+function subscribeSounds(fn: () => void): () => void {
+  soundListeners.add(fn);
+  return () => soundListeners.delete(fn);
+}
+
 export function useShowSounds(role: ShowdownRole): [boolean, (on: boolean) => void] {
-  useSyncExternalStore(
-    (fn) => {
-      soundListeners.add(fn);
-      return () => soundListeners.delete(fn);
-    },
-    () => soundVersion,
-  );
+  useSyncExternalStore(subscribeSounds, () => soundVersion);
   const pref = readSoundPref();
   const on = pref === null ? role === 'presenter' || role === 'screen' : pref === 'on';
   const set = (next: boolean) => {

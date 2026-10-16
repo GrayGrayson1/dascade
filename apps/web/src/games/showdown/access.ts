@@ -103,15 +103,13 @@ export function setScreenMode(code: string, on: boolean): void {
   for (const l of [...listeners]) l();
 }
 
+function subscribeScreen(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 export function useScreenMode(code: string | null): boolean {
-  useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
-    },
-    () => version,
-    () => version,
-  );
+  useSyncExternalStore(subscribeScreen, () => version, () => version);
   return code ? readScreen(code) : false;
 }
 
@@ -120,6 +118,27 @@ export async function copyText(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
+    // No async clipboard (plain http on a LAN address, or refused): the legacy copy still works in a click.
+    return legacyCopy(text);
+  }
+}
+
+function legacyCopy(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  try {
+    area.select();
+    return document.execCommand('copy');
+  } catch {
     return false;
+  } finally {
+    area.remove();
+    focused?.focus({ preventScroll: true });
   }
 }

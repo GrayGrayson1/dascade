@@ -23,7 +23,7 @@ import {
   type TeamIndex,
 } from '@dascade/shared/games/showdown';
 import { Badge, Button, IconButton, Kbd, Modal, PixelIcon, Select } from '@dascade/ui';
-import { session, useRoomSelector } from '../../net/hooks.ts';
+import { playersEqual, session, useRoomSelector } from '../../net/hooks.ts';
 import { useApp } from '../../app/store.ts';
 import { sfx } from '../../audio/audio.ts';
 import { Stage } from './Stage.tsx';
@@ -33,6 +33,7 @@ import { openStageWindow, useStageWindow } from './stageWindow.ts';
 import { useBoard, useMotion, usePass, useRosters, useSheet, useShowSounds } from './state.ts';
 
 type ActBody = { [K in ShowdownActPayload['a']]: Omit<Extract<ShowdownActPayload, { a: K }>, 'a' | 'rev'> };
+type ActFn = <K extends ShowdownActPayload['a']>(a: K, body?: ActBody[K]) => void;
 
 export function PresenterConsole({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
   const board = useBoard();
@@ -47,6 +48,8 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
   boardRef.current = board;
   const confirmRef = useRef(confirm);
   confirmRef.current = confirm;
+  const undoRef = useRef(0);
+  undoRef.current = sheet?.undo ?? 0;
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   const title = settings ? showTitle(settings) : 'DAS Survey Showdown';
 
@@ -100,16 +103,25 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
       const b = boardRef.current;
       if (!b) return;
       const k = e.key.toLowerCase();
-      if (/^[0-9]$/.test(k)) {
-        const slot = k === '0' ? 9 : Number(k) - 1;
-        if (slot < b.slots.length) act('reveal', { slot });
-      } else if (k === 'x') act('strike');
-      else if (k === 'q') b.stage === 'intro' ? act('begin') : act('question');
-      else if (k === 'arrowleft' || k === '[') act('control', { team: 0 });
-      else if (k === 'arrowright' || k === ']') act('control', { team: 1 });
-      else if (k === 'n') next();
-      else if (k === 'u') act('undo');
-      else return;
+      // Digits by key position too, so AZERTY's unshifted top row (&, é, "…) reveals as well.
+      const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? (/^\d$/.test(k) ? k : null);
+      // A key only sends what its button would allow: a command the stage refuses would just beep.
+      if (digit !== null) {
+        const slot = digit === '0' ? 9 : Number(digit) - 1;
+        const tile = b.slots[slot];
+        if (b.stage !== 'intro' && tile && !tile.revealed) act('reveal', { slot });
+      } else if (k === 'x') {
+        if (canStrike(b)) act('strike');
+      } else if (k === 'q') {
+        if (b.stage === 'intro') act('begin');
+        else if (b.stage === 'title') act('question');
+      } else if (k === 'arrowleft' || k === '[' || k === 'arrowright' || k === ']') {
+        const team: TeamIndex = k === 'arrowleft' || k === '[' ? 0 : 1;
+        if (b.stage === 'live' && b.control !== team) act('control', { team });
+      } else if (k === 'n') next();
+      else if (k === 'u') {
+        if (undoRef.current > 0) act('undo');
+      } else return;
       e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
@@ -290,10 +302,43 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
   );
 }
 
-async function copyLink(text: string, done: string): Promise<void> {
+async function copyLink(text: string, done: string, secret = false): Promise<void> {
   const ok = await copyText(text);
   sfx('pop');
-  useApp.getState().toast(ok ? 'success' : 'info', ok ? done : text);
+  if (ok) useApp.getState().toast('success', done);
+  // The presenter link carries the pass: never put it up in a toast (the console may be screen-shared).
+  else if (secret) useApp.getState().toast('warning', 'Couldn’t copy the presenter link: this browser blocked the clipboard. Allow clipboard access for this site and try again.');
+  else useApp.getState().toast('info', text);
+}
+
+/** Strike (or "Steal missed") applies: what the strike button and the X key allow. */
+function canStrike(board: ShowdownBoardView): boolean {
+  return board.stage === 'steal' || (board.stage === 'live' && board.control !== -1 && board.strikes < SHOWDOWN_LIMITS.strikes);
+}
+
+/**
+ * Score adjustments carry the board revision, so a second click before the board caught up would be
+ * dropped as stale. Clicks queue instead: each team's queued total goes out once the previous one landed.
+ */
+function useAdjustQueue(rev: number, onAct: ActFn): (team: TeamIndex, delta: number) => void {
+  const [queued, setQueued] = useState<[number, number]>([0, 0]);
+  /** The revision the adjust in flight was sent against (null: none in flight). */
+  const [sentAt, setSentAt] = useState<number | null>(null);
+  const waiting = sentAt !== null && sentAt === rev;
+  useEffect(() => {
+    if (waiting) {
+      // A refused adjust never moves the board: stop waiting after a moment.
+      const t = setTimeout(() => setSentAt(null), 1500);
+      return () => clearTimeout(t);
+    }
+    const team: TeamIndex | -1 = queued[0] ? 0 : queued[1] ? 1 : -1;
+    if (team === -1) return;
+    const delta = Math.max(-SHOWDOWN_LIMITS.adjustMax, Math.min(SHOWDOWN_LIMITS.adjustMax, queued[team]));
+    onAct('adjust', { team, delta });
+    setSentAt(rev);
+    setQueued((q) => (team === 0 ? [q[0] - delta, q[1]] : [q[0], q[1] - delta]));
+  }, [waiting, queued, rev, onAct]);
+  return useCallback((team: TeamIndex, delta: number) => setQueued((q) => (team === 0 ? [q[0] + delta, q[1]] : [q[0], q[1] + delta])), []);
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -314,7 +359,7 @@ function NextStep({
   board: ShowdownBoardView;
   names: [string, string];
   lastRound: boolean;
-  onAct: <K extends ShowdownActPayload['a']>(a: K, body?: ActBody[K]) => void;
+  onAct: ActFn;
   onNext: () => void;
 }) {
   const stealer: TeamIndex = board.control === 1 ? 0 : 1;
@@ -476,7 +521,7 @@ function ControlPanel({
   board: ShowdownBoardView;
   names: [string, string];
   lastRound: boolean;
-  onAct: <K extends ShowdownActPayload['a']>(a: K, body?: ActBody[K]) => void;
+  onAct: ActFn;
   onNext: () => void;
   undo: number;
   motion: boolean;
@@ -484,6 +529,7 @@ function ControlPanel({
   const live = board.stage === 'live';
   const steal = board.stage === 'steal';
   const undecided = board.roundHow === '';
+  const adjust = useAdjustQueue(board.rev, onAct);
   const canAward = undecided && board.bank > 0 && (live || steal || board.stage === 'done');
   return (
     <div className="sd-panel sd-controls" data-motion={motion ? 'on' : 'off'}>
@@ -512,7 +558,7 @@ function ControlPanel({
         <button
           type="button"
           className="sd-strikebtn"
-          disabled={!(steal || (live && board.control !== -1 && board.strikes < SHOWDOWN_LIMITS.strikes))}
+          disabled={!canStrike(board)}
           onClick={() => onAct('strike')}
         >
           <span aria-hidden>✕</span> {steal ? 'Steal missed' : 'Strike'} <Kbd>X</Kbd>
@@ -553,7 +599,7 @@ function ControlPanel({
           <div key={t} className="sd-adjust__row" data-team={SHOWDOWN_TEAMS[t].id}>
             <span className="sd-adjust__name">{names[t]}</span>
             {[-10, -5, 5, 10].map((d) => (
-              <button key={d} type="button" className="sd-adjust__btn" onClick={() => onAct('adjust', { team: t, delta: d })} aria-label={`${d > 0 ? 'Add' : 'Remove'} ${Math.abs(d)} points ${d > 0 ? 'to' : 'from'} ${names[t]}`}>
+              <button key={d} type="button" className="sd-adjust__btn" onClick={() => adjust(t, d)} aria-label={`${d > 0 ? 'Add' : 'Remove'} ${Math.abs(d)} points ${d > 0 ? 'to' : 'from'} ${names[t]}`}>
                 {d > 0 ? `+${d}` : d}
               </button>
             ))}
@@ -591,7 +637,8 @@ function AudiencePanel({ sheet }: { sheet: ShowdownSheet | null }) {
 
 function TeamsPanel({ names }: { names: [string, string] }) {
   const teams = useRoomSelector<ShowdownPublicState, Record<string, number>>((s) => s.teams);
-  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players);
+  // Players compare by value: hype patches (4 Hz) rebuild the map without changing anyone in it.
+  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
   const screens = useRoomSelector<ShowdownPublicState, number>((s) => Object.keys(s.screens ?? {}).length) ?? 0;
   const rosters = useRosters();
   const members = Object.entries(teams ?? {})
@@ -611,7 +658,12 @@ function TeamsPanel({ names }: { names: [string, string] }) {
           <li key={m.id} data-team={SHOWDOWN_TEAMS[m.team].id} data-away={m.connected ? undefined : 'true'}>
             <span className="sd-teams__dot" style={{ '--team': SHOWDOWN_TEAMS[m.team].color } as CSSProperties} aria-hidden />
             <span className="sd-teams__name">{m.name}</span>
-            <button type="button" className="sd-teams__move" onClick={() => session.send(SHOWDOWN_MSG.move, { playerId: m.id, team: m.team === 0 ? 1 : 0 })}>
+            <button
+              type="button"
+              className="sd-teams__move"
+              aria-label={`Move ${m.name} to ${names[m.team === 0 ? 1 : 0]}`}
+              onClick={() => session.send(SHOWDOWN_MSG.move, { playerId: m.id, team: m.team === 0 ? 1 : 0 })}
+            >
               → {names[m.team === 0 ? 1 : 0]}
             </button>
           </li>
@@ -644,7 +696,7 @@ function Rundown({ sheet, current }: { sheet: ShowdownSheet | null; current: num
 
 /** Stage window, big-screen link, presenter pass and hand-over — shared by the console and the lobby. */
 export function PresenterTools({ code, pass }: { code: string; pass: string | null }) {
-  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players);
+  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
   const me = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId);
   const screens = useRoomSelector<ShowdownPublicState, Record<string, boolean>>((s) => s.screens);
   const [target, setTarget] = useState('');
@@ -657,7 +709,7 @@ export function PresenterTools({ code, pass }: { code: string; pass: string | nu
       </summary>
       <p className="sd-muted">Your presenter pass reclaims the controls from any device. Keep it private — whoever has it sees the answers.</p>
       <div className="sd-row sd-row--wrap">
-        <Button size="sm" icon="copy" disabled={!pass} onClick={() => pass && void copyLink(presenterLink(code, pass), 'Presenter link copied — open it on your other device')}>
+        <Button size="sm" icon="copy" disabled={!pass} onClick={() => pass && void copyLink(presenterLink(code, pass), 'Presenter link copied — open it on your other device', true)}>
           Copy presenter link
         </Button>
         <Button size="sm" variant="ghost" icon="copy" onClick={() => void copyLink(screenLink(code), 'Big-screen link copied')}>
