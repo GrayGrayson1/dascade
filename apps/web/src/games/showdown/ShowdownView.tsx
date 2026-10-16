@@ -356,16 +356,19 @@ function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings:
     lastCalls.current = { calls: me.calls, points: me.points };
     if (!prev || me.calls <= prev.calls || me.points <= prev.points) return;
     showFeed.called(me.points - prev.points);
-    playShowSound('calledIt', ctx.current.look);
+    // Phones default to show sounds off: a room of them chiming with the stage's clang is the echo that avoids.
+    if (ctx.current.sounds) playShowSound('calledIt', ctx.current.look);
   }, [me]);
 
-  // The finale: fanfare + applause once per show on this device.
-  const finaleKey = useRef('');
+  // The finale: fanfare + applause once per show on this device, as the show ends. A device that
+  // joins (or reloads) on the results screen hears nothing: the first finale it sees is already over.
+  const finaleKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!finale) return;
-    const key = JSON.stringify(finale.scores) + finale.results.length;
-    if (finaleKey.current === key) return;
+    if (!loaded) return;
+    const key = finale ? JSON.stringify(finale.scores) + finale.results.length : '';
+    const prev = finaleKey.current;
     finaleKey.current = key;
+    if (prev === null || !key || key === prev) return;
     play([['finale', 250]]);
-  }, [finale, play]);
+  }, [finale, loaded, play]);
 }

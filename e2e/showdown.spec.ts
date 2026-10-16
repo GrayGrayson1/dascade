@@ -92,6 +92,22 @@ test('DAS Survey Showdown: the presenter runs a round, the audience only ever se
   await leaveRoom(host);
 });
 
+test('DAS Survey Showdown: a lobby title keeps the space just typed when the server echoes it', async ({ page }) => {
+  await createRoom(page, 'showdown', 'Host');
+  // Phones show one lobby section at a time.
+  const settingsTab = page.getByRole('tab', { name: 'Settings' });
+  if (await settingsTab.isVisible()) await settingsTab.click();
+  const title = page.getByRole('textbox', { name: 'Show title' });
+  await title.click();
+  await title.pressSequentially('Spooky ');
+  // The server stores "Spooky" (trimmed) and echoes it back while the field still shows "Spooky ".
+  await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson || '{}').title).toBe('Spooky');
+  await title.pressSequentially('Show');
+  await expect(title).toHaveValue('Spooky Show');
+  await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson || '{}').title).toBe('Spooky Show');
+  await leaveRoom(page);
+});
+
 test('DAS Survey Showdown: a big-screen device shows the stage and joins no team', async ({ page, browser }, testInfo) => {
   const code = await createRoom(page, 'showdown', 'Host');
   const ctx = await browser.newContext(device(testInfo));

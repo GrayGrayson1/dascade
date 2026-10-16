@@ -3,6 +3,7 @@
  * card — team pick for the audience, presenter tools for the presenter, big-screen mode for a TV.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { cleanText } from '@dascade/shared';
 import {
   SHOWDOWN_LIMITS,
   SHOWDOWN_LOOKS,
@@ -37,10 +38,14 @@ import { usePass, useRole, useRosters, useShowdownSettings } from './state.ts';
 /** A text setting sent ~400 ms after the last keystroke (settings are rate limited). */
 function useDebouncedText(value: string, commit: (v: string) => void): [string, (v: string) => void] {
   const [draft, setDraft] = useState(value);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editing = useRef(false);
   useEffect(() => {
-    if (!editing.current) setDraft(value);
+    // The server's cleaned echo of the draft ("Spooky " comes back "Spooky") must not eat the space
+    // just typed: only a value that really differs replaces what's in the field.
+    if (!editing.current && cleanText(draftRef.current, draftRef.current.length) !== value) setDraft(value);
   }, [value]);
   useEffect(() => () => (timer.current ? clearTimeout(timer.current) : undefined), []);
   const change = (v: string) => {
