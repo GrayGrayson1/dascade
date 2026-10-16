@@ -31,8 +31,9 @@ It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/
    with a round recap and the top "Survey Sayers" from the audience. *Play again* returns to the lobby.
 
 The console guides each step ("Next step") and has keyboard shortcuts: `1`–`0` reveal, `Q` question,
-`←`/`→` team in control, `X` strike, `N` next, `U` undo. Every action can be undone, including
-scores and audience points.
+`←`/`→` team in control, `X` strike, `N` next, `U` undo. Digits go by key position, so AZERTY works
+too, and a shortcut only sends what its button would allow (no refusal beep). Every action can be
+undone, including scores and audience points.
 
 ### Audience game
 
@@ -66,6 +67,7 @@ The presenter sees the audience's most popular guesses live.
   command is ignored. Reveals are idempotent by slot and carry the round instead of the revision (a
   fast presenter can flip several before the board catches up), so a late one, e.g. *Reveal the rest*
   racing *Next round*, never flips a tile of the next board. Held keys don't auto-repeat commands.
+  Score adjustments queue on the console (one in flight per revision), so quick +5 clicks all count.
   Undo restores the previous engine state, and the revision keeps rising.
 - **Room size:** up to 100 seats, and the default is the limit, so everyone who joins plays. The
   presenter and each big screen take a seat too; anyone past the limit watches as a spectator. The
@@ -102,8 +104,11 @@ Notes:
 - **Stage window:** in the presenter's own browser, a second tab would reclaim the presenter's seat,
   because seat tokens are per browser. So the stage window is a same-origin `window.open` that the
   console renders into with a React portal (`stageWindow.ts`). The app's stylesheets and `<html>`
-  attributes (theme, motion, effects) are mirrored into it, and it plays no sound of its own. Other
-  devices use the big-screen link, which joins as a normal connection marked `screen`.
+  attributes (theme, motion, effects) are mirrored into it node by node (an edited sheet is re-copied
+  alone, so theme previews don't flash the projector), a reload of the window rebuilds the stage, and
+  it plays no sound of its own. Other devices use the big-screen link, which joins as a normal
+  connection marked `screen`; until the browser lets it play audio (a first click or tap) it shows
+  "Click or tap here for the show's sound".
 - **Show feed** (`fx.ts`): one per-device store of the latest event, host line, cue and reactions.
   Every stage on the device animates from it, and sounds play once per device.
 - **Crowd load:** reactions go out in 250 ms batches, and while guesses pour in the presenter's sheet
