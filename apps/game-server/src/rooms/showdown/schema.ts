@@ -23,6 +23,19 @@ export const ShowdownState = BaseRoomState.extend(
     customRounds: t.uint8().default(0),
     /** JSON ShowdownFinale once the show is over. */
     finaleJson: t.string().default(''),
+    /** Holding card on every stage ('' = none). */
+    card: t.string().default(''),
+    /** Round clock (Presenter Showcase): server epoch ms it runs out while running, else 0. */
+    clockEndsAt: t.number().default(0),
+    /** Ms left while paused (negative = overtime). */
+    clockLeft: t.number().default(0),
+    /** The round's full time in ms (0 = no clock). */
+    clockMax: t.number().default(0),
+    clockShow: t.boolean().default(true),
+    /** A Reveal remaining sweep is running. */
+    sweep: t.boolean().default(false),
+    /** The rounds loaded are an event preset's practice boards. */
+    rehearsal: t.boolean().default(false),
   },
   'ShowdownState',
 );

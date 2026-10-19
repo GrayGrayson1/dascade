@@ -4,6 +4,9 @@
  * Only rendered for the presenter, and it only has answers because the server sent this connection
  * the answer sheet (`showdown:sheet`); nobody else ever receives one. Every command carries the board
  * revision the console was showing, so a double click or a stale view never applies twice.
+ *
+ * Two consoles: Team Showdown's (below) and Presenter Showcase's (consoleShowcase.tsx), picked by the
+ * format of the show on the board.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
@@ -22,20 +25,30 @@ import {
   type ShowdownSheet,
   type TeamIndex,
 } from '@dascade/shared/games/showdown';
-import { Badge, Button, IconButton, Kbd, Modal, PixelIcon, Select } from '@dascade/ui';
+import { Badge, Button, IconButton, Kbd, Modal, PixelIcon } from '@dascade/ui';
 import { playersEqual, session, useRoomSelector } from '../../net/hooks.ts';
 import { useApp } from '../../app/store.ts';
-import { sfx } from '../../audio/audio.ts';
 import { Stage } from './Stage.tsx';
 import { StrikeLamps } from './Board.tsx';
-import { copyText, presenterLink, screenLink } from './access.ts';
+import { screenLink } from './access.ts';
 import { openStageWindow, useStageWindow } from './stageWindow.ts';
 import { useBoard, useMotion, usePass, useRosters, useSheet, useShowSounds } from './state.ts';
+import { PresenterTools, copyLink } from './consoleParts.tsx';
+import { ShowcaseConsole } from './consoleShowcase.tsx';
+
+export { PresenterTools } from './consoleParts.tsx';
 
 type ActBody = { [K in ShowdownActPayload['a']]: Omit<Extract<ShowdownActPayload, { a: K }>, 'a' | 'rev'> };
 type ActFn = <K extends ShowdownActPayload['a']>(a: K, body?: ActBody[K]) => void;
 
 export function PresenterConsole({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
+  const board = useBoard();
+  if (board?.mode === 'showcase') return <ShowcaseConsole look={look} settings={settings} code={code} />;
+  return <ClassicConsole look={look} settings={settings} code={code} />;
+}
+
+/** Team Showdown: teams, strikes, steals, the bank and scores. */
+function ClassicConsole({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
   const board = useBoard();
   const sheet = useSheet();
   const pass = usePass();
@@ -300,15 +313,6 @@ export function PresenterConsole({ look, settings, code }: { look: ShowdownLook;
       </Modal>
     </div>
   );
-}
-
-async function copyLink(text: string, done: string, secret = false): Promise<void> {
-  const ok = await copyText(text);
-  sfx('pop');
-  if (ok) useApp.getState().toast('success', done);
-  // The presenter link carries the pass: never put it up in a toast (the console may be screen-shared).
-  else if (secret) useApp.getState().toast('warning', 'Couldn’t copy the presenter link: this browser blocked the clipboard. Allow clipboard access for this site and try again.');
-  else useApp.getState().toast('info', text);
 }
 
 /** Strike (or "Steal missed") applies: what the strike button and the X key allow. */
@@ -690,47 +694,6 @@ function Rundown({ sheet, current }: { sheet: ShowdownSheet | null; current: num
           </li>
         ))}
       </ol>
-    </details>
-  );
-}
-
-/** Stage window, big-screen link, presenter pass and hand-over — shared by the console and the lobby. */
-export function PresenterTools({ code, pass }: { code: string; pass: string | null }) {
-  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
-  const me = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId);
-  const screens = useRoomSelector<ShowdownPublicState, Record<string, boolean>>((s) => s.screens);
-  const [target, setTarget] = useState('');
-  // Big screens never present (the server refuses): the answers would go up on the stage.
-  const candidates = Object.values(players ?? {}).filter((p) => p.id !== me && p.connected && !screens?.[p.id]);
-  return (
-    <details className="sd-panel sd-tools">
-      <summary className="sd-panel__title">
-        <PixelIcon name="crown" /> Presenter tools
-      </summary>
-      <p className="sd-muted">Your presenter pass reclaims the controls from any device. Keep it private — whoever has it sees the answers.</p>
-      <div className="sd-row sd-row--wrap">
-        <Button size="sm" icon="copy" disabled={!pass} onClick={() => pass && void copyLink(presenterLink(code, pass), 'Presenter link copied — open it on your other device', true)}>
-          Copy presenter link
-        </Button>
-        <Button size="sm" variant="ghost" icon="copy" onClick={() => void copyLink(screenLink(code), 'Big-screen link copied')}>
-          Copy big-screen link
-        </Button>
-      </div>
-      {candidates.length ? (
-        <div className="sd-row sd-row--wrap sd-handover">
-          <Select aria-label="Hand the show to" value={target} onChange={(e) => setTarget(e.currentTarget.value)}>
-            <option value="">Hand the show to…</option>
-            {candidates.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-          <Button size="sm" variant="secondary" disabled={!target} onClick={() => target && session.send(SHOWDOWN_MSG.handover, { playerId: target })}>
-            Hand over
-          </Button>
-        </div>
-      ) : null}
     </details>
   );
 }

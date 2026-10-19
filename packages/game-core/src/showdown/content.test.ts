@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { createSeededRng, normalizeForCompare } from '@dascade/shared';
 import {
+  SHOWDOWN_EVENT_IDS,
+  SHOWDOWN_EVENT_INFO,
   SHOWDOWN_LIMITS,
   SHOWDOWN_PACK_IDS,
   SHOWDOWN_PACK_INFO,
   ShowdownSettingsSchema,
   boardTotal,
   defaultShowdownSettings,
+  eventTitle,
   resolveShowdownLook,
+  roundToInput,
   teamName,
   validateShowContent,
   type ShowdownRoundInput,
 } from '@dascade/shared/games/showdown';
 import { SHOWDOWN_PACKS, pickRounds } from './packs.ts';
+import { SHOWDOWN_EVENT_ROUNDS } from './events.ts';
 import { matchSlot } from './guesses.ts';
 
 describe('built-in packs', () => {
@@ -124,9 +129,116 @@ describe('validateShowContent', () => {
   });
 });
 
+describe('validateShowContent: Presenter Showcase rounds', () => {
+  const ranked = (n: number, extra: Partial<ShowdownRoundInput> = {}): ShowdownRoundInput => ({
+    prompt: 'Name the Top 10 Halloween Songs.',
+    answers: Array.from({ length: n }, (_, i) => ({ text: `Song ${i + 1}`, points: 0 })),
+    ...extra,
+  });
+
+  it('keeps a ranked list (every answer at 0 points) in the order given', () => {
+    const input = ranked(10);
+    input.answers.reverse();
+    const r = validateShowContent([input]).rounds[0]!;
+    expect(r.ranked).toBe(true);
+    expect(r.answers.map((a) => a.text)[0]).toBe('Song 10');
+    expect(r.answers.every((a) => a.points === 0)).toBe(true);
+  });
+
+  it('refuses a mix of points and blanks, with a hint', () => {
+    const input = ranked(4);
+    input.answers[1]!.points = 20;
+    const report = validateShowContent([input]);
+    expect(report.rounds).toHaveLength(0);
+    expect(report.issues[0]).toMatchObject({ field: 'answers', message: expect.stringContaining('leave every answer at 0') });
+  });
+
+  it('cleans the category, attribution and notes, and stores the special answer as a slot', () => {
+    const r = validateShowContent([
+      ranked(10, {
+        title: '  Halloween\u0000 Songs ',
+        source: ' DAS-O-Ween   Host Picks ',
+        special: 5,
+        answers: Array.from({ length: 10 }, (_, i) => ({ text: `Song ${i + 1}`, points: 0, note: i === 0 ? '  Michael\u200b Jackson ' : '' })),
+      }),
+    ]).rounds[0]!;
+    expect(r).toMatchObject({ title: 'Halloween Songs', source: 'DAS-O-Ween Host Picks', special: 4 });
+    expect(r.answers[0]!.note).toBe('Michael Jackson');
+    expect('note' in r.answers[1]!).toBe(false);
+    expect(validateShowContent([ranked(10, { title: '   ', source: '!!!' })]).rounds[0]).not.toHaveProperty('title');
+  });
+
+  it('a special answer must be on the board', () => {
+    const report = validateShowContent([ranked(4, { special: 5 }), ranked(5, { special: 5 }), ranked(5, { special: 0 })]);
+    expect(report.issues).toEqual([{ index: 0, field: 'special', message: expect.stringContaining('#5') }]);
+    expect(report.rounds[0]!.special).toBe(4);
+    expect(report.rounds[1]).not.toHaveProperty('special');
+  });
+
+  it('roundToInput turns a stored round back into the same input', () => {
+    const rounds = validateShowContent([
+      ranked(10, { title: 'Songs', source: 'Host Picks', special: 5 }),
+      { prompt: 'Name a pizza topping', answers: [{ text: 'Cheese', points: 50, aliases: ['mozzarella'] }, { text: 'Ham', points: 30 }, { text: 'Corn', points: 20, note: 'Really' }] },
+    ]).rounds;
+    const again = validateShowContent(rounds.map(roundToInput)).rounds;
+    expect(again).toEqual(rounds);
+  });
+
+  it('long titles fit (up to the answer limit)', () => {
+    const long = 'It’s the Great Pumpkin, Charlie Brown: The Movie!';
+    const r = validateShowContent([{ prompt: 'Name a Halloween classic', answers: [{ text: long, points: 0 }, { text: 'B', points: 0 }, { text: 'C', points: 0 }] }]).rounds[0]!;
+    expect(r.answers[0]!.text).toBe(long.slice(0, SHOWDOWN_LIMITS.answerMax));
+  });
+});
+
+describe('event presets', () => {
+  it('match their metadata, and their settings are valid', () => {
+    for (const id of SHOWDOWN_EVENT_IDS) {
+      const info = SHOWDOWN_EVENT_INFO[id];
+      const report = validateShowContent(SHOWDOWN_EVENT_ROUNDS[id]);
+      expect(report.issues).toEqual([]);
+      expect(report.rounds).toHaveLength(info.rounds);
+      expect(ShowdownSettingsSchema.safeParse({ ...defaultShowdownSettings(new Date(2026, 10, 2)), ...info.settings }).success).toBe(true);
+      expect(info.settings.mode).toBe('showcase');
+    }
+  });
+
+  it('DAS-O-Ween: two ranked Top-10 boards, #5 special, attributed as host picks (not a poll)', () => {
+    const rounds = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-2026']).rounds;
+    expect(rounds.map((r) => r.prompt)).toEqual(['Name the Top 10 Halloween Songs.', 'Name the Top 10 Halloween Movies.']);
+    for (const r of rounds) {
+      expect(r.answers).toHaveLength(10);
+      expect(r.ranked).toBe(true);
+      expect(r.special).toBe(4);
+      expect(r.source).toBe('DAS-O-Ween Host Picks');
+      expect(r.answers.every((a) => a.note)).toBe(true);
+    }
+    expect(SHOWDOWN_EVENT_INFO['dasoween-2026'].settings).toMatchObject({ mode: 'showcase', look: 'halloween', title: 'DAS-O-Ween Trivia', minutes: 10 });
+  });
+
+  it('the rehearsal boards share no answer with the real show', () => {
+    const real = new Set(SHOWDOWN_EVENT_ROUNDS['dasoween-2026'].flatMap((r) => r.answers.map((a) => normalizeForCompare(a.text))));
+    for (const r of SHOWDOWN_EVENT_ROUNDS['dasoween-rehearsal']) for (const a of r.answers) expect(real.has(normalizeForCompare(a.text))).toBe(false);
+    expect(SHOWDOWN_EVENT_INFO['dasoween-rehearsal'].rehearsal).toBe(true);
+  });
+
+  it('every answer and alias is matched back to its own slot', () => {
+    for (const id of SHOWDOWN_EVENT_IDS) {
+      for (const round of validateShowContent(SHOWDOWN_EVENT_ROUNDS[id]).rounds) {
+        round.answers.forEach((a, slot) => {
+          expect(matchSlot(round, a.text)).toBe(slot);
+          for (const alias of a.aliases) expect(matchSlot(round, alias), `${round.prompt}: ${alias}`).toBe(slot);
+        });
+      }
+    }
+  });
+});
+
 describe('settings', () => {
   it('defaults are valid, seasonal in October', () => {
     expect(ShowdownSettingsSchema.safeParse(defaultShowdownSettings(new Date(2026, 9, 14))).success).toBe(true);
+    // New rooms are Team Showdown, as before; the showcase clock defaults to 10 minutes.
+    expect(defaultShowdownSettings(new Date(2026, 9, 14))).toMatchObject({ mode: 'classic', minutes: 10, stageClock: true, eventName: '' });
     expect(defaultShowdownSettings(new Date(2026, 9, 14)).packs).toEqual(['spooky']);
     expect(defaultShowdownSettings(new Date(2026, 10, 2)).packs).not.toContain('spooky');
   });
@@ -141,6 +253,11 @@ describe('settings', () => {
     expect(ShowdownSettingsSchema.safeParse({ ...base, rounds: 9 }).success).toBe(false);
     expect(ShowdownSettingsSchema.safeParse({ ...base, look: 'disco' }).success).toBe(false);
     expect(teamName(parsed, 0)).toBe('Ghouls');
+    expect(ShowdownSettingsSchema.safeParse({ ...base, mode: 'quiz' }).success).toBe(false);
+    expect(ShowdownSettingsSchema.safeParse({ ...base, minutes: 31 }).success).toBe(false);
+    const ev = ShowdownSettingsSchema.parse({ ...base, eventName: '  Remoties\u0000  Happy Hour ' });
+    expect(eventTitle(ev)).toBe('Remoties Happy Hour');
+    expect(eventTitle({ ...ev, eventName: '' })).toBe('DAS Survey Showdown');
     expect(teamName({ teamNames: ['', ''] }, 1)).toBe('Team Sierra');
   });
 

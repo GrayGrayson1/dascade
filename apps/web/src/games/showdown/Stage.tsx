@@ -3,15 +3,22 @@
  * and what the presenter sees in the console preview. Everything here is public: it renders the
  * synchronized board, the rosters and the shared show feed (events, cues, host lines, reactions).
  *
+ * Two formats: Team Showdown (classic — podiums, strikes, a bank; this file) and Presenter Showcase
+ * (one big board for a crowd; stageShowcase.tsx + scenes.tsx). Holding cards show in both.
+ *
  * Sizes use container units (the stage is a size container), so the same stage fills a projector,
  * a laptop window or a 16:9 preview card.
  */
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+// The stage's stylesheets, in cascade order: the base stage, then the showcase layer on top of it.
+import './showdown.css';
+import './stageShowcase.css';
+import { type CSSProperties, type ReactNode } from 'react';
 import {
   SHOWDOWN_TEAMS,
   showTitle,
   teamName,
   type ShowdownBoardView,
+  type ShowdownCard,
   type ShowdownFinale,
   type ShowdownLook,
   type ShowdownPublicState,
@@ -23,9 +30,14 @@ import { useRoomSelector } from '../../net/hooks.ts';
 import { Board, Rolling, StrikeLamps } from './Board.tsx';
 import { Backdrop, Bulbs, Pumpkin } from './Decor.tsx';
 import { HostFigure } from './Host.tsx';
-import { LOOK_COPY, idleLine, joinAddress, lineForFinale, type HostLine } from './look.ts';
-import { REACTION_LIFE, useShowFeed, type ShowFeed } from './fx.ts';
-import { useBoard, useFinale, useHype, useMotion, useRosters, type MotionPrefs } from './state.ts';
+import { LOOK_COPY, cardLine, idleLine, joinAddress, lineForFinale, type HostLine } from './look.ts';
+import { useShowFeed, type ShowFeed } from './fx.ts';
+import { useBoard, useCard, useFinale, useHype, useMode, useMotion, useRosters, type MotionPrefs } from './state.ts';
+import { Confetti, Reactions, useRecent } from './stageFx.tsx';
+import { ShowcaseStage } from './stageShowcase.tsx';
+import { CardScene } from './scenes.tsx';
+
+export { useRecent } from './stageFx.tsx';
 
 export type StageVariant = 'screen' | 'preview';
 
@@ -37,25 +49,23 @@ export interface StageProps {
   corner?: ReactNode;
 }
 
-/** True for `ms` after `at` (performance.now() time), then false — re-renders itself when it expires. */
-export function useRecent(at: number | undefined, ms: number): boolean {
-  const [, force] = useState(0);
-  const live = at !== undefined && at > 0 && performance.now() - at < ms;
-  useEffect(() => {
-    if (!live || at === undefined) return;
-    const t = setTimeout(() => force((n) => n + 1), Math.max(0, ms - (performance.now() - at)) + 16);
-    return () => clearTimeout(t);
-  }, [live, at, ms]);
-  return live;
+export function Stage(props: StageProps) {
+  const finale = useFinale();
+  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
+  const live = useMode(props.settings);
+  const mode = phase === 'RESULTS' && finale ? finale.mode : live;
+  return mode === 'showcase' ? <ShowcaseStage {...props} /> : <ClassicStage {...props} />;
 }
 
-export function Stage({ look, settings, variant, corner }: StageProps) {
+/** Team Showdown: podiums, strikes, steals, the bank. */
+function ClassicStage({ look, settings, variant, corner }: StageProps) {
   const board = useBoard();
   const finale = useFinale();
   const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
   const code = useRoomSelector<ShowdownPublicState, string>((s) => s.code) ?? '';
   const feed = useShowFeed();
   const motion = useMotion();
+  const card = useCard();
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   const copy = LOOK_COPY[look];
 
@@ -87,7 +97,10 @@ export function Stage({ look, settings, variant, corner }: StageProps) {
       <Backdrop look={look} fx={motion.fx} />
       <Bulbs />
       <div className="sd-stage__inner">
-        {inShow ? (
+        {card ? (
+          // A holding card replaces the stage (any phase); the show carries on underneath.
+          <CardScene card={card} settings={settings} look={look} code={code} />
+        ) : inShow ? (
           <>
             <TopRow board={board} settings={settings} code={code} look={look} />
             <Arena board={board} names={names} look={look} motion={motion} copy={copy.bank} hype={copy.hype} topFlash={top} />
@@ -105,7 +118,7 @@ export function Stage({ look, settings, variant, corner }: StageProps) {
           <IntroCard settings={settings} code={code} look={look} names={names} waiting />
         )}
       </div>
-      <HostCorner look={look} feed={feed} board={board} names={names} finale={phase === 'RESULTS' ? finale : null} />
+      <HostCorner look={look} feed={feed} board={board} names={names} finale={phase === 'RESULTS' ? finale : null} card={card} />
       <Reactions feed={feed} look={look} motion={motion} />
       {party && motion.particles > 0 ? <Confetti key={`${ev?.at ?? 0}-${feed.cue?.id ?? 0}`} count={Math.round(motion.particles * 1.2)} look={look} /> : null}
       {corner ? <div className="sd-stage__corner">{corner}</div> : null}
@@ -453,16 +466,19 @@ function HostCorner({
   board,
   names,
   finale,
+  card,
 }: {
   look: ShowdownLook;
   feed: ShowFeed;
   board: ShowdownBoardView | null;
   names: [string, string];
   finale: ShowdownFinale | null;
+  card: ShowdownCard | null;
 }) {
   const fresh = useRecent(feed.line ? feed.lineAt : undefined, 5600);
   let line: HostLine | null = fresh ? feed.line : null;
-  if (finale) line = lineForFinale(look, finale.winner, finale.names);
+  if (card && !fresh) line = cardLine(look, card);
+  else if (finale) line = lineForFinale(look, finale.winner, finale.names);
   else if (!feed.line) line = idleLine(look, board, names);
   const copy = LOOK_COPY[look];
   return (
@@ -478,59 +494,6 @@ function HostCorner({
           {line.text}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function Reactions({ feed, look, motion }: { feed: ShowFeed; look: ShowdownLook; motion: MotionPrefs }) {
-  const [, force] = useState(0);
-  const now = performance.now();
-  const alive = motion.motion ? feed.reactions.filter((r) => now - r.at < REACTION_LIFE) : [];
-  // Expire floating emoji even when nothing new arrives.
-  const next = alive.length ? Math.min(...alive.map((r) => r.at + REACTION_LIFE - now)) : 0;
-  useEffect(() => {
-    if (next <= 0) return;
-    const t = setTimeout(() => force((n) => n + 1), next + 20);
-    return () => clearTimeout(t);
-  }, [next, feed.reactions]);
-  if (!alive.length) return null;
-  const emoji = LOOK_COPY[look].reactions;
-  return (
-    <div className="sd-reactions" aria-hidden>
-      {alive.map((r) => (
-        <span
-          key={r.id}
-          className="sd-float"
-          data-side={r.side === 0 ? 'left' : r.side === 1 ? 'right' : 'mid'}
-          style={{ '--x': r.x, '--delay': `${Math.max(0, r.at - now)}ms` } as CSSProperties}
-        >
-          {emoji[r.kind] ?? '👏'}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export function Confetti({ count, look }: { count: number; look: ShowdownLook }) {
-  const colors = look === 'halloween' ? ['#ff8a1f', '#b26bff', '#a8ff3c', '#fff1d6', '#ffd36b'] : ['#ffd36b', '#ff4fd8', '#22d3ee', '#2de38f', '#ffffff'];
-  return (
-    <div className="sd-confetti" aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        <i
-          key={i}
-          data-shape={i % 3}
-          style={
-            {
-              '--x': `${(i * 37 + 11) % 100}%`,
-              '--dur': `${2.6 + ((i * 7) % 10) * 0.18}s`,
-              '--delay': `${((i * 3) % 14) * 0.08}s`,
-              '--drift': `${((i * 13) % 9) - 4}cqw`,
-              '--spin': `${((i * 29) % 7) - 3}`,
-              '--c': colors[i % colors.length],
-            } as CSSProperties
-          }
-        />
-      ))}
     </div>
   );
 }

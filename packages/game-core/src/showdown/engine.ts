@@ -5,7 +5,7 @@
  * undo stack) plus the events every screen animates. Nothing here knows about players, sockets or
  * timers: the presenter's console sends commands, the room applies them and publishes `boardView()`.
  *
- * A round (one survey question):
+ * Team Showdown (mode 'classic') — a round (one survey question):
  *   title → (question) → live → [3 strikes → steal] → done → (next) → next round's title …
  *   - Reveals in `live` bank points (× the round's multiplier) for the team in control; revealing the
  *     whole board wins the bank ("sweep").
@@ -13,6 +13,14 @@
  *     team in control keeps it ("defend"). With steals off, three strikes lose the bank.
  *   - The presenter may award the bank by hand at any time, adjust scores, and reveal the rest of a
  *     decided board for show (no points move).
+ *
+ * Presenter Showcase (mode 'showcase') — one board for a crowd, no teams and no scores:
+ *   title → (question) → live → done (every answer up) → (next) …
+ *   - Reveals just flip tiles. One flagged `late` was revealed after the round was played (the
+ *     "Reveal remaining" sweep): nobody found it. The round's result counts the answers found.
+ *   - Wrong answers aren't state at all (the room broadcasts them), so they never pile up as strikes
+ *     and never make the presenter's next command stale.
+ *   - `restart` puts the current round back on its title card; `reset` goes back to the opening.
  */
 import {
   SHOWDOWN_LIMITS,
@@ -20,6 +28,7 @@ import {
   roundMultipliers,
   type ShowdownBoardView,
   type ShowdownEvent,
+  type ShowdownMode,
   type ShowdownRoundDef,
   type ShowdownRoundResult,
   type ShowdownScoring,
@@ -41,9 +50,12 @@ export interface SlotState {
   readonly by: TeamSlot;
   /** Reveal order within the show (0 = hidden). */
   readonly seq: number;
+  /** Revealed after the round was played (nobody found it). */
+  readonly late: boolean;
 }
 
 export interface ShowState {
+  readonly mode: ShowdownMode;
   readonly rounds: readonly ShowRound[];
   /** 0-based current round; -1 before round 1. */
   readonly round: number;
@@ -72,11 +84,14 @@ export type ShowCommand =
   | { a: 'begin' }
   | { a: 'question' }
   | { a: 'control'; team: TeamIndex }
-  | { a: 'reveal'; slot: number }
+  /** `late` / `sweep` are set by the room only (a Reveal remaining sweep), never by a client. */
+  | { a: 'reveal'; slot: number; late?: boolean; sweep?: boolean }
   | { a: 'strike' }
   | { a: 'award'; team: TeamIndex }
   | { a: 'adjust'; team: TeamIndex; delta: number }
-  | { a: 'next' };
+  | { a: 'next' }
+  | { a: 'restart' }
+  | { a: 'reset' };
 
 export type StepFailure = { ok: false; code: 'wrong_stage' | 'not_allowed' | 'noop'; message: string };
 export type StepSuccess = {
@@ -91,13 +106,22 @@ export type StepResult = StepSuccess | StepFailure;
 export interface CreateShowOptions {
   scoring: ShowdownScoring;
   steal: boolean;
+  /** Default 'classic'. */
+  mode?: ShowdownMode;
 }
 
 /** A fresh show at the intro marquee. */
 export function createShow(rounds: readonly ShowdownRoundDef[], opts: CreateShowOptions): ShowState {
-  const multipliers = roundMultipliers(rounds.length, opts.scoring);
+  const mode = opts.mode ?? 'classic';
+  // Presenter Showcase has no scores, so no multipliers either.
+  const multipliers = roundMultipliers(rounds.length, mode === 'showcase' ? 'flat' : opts.scoring);
   return {
-    rounds: rounds.map((r, i) => ({ ...r, answers: r.answers.map((a) => ({ ...a, aliases: [...a.aliases] })), multiplier: multipliers[i] ?? 1 })),
+    mode,
+    rounds: rounds.map((r, i) => ({
+      ...r,
+      answers: r.answers.map((a) => ({ ...a, aliases: [...a.aliases] })),
+      multiplier: multipliers[i] ?? 1,
+    })),
     round: -1,
     stage: 'intro',
     slots: [],
@@ -112,12 +136,18 @@ export function createShow(rounds: readonly ShowdownRoundDef[], opts: CreateShow
     past: [],
     seq: 0,
     rev: 1,
-    steal: opts.steal,
+    steal: mode === 'showcase' ? false : opts.steal,
   };
 }
 
 export function currentRound(state: ShowState): ShowRound | null {
   return state.rounds[state.round] ?? null;
+}
+
+/** Slot of a round's special answer, or -1. */
+export function specialSlot(round: Pick<ShowdownRoundDef, 'special' | 'answers'> | null | undefined): number {
+  const s = round?.special;
+  return s !== undefined && Number.isInteger(s) && s >= 0 && s < round!.answers.length ? s : -1;
 }
 
 const fail = (code: StepFailure['code'], message: string): StepFailure => ({ ok: false, code, message });
@@ -130,6 +160,8 @@ function addScore(scores: readonly [number, number], team: TeamIndex, points: nu
   return next;
 }
 
+const hiddenSlots = (round: ShowRound): SlotState[] => round.answers.map(() => ({ revealed: false, by: -1, seq: 0, late: false }));
+
 function enterRound(state: ShowState, index: number): ShowState {
   const round = state.rounds[index]!;
   const past = state.round >= 0 ? withPast(state) : state.past;
@@ -137,7 +169,7 @@ function enterRound(state: ShowState, index: number): ShowState {
     ...state,
     round: index,
     stage: 'title',
-    slots: round.answers.map(() => ({ revealed: false, by: -1, seq: 0 })),
+    slots: hiddenSlots(round),
     control: -1,
     strikes: 0,
     stealFailed: false,
@@ -167,16 +199,22 @@ function decide(state: ShowState, team: TeamSlot, how: ShowdownWin): { state: Sh
   };
 }
 
+const foundIn = (slots: readonly SlotState[]) => slots.filter((s) => s.revealed && !s.late).length;
+
 /** The round ends with nobody winning it (skipped, or the show ended mid-round). No-op if decided. */
 function closeUndecided(state: ShowState): ShowState {
   if (state.round < 0 || state.roundHow !== '') return state;
-  const result: ShowdownRoundResult = { index: state.round, winner: -1, points: 0, how: 'none' };
+  const result: ShowdownRoundResult =
+    state.mode === 'showcase'
+      ? { index: state.round, winner: -1, points: 0, how: 'none', found: foundIn(state.slots), total: state.slots.length }
+      : { index: state.round, winner: -1, points: 0, how: 'none' };
   return { ...state, bank: 0, roundHow: 'none', results: [...state.results, result] };
 }
 
 const allRevealed = (slots: readonly SlotState[]) => slots.length > 0 && slots.every((s) => s.revealed);
 
-function reveal(state: ShowState, slot: number): StepResult {
+function reveal(state: ShowState, cmd: Extract<ShowCommand, { a: 'reveal' }>): StepResult {
+  const slot = cmd.slot;
   if (state.stage === 'intro') return fail('wrong_stage', 'Start round 1 first.');
   const round = currentRound(state);
   if (!round || slot < 0 || slot >= state.slots.length) return fail('not_allowed', `There is no answer #${slot + 1} on this board.`);
@@ -189,16 +227,18 @@ function reveal(state: ShowState, slot: number): StepResult {
     events.push({ type: 'question', rev: s.rev });
   }
   const answer = round.answers[slot]!;
+  const special = slot === specialSlot(round);
+  if (s.mode === 'showcase') return revealShowcase(s, cmd, events, special);
   const late = s.stage === 'done';
   const stealing = s.stage === 'steal' && s.control !== -1;
   const by: TeamSlot = late ? -1 : stealing ? otherTeam(s.control as TeamIndex) : s.control;
   const seq = s.seq + 1;
-  const slots = s.slots.map((x, i) => (i === slot ? { revealed: true, by, seq } : x));
+  const slots = s.slots.map((x, i) => (i === slot ? { revealed: true, by, seq, late } : x));
   const bank = late ? s.bank : s.bank + answer.points * round.multiplier;
   const rev = s.rev + 1;
   s = { ...s, slots, seq, bank, rev };
   const cleared = allRevealed(slots);
-  events.push({ type: 'reveal', rev, slot, text: answer.text, points: answer.points, top: slot === 0, late, callers: 0, cleared });
+  events.push(revealEvent(rev, slot, answer, { top: slot === 0, late, cleared, special, sweep: false }));
   if (stealing) {
     const d = decide(s, otherTeam(s.control as TeamIndex), 'steal');
     return { ok: true, state: d.state, events: [...events, d.event] };
@@ -212,6 +252,43 @@ function reveal(state: ShowState, slot: number): StepResult {
     s = { ...s, stage: 'done' };
   }
   return { ok: true, state: s, events };
+}
+
+function revealEvent(
+  rev: number,
+  slot: number,
+  answer: ShowRound['answers'][number],
+  flags: { top: boolean; late: boolean; cleared: boolean; special: boolean; sweep: boolean },
+): ShowdownEvent {
+  return {
+    type: 'reveal',
+    rev,
+    slot,
+    text: answer.text,
+    points: answer.points,
+    ...flags,
+    callers: 0,
+    ...(answer.note ? { note: answer.note } : {}),
+  };
+}
+
+/** Presenter Showcase: a tile just flips. The whole board up ends the round (stage done). */
+function revealShowcase(s: ShowState, cmd: Extract<ShowCommand, { a: 'reveal' }>, events: ShowdownEvent[], special: boolean): StepResult {
+  const round = currentRound(s)!;
+  const answer = round.answers[cmd.slot]!;
+  const late = Boolean(cmd.late) || s.stage === 'done';
+  const seq = s.seq + 1;
+  const slots = s.slots.map((x, i) => (i === cmd.slot ? { revealed: true, by: -1 as TeamSlot, seq, late } : x));
+  const rev = s.rev + 1;
+  const cleared = allRevealed(slots);
+  let next: ShowState = { ...s, slots, seq, rev };
+  if (cleared && next.roundHow === '') {
+    const found = foundIn(slots);
+    const how: ShowdownWin = found === slots.length ? 'sweep' : 'none';
+    next = { ...next, stage: 'done', roundHow: how, results: [...next.results, { index: next.round, winner: -1, points: 0, how, found, total: slots.length }] };
+  }
+  events.push(revealEvent(rev, cmd.slot, answer, { top: cmd.slot === 0, late, cleared, special, sweep: Boolean(cmd.sweep) }));
+  return { ok: true, state: next, events };
 }
 
 function strike(state: ShowState): StepResult {
@@ -260,8 +337,42 @@ function next(state: ShowState): StepResult {
   return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: entered.round, multiplier: round.multiplier, answers: round.answers.length }] };
 }
 
+/** Presenter Showcase: the current round back on its title card, every tile hidden again. */
+function restart(state: ShowState): StepResult {
+  if (state.round < 0) return fail('wrong_stage', 'Start round 1 first.');
+  const round = currentRound(state)!;
+  const rev = state.rev + 1;
+  return {
+    ok: true,
+    state: {
+      ...state,
+      stage: 'title',
+      slots: hiddenSlots(round),
+      roundHow: '',
+      roundWinner: -1,
+      results: state.results.filter((r) => r.index !== state.round),
+      rev,
+    },
+    events: [{ type: 'restart', rev, round: state.round }],
+  };
+}
+
+/** Presenter Showcase: back to the opening marquee (the same rounds; the revision keeps rising). */
+function reset(state: ShowState): StepResult {
+  if (state.stage === 'intro') return fail('noop', 'The show is already at the opening.');
+  const fresh = createShow(state.rounds, { scoring: 'flat', steal: false, mode: state.mode });
+  const rev = state.rev + 1;
+  // Keep each round's multiplier as it was (createShow recomputes flat ones for the showcase anyway).
+  return { ok: true, state: { ...fresh, rounds: state.rounds, rev }, events: [{ type: 'reset', rev }] };
+}
+
+const SHOWCASE_ONLY = new Set<ShowCommand['a']>(['restart', 'reset']);
+const CLASSIC_ONLY = new Set<ShowCommand['a']>(['control', 'strike', 'award', 'adjust']);
+
 /** Applies one presenter command. Pure: `state` is never modified. */
 export function step(state: ShowState, cmd: ShowCommand): StepResult {
+  if (state.mode === 'showcase' && CLASSIC_ONLY.has(cmd.a)) return fail('not_allowed', 'Presenter Showcase has no teams or scores.');
+  if (state.mode !== 'showcase' && SHOWCASE_ONLY.has(cmd.a)) return fail('not_allowed', 'That control is for Presenter Showcase shows.');
   switch (cmd.a) {
     case 'begin': {
       if (state.stage !== 'intro') return fail('noop', 'The show has already started.');
@@ -284,7 +395,7 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
       return { ok: true, state: { ...state, control: cmd.team, strikes: 0, rev }, events: [{ type: 'control', rev, team: cmd.team }] };
     }
     case 'reveal':
-      return reveal(state, cmd.slot);
+      return reveal(state, cmd);
     case 'strike':
       return strike(state);
     case 'award':
@@ -297,6 +408,10 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
     }
     case 'next':
       return next(state);
+    case 'restart':
+      return restart(state);
+    case 'reset':
+      return reset(state);
   }
 }
 
@@ -306,8 +421,9 @@ export function finalizeShow(state: ShowState): ShowState {
   return closed.round >= 0 ? { ...closed, past: withPast(closed) } : closed;
 }
 
-/** Leading team, or -1 for a tie. */
-export function showWinner(state: Pick<ShowState, 'scores'>): TeamSlot {
+/** Leading team, or -1 for a tie (always -1 in Presenter Showcase: it has no teams). */
+export function showWinner(state: Pick<ShowState, 'scores'> & Partial<Pick<ShowState, 'mode'>>): TeamSlot {
+  if (state.mode === 'showcase') return -1;
   const [a, b] = state.scores;
   return a === b ? -1 : a > b ? 0 : 1;
 }
@@ -318,28 +434,48 @@ export function revealedIn(state: ShowState, round: number): readonly boolean[] 
   return state.past[round] ?? [];
 }
 
+/** The hidden slot a Reveal remaining sweep flips next: the lowest on the board (#10 before #9). */
+export function nextSweepSlot(state: ShowState): number {
+  for (let i = state.slots.length - 1; i >= 0; i--) if (!state.slots[i]!.revealed) return i;
+  return -1;
+}
+
 // ---------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------
 
 /**
- * The public board. Hidden answers contribute NOTHING but their slot position: no text, no points.
- * `callers[i]` (audience members who called slot i) is only published for revealed slots.
+ * The public board. Hidden answers contribute NOTHING but their slot position: no text, no points,
+ * no note. `callers[i]` (audience members who called slot i) is only published for revealed slots.
+ * The special answer's position is public (it's what the crowd hunts for); its text is not.
  */
 export function boardView(state: ShowState, callers: readonly number[] = []): ShowdownBoardView {
   const round = currentRound(state);
   const promptVisible = state.stage !== 'intro' && state.stage !== 'title';
   return {
     rev: state.rev,
+    mode: state.mode,
     stage: state.stage,
     round: state.round,
     totalRounds: state.rounds.length,
     multiplier: round?.multiplier ?? 1,
+    title: round?.title ?? '',
     prompt: promptVisible && round ? round.prompt : '',
+    source: promptVisible && round?.source ? round.source : '',
+    special: specialSlot(round),
     slots: state.slots.map((slot, i) => {
-      if (!slot.revealed || !round) return { revealed: false, by: -1, seq: 0, callers: 0 };
+      if (!slot.revealed || !round) return { revealed: false, by: -1, seq: 0, callers: 0, late: false };
       const answer = round.answers[i]!;
-      return { revealed: true, text: answer.text, points: answer.points, by: slot.by, seq: slot.seq, callers: callers[i] ?? 0 };
+      return {
+        revealed: true,
+        text: answer.text,
+        points: answer.points,
+        by: slot.by,
+        seq: slot.seq,
+        callers: callers[i] ?? 0,
+        late: slot.late,
+        ...(answer.note ? { note: answer.note } : {}),
+      };
     }),
     control: state.control,
     strikes: state.strikes,
@@ -362,18 +498,27 @@ export function sheetView(
     index,
     prompt: r.prompt,
     multiplier: r.multiplier,
-    answers: r.answers.map((a) => ({ text: a.text, points: a.points, aliases: [...a.aliases] })),
+    answers: r.answers.map((a) => ({ text: a.text, points: a.points, aliases: [...a.aliases], ...(a.note ? { note: a.note } : {}) })),
+    ...(r.title ? { title: r.title } : {}),
+    ...(r.source ? { source: r.source } : {}),
+    special: specialSlot(r),
+    ranked: Boolean(r.ranked),
   }));
   return {
     rev: state.rev,
     round: state.round,
     prompt: round?.prompt ?? '',
     multiplier: round?.multiplier ?? 1,
+    special: specialSlot(round),
+    ranked: Boolean(round?.ranked),
+    ...(round?.title ? { title: round.title } : {}),
+    ...(round?.source ? { source: round.source } : {}),
     answers: round
       ? round.answers.map((a, i) => ({
           text: a.text,
           points: a.points,
           aliases: [...a.aliases],
+          ...(a.note ? { note: a.note } : {}),
           revealed: state.slots[i]?.revealed ?? false,
           guessed: extra.guessed?.[i] ?? 0,
         }))

@@ -19,19 +19,33 @@ export interface FloatingReaction {
   at: number;
 }
 
+export type FeedEntry<T extends ShowdownEvent['type'] = ShowdownEvent['type']> = { e: Extract<ShowdownEvent, { type: T }>; at: number };
+
 export interface ShowFeed {
   /** Last board event with the time it arrived (performance.now()). */
   event: { e: ShowdownEvent; at: number } | null;
+  /**
+   * The latest event of each kind, so overlays don't cut each other off: a wrong answer pressed
+   * during the special answer's celebration shows its ✕ without ending the celebration.
+   */
+  last: { [T in ShowdownEvent['type']]?: FeedEntry<T> };
+  /**
+   * The big celebration: a special answer flipped (slot ≥ 0, with its text) or the presenter's
+   * "Celebrate!" cue (slot -1). `key` re-keys the animation.
+   */
+  celebrate: { at: number; slot: number; text: string; key: string } | null;
   cue: { cue: ShowdownCue; id: number; at: number } | null;
   line: HostLine | null;
   lineAt: number;
   reactions: FloatingReaction[];
+  /** The latest reaction batch's size and when it came (the host reacts to a cheering crowd). */
+  cheer: { at: number; count: number } | null;
   /** Your own guess was just called (private flash). */
   calledAt: number;
   calledPoints: number;
 }
 
-const EMPTY: ShowFeed = { event: null, cue: null, line: null, lineAt: 0, reactions: [], calledAt: 0, calledPoints: 0 };
+const EMPTY: ShowFeed = { event: null, last: {}, celebrate: null, cue: null, line: null, lineAt: 0, reactions: [], cheer: null, calledAt: 0, calledPoints: 0 };
 let feed: ShowFeed = EMPTY;
 const listeners = new Set<() => void>();
 let reactionSeq = 0;
@@ -50,10 +64,16 @@ export const showFeed = {
     for (const l of [...listeners]) l();
   },
   event(e: ShowdownEvent): void {
-    set({ event: { e, at: performance.now() } });
+    const at = performance.now();
+    const patch: Partial<ShowFeed> = { event: { e, at }, last: { ...feed.last, [e.type]: { e, at } } };
+    if (e.type === 'reveal' && e.special) patch.celebrate = { at, slot: e.slot, text: e.text, key: `reveal:${e.rev}` };
+    // Rewinding the board (undo, restart, reset) ends a celebration that was still on.
+    if (e.type === 'undo' || e.type === 'restart' || e.type === 'reset') patch.celebrate = null;
+    set(patch);
   },
   cue(cue: ShowdownCue, id: number): void {
-    set({ cue: { cue, id, at: performance.now() } });
+    const at = performance.now();
+    set({ cue: { cue, id, at }, ...(cue === 'celebrate' ? { celebrate: { at, slot: -1, text: '', key: `cue:${id}` } } : {}) });
   },
   say(line: HostLine | null): void {
     if (!line || line.key === feed.line?.key) return;
@@ -61,8 +81,13 @@ export const showFeed = {
   },
   /** Spreads a batch of reactions into floating emoji (budgeted by the effects setting). */
   reactions(batch: ShowdownReactions, budget: number): void {
-    if (budget <= 0) return;
     const now = performance.now();
+    const count = batch.k.reduce((a, b) => a + b, 0);
+    if (count > 0) feed = { ...feed, cheer: { at: now, count } };
+    if (budget <= 0) {
+      if (count > 0) set({});
+      return;
+    }
     const alive = feed.reactions.filter((r) => now - r.at < REACTION_LIFE_MS);
     const total = batch.k.reduce((a, b) => a + b, 0);
     if (total === 0) return;

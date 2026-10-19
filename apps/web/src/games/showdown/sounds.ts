@@ -1,12 +1,21 @@
 /**
  * DAS Survey Showdown sounds — the metallic CLANG of a flipping answer, the strike buzzer, steal
  * stings, applause, the intro fanfare and the presenter's cues, in two looks (DAS Showtime and
- * Halloween Night).
+ * Halloween Night). Presenter Showcase adds its own cues on top: the "correct!" ding before a clang,
+ * the special answer's celebration, the wrong-answer buzzer, the cinematic opening, the category
+ * sting, the Reveal remaining sting and drumroll, time's up, the board-complete flourish and the
+ * holding-card whoosh. Every one is an original motif (no TV themes, no film riffs).
  *
  * Every voice is a pure function of the shared synth kit (tone / noise / note) plus a random source,
  * so it runs on the ONE audio pipeline (src/audio/audio.ts: the shared AudioContext, the SFX bus, the
  * jukebox dip, mute and volume) and is unit-testable with a fake kit. Voices return their length in
  * seconds; long ones hold the jukebox dip while they play (synth.hold).
+ *
+ * Mixed for a Teams screen share (computer sound on): the weight of every hit sits in the mids a
+ * laptop speaker and a voice codec keep (a 200 Hz knock under each kick, a mid crack on the thunder),
+ * no single noise burst is longer than the shared 1-second noise buffer, and the impact grows from a
+ * found answer (ding + clang) to the board complete (+ flourish + applause) to the special answer
+ * (a hit, a fanfare and a crowd). Peaks stay well under full scale (see voices.test.ts).
  *
  * RECORDED SOUNDS (optional): drop a file into apps/web/public/audio/showdown/ and map it below in
  * SHOWDOWN_SOUND_FILES, e.g. `clang: '/audio/showdown/clang.mp3'` (or per look:
@@ -14,9 +23,10 @@
  * AudioContext and played on the SFX bus — never through an <audio> element — and any file that fails
  * to load falls back to the procedural voice. Use only sounds you have the rights to (public repo).
  */
-import type { ShowdownCue, ShowdownLook } from '@dascade/shared/games/showdown';
+import type { ShowdownCue, ShowdownEvent, ShowdownLook, ShowdownMode } from '@dascade/shared/games/showdown';
 import type { SfxKit } from '../../audio/voices.ts';
 import { synth } from '../../audio/audio.ts';
+import { duckThemeMusic } from './themeMusic.ts';
 
 export type ShowdownSound =
   | 'clang'
@@ -37,7 +47,30 @@ export type ShowdownSound =
   | 'undo'
   | 'calledIt'
   | 'tap'
-  | 'finale';
+  | 'finale'
+  // ---- Presenter Showcase ----
+  /** The "correct!" ding at the start of a reveal (the clang follows as the tile lands). */
+  | 'correct'
+  /** A tile flipped by the Reveal remaining sweep (lighter than a found answer). */
+  | 'clangLate'
+  /** The special answer's celebration: a hit on the flip, a fanfare, the crowd (~3 s). */
+  | 'special'
+  /** A wrong answer: one short, dramatic buzzer. */
+  | 'miss'
+  /** The cinematic opening (longer than the Team Showdown intro sting). */
+  | 'opening'
+  /** A new round's category card (the transition sting). */
+  | 'category'
+  /** Reveal remaining begins ("here come the answers"). */
+  | 'sweepStart'
+  /** The sweep's drumroll before the special answer: no crash of its own, it lands on the celebration. */
+  | 'rollIn'
+  /** The round clock ran out. */
+  | 'timeup'
+  /** Every answer on the board (a flourish under the applause). */
+  | 'complete'
+  /** A holding card goes up. */
+  | 'cardIn';
 
 /** Recorded overrides: `<sound>` for both looks, `<look>:<sound>` for one look. Empty = all procedural. */
 export const SHOWDOWN_SOUND_FILES: Partial<Record<ShowdownSound | `${ShowdownLook}:${ShowdownSound}`, string>> = {};
@@ -92,18 +125,36 @@ function organ(k: SfxKit, notes: number[], start: number, dur: number, gain: num
 
 const kick = (k: SfxKit, start: number, gain = 0.3) => k.tone({ type: 'sine', freq: 150, to: 48, start, dur: 0.24, gain, attack: 0.003 });
 const snare = (k: SfxKit, start: number, gain = 0.16) => k.noise({ start, dur: 0.15, gain, freq: 2300, q: 0.6 });
-const cymbal = (k: SfxKit, start: number, dur = 1.4, gain = 0.15) => k.noise({ start, dur, gain, freq: 6500, q: 0.4, type: 'highpass', attack: 0.01 });
-const thunder = (k: SfxKit, start: number, dur = 1.8, gain = 0.22) => k.noise({ start, dur, gain, freq: 160, to: 55, q: 0.7, type: 'lowpass', attack: 0.06 });
+const cymbal = (k: SfxKit, start: number, dur = 1.4, gain = 0.15) =>
+  k.noise({ start, dur, gain, freq: 6500, q: 0.4, type: 'highpass', attack: 0.01 });
+const thunder = (k: SfxKit, start: number, dur = 1.8, gain = 0.22) =>
+  k.noise({ start, dur, gain, freq: 160, to: 55, q: 0.7, type: 'lowpass', attack: 0.06 });
 
-/** Crowd applause: a bed of noise and a swarm of claps that swells, holds and fades. */
-export function applause(k: SfxKit, rand: () => number, seconds = 3.4, claps = 110): number {
-  k.noise({ dur: seconds, gain: 0.05, freq: 1600, q: 0.5, attack: 0.45 });
-  k.noise({ dur: seconds * 0.9, gain: 0.028, freq: 650, q: 0.6, type: 'lowpass', attack: 0.3 });
-  for (let i = 0; i < claps; i++) {
+/** Individual claps, swelling in and thinning out over `seconds`. */
+function claps(k: SfxKit, rand: () => number, start: number, seconds: number, count: number, level = 1): void {
+  for (let i = 0; i < count; i++) {
     const t = seconds * Math.pow(rand(), 0.8);
     const tail = t > seconds * 0.6 ? 1 - (t - seconds * 0.6) / (seconds * 0.4) : 1;
-    k.noise({ start: t, dur: 0.018 + rand() * 0.03, gain: (0.055 + rand() * 0.08) * Math.max(0.15, tail), freq: 900 + rand() * 1900, q: 0.7 + rand() * 0.9 });
+    k.noise({
+      start: start + t,
+      dur: 0.018 + rand() * 0.03,
+      gain: Math.min(0.4, (0.12 + rand() * 0.16) * Math.max(0.15, tail) * level),
+      freq: 900 + rand() * 1900,
+      q: 0.7 + rand() * 0.9,
+    });
   }
+}
+
+/** Crowd applause: a bed of noise and a swarm of claps that swells, holds and fades. */
+export function applause(k: SfxKit, rand: () => number, seconds = 3.4, count = 110): number {
+  // The bed in overlapping one-second layers (the shared noise buffer is one second long: a longer
+  // burst would stop dead after a second).
+  for (let t = 0, i = 0; t < seconds - 0.4; t += 0.5, i++) {
+    const fade = Math.max(0.25, 1 - t / seconds);
+    k.noise({ start: t, dur: 0.98, gain: 0.1 * fade, freq: 1600, q: 0.5, attack: i === 0 ? 0.45 : 0.3 });
+    if (t < seconds * 0.6) k.noise({ start: t + 0.1, dur: 0.9, gain: 0.05 * fade, freq: 650, q: 0.6, type: 'lowpass', attack: 0.3 });
+  }
+  claps(k, rand, 0, seconds, Math.round(count * 1.3));
   k.tone({ type: 'sine', freq: 1500, to: 2350, start: 0.35, dur: 0.45, gain: 0.032, attack: 0.05 });
   k.tone({ type: 'sine', freq: 1750, to: 1250, start: 0.95, dur: 0.5, gain: 0.028, attack: 0.04 });
   return seconds;
@@ -119,6 +170,173 @@ function drumroll(k: SfxKit, rand: () => number, seconds = 2.4): number {
   kick(k, seconds + 0.04, 0.34);
   cymbal(k, seconds + 0.04, 1.5, 0.2);
   return seconds + 1.5;
+}
+
+// ---------------------------------------------------------------------------
+// Presenter Showcase building blocks
+// ---------------------------------------------------------------------------
+
+/** A kick that survives a laptop speaker: the sub drop, a 200 Hz knock and a click. */
+function thump(k: SfxKit, start: number, gain = 0.22): void {
+  k.tone({ type: 'sine', freq: 140, to: 50, start, dur: 0.3, gain, attack: 0.002 });
+  k.tone({ type: 'triangle', freq: 240, to: 115, start, dur: 0.09, gain: gain * 0.6, attack: 0.001 });
+  k.noise({ start, dur: 0.02, gain: gain * 0.45, freq: 2600, q: 0.7, type: 'lowpass' });
+}
+
+/** A crash cymbal: a mid body (what survives a call) and the air above it. */
+function crash(k: SfxKit, start: number, gain = 0.11): void {
+  k.noise({ start, dur: 0.5, gain: gain * 0.75, freq: 3400, q: 0.6 });
+  k.noise({ start, dur: 0.98, gain, freq: 6800, q: 0.5, type: 'highpass', attack: 0.004 });
+}
+
+/** A tuned chime (celesta / glockenspiel): a sine, a soft octave and a glassy upper partial. */
+function chime(k: SfxKit, freq: number, start: number, dur = 0.6, gain = 0.05): void {
+  k.tone({ type: 'sine', freq, start, dur, gain, attack: 0.003 });
+  k.tone({ type: 'sine', freq: freq * 2, start, dur: dur * 0.5, gain: gain * 0.3, attack: 0.002 });
+  k.tone({ type: 'sine', freq: freq * 4.07, start, dur: dur * 0.22, gain: gain * 0.12, attack: 0.001 });
+}
+
+/** A brass section: two detuned saws for the blare, a triangle for the body. */
+function horn(k: SfxKit, notes: number[], start: number, dur: number, gain: number, attack = 0.018): void {
+  for (const n of notes) {
+    const f = k.note(n);
+    k.tone({ type: 'sawtooth', freq: f, start, dur, gain: gain * 0.6, attack, detune: 6 });
+    k.tone({ type: 'sawtooth', freq: f, start, dur, gain: gain * 0.6, attack, detune: -6 });
+    k.tone({ type: 'triangle', freq: f, start, dur: dur * 1.2, gain: gain * 0.8, attack });
+  }
+}
+
+/** A theatre organ: a triangle flue, a sine octave and a little reed. */
+function pipe(k: SfxKit, notes: number[], start: number, dur: number, gain: number, attack = 0.025): void {
+  for (const n of notes) {
+    const f = k.note(n);
+    k.tone({ type: 'triangle', freq: f, start, dur, gain, attack });
+    k.tone({ type: 'sine', freq: f * 2, start, dur, gain: gain * 0.55, attack });
+    k.tone({ type: 'square', freq: f, start, dur: dur * 0.8, gain: gain * 0.22, attack });
+  }
+}
+
+/** A short tom (pitched for small speakers). */
+function tom(k: SfxKit, start: number, freq: number, gain = 0.12): void {
+  k.tone({ type: 'triangle', freq, to: freq * 0.62, start, dur: 0.22, gain, attack: 0.002 });
+  k.noise({ start, dur: 0.05, gain: gain * 0.5, freq: freq * 6, q: 0.8 });
+}
+
+/** A snare roll that swells from `from` to `to` over `seconds` (no crash: it lands on whatever follows). */
+function roll(k: SfxKit, rand: () => number, start: number, seconds: number, from: number, to: number): void {
+  const hits = Math.round(seconds / 0.034);
+  for (let i = 0; i < hits; i++) {
+    const x = i / Math.max(1, hits - 1);
+    k.noise({ start: start + i * 0.034 + rand() * 0.006, dur: 0.05, gain: from + (to - from) * x * x, freq: 1600 + rand() * 600, q: 0.55 });
+  }
+}
+
+/**
+ * An electric buzzer: a dissonant pair re-struck 30 times a second (the rattle of a real buzzer), at a
+ * steady level for `dur`, then cut. Repeats cleanly: nothing rings on after it.
+ */
+function buzzer(k: SfxKit, start: number, dur: number, low: number, gain: number, round = false): void {
+  const rate = 30;
+  const n = Math.max(3, Math.round(dur * rate));
+  for (let i = 0; i < n; i++) {
+    const shape = i === 0 ? 1.15 : i >= n - 3 ? (n - i) / 4 : 1;
+    const t = start + i / rate;
+    k.tone({ type: round ? 'triangle' : 'sawtooth', freq: low, start: t, dur: 2.4 / rate, gain: gain * shape, attack: 0.002 });
+    k.tone({ type: 'square', freq: low * 1.0595, start: t, dur: 2.4 / rate, gain: gain * (round ? 0.38 : 0.45) * shape, attack: 0.002 });
+  }
+}
+
+/** A tuned church bell (hum, prime, minor tierce, quint, nominal) for the Halloween cascades and tolls. */
+function churchBell(k: SfxKit, freq: number, start: number, dur = 1.4, gain = 0.05): void {
+  const partials: Array<[number, number, number]> = [
+    [0.5, 0.45, 1.3],
+    [1, 1, 1],
+    [1.19, 0.45, 0.8],
+    [1.5, 0.22, 0.6],
+    [2, 0.35, 0.5],
+    [2.98, 0.12, 0.3],
+  ];
+  for (const [ratio, g, d] of partials) k.tone({ type: 'sine', freq: freq * ratio, start, dur: dur * d, gain: gain * g, attack: 0.002 });
+  k.noise({ start, dur: 0.03, gain: gain * 1.4, freq: Math.min(9000, freq * 4), q: 1.2 });
+}
+
+/** A theremin-ish glide: a sine and a twin ~5 Hz away (the beating is the wobble). */
+function theremin(k: SfxKit, from: number, to: number, start: number, dur: number, gain: number, attack = 0.12): void {
+  const wobble = 1200 * Math.log2(1 + 5.5 / from);
+  k.tone({ type: 'sine', freq: from, to, start, dur, gain, attack });
+  k.tone({ type: 'sine', freq: from, to, start, dur, gain: gain * 0.7, attack, detune: wobble });
+}
+
+/** Bat wings: a flutter of short noise flaps. */
+function bats(k: SfxKit, start: number, count = 7, gain = 0.06): void {
+  for (let i = 0; i < count; i++) {
+    k.noise({ start: start + i * 0.034, dur: 0.028, gain: gain * (1 - i / (count * 1.8)), freq: 2300 + (i % 2) * 1100, q: 1.6 });
+  }
+}
+
+/** Thunder that a laptop speaker can still hear: a mid crack, a rumble with mids in it, the roll. */
+function storm(k: SfxKit, start: number, gain = 0.2): void {
+  k.noise({ start, dur: 0.16, gain, freq: 1500, to: 600, q: 0.6 });
+  k.noise({ start: start + 0.03, dur: 0.97, gain: gain * 0.85, freq: 900, to: 120, q: 0.5, type: 'lowpass', attack: 0.03 });
+  k.noise({ start: start + 0.12, dur: 0.86, gain: gain * 0.5, freq: 260, q: 1.1, attack: 0.15 });
+}
+
+/** A heartbeat: lub-dub. */
+function heartbeat(k: SfxKit, start: number, gain = 0.12): void {
+  for (const [at, g] of [
+    [0, 1],
+    [0.17, 0.75],
+  ] as const) {
+    k.tone({ type: 'sine', freq: 90, to: 48, start: start + at, dur: 0.2, gain: gain * g, attack: 0.004 });
+    k.tone({ type: 'triangle', freq: 190, to: 110, start: start + at, dur: 0.07, gain: gain * g * 0.5, attack: 0.002 });
+  }
+}
+
+/**
+ * The crowd going wild: an "aah" roar (two vowel formants, in overlapping one-second layers), a few
+ * whoops and whistles, and the claps.
+ */
+function crowd(k: SfxKit, rand: () => number, start: number, seconds: number, level = 1): void {
+  for (let t = 0; t < seconds - 0.5; t += 0.26) {
+    const fade = Math.max(0.25, 1 - Math.pow(t / seconds, 2));
+    k.noise({
+      start: start + t,
+      dur: 0.95,
+      gain: Math.min(0.4, 0.3 * level * fade),
+      freq: 700 + rand() * 80,
+      to: 820,
+      q: 0.9,
+      attack: 0.28,
+    });
+    k.noise({
+      start: start + t + 0.12,
+      dur: 0.9,
+      gain: Math.min(0.4, 0.18 * level * fade),
+      freq: 1180 + rand() * 120,
+      to: 1300,
+      q: 1.2,
+      attack: 0.26,
+    });
+    k.noise({
+      start: start + t + 0.06,
+      dur: 0.9,
+      gain: Math.min(0.4, 0.16 * level * fade),
+      freq: 460 + rand() * 40,
+      to: 520,
+      q: 1,
+      attack: 0.3,
+    });
+  }
+  const whoops: Array<[number, number, number]> = [
+    [0.12, 1500, 2500],
+    [0.55, 1900, 2800],
+    [0.95, 2200, 1500],
+    [1.45, 1650, 2450],
+  ];
+  for (const [at, f0, f1] of whoops) {
+    if (at < seconds - 0.5) k.tone({ type: 'sine', freq: f0, to: f1, start: start + at, dur: 0.42, gain: 0.03 * level, attack: 0.06 });
+  }
+  claps(k, rand, start, seconds, Math.round(seconds * 40), level);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +380,15 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
   stealMiss: (k) => {
     [63, 62, 61, 58].forEach((n, i) => {
       const last = i === 3;
-      k.tone({ type: 'triangle', freq: k.note(n), to: last ? k.note(n) * 0.97 : undefined, start: i * 0.32, dur: last ? 0.9 : 0.3, gain: 0.09, attack: 0.02 });
+      k.tone({
+        type: 'triangle',
+        freq: k.note(n),
+        to: last ? k.note(n) * 0.97 : undefined,
+        start: i * 0.32,
+        dur: last ? 0.9 : 0.3,
+        gain: 0.09,
+        attack: 0.02,
+      });
       k.tone({ type: 'sawtooth', freq: k.note(n - 12), start: i * 0.32, dur: last ? 0.9 : 0.3, gain: 0.04, attack: 0.02 });
     });
     return 1.9;
@@ -254,6 +480,153 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
     cymbal(k, 0.5, 1.8, 0.16);
     applause(k, rand, 4, 130);
     return 4;
+  },
+
+  // ---- Presenter Showcase ----
+  // "Ding-DING!": a rising fifth (E6 → B6) on a glassy chime, high above the clang that follows.
+  correct: (k) => {
+    chime(k, k.note(88), 0, 0.5, 0.14);
+    chime(k, k.note(95), 0.075, 0.62, 0.125);
+    return 0.7;
+  },
+  // The sweep's tiles: the same plate, smaller and drier, so ten in a row never tire.
+  clangLate: (k) => {
+    swish(k, 0, 0.55);
+    k.noise({ start: 0.11, dur: 0.03, gain: 0.16, freq: 5200, q: 0.7, type: 'highpass' });
+    for (const [ratio, gain, dur] of [
+      [1, 0.12, 0.95],
+      [1.009, 0.07, 0.9],
+      [2.756, 0.07, 0.6],
+      [5.404, 0.04, 0.4],
+      [8.933, 0.022, 0.25],
+    ] as const) {
+      k.tone({ type: 'sine', freq: 349 * ratio, start: 0.11, dur, gain, attack: 0.002 });
+    }
+    k.tone({ type: 'triangle', freq: 175, to: 120, start: 0.11, dur: 0.18, gain: 0.07, attack: 0.003 });
+    return 1.1;
+  },
+  // THE moment (lands on the flip): clang + kick + crash under a C-major blast, a sparkle run, a
+  // ta-ta-ta-TAAA brass fanfare (I–IV–V–I) whose last chord rings a second, higher plate, a bell
+  // cascade down and the crowd going wild.
+  special: (k, rand) => {
+    // The hit's layers are flammed by a few ms (heard as one hit, but their peaks don't stack).
+    thump(k, 0, 0.26);
+    plate(k, 392, 0.75, 0.008);
+    crash(k, 0.014, 0.12);
+    horn(k, [48, 60, 64, 67], 0.004, 0.5, 0.06);
+    [84, 88, 91, 96, 100, 103].forEach((n, i) => chime(k, k.note(n), 0.06 + i * 0.045, 0.35, 0.055));
+    horn(k, [64, 67, 72], 0.52, 0.14, 0.1);
+    horn(k, [65, 69, 72], 0.67, 0.14, 0.1);
+    horn(k, [67, 71, 74], 0.82, 0.14, 0.1);
+    thump(k, 1.0, 0.24);
+    horn(k, [48, 60, 64, 67, 72], 1.004, 2.1, 0.075);
+    plate(k, 523, 0.45, 1.01);
+    crash(k, 1.016, 0.12);
+    [96, 91, 88, 84, 79].forEach((n, i) => chime(k, k.note(n), 1.08 + i * 0.09, 0.9, 0.085));
+    crowd(k, rand, 0.25, 2.9, 2);
+    return 3.2;
+  },
+  // One dramatic buzz (an A–B♭ cluster, rattling), on a thump that lands with the big ✕.
+  miss: (k) => {
+    thump(k, 0, 0.18);
+    buzzer(k, 0, 0.5, 110, 0.17);
+    k.noise({ dur: 0.42, gain: 0.09, freq: 520, q: 0.8, type: 'lowpass' });
+    return 0.55;
+  },
+  // The cold open (~5.5 s): a riser and a snare roll, then a call-and-answer brass fanfare
+  // (G G C! · A A D! · E F G) into a big C-major chord that rings out under the theme.
+  opening: (k, rand) => {
+    k.noise({ dur: 0.98, gain: 0.16, freq: 380, to: 4200, q: 0.9, attack: 0.85 });
+    k.tone({ type: 'sine', freq: 196, to: 784, dur: 1.05, gain: 0.06, attack: 0.9 });
+    roll(k, rand, 0.45, 0.62, 0.05, 0.2);
+    horn(k, [55, 67], 1.1, 0.12, 0.06);
+    horn(k, [55, 67], 1.25, 0.12, 0.06);
+    horn(k, [48, 60, 64, 67, 72], 1.404, 0.55, 0.045);
+    thump(k, 1.4, 0.24);
+    crash(k, 1.4, 0.09);
+    horn(k, [57, 69], 1.95, 0.12, 0.06);
+    horn(k, [57, 69], 2.1, 0.12, 0.06);
+    horn(k, [55, 65, 71, 74], 2.254, 0.55, 0.045);
+    thump(k, 2.25, 0.22);
+    snare(k, 2.25, 0.1);
+    horn(k, [76], 2.82, 0.11, 0.06);
+    horn(k, [77], 2.95, 0.11, 0.06);
+    horn(k, [79], 3.08, 0.11, 0.06);
+    tom(k, 2.82, 220, 0.11);
+    tom(k, 2.95, 180, 0.12);
+    tom(k, 3.08, 150, 0.13);
+    horn(k, [48, 60, 64, 67, 72, 76], 3.254, 2.4, 0.034);
+    thump(k, 3.25, 0.26);
+    crash(k, 3.25, 0.12);
+    [84, 88, 91, 96].forEach((n, i) => chime(k, k.note(n), 3.3 + i * 0.07, 0.5, 0.05));
+    chime(k, k.note(96), 3.62, 2.0, 0.05);
+    return 5.6;
+  },
+  // A round's category card: a whoosh up, a tom fill, then a suspended chord that opens to C major
+  // with a glockenspiel answer.
+  category: (k) => {
+    k.noise({ dur: 0.5, gain: 0.2, freq: 420, to: 3600, q: 0.8, attack: 0.42 });
+    tom(k, 0.3, 230, 0.12);
+    tom(k, 0.39, 190, 0.13);
+    tom(k, 0.48, 155, 0.15);
+    thump(k, 0.58, 0.22);
+    horn(k, [60, 65, 67, 72], 0.584, 0.34, 0.042);
+    crash(k, 0.59, 0.1);
+    horn(k, [60, 64, 67, 72], 0.92, 1.3, 0.042, 0.04);
+    [79, 84, 88, 91].forEach((n, i) => chime(k, k.note(n), 0.98 + i * 0.09, 0.7, 0.06));
+    return 2.4;
+  },
+  // "Here come the answers": a snare build and a dominant stab that leaves the door open.
+  sweepStart: (k, rand) => {
+    roll(k, rand, 0, 0.42, 0.07, 0.32);
+    k.tone({ type: 'sine', freq: 330, to: 660, dur: 0.45, gain: 0.07, attack: 0.38 });
+    thump(k, 0.45, 0.22);
+    horn(k, [55, 59, 65, 74], 0.454, 0.55, 0.05);
+    chime(k, k.note(91), 0.47, 0.5, 0.07);
+    return 1.05;
+  },
+  // The beat before the special tile: a snare roll swelling over a rising sine (no crash: the
+  // celebration's hit is the landing). Ends ~2.9 s, as the special tile lands.
+  rollIn: (k, rand) => {
+    roll(k, rand, 0, 2.9, 0.05, 0.4);
+    k.tone({ type: 'sine', freq: 220, to: 523, dur: 2.9, gain: 0.1, attack: 2.4 });
+    k.tone({ type: 'triangle', freq: 98, to: 131, dur: 2.9, gain: 0.11, attack: 2.2 });
+    return 2.95;
+  },
+  // Time! A boxing-ring bell, struck three times.
+  timeup: (k) => {
+    for (const t of [0, 0.19, 0.38]) {
+      k.noise({ start: t, dur: 0.02, gain: 0.16, freq: 6000, q: 0.8, type: 'highpass' });
+      for (const [ratio, gain, dur] of [
+        [1, 0.17, 1.4],
+        [2.32, 0.085, 1],
+        [4.25, 0.05, 0.6],
+        [6.63, 0.025, 0.35],
+      ] as const) {
+        k.tone({ type: 'sine', freq: 784 * ratio, start: t, dur: t === 0.38 ? dur : dur * 0.5, gain, attack: 0.002 });
+      }
+    }
+    k.tone({ type: 'sine', freq: 196, start: 0, dur: 0.9, gain: 0.09, attack: 0.004 });
+    return 1.8;
+  },
+  // The board's last tile: "ta-DAAA!" — a G pickup into C major, a glockenspiel run up, a crash and
+  // a cheer (the applause follows).
+  complete: (k, rand) => {
+    horn(k, [55, 67, 71, 74], 0, 0.11, 0.06);
+    thump(k, 0.13, 0.24);
+    horn(k, [48, 60, 64, 67, 72], 0.134, 1.6, 0.06);
+    crash(k, 0.142, 0.12);
+    [84, 88, 91, 96, 100].forEach((n, i) => chime(k, k.note(n), 0.16 + i * 0.05, 0.5, 0.06));
+    chime(k, k.note(96), 0.45, 1.2, 0.06);
+    crowd(k, rand, 0.2, 1.6, 1.1);
+    return 1.8;
+  },
+  // A holding card slides up: a soft whoosh and a faint chime.
+  cardIn: (k) => {
+    k.noise({ dur: 0.5, gain: 0.4, freq: 300, to: 2600, q: 0.7, type: 'lowpass', attack: 0.28 });
+    k.noise({ dur: 0.5, gain: 0.26, freq: 900, to: 2200, q: 1, attack: 0.3 });
+    chime(k, k.note(91), 0.4, 0.5, 0.03);
+    return 0.9;
   },
 };
 
@@ -368,6 +741,148 @@ const HALLOWEEN: Partial<Record<ShowdownSound, Voice>> = {
     applause(k, rand, 4, 130);
     return 4;
   },
+
+  // ---- Presenter Showcase ----
+  // A haunted music box: A5 → E6 with an eerie detuned twin on the answer.
+  correct: (k) => {
+    k.tone({ type: 'triangle', freq: k.note(81), dur: 0.42, gain: 0.17, attack: 0.003 });
+    k.tone({ type: 'sine', freq: k.note(93), dur: 0.2, gain: 0.045, attack: 0.002 });
+    k.tone({ type: 'triangle', freq: k.note(88), start: 0.08, dur: 0.6, gain: 0.155, attack: 0.003 });
+    k.tone({ type: 'sine', freq: k.note(88), start: 0.08, dur: 0.6, gain: 0.065, attack: 0.003, detune: 16 });
+    k.tone({ type: 'sine', freq: k.note(100), start: 0.08, dur: 0.25, gain: 0.035, attack: 0.002 });
+    return 0.7;
+  },
+  // The sweep's tiles: a small hand bell instead of the big one.
+  clangLate: (k) => {
+    swish(k, 0, 0.5);
+    k.noise({ start: 0.11, dur: 0.03, gain: 0.14, freq: 5200, q: 0.7, type: 'highpass' });
+    churchBell(k, 392, 0.11, 1.3, 0.11);
+    k.tone({ type: 'triangle', freq: 131, to: 98, start: 0.11, dur: 0.18, gain: 0.06, attack: 0.003 });
+    return 1.4;
+  },
+  // THE moment: thunder and the big bell on the flip, a D-major organ fanfare (the spooky turned
+  // happy), a bell cascade, bats, a ghostly "woo-OOO" and the crowd.
+  special: (k, rand) => {
+    thump(k, 0, 0.24);
+    storm(k, 0.006, 0.2);
+    bell(k, 294, 0.8, 0.012);
+    pipe(k, [50, 62, 66, 69], 0.004, 0.5, 0.07);
+    bats(k, 0.12, 8, 0.07);
+    [86, 90, 93, 98].forEach((n, i) => chime(k, k.note(n), 0.1 + i * 0.05, 0.35, 0.055));
+    pipe(k, [62, 69], 0.52, 0.14, 0.1);
+    pipe(k, [66, 74], 0.67, 0.14, 0.1);
+    pipe(k, [69, 78], 0.82, 0.14, 0.1);
+    pipe(k, [50, 57, 62, 66, 69, 74], 1.0, 2.1, 0.07);
+    thump(k, 1.0, 0.24);
+    crash(k, 1.012, 0.11);
+    [98, 93, 90, 86, 81].forEach((n, i) => churchBell(k, k.note(n), 1.06 + i * 0.1, 1.1, 0.08));
+    theremin(k, 523, 1046, 1.15, 1.4, 0.07, 0.35);
+    crowd(k, rand, 0.25, 2.9, 2);
+    return 3.2;
+  },
+  // A lower, rounder buzz, then a ghost wails away (quiet enough to run into the next press).
+  miss: (k) => {
+    thump(k, 0, 0.16);
+    buzzer(k, 0, 0.46, 98, 0.18, true);
+    k.noise({ dur: 0.4, gain: 0.08, freq: 480, q: 0.8, type: 'lowpass' });
+    theremin(k, 760, 380, 0.3, 0.65, 0.045, 0.08);
+    return 0.95;
+  },
+  // The cold open (~5.8 s): thunder, two tolls of the bell and a theremin rising over the organ
+  // pedal, a creeping organ line (A B♭ A G♯ A · D F E C♯), then the landing on D minor (the theme's
+  // key: the bed fades in under it) with thunder, a bell cascade and the bats.
+  opening: (k) => {
+    storm(k, 0, 0.2);
+    bell(k, 294, 0.9, 0.4);
+    bell(k, 294, 0.75, 1.3);
+    pipe(k, [38, 45], 0.45, 1.7, 0.045, 1.1);
+    theremin(k, 440, 660, 0.7, 1.3, 0.045, 0.55);
+    bats(k, 1.55, 8, 0.06);
+    const line: Array<[number, number, number]> = [
+      [69, 0, 0.13],
+      [70, 0.15, 0.13],
+      [69, 0.3, 0.13],
+      [68, 0.45, 0.13],
+      [69, 0.6, 0.32],
+      [74, 1.0, 0.13],
+      [77, 1.15, 0.13],
+      [76, 1.3, 0.13],
+      [73, 1.45, 0.13],
+    ];
+    for (const [n, t, d] of line) pipe(k, [n], 1.9 + t, d, 0.08);
+    pipe(k, [50], 1.9, 0.9, 0.05);
+    pipe(k, [45], 2.9, 0.6, 0.05);
+    const end = 3.55;
+    storm(k, end, 0.15);
+    thump(k, end, 0.24);
+    pipe(k, [50, 57, 62, 65, 69], end + 0.004, 2.3, 0.046);
+    crash(k, end, 0.09);
+    [86, 81, 77, 74].forEach((n, i) => churchBell(k, k.note(n), end + 0.08 + i * 0.11, 1.2, 0.055));
+    theremin(k, 587, 880, end + 0.3, 1.4, 0.035, 0.4);
+    bats(k, end + 0.5, 7, 0.05);
+    return 5.8;
+  },
+  // A round's category card: bat wings rush past, then the organ goes iv – V – i in D minor with a
+  // bell on the landing and a theremin sigh.
+  category: (k) => {
+    bats(k, 0, 10, 0.08);
+    k.noise({ dur: 0.5, gain: 0.18, freq: 450, to: 1600, q: 1.1, attack: 0.35 });
+    pipe(k, [55, 67, 70, 74], 0.5, 0.2, 0.05);
+    pipe(k, [57, 69, 73, 76], 0.72, 0.2, 0.05);
+    thump(k, 0.95, 0.22);
+    pipe(k, [50, 62, 65, 69, 74], 0.954, 1.4, 0.042);
+    churchBell(k, k.note(74), 0.97, 1.4, 0.08);
+    theremin(k, 587, 440, 1.2, 1.2, 0.045, 0.3);
+    return 2.6;
+  },
+  // "Here come the answers": a quick organ run up D minor into a bell and an A7 chord.
+  sweepStart: (k) => {
+    [62, 64, 65, 67, 69, 70, 73, 74].forEach((n, i) => pipe(k, [n], i * 0.045, 0.08, 0.065, 0.006));
+    bats(k, 0.1, 6, 0.07);
+    thump(k, 0.42, 0.2);
+    pipe(k, [45, 57, 61, 67], 0.424, 0.6, 0.05);
+    churchBell(k, k.note(81), 0.43, 0.9, 0.08);
+    return 1.05;
+  },
+  // The beat before the special tile: a snare roll over a quickening heartbeat and a theremin rising.
+  rollIn: (k, rand) => {
+    roll(k, rand, 0, 2.9, 0.045, 0.38);
+    for (const t of [0, 0.62, 1.16, 1.62, 2.02, 2.36, 2.64]) heartbeat(k, t, 0.22);
+    theremin(k, 330, 880, 0.2, 2.7, 0.075, 2.2);
+    return 2.95;
+  },
+  // Midnight: a tick and a tock, then the clock tower strikes twice.
+  timeup: (k) => {
+    for (const [t, f] of [
+      [0, 1800],
+      [0.3, 1250],
+    ] as const) {
+      k.tone({ type: 'sine', freq: f, start: t, dur: 0.06, gain: 0.07, attack: 0.001 });
+      k.noise({ start: t, dur: 0.025, gain: 0.08, freq: f * 1.6, q: 3 });
+    }
+    bell(k, 196, 0.85, 0.62);
+    bell(k, 196, 0.7, 1.55);
+    k.noise({ start: 0.7, dur: 0.95, gain: 0.03, freq: 1100, q: 3, attack: 0.3 });
+    return 2.9;
+  },
+  // The board's last tile: an organ "ta-DAAA" in D major, a bell cascade up, the bats and a cheer.
+  complete: (k, rand) => {
+    pipe(k, [57, 69, 73, 76], 0, 0.11, 0.06);
+    thump(k, 0.13, 0.24);
+    pipe(k, [50, 62, 66, 69, 74], 0.134, 1.6, 0.06);
+    crash(k, 0.142, 0.11);
+    [74, 78, 81, 86, 90].forEach((n, i) => churchBell(k, k.note(n), 0.16 + i * 0.07, 0.9, 0.065));
+    bats(k, 0.5, 7, 0.05);
+    crowd(k, rand, 0.2, 1.6, 1.1);
+    return 1.8;
+  },
+  // A holding card drifts up: a gust of wind and a faint flutter.
+  cardIn: (k) => {
+    k.noise({ dur: 0.6, gain: 0.4, freq: 450, to: 1300, q: 1.3, attack: 0.3 });
+    k.noise({ start: 0.05, dur: 0.55, gain: 0.24, freq: 800, to: 1900, q: 1.2, attack: 0.28 });
+    bats(k, 0.32, 5, 0.05);
+    return 0.75;
+  },
 };
 
 export const SHOWDOWN_VOICES: Record<ShowdownLook, Record<ShowdownSound, Voice>> = {
@@ -382,7 +897,90 @@ export const CUE_SOUND: Record<ShowdownCue, ShowdownSound> = {
   aww: 'aww',
   ding: 'ding',
   suspense: 'suspense',
+  celebrate: 'special',
 };
+
+// ---------------------------------------------------------------------------
+// Which sounds each board event plays
+// ---------------------------------------------------------------------------
+
+/**
+ * When the stage's 3D flip lands, in ms after the reveal event: the tile's 0.75 s overshooting
+ * transition passes 180° at ~0.28 s, plus a frame or two to render. Showcase clangs hit here.
+ */
+export const FLIP_LAND_MS = 320;
+/** clang / clangLate strike their plate this far into the voice (the swish leads in). */
+const STRIKE_MS = 110;
+/** A special answer that also completes the board: the flourish waits for the fanfare to ring. */
+const SPECIAL_RING_MS = 2500;
+
+/** The sounds of one board event: [sound, delay in ms]. */
+export function eventSounds(e: ShowdownEvent, mode: ShowdownMode = 'classic'): Array<[ShowdownSound, number]> {
+  const showcase = mode === 'showcase';
+  switch (e.type) {
+    case 'intro':
+      return [[showcase ? 'opening' : 'intro', 0]];
+    case 'round':
+      return [[showcase ? 'category' : 'round', 0]];
+    case 'question':
+      return [['question', 0]];
+    case 'control':
+      return [['control', 0]];
+    case 'reveal': {
+      if (showcase) {
+        // The crescendo: a found answer goes ding … CLANG (as the tile lands); the special one goes
+        // ding … into the celebration; the sweep's tiles (and other late ones) only clang, lighter;
+        // the board's last tile adds the flourish and the applause.
+        const list: Array<[ShowdownSound, number]> = e.late ? [] : [['correct', 0]];
+        if (e.special) list.push(['special', FLIP_LAND_MS]);
+        else list.push([e.late ? 'clangLate' : 'clang', FLIP_LAND_MS - STRIKE_MS]);
+        if (e.cleared) {
+          const at = e.special ? FLIP_LAND_MS + SPECIAL_RING_MS : FLIP_LAND_MS + 380;
+          list.push(['complete', at], ['applause', at + 250]);
+        }
+        return list;
+      }
+      return e.cleared
+        ? [
+            [e.top ? 'clangTop' : 'clang', 0],
+            ['applause', 600],
+          ]
+        : [[e.top ? 'clangTop' : 'clang', 0]];
+    }
+    case 'miss':
+      return [['miss', 0]];
+    case 'sweep':
+      return e.on ? [['sweepStart', 0]] : [];
+    case 'suspense':
+      // The server flips the special tile 2.6 s later: the roll runs into its celebration.
+      return [[showcase ? 'rollIn' : 'drumroll', 0]];
+    case 'timeup':
+      return [['timeup', 0]];
+    case 'restart':
+    case 'reset':
+      return [['undo', 0]];
+    case 'strike':
+      if (e.stealFailed) return [['stealMiss', 0]];
+      return e.steal
+        ? [
+            ['strike', 0],
+            ['stealOpen', 950],
+          ]
+        : [['strike', 0]];
+    case 'award':
+      if (e.how === 'none') return [['aww', 0]];
+      return e.how === 'steal'
+        ? [
+            ['award', 300],
+            ['applause', 700],
+          ]
+        : [['award', 300]];
+    case 'undo':
+      return [['undo', 0]];
+    case 'adjust':
+      return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Playback
@@ -408,8 +1006,9 @@ function decode(url: string, ctx: AudioContext): Promise<AudioBuffer | null> {
   return p;
 }
 
-/** Holds the jukebox dip for a long sound. */
+/** Holds the jukebox dip for a long sound, and tucks the theme music under every show sound. */
 function hold(seconds: number): void {
+  duckThemeMusic(seconds);
   if (seconds < 1.2) return;
   const key = `showdown:${++holdSeq}`;
   synth.hold(key, true);

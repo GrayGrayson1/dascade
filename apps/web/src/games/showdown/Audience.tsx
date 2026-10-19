@@ -2,12 +2,18 @@
  * The audience view (phones first): your team, the live board, your private "survey says" guesses,
  * and the cheer pad that fills your team's hype meter on the big screen. Wide screens get the full
  * stage next to the controls.
+ *
+ * Presenter Showcase has no teams: a mini board with the round, the question and the clock, how many
+ * answers the crowd has found, the cheer pad (reactions float up on the stage), and — only when the
+ * presenter allows it — private guesses that say "you called it" when they flip.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import {
+  SHOWDOWN_CARD_INFO,
   SHOWDOWN_LIMITS,
   SHOWDOWN_MSG,
   SHOWDOWN_TEAMS,
+  showTitle,
   teamName,
   type ShowdownBoardView,
   type ShowdownLook,
@@ -23,13 +29,15 @@ import { LOOK_COPY } from './look.ts';
 import { showFeed, useShowFeed } from './fx.ts';
 import { setScreenMode } from './access.ts';
 import { playShowSound } from './sounds.ts';
-import { useBoard, useHype, useMe, useMotion, useShowSounds, type RoleInfo } from './state.ts';
+import { formatClock, useBoard, useCard, useClock, useHype, useMe, useMotion, useShowSounds, useSweep, type RoleInfo } from './state.ts';
+import './chrome-showcase.css';
 
 export function AudienceView({ look, settings, code, role }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string; role: RoleInfo }) {
   const board = useBoard();
   const wide = useMedia('(min-width: 960px) and (min-height: 560px)');
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   if (!board) return null;
+  if (board.mode === 'showcase') return <ShowcaseAudience board={board} look={look} settings={settings} code={code} role={role} wide={wide} />;
   const canPickTeam = board.stage === 'intro' || role.team === null;
   return (
     <div className="sd-aud" data-look={look} data-wide={wide ? 'true' : undefined}>
@@ -298,3 +306,277 @@ export function switchToScreen(code: string, on: boolean): void {
   session.send(SHOWDOWN_MSG.screen, { on });
   if (!on) showFeed.say(null);
 }
+
+// ---------------------------------------------------------------------------
+// Presenter Showcase: the crowd (no teams, no scores)
+// ---------------------------------------------------------------------------
+
+function ShowcaseAudience({
+  board,
+  look,
+  settings,
+  code,
+  role,
+  wide,
+}: {
+  board: ShowdownBoardView;
+  look: ShowdownLook;
+  settings: ShowdownSettings | null;
+  code: string;
+  role: RoleInfo;
+  wide: boolean;
+}) {
+  return (
+    <div className="sd-aud sdc-aud" data-look={look} data-wide={wide ? 'true' : undefined} data-mode="showcase">
+      <div className="sd-aud__main">
+        {wide ? (
+          <div className="sd-aud__stagebox">
+            <Stage look={look} settings={settings} variant="preview" />
+          </div>
+        ) : (
+          <ShowcaseMini board={board} look={look} show={settings ? showTitle(settings) : ''} />
+        )}
+      </div>
+      <aside className="sd-aud__side">
+        <div className="sd-panel sdc-crowdcard">
+          <span className="sdc-crowdcard__icon" aria-hidden>
+            {look === 'halloween' ? '🎃' : '🎉'}
+          </span>
+          <span>
+            {role.role === 'spectator' ? (
+              <>You’re watching as a spectator — cheer along!</>
+            ) : (
+              <>
+                <b>You’re in the audience.</b> Guess out loud or in the chat — the host flips what you name.
+                {look === 'halloween' ? ' Tap 👻 Boo! to make the host jump.' : ''}
+              </>
+            )}
+          </span>
+        </div>
+        {settings?.audience && role.role === 'audience' ? <ShowcaseGuessBox board={board} look={look} /> : null}
+        {wide ? <ShowcaseCheerPad look={look} /> : null}
+        <DeviceOptions code={code} role={role} />
+      </aside>
+      {/* Phones: the cheer pad is the last child of the page grid, so it can stay at the bottom of the screen. */}
+      {wide ? null : <ShowcaseCheerPad look={look} />}
+    </div>
+  );
+}
+
+function ShowcaseMini({ board, look, show }: { board: ShowdownBoardView; look: ShowdownLook; show: string }) {
+  const clock = useClock();
+  const feed = useShowFeed();
+  const card = useCard();
+  const sweeping = useSweep();
+  const copy = LOOK_COPY[look];
+  const miss = feed.last.miss;
+  const missFlash = useRecent(miss && miss.e.round === board.round ? miss.at : undefined, 1300);
+  const party = useRecent(feed.celebrate?.at, 3200);
+  const found = board.slots.filter((s) => s.revealed && !s.late).length;
+  const total = board.slots.length;
+  const stage = board.stage;
+  const mark = look === 'halloween' ? '🎃' : '⭐';
+  const showClock = clock.on && clock.stage && stage === 'live' && !sweeping;
+  const waiting = stage === 'intro' ? 'The show is about to begin…' : stage === 'title' ? 'Get ready — here comes the question!' : '';
+  return (
+    <section className="sd-mini sdc-mini" data-look={look} data-stage={stage} aria-label="Live board">
+      <header className="sdc-mini__head">
+        <span className="sdc-mini__round">{board.round < 0 ? copy.showcase.tagline : `Round ${board.round + 1} of ${board.totalRounds}`}</span>
+        {showClock ? (
+          <span className="sdc-mini__clock" role="timer" data-over={clock.left <= 0 ? 'true' : undefined}>
+            <PixelIcon name="clock" size={14} /> {clock.left <= 0 ? copy.showcase.finalGuesses : <span className="sd-num">{formatClock(clock.left)}</span>}
+          </span>
+        ) : null}
+      </header>
+      {board.round < 0 && show ? <p className="sdc-mini__title">{show}</p> : null}
+      {board.title && board.round >= 0 ? <p className="sdc-mini__title">{board.title}</p> : null}
+      {board.prompt || waiting ? <p className="sd-mini__prompt">{board.prompt || waiting}</p> : null}
+      {board.source && board.prompt ? (
+        <p className="sdc-mini__source">
+          {copy.showcase.according} {board.source}
+        </p>
+      ) : null}
+      {card ? (
+        <p className="sdc-mini__card" role="status">
+          <span aria-hidden>{SHOWDOWN_CARD_INFO[card].icon}</span> On the stage: {SHOWDOWN_CARD_INFO[card].title}
+        </p>
+      ) : null}
+      {board.round >= 0 && total ? (
+        <div className="sdc-mini__status">
+          <span className="sdc-mini__found">
+            <span className="sd-num">{found}</span> of <span className="sd-num">{total}</span> found
+          </span>
+          {sweeping ? <span className="sdc-mini__sweep">{copy.showcase.sweeping}</span> : null}
+          {board.special >= 0 && !sweeping ? (
+            <span className="sdc-mini__special">
+              <span aria-hidden>{mark}</span> #{board.special + 1} is the special one
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {total && board.round >= 0 ? <Board board={board} compact specialLabel={copy.showcase.special} /> : null}
+      {/* Phones have no stage (and so no host): screen readers hear the host's line for each event. */}
+      <p className="visually-hidden" aria-live="polite">
+        {feed.line?.text ?? ''}
+      </p>
+      {missFlash && miss ? (
+        <div key={miss.at} className="sd-mini__x sdc-mini__x" aria-hidden>
+          ✕
+        </div>
+      ) : null}
+      {party && feed.celebrate ? (
+        <div key={feed.celebrate.key} className="sdc-mini__party" aria-hidden>
+          <span>{mark}</span> {feed.celebrate.slot >= 0 ? copy.showcase.specialBanner : copy.showcase.cueBanner}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Private guesses in a showcase: no points — "you called it" when one of yours flips. */
+function ShowcaseGuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLook }) {
+  const me = useMe();
+  const [text, setText] = useState('');
+  const open = board.stage === 'live';
+  const mine = me && me.round === board.round ? me.guesses : [];
+  const left = SHOWDOWN_LIMITS.guessesPerRound - mine.length;
+  // Ranked boards have no points, so "called it" follows the calls count (not the points).
+  const [calledAt, setCalledAt] = useState(0);
+  const prevCalls = useRef<number | null>(null);
+  useEffect(() => {
+    if (!me) return;
+    const prev = prevCalls.current;
+    prevCalls.current = me.calls;
+    if (prev !== null && me.calls > prev) setCalledAt(performance.now());
+  }, [me]);
+  const flash = useRecent(calledAt || undefined, 2600);
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    sent.current = null;
+  }, [mine.length]);
+  useRoomMessage<ActionErrorPayload>(SYS.error, (p) => {
+    if (p.type !== SHOWDOWN_MSG.guess || sent.current === null) return;
+    const back = sent.current;
+    sent.current = null;
+    setText((t) => t || back);
+  });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const clean = text.trim();
+    if (!clean || !open || left <= 0) return;
+    session.send(SHOWDOWN_MSG.guess, { round: board.round, text: clean });
+    sent.current = clean;
+    playShowSound('tap', look);
+    setText('');
+  };
+  return (
+    <div className="sd-panel sd-guess" data-open={open ? 'true' : undefined}>
+      <h3 className="sd-panel__title">
+        Your secret guesses
+        {me && me.calls > 0 ? (
+          <span className="sd-guess__score" aria-label={`You called ${me.calls} so far`}>
+            <PixelIcon name="star" size={14} /> <span className="sd-num">{me.calls}</span>
+          </span>
+        ) : null}
+      </h3>
+      {flash ? (
+        <p className="sd-guess__flash" role="status">
+          You called it!
+        </p>
+      ) : null}
+      <p className="sd-muted">
+        {open
+          ? left > 0
+            ? `Lock in up to ${SHOWDOWN_LIMITS.guessesPerRound} guesses. Nobody sees them — you find out when your answer flips.`
+            : 'All guesses locked in — watch the board!'
+          : 'Guesses open when the question is on the board.'}
+      </p>
+      <form className="sd-guess__form" onSubmit={submit}>
+        <TextInput
+          value={text}
+          maxLength={SHOWDOWN_LIMITS.guessText}
+          placeholder={open ? 'Your guess…' : 'Waiting for the question…'}
+          aria-label="Your guess"
+          disabled={!open || left <= 0}
+          onChange={(e) => setText(e.currentTarget.value)}
+          enterKeyHint="send"
+          autoComplete="off"
+        />
+        <Button type="submit" variant="primary" disabled={!open || left <= 0 || !text.trim()}>
+          Lock in
+        </Button>
+      </form>
+      {mine.length ? (
+        <ul className="sd-guess__list">
+          {mine.map((g, i) => (
+            <li key={i} data-called={g.slot >= 0 ? 'true' : undefined}>
+              <span className="sd-guess__text">{g.text}</span>
+              {g.slot >= 0 ? (
+                <span className="sd-guess__hit">Called it · #{g.slot + 1}</span>
+              ) : (
+                <span className="sd-guess__lock">
+                  <PixelIcon name="lock" size={12} /> locked
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="sd-guess__left" aria-live="polite">
+        {open ? `${Math.max(0, left)} of ${SHOWDOWN_LIMITS.guessesPerRound} guesses left` : ' '}
+      </p>
+    </div>
+  );
+}
+
+/** The cheer pad (reactions float up on every stage). The ghost makes the host jump. */
+function ShowcaseCheerPad({ look }: { look: ShowdownLook }) {
+  const copy = LOOK_COPY[look];
+  const [burst, setBurst] = useState<{ id: number; kind: number } | null>(null);
+  const seq = useRef(0);
+  const react = (r: number) => {
+    session.send(SHOWDOWN_MSG.react, { r });
+    playShowSound('tap', look);
+    seq.current++;
+    setBurst({ id: seq.current, kind: r });
+  };
+  useEffect(() => {
+    if (!burst) return;
+    const t = setTimeout(() => setBurst(null), 900);
+    return () => clearTimeout(t);
+  }, [burst]);
+  const boo = look === 'halloween' ? copy.reactions.indexOf('👻') : -1;
+  return (
+    <div className="sd-panel sd-cheer sdc-cheer" role="group" aria-label="Cheer on the show">
+      <h3 className="sd-panel__title">Cheer on the show</h3>
+      <div className="sdc-cheer__pad">
+        {copy.reactions.map((emoji, i) => (
+          <button
+            key={i}
+            type="button"
+            className="sd-cheer__btn sdc-cheer__btn"
+            data-boo={i === boo ? 'true' : undefined}
+            onClick={() => react(i)}
+            aria-label={i === boo ? `${copy.reactionNames[i]} — make the host jump` : copy.reactionNames[i]}
+          >
+            <span aria-hidden className="sdc-cheer__emoji">
+              {emoji}
+            </span>
+            <span className="sdc-cheer__name" aria-hidden>
+              {copy.reactionNames[i]}
+            </span>
+            {burst?.kind === i ? (
+              <span key={burst.id} className="sd-cheer__pop" aria-hidden>
+                {emoji}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+      <p className="sd-muted sdc-cheer__hint">
+        Your taps float up on the big screen{boo >= 0 ? ' — and a 👻 Boo! makes the host jump.' : '.'}
+      </p>
+    </div>
+  );
+}
+

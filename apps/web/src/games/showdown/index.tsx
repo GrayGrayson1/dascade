@@ -13,6 +13,7 @@ import type { GameClientModule, SettingsPanelProps } from '../types.ts';
 import { ShowdownView } from './ShowdownView.tsx';
 import { ShowdownPlayerSetup, ShowdownSettingsPanel } from './Lobby.tsx';
 import './showdown.css';
+import './chrome.css';
 
 const module: GameClientModule = {
   GameView: ShowdownView,

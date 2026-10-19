@@ -11,6 +11,10 @@
  *    and plays the audience game: cheers fill their team's hype meter, private guesses score
  *    "called it" points when a matching answer is revealed.
  *  - Stage displays (`showdown:screen`) join no team.
+ *  - Presenter Showcase (mode 'showcase') has no teams at all: everyone else is just the audience.
+ *    The room adds what the pure engine doesn't hold: wrong answers (broadcast only, never state), the
+ *    round clock (server time; clients count down with serverNow()), the "Reveal remaining" sweep
+ *    (run here on timers, #10 → #1, so a hidden console tab can't stall it) and the stage cards.
  *
  * Authority: the show is a pure state machine (@dascade/game-core/showdown). Presenter commands carry
  * the board revision they were made against; a stale or duplicate command (double click, a console
@@ -21,16 +25,20 @@ import { timingSafeEqual } from 'node:crypto';
 import type { Phase } from '@dascade/shared';
 import { RATE, randomId } from '@dascade/shared';
 import {
+  SHOWDOWN_EVENT_INFO,
   SHOWDOWN_LIMITS,
+  SHOWDOWN_MISS_GAP_MS,
   SHOWDOWN_MSG,
   SHOWDOWN_REACTION_KINDS,
   ShowdownActSchema,
+  ShowdownCardSchema,
   ShowdownClaimSchema,
   ShowdownContentSchema,
   ShowdownCueSchema,
   ShowdownGuessSchema,
   ShowdownHandoverSchema,
   ShowdownMoveSchema,
+  ShowdownPresetSchema,
   ShowdownReactSchema,
   ShowdownScreenSchema,
   ShowdownSettingsSchema,
@@ -40,26 +48,33 @@ import {
   teamName,
   validateShowContent,
   type ShowdownActPayload,
+  type ShowdownCard,
+  type ShowdownClockOp,
   type ShowdownContentPrivate,
   type ShowdownEvent,
+  type ShowdownEventId,
   type ShowdownFinale,
   type ShowdownReactions,
   type ShowdownRoundDef,
   type ShowdownRoundInput,
   type ShowdownSettings,
   type TeamIndex,
+  type TeamSlot,
 } from '@dascade/shared/games/showdown';
 import {
   GUESS_REJECTION_TEXT,
   GuessBook,
+  SHOWDOWN_EVENT_ROUNDS,
   boardView,
   createShow,
   currentRound,
   finalizeShow,
+  nextSweepSlot,
   pickRounds,
   revealedIn,
   sheetView,
   showWinner,
+  specialSlot,
   step,
   type ShowCommand,
   type ShowState,
@@ -74,6 +89,11 @@ const HYPE_PER_CHEER = 3;
 const HYPE_DRAIN = 0.8;
 const LIVE_STAGES = new Set(['live', 'steal']);
 const PRESENTER_PHASES: readonly Phase[] = ['LOBBY', 'COUNTDOWN', 'PLAYING', 'INTERMISSION', 'RESULTS'];
+/**
+ * Reveal remaining: the beat before the first tile, between tiles, the drumroll before the special
+ * answer, and the celebration after it.
+ */
+const SWEEP_MS = { lead: 900, step: 1700, suspense: 2600, special: 4200 };
 
 export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> {
   readonly gameId = 'showdown' as const;
@@ -82,6 +102,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   protected override countdownMs = 0;
   /** Test hook: how long a show waits for an absent presenter before it ends. */
   protected presenterAwayMs = PRESENTER_AWAY_MS;
+  /** Test hooks: the sweep's pacing and the length of a clock "minute". */
+  protected sweepMs = SWEEP_MS;
+  protected minuteMs = 60_000;
 
   private presenterId = '';
   /** The first player to join (the creator) becomes the presenter — once per room. */
@@ -93,8 +116,11 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private readonly guesses = new GuessBook();
   /** Pack questions already played in this room (later shows prefer fresh ones). */
   private readonly seen = new Set<string>();
-  /** Team of everyone who played this show, including players who left (for the outcome). */
-  private readonly playedFor = new Map<string, TeamIndex>();
+  /**
+   * Team of everyone who played this show, including players who left (for the outcome). -1 = an
+   * audience member of a Presenter Showcase (no teams).
+   */
+  private readonly playedFor = new Map<string, TeamSlot>();
   /** Names of everyone in `playedFor` (leavers keep theirs on the results screen). */
   private readonly playedNames = new Map<string, string>();
   private readonly lastMe = new Map<string, string>();
@@ -105,6 +131,16 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private reactions: ShowdownReactions = emptyReactions();
   private reactionsPending = false;
   private cueSeq = 0;
+  /** Wrong answers this round (Presenter Showcase) and when the last one landed. */
+  private misses = 0;
+  private lastMissAt = 0;
+  /** The round clock ran out this round (the "time's up" event went out). */
+  private timeUp = false;
+  /** The clock hasn't run yet this round: showing the question starts it. */
+  private clockArmed = false;
+  /** Running sweep: the round it belongs to, and whether the special answer's drumroll has played. */
+  private sweepRound = -1;
+  private sweepSuspense = false;
 
   protected defaultSettings(): ShowdownSettings {
     return defaultShowdownSettings(new Date());
@@ -149,14 +185,37 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       phases: ['LOBBY', 'RESULTS'],
       rate: { burst: 4, perSecond: 1 },
     });
+    this.handle(SHOWDOWN_MSG.preset, ShowdownPresetSchema, (p, { id }) => this.loadPreset(p, id), { phases: ['LOBBY', 'RESULTS'], rate: { burst: 4, perSecond: 1 } });
+    this.handle(SHOWDOWN_MSG.card, ShowdownCardSchema, (p, { card }) => this.setCard(p, card), { phases: PRESENTER_PHASES, rate: { burst: 8, perSecond: 2 } });
     this.clock.setInterval(() => this.tick(), TICK_MS);
   }
 
+  private get showcase(): boolean {
+    return this.getSettings().mode === 'showcase';
+  }
+
   protected override validateStart(): string | null {
-    if (this.getSettings().source === 'custom' && this.custom.rounds.length === 0) {
+    const settings = this.getSettings();
+    if (settings.source === 'custom' && this.custom.rounds.length === 0) {
       return 'Add at least one custom round (Settings → Custom rounds), or switch to the question packs.';
     }
+    if (settings.mode === 'classic' && settings.source === 'custom') {
+      const ranked = this.custom.rounds.findIndex((r) => r.ranked);
+      if (ranked >= 0) {
+        return `Round ${ranked + 1} ranks its answers without survey points, and Team Showdown scores points. Give its answers points, or switch the format to Presenter Showcase.`;
+      }
+    }
     return null;
+  }
+
+  /** Switching the format in the lobby: a showcase has no teams; back to teams, everyone gets one. */
+  protected override onSettingsChanged(prev: ShowdownSettings, next: ShowdownSettings): void {
+    if (prev.mode === next.mode) return;
+    if (next.mode === 'showcase') {
+      this.state.teams.clear();
+      return;
+    }
+    for (const p of this.seatedPlayers()) if (this.isAudience(p) && this.teamOf(p) === null) this.assignTeam(p, this.smallestTeam());
   }
 
   protected onGameStart(): void {
@@ -164,22 +223,32 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const rounds: ShowdownRoundDef[] =
       settings.source === 'custom' ? structuredClone(this.custom.rounds) : pickRounds(settings.packs, settings.rounds, this.rng, this.seen);
     for (const r of rounds) if (settings.source === 'packs') this.seen.add(r.id);
-    this.show = createShow(rounds, { scoring: settings.scoring, steal: settings.steal });
+    this.show = createShow(rounds, { scoring: settings.scoring, steal: settings.steal, mode: settings.mode });
     this.undoStack = [];
     this.guesses.clear();
     this.lastMe.clear();
     this.hype = [0, 0];
     this.state.finaleJson = '';
     this.state.guessesIn = 0;
+    // The opening plays on a clean stage: a lobby holding card comes down when the show starts.
+    this.state.card = '';
     this.playedFor.clear();
     this.playedNames.clear();
+    this.stopSweep(false);
+    this.resetClock(settings.mode === 'showcase' ? settings.minutes * this.minuteMs : 0);
+    this.state.clockShow = settings.stageClock;
     // Lobby leftovers: players who moved to spectating keep no team.
     for (const id of [...this.state.teams.keys()]) {
       const p = this.getPlayer(id);
-      if (!p || p.state.spectator || !this.isAudience(p)) this.state.teams.delete(id);
+      if (!p || p.state.spectator || !this.isAudience(p) || settings.mode === 'showcase') this.state.teams.delete(id);
     }
     for (const p of this.seatedPlayers()) {
-      if (this.isAudience(p) && this.teamOf(p) === null) this.assignTeam(p, this.smallestTeam());
+      if (!this.isAudience(p)) continue;
+      if (settings.mode === 'showcase') {
+        this.recordPlayer(p, -1);
+        continue;
+      }
+      if (this.teamOf(p) === null) this.assignTeam(p, this.smallestTeam());
       const team = this.teamOf(p);
       if (team !== null) this.recordPlayer(p, team);
     }
@@ -188,6 +257,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   }
 
   protected override onReturnToLobby(): void {
+    this.stopSweep(false);
+    this.resetClock(0);
     this.show = null;
     this.undoStack = [];
     this.guesses.clear();
@@ -211,7 +282,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       this.setPresenter(player, false);
       return;
     }
-    if (this.isAudience(player) && !player.state.spectator) this.assignTeam(player, this.smallestTeam());
+    if (!this.isAudience(player) || player.state.spectator) return;
+    if (!this.showcase) this.assignTeam(player, this.smallestTeam());
+    else if (this.show && this.phase === 'PLAYING') this.recordPlayer(player, -1);
   }
 
   protected override onPlayerReconnected(player: PlayerRecord): void {
@@ -309,7 +382,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       this.sendTo(prev, SHOWDOWN_MSG.pass, null);
       this.sendTo(prev, SHOWDOWN_MSG.content, null);
       this.toast(prev, 'info', `${next.state.name} is presenting now.`);
-      if (this.isAudience(prev) && !prev.state.spectator) this.assignTeam(prev, this.smallestTeam());
+      if (this.isAudience(prev) && !prev.state.spectator) this.joinAudience(prev);
     }
     this.syncPrivate(next);
     if (next.client) this.cancel('presenter-away');
@@ -335,6 +408,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     // The previous presenter's prepared answers stay theirs: a new presenter starts from a clean slate.
     this.custom = { rounds: [], issues: [], dropped: 0 };
     this.state.customRounds = 0;
+    this.state.rehearsal = false;
     this.presenterPass = randomId(24, this.rng);
     if (this.getSettings().source === 'custom') this.updateSettings({ ...this.getSettings(), source: 'packs' });
     this.setPresenter(player);
@@ -357,7 +431,27 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const report = validateShowContent(rounds);
     this.custom = report;
     this.state.customRounds = report.rounds.length;
+    // The presenter's own rounds now (even if they started from the practice boards).
+    this.state.rehearsal = false;
     this.sendTo(player, SHOWDOWN_MSG.content, report);
+  }
+
+  /** An event preset: its settings, and its rounds (server-side content) as this room's custom rounds. */
+  private loadPreset(player: PlayerRecord, id: ShowdownEventId): void {
+    if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.preset, 'not_host', 'Only the presenter loads a show.');
+    const info = SHOWDOWN_EVENT_INFO[id];
+    const report = validateShowContent(SHOWDOWN_EVENT_ROUNDS[id]);
+    this.custom = report;
+    this.state.customRounds = report.rounds.length;
+    this.state.rehearsal = info.rehearsal;
+    this.updateSettings({ ...this.getSettings(), ...info.settings });
+    this.sendTo(player, SHOWDOWN_MSG.content, report);
+    this.toast(player, 'success', `Loaded ${info.title}: ${report.rounds.length} rounds. Check them in Settings → Your own rounds.`);
+  }
+
+  private setCard(player: PlayerRecord, card: ShowdownCard | ''): void {
+    if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.card, 'not_host', 'Only the presenter changes the stage.');
+    this.state.card = card;
   }
 
   private cue(player: PlayerRecord, cue: string): void {
@@ -375,19 +469,61 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (!show) return;
     // Made against an older board (double click, or the console hadn't caught up): ignore quietly.
     if ('rev' in payload && payload.rev !== show.rev) return;
-    if (payload.a === 'reveal' && payload.round !== undefined && payload.round !== show.round) return;
+    if ('round' in payload && payload.round !== undefined && payload.round !== show.round) return;
+    switch (payload.a) {
+      case 'miss':
+        return this.miss(player);
+      case 'sweep':
+        return this.startSweep(player);
+      case 'halt':
+        return this.stopSweep(true);
+      case 'clock':
+        return this.clockOp(player, payload.op);
+      case 'reveal':
+        // A tile flipped by hand during a sweep: the sweep carries on with the rest.
+        break;
+      default:
+        // Any other command (next, undo, restart…) stops a sweep rather than racing it.
+        this.stopSweep(true);
+    }
     if (payload.a === 'undo') return this.undo(player);
     if (payload.a === 'finish') return this.finishShow('presenter');
-    const result = step(show, payload as ShowCommand);
+    this.applyStep(player, payload as ShowCommand);
+  }
+
+  /** Runs one engine command (keeping the previous state for Undo) and publishes it. False if refused. */
+  private applyStep(player: PlayerRecord | null, cmd: ShowCommand): boolean {
+    const show = this.show;
+    if (!show) return false;
+    const result = step(show, cmd);
     if (!result.ok) {
-      if (result.code !== 'noop') this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', result.message);
-      return;
+      if (player && result.code !== 'noop') this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', result.message);
+      return false;
     }
     this.undoStack.push(show);
     if (this.undoStack.length > SHOWDOWN_LIMITS.undo) this.undoStack.shift();
     this.show = result.state;
-    if (result.finished) return this.finishShow('completed');
+    if (result.finished) {
+      this.finishShow('completed');
+      return true;
+    }
+    this.afterStep(show, result.state, result.events);
     this.publish(result.events);
+    return true;
+  }
+
+  /** The room's side of a change: the round clock follows the board, a new round forgets its misses. */
+  private afterStep(prev: ShowState, next: ShowState, events: readonly ShowdownEvent[]): void {
+    if (next.mode !== 'showcase') return;
+    const newRound = prev.round !== next.round || events.some((e) => e.type === 'restart' || e.type === 'reset' || e.type === 'round');
+    if (newRound) {
+      this.misses = 0;
+      this.resetClock(this.state.clockMax || this.getSettings().minutes * this.minuteMs);
+    }
+    // The clock starts with the question (not when a sweep put the question up on its way).
+    if (events.some((e) => e.type === 'question') && this.clockArmed && !this.state.sweep) this.runClock(true);
+    // The whole board is up: nothing left to guess, so the clock stops.
+    if (next.stage === 'done' && prev.stage !== 'done') this.runClock(false);
   }
 
   private undo(player: PlayerRecord): void {
@@ -395,8 +531,139 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (!prev || !this.show) return this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', 'There is nothing to undo.');
     // Revisions only ever go up (screens key their animations on them).
     const rev = this.show.rev + 1;
+    const from = this.show;
     this.show = { ...prev, rev };
+    // Undo into another round, onto a title card or out of one: the clock starts over, paused (the
+    // presenter restarts it from the console if the round is live again).
+    if (from.mode === 'showcase' && (from.round !== prev.round || (from.stage === 'title') !== (prev.stage === 'title') || prev.stage === 'intro')) {
+      this.misses = 0;
+      this.resetClock(this.state.clockMax);
+    }
     this.publish([{ type: 'undo', rev }]);
+  }
+
+  // ===========================================================================
+  // Presenter Showcase: wrong answers, the sweep, the clock
+  // ===========================================================================
+
+  /** A wrong answer: everyone sees the ✕ and hears the buzzer. Nothing is stored, nothing is scored. */
+  private miss(player: PlayerRecord): void {
+    const show = this.show;
+    if (!show) return;
+    if (show.mode !== 'showcase') return this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', 'Use Strike in Team Showdown.');
+    if (show.stage !== 'live') {
+      return this.reject(player, SHOWDOWN_MSG.act, 'wrong_phase', show.stage === 'done' ? 'Every answer is already on the board.' : 'Show the question first.');
+    }
+    const now = Date.now();
+    // A double click (or two presses at once) is one miss.
+    if (now - this.lastMissAt < SHOWDOWN_MISS_GAP_MS) return;
+    this.lastMissAt = now;
+    this.misses++;
+    this.broadcast(SHOWDOWN_MSG.event, { type: 'miss', rev: show.rev, round: show.round, n: this.misses } satisfies ShowdownEvent);
+  }
+
+  /** Reveal remaining, #10 → #1: a tile every SWEEP_STEP_MS, with a drumroll before the special one. */
+  private startSweep(player: PlayerRecord): void {
+    const show = this.show;
+    if (!show) return;
+    if (show.mode !== 'showcase') return this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', 'Use Reveal the rest in Team Showdown.');
+    if (show.stage === 'intro') return this.reject(player, SHOWDOWN_MSG.act, 'wrong_phase', 'Start round 1 first.');
+    if (this.state.sweep || nextSweepSlot(show) < 0) return;
+    this.sweepRound = show.round;
+    this.sweepSuspense = false;
+    this.state.sweep = true;
+    // Time's up for guessing: the clock stops while the rest of the board goes up.
+    this.runClock(false);
+    this.broadcast(SHOWDOWN_MSG.event, { type: 'sweep', rev: show.rev, on: true } satisfies ShowdownEvent);
+    this.schedule('sweep', this.sweepMs.lead, () => this.sweepStep());
+  }
+
+  private sweepStep(): void {
+    const show = this.show;
+    if (!show || !this.state.sweep || this.phase !== 'PLAYING' || show.round !== this.sweepRound) return this.stopSweep(false);
+    const slot = nextSweepSlot(show);
+    if (slot < 0) return this.stopSweep(true);
+    const special = slot === specialSlot(currentRound(show));
+    if (special && !this.sweepSuspense) {
+      // The beat before the special answer: a drumroll and the tile in the spotlight.
+      this.sweepSuspense = true;
+      this.broadcast(SHOWDOWN_MSG.event, { type: 'suspense', rev: show.rev, slot } satisfies ShowdownEvent);
+      return this.schedule('sweep', this.sweepMs.suspense, () => this.sweepStep());
+    }
+    if (!this.applyStep(null, { a: 'reveal', slot, late: true, sweep: true })) return this.stopSweep(true);
+    if (nextSweepSlot(this.show!) < 0) return this.stopSweep(true);
+    this.schedule('sweep', special ? this.sweepMs.special : this.sweepMs.step, () => this.sweepStep());
+  }
+
+  /** Ends a sweep (announce = tell every screen it stopped). Idempotent. */
+  private stopSweep(announce: boolean): void {
+    this.cancel('sweep');
+    if (!this.state.sweep) return;
+    this.state.sweep = false;
+    this.sweepRound = -1;
+    if (announce && this.show) this.broadcast(SHOWDOWN_MSG.event, { type: 'sweep', rev: this.show.rev, on: false } satisfies ShowdownEvent);
+  }
+
+  private clockOp(player: PlayerRecord, op: ShowdownClockOp): void {
+    const show = this.show;
+    if (!show) return;
+    if (show.mode !== 'showcase') return this.reject(player, SHOWDOWN_MSG.act, 'not_allowed', 'Team Showdown has no round clock.');
+    if (op === 'show' || op === 'hide') {
+      this.state.clockShow = op === 'show';
+      return;
+    }
+    if (this.state.clockMax <= 0) {
+      // A show set up without a clock gets one now (the presenter asked for it).
+      this.state.clockMax = (this.getSettings().minutes || 10) * this.minuteMs;
+      this.state.clockLeft = this.state.clockMax;
+    }
+    switch (op) {
+      case 'start':
+        this.clockArmed = false;
+        return this.runClock(true);
+      case 'pause':
+        return this.runClock(false);
+      case 'reset':
+        return this.resetClock(this.state.clockMax);
+      case 'plus':
+      case 'minus':
+        return this.addClock(op === 'plus' ? this.minuteMs : -this.minuteMs);
+    }
+  }
+
+  private clockLeftNow(): number {
+    return this.state.clockEndsAt > 0 ? this.state.clockEndsAt - Date.now() : this.state.clockLeft;
+  }
+
+  /** Full time, paused (`max` 0 = no clock this show). */
+  private resetClock(max: number): void {
+    this.state.clockMax = Math.max(0, max);
+    this.state.clockLeft = this.state.clockMax;
+    this.state.clockEndsAt = 0;
+    this.timeUp = false;
+    this.clockArmed = this.state.clockMax > 0;
+  }
+
+  private runClock(on: boolean): void {
+    if (this.state.clockMax <= 0) return;
+    const left = this.clockLeftNow();
+    if (on) {
+      this.clockArmed = false;
+      if (this.state.clockEndsAt === 0) this.state.clockEndsAt = Date.now() + left;
+      return;
+    }
+    if (this.state.clockEndsAt === 0) return;
+    this.state.clockLeft = Math.round(left);
+    this.state.clockEndsAt = 0;
+  }
+
+  private addClock(ms: number): void {
+    const left = this.clockLeftNow() + ms;
+    // Never below zero by a click (overtime only comes from the clock running out).
+    const next = Math.max(Math.min(left, this.state.clockMax + SHOWDOWN_LIMITS.minutesMax * this.minuteMs), Math.min(0, this.clockLeftNow()));
+    if (this.state.clockEndsAt > 0) this.state.clockEndsAt = Date.now() + next;
+    else this.state.clockLeft = Math.round(next);
+    if (next > 0) this.timeUp = false;
   }
 
   /** Board + sheet + per-player views after a change, then the events for sounds and animation. */
@@ -419,13 +686,17 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private finishShow(reason: string): void {
     if (!this.show || this.phase !== 'PLAYING') return;
     this.cancel('presenter-away');
+    this.stopSweep(false);
+    this.runClock(false);
     const show = finalizeShow(this.show);
     this.show = show;
     this.undoStack = [];
     const settings = this.getSettings();
     const winner = showWinner(show);
     const members: [string[], string[]] = [[], []];
-    for (const [id, team] of this.playedFor) members[team].push(id);
+    /** Presenter Showcase: the whole audience, in one group (no teams, no invented winner). */
+    const crowd: string[] = [];
+    for (const [id, team] of this.playedFor) (team === -1 ? crowd : members[team]).push(id);
     const rounds = show.rounds;
     const callers = [...this.guesses.players()]
       .map((id) => {
@@ -435,6 +706,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       .filter((c) => c.calls > 0)
       .sort((a, b) => b.points - a.points || b.calls - a.calls || a.name.localeCompare(b.name));
     const finale: ShowdownFinale = {
+      mode: show.mode,
       winner,
       scores: [show.scores[0], show.scores[1]],
       names: [teamName(settings, 0), teamName(settings, 1)],
@@ -446,9 +718,11 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.state.rev = show.rev;
     this.state.finaleJson = JSON.stringify(finale);
 
-    const placements = winner === -1 ? [[...members[0], ...members[1]]] : [members[winner], members[winner === 0 ? 1 : 0]];
+    const placements = winner === -1 ? [[...members[0], ...members[1], ...crowd]] : [members[winner], members[winner === 0 ? 1 : 0]];
     const scores: Record<string, number> = {};
-    for (const [id, team] of this.playedFor) scores[id] = show.scores[team];
+    const called = new Map(callers.map((c) => [c.playerId, c.points]));
+    // A showcase has no team scores: an audience member's score is their called-it points.
+    for (const [id, team] of this.playedFor) scores[id] = team === -1 ? (called.get(id) ?? 0) : show.scores[team];
     const playerStats: Record<string, Record<string, number>> = {};
     for (const c of callers) playerStats[c.playerId] = { calls: c.calls, bestCallPoints: c.points };
     // A show ended before round 1 was played reports nothing (nobody won or lost anything).
@@ -491,7 +765,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (this.show && this.phase === 'PLAYING') this.recordPlayer(player, team);
   }
 
-  private recordPlayer(player: PlayerRecord, team: TeamIndex): void {
+  private recordPlayer(player: PlayerRecord, team: TeamSlot): void {
     this.playedFor.set(player.id, team);
     this.playedNames.set(player.id, player.state.name);
   }
@@ -502,6 +776,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   }
 
   private pickTeam(player: PlayerRecord, team: TeamIndex): void {
+    if (this.showcase) return this.reject(player, SHOWDOWN_MSG.team, 'not_allowed', 'This show has no teams — just cheer!');
     if (player.id === this.presenterId) return this.reject(player, SHOWDOWN_MSG.team, 'not_allowed', 'The presenter stays neutral.');
     if (this.state.screens.get(player.id)) return this.reject(player, SHOWDOWN_MSG.team, 'not_allowed', 'Big screens don’t join a team.');
     const current = this.teamOf(player);
@@ -515,6 +790,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   private movePlayer(player: PlayerRecord, playerId: string, team: TeamIndex | -1): void {
     if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.move, 'not_host', 'Only the presenter can move players.');
+    if (this.showcase) return this.reject(player, SHOWDOWN_MSG.move, 'not_allowed', 'This show has no teams.');
     const target = this.getPlayer(playerId);
     if (!target || target.id === this.presenterId || target.state.spectator || this.state.screens.get(target.id)) {
       return this.reject(player, SHOWDOWN_MSG.move, 'not_allowed', 'That player can’t join a team.');
@@ -539,7 +815,13 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     }
     if (!this.state.screens.get(player.id)) return;
     this.state.screens.delete(player.id);
-    if (!player.state.spectator && player.id !== this.presenterId) this.assignTeam(player, this.smallestTeam());
+    if (!player.state.spectator && player.id !== this.presenterId) this.joinAudience(player);
+  }
+
+  /** A seat back in the audience: a team in Team Showdown, just a spot in the crowd in a showcase. */
+  private joinAudience(player: PlayerRecord): void {
+    if (!this.showcase) return this.assignTeam(player, this.smallestTeam());
+    if (this.show && this.phase === 'PLAYING') this.recordPlayer(player, -1);
   }
 
   // ===========================================================================
@@ -576,9 +858,14 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.reactionsPending = true;
   }
 
-  /** Reactions go out in small batches; hype drains while nobody cheers. */
+  /** Reactions go out in small batches; hype drains while nobody cheers; the round clock runs out. */
   private tick(): void {
     if (this.sheetDirty) this.refreshSheet();
+    if (this.show && !this.timeUp && this.state.clockEndsAt > 0 && Date.now() >= this.state.clockEndsAt) {
+      // Time's up: the console says "wrap up", the host says so on the stage. Nothing is revealed.
+      this.timeUp = true;
+      this.broadcast(SHOWDOWN_MSG.event, { type: 'timeup', rev: this.show.rev, round: this.show.round } satisfies ShowdownEvent);
+    }
     if (this.reactionsPending) {
       this.broadcast(SHOWDOWN_MSG.reactions, this.reactions);
       this.reactions = emptyReactions();
