@@ -15,8 +15,9 @@ rest of the year), and two formats (the `mode` setting):
 
 It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/play/showdown`).
 
-> Status: **experimental spike** on branch `feature/das-survey-showdown-spike`. It is built to be easy
-> to keep or drop. The removal checklist is at the end.
+> Status: **live** on <https://dascade.onrender.com> since 2026-10-15 (PR #4); the Presenter Showcase
+> format and the DAS-O-Ween presets since 2026-10-19 (PR #9). It is still built to be easy to drop:
+> the removal checklist is at the end.
 
 ## How a show runs
 
@@ -104,6 +105,34 @@ Showdown. What differs:
 - **Theme music:** a looping procedural bed under the opening, the category cards and the holding
   cards, on devices that play show sounds (a per-device toggle).
 
+## The Presenter Tour
+
+An animated, self-paced walk through running a Presenter Showcase show (about 3½ minutes, ten
+chapters): `/tutorial/showdown`, or **Watch the presenter tour** on the presenter's setup card and
+**Tour** in the showcase console's top bar (a large dialog). The film cut, *Boo's Backstage Tour*, is
+the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1080.
+
+- **The real stage, a demo show.** The stage hooks (`useBoard`, `useClock`, `useCard`, `useSweep`,
+  `useShowPhase`…, and `useShowFeed`) read the room through `useShowSelector` (`source.ts`). Inside a
+  `<ShowSourceProvider>` they read a demo source instead (`tour/demoSource.ts`): a pretend room with its
+  own state, clock and show feed. Without a provider nothing changes. The tour opens no connection and
+  sends nothing, and a tour opened mid-show never touches that show's board, feed or sounds (the
+  console's shortcut keys rest while its dialog is open).
+- **A timeline of pure beats** (`tour/timeline.ts`, `tour/script.ts`): each beat says what changes on
+  the stage, which board events play (so the host says his real lines), where the cursor goes on the
+  mock console, a meeting-chat line and a caption. `[[Name]]` in a caption is a control's exact name
+  (a test checks it against the console), `{{X}}` a key. **Practice content only**: the boards are the
+  rehearsal preset's candy and costume lists, never the real show's answers (`secrecy.test.ts`).
+- **The player** (`tour/TourPlayer.tsx`): a picture of the console (`tour/MockConsole.tsx`, inert,
+  drawn with the console's own classes) with a cursor, a spotlight and a zooming camera, the stage
+  window, the meeting chat, captions with Boo, and a chapter rail. Sound is off until the viewer turns
+  it on (this device only). Space plays and pauses, ←/→ change chapters. Under reduced motion or
+  effects off nothing plays by itself: each beat is a still to step through.
+- **The film** (`tour/TourFilm.tsx`, `film.css`, `narration.ts`): the same chapters with Boo narrating
+  in speech bubbles and doing his bits, big captions, chapter cards, a DASbot cameo and an end card.
+  `?voice=1` plays a voice-over clip per line through the one audio pipeline; the clips (and the video
+  files) are made outside the repo.
+
 ## Roles and secrecy
 
 - **Presenter = host, and never migrates.** `ShowdownRoom.canBecomeHost` only allows the presenter.
@@ -157,7 +186,8 @@ Everything is new files, plus a few one-line registrations.
 | Server | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts` |
 | Client | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css` |
 | Floor | `apps/web/src/arcade/scenes/showdown.ts` (attract scene) |
-| Tests | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`) |
+| Presenter Tour | `apps/web/src/games/showdown/source.ts` (the show source the stage hooks read), `apps/web/src/games/showdown/tour/` (demo source, timeline, script, player, mock console, film), the `/tutorial/showdown` route in `apps/web/src/app/App.tsx` |
+| Tests | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`) |
 
 Notes:
 
@@ -287,12 +317,13 @@ Manual walkthrough:
 1. Delete `apps/web/src/games/showdown/`, `apps/game-server/src/rooms/showdown/`,
    `packages/game-core/src/showdown/`, `packages/shared/src/games/showdown.ts`,
    `apps/game-server/test/showdown.test.ts`, `apps/game-server/test/showdown-showcase.test.ts`,
-   `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `scripts/load/showdown.ts`,
+   `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `scripts/load/showdown.ts`,
    `apps/web/src/arcade/scenes/showdown.ts`, `docs/DAS-O-WEEN-RUNBOOK.md` and this file.
 2. Remove the one-line registrations: `'showdown'` in `GAME_IDS` and its `GAME_CATALOG` entry
    (`packages/shared/src/catalog.ts`); `g('showdown')` and the tagline/description wording in the
    DAStravaganza cabinet (`cabinets.ts`); `ROOM_LOADERS` (`apps/game-server/src/rooms/registry.ts`);
-   `GAME_MODULES` (`apps/web/src/games/registry.ts`); the scene in `apps/web/src/arcade/attract.ts`;
+   `GAME_MODULES` (`apps/web/src/games/registry.ts`); the `/tutorial/showdown` route
+   (`apps/web/src/app/App.tsx`); the scene in `apps/web/src/arcade/attract.ts`;
    `showdown` in `scripts/load/index.ts`; the two stat labels and `STAT_GAME_DISPLAY.showdown`
    (`packages/shared/src/stats.ts`); and the README/CLAUDE.md lines (game count 26 → 25).
 

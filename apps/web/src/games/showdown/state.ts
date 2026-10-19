@@ -26,6 +26,7 @@ import {
   type TeamSlot,
 } from '@dascade/shared/games/showdown';
 import { playersEqual, serverNow, useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
+import { useShowSelector } from './source.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
@@ -34,14 +35,27 @@ export function useShowdownGame() {
   return useGame<ShowdownPublicState, ShowdownSettings>();
 }
 
+// The stage's hooks (board, finale, card, clock, sweep…) read the room through useShowSelector, so a
+// demo source (the Presenter Tour, source.ts) can drive the same stage without a room.
+
+/** The room's phase, as the stage sees it. */
+export function useShowPhase(): string {
+  return useShowSelector((s) => s.phase) ?? 'LOBBY';
+}
+
+/** The room code, as the stage sees it ('' outside a room). */
+export function useShowCode(): string {
+  return useShowSelector((s) => s.code) ?? '';
+}
+
 /** The parsed public board (null outside a show). Re-parses only when the JSON changes. */
 export function useBoard(): ShowdownBoardView | null {
-  const json = useRoomSelector<ShowdownPublicState, string>((s) => s.boardJson);
+  const json = useShowSelector((s) => s.boardJson);
   return useMemo(() => parseBoard(json), [json]);
 }
 
 export function useFinale(): ShowdownFinale | null {
-  const json = useRoomSelector<ShowdownPublicState, string>((s) => s.finaleJson);
+  const json = useShowSelector((s) => s.finaleJson);
   return useMemo(() => {
     if (!json) return null;
     try {
@@ -98,9 +112,9 @@ export function useMe(): ShowdownMe | null {
 
 /** Team rosters (names), from the synchronized team map. */
 export function useRosters(): [string[], string[]] {
-  const teams = useRoomSelector<ShowdownPublicState, Record<string, number>>((s) => s.teams);
+  const teams = useShowSelector((s) => s.teams);
   // By value: the 4 Hz hype patches would otherwise rebuild every roster on every stage.
-  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
+  const players = useShowSelector((s) => s.players, playersEqual);
   return useMemo(() => {
     const out: [string[], string[]] = [[], []];
     const ordered = Object.entries(teams ?? {}).sort(([a], [b]) => (players?.[a]?.joinOrder ?? 0) - (players?.[b]?.joinOrder ?? 0));
@@ -113,8 +127,8 @@ export function useRosters(): [string[], string[]] {
 }
 
 export function useHype(): [number, number] {
-  const h0 = useRoomSelector<ShowdownPublicState, number>((s) => s.hype0) ?? 0;
-  const h1 = useRoomSelector<ShowdownPublicState, number>((s) => s.hype1) ?? 0;
+  const h0 = useShowSelector((s) => s.hype0) ?? 0;
+  const h1 = useShowSelector((s) => s.hype1) ?? 0;
   return [h0, h1];
 }
 
@@ -131,18 +145,18 @@ export function useMode(settings: Pick<ShowdownSettings, 'mode'> | null | undefi
 
 /** The holding card on the stage (null = none). */
 export function useCard(): ShowdownCard | null {
-  const card = useRoomSelector<ShowdownPublicState, string>((s) => s.card) ?? '';
+  const card = useShowSelector((s) => s.card) ?? '';
   return (SHOWDOWN_CARDS as readonly string[]).includes(card) ? (card as ShowdownCard) : null;
 }
 
 /** A Reveal remaining sweep is running. */
 export function useSweep(): boolean {
-  return useRoomSelector<ShowdownPublicState, boolean>((s) => s.sweep) ?? false;
+  return useShowSelector((s) => s.sweep) ?? false;
 }
 
 /** The loaded rounds are an event preset's practice boards (say "Rehearsal" everywhere). */
 export function useRehearsal(): boolean {
-  return useRoomSelector<ShowdownPublicState, boolean>((s) => s.rehearsal) ?? false;
+  return useShowSelector((s) => s.rehearsal) ?? false;
 }
 
 export interface ClockView {
@@ -158,10 +172,10 @@ export interface ClockView {
 
 /** The round clock (Presenter Showcase), counted down locally against the server's time. */
 export function useClock(): ClockView {
-  const endsAt = useRoomSelector<ShowdownPublicState, number>((s) => s.clockEndsAt) ?? 0;
-  const paused = useRoomSelector<ShowdownPublicState, number>((s) => s.clockLeft) ?? 0;
-  const max = useRoomSelector<ShowdownPublicState, number>((s) => s.clockMax) ?? 0;
-  const stage = useRoomSelector<ShowdownPublicState, boolean>((s) => s.clockShow) ?? true;
+  const endsAt = useShowSelector((s) => s.clockEndsAt) ?? 0;
+  const paused = useShowSelector((s) => s.clockLeft) ?? 0;
+  const max = useShowSelector((s) => s.clockMax) ?? 0;
+  const stage = useShowSelector((s) => s.clockShow) ?? true;
   const [now, setNow] = useState(() => serverNow());
   useEffect(() => {
     if (!endsAt) return;

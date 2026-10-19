@@ -45,7 +45,7 @@ import { LOOK_COPY, fill, lineForCue, lineForEvent } from './look.ts';
 import { showFeed } from './fx.ts';
 import { CUE_SOUND, eventSounds, playShowSound, type ShowdownSound } from './sounds.ts';
 import { themeMusic } from './themeMusic.ts';
-import { canFullscreen, closeStageWindow, toggleFullscreen, useStageWindow } from './stageWindow.ts';
+import { canFullscreen, closeStageWindow, setStageWindowTitle, toggleFullscreen, useStageWindow } from './stageWindow.ts';
 import { rememberPass, storedPass, takeHashPass, useScreenMode } from './access.ts';
 import {
   useBoard,
@@ -94,6 +94,11 @@ export function ShowdownView() {
   useEffect(() => {
     if (role.role !== 'presenter' && stageWin.open) closeStageWindow();
   }, [role.role, stageWin.open]);
+  // Its title follows the show's (a preset loaded with the window already open renames it).
+  const showName = settings ? showTitle(settings) : '';
+  useEffect(() => {
+    if (stageWin.open && showName) setStageWindowTitle(showName);
+  }, [stageWin.open, showName]);
 
   const portal =
     stageWin.container && role.role === 'presenter'

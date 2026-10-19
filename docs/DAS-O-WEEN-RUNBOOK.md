@@ -7,6 +7,11 @@ watches your shared screen. Nobody has to join anything.
 The game is DASCADE's **DAS Survey Showdown** in its **Presenter Showcase** format, with the
 **DAS-O-Ween 2026** preset loaded. Site: <https://dascade.onrender.com>.
 
+> **Watch the presenter tour** first: <https://dascade.onrender.com/tutorial/showdown> (about 3½
+> minutes, animated, on practice boards). It's also a click away in the lobby (*Watch the presenter
+> tour*, on your setup card) and in the console (**Tour**, in the top bar). Opening it during the show
+> never changes the show.
+
 ---
 
 ## The one rule: share the stage, never the console

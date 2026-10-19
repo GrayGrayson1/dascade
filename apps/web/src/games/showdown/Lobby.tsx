@@ -44,6 +44,7 @@ import { ContentEditor } from './ContentEditor.tsx';
 import { AudioStatus, BigScreenLinkButton, PresenterTools, StageCards, StageWindowButton, loadEventPreset, useLoadedPreset } from './consoleParts.tsx';
 import { copyText, screenLink, setScreenMode, useScreenMode } from './access.ts';
 import { useLook, usePass, useRehearsal, useRole, useRosters, useShowdownSettings } from './state.ts';
+import { TourButton } from './tour/TourButton.tsx';
 import './chrome-showcase.css';
 
 /** A text setting sent ~400 ms after the last keystroke (settings are rate limited). */
@@ -450,6 +451,10 @@ export function ShowdownPlayerSetup() {
             <b>You’re the presenter.</b> Only you see the answers — on your console, never on the stage.
           </span>
         </p>
+        <div className="sdc-setup__tour">
+          <TourButton look={look} label="Watch the presenter tour" />
+          <span className="dc-field__hint">An animated walk through the whole show (about 3½ minutes, on practice boards).</span>
+        </div>
         <div className="sdc-teamsflow">
           <span className="dc-field__label">Run it in a Teams call</span>
           <ol className="sdc-steps">

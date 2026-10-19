@@ -21,18 +21,16 @@ import {
   type ShowdownCard,
   type ShowdownFinale,
   type ShowdownLook,
-  type ShowdownPublicState,
   type ShowdownSettings,
   type TeamIndex,
 } from '@dascade/shared/games/showdown';
 import { PixelIcon, cx } from '@dascade/ui';
-import { useRoomSelector } from '../../net/hooks.ts';
 import { Board, Rolling, StrikeLamps } from './Board.tsx';
 import { Backdrop, Bulbs, Pumpkin } from './Decor.tsx';
 import { HostFigure } from './Host.tsx';
 import { LOOK_COPY, cardLine, idleLine, joinAddress, lineForFinale, type HostLine } from './look.ts';
 import { useShowFeed, type ShowFeed } from './fx.ts';
-import { useBoard, useCard, useFinale, useHype, useMode, useMotion, useRosters, type MotionPrefs } from './state.ts';
+import { useBoard, useCard, useFinale, useHype, useMode, useMotion, useRosters, useShowCode, useShowPhase, type MotionPrefs } from './state.ts';
 import { Confetti, Reactions, useRecent } from './stageFx.tsx';
 import { ShowcaseStage } from './stageShowcase.tsx';
 import { CardScene } from './scenes.tsx';
@@ -51,7 +49,7 @@ export interface StageProps {
 
 export function Stage(props: StageProps) {
   const finale = useFinale();
-  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
+  const phase = useShowPhase();
   const live = useMode(props.settings);
   const mode = phase === 'RESULTS' && finale ? finale.mode : live;
   return mode === 'showcase' ? <ShowcaseStage {...props} /> : <ClassicStage {...props} />;
@@ -61,8 +59,8 @@ export function Stage(props: StageProps) {
 function ClassicStage({ look, settings, variant, corner }: StageProps) {
   const board = useBoard();
   const finale = useFinale();
-  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
-  const code = useRoomSelector<ShowdownPublicState, string>((s) => s.code) ?? '';
+  const phase = useShowPhase();
+  const code = useShowCode();
   const feed = useShowFeed();
   const motion = useMotion();
   const card = useCard();
