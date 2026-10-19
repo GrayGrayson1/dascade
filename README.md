@@ -288,7 +288,7 @@ Sidecar values beat tags, and tags beat `defaults`. `cover` is a JPEG, PNG, GIF 
 
 ### Records
 
-A **record** is an album people can put on. The jukebox shelf lets each person pick one; the title strips, shuffle, Next and auto-advance then play that record. There's also an optional **All records** mix. The pick is per device, and only appears once there are two or more records.
+A **record** is an album people can put on. Up close, the jukebox shows its records as sleeves on a turning **carousel** under the dome: the arrows, a swipe, a sideways scroll or ←/→ turn it, and picking a sleeve puts that record on (the vinyl flies onto the turntable). The title strips, shuffle, Next and auto-advance then play that record. There's also an optional **All records** mix. The pick is per device, and the carousel only appears once there are two or more records.
 
 ```
 apps/web/public/audio/jukebox/
@@ -311,12 +311,12 @@ To add a record: make a folder, drop the MP3s in, and optionally add a `jukebox.
 
 - **Name:** `record.title`, else the album tag most of its songs share, else the folder name (`halloween` → "Halloween"). Songs with no album tag are given the record's name.
 - **Sleeve:** `record.cover` (an image inside the folder), else the first song's embedded art, else a generated sigil.
-- **Paired theme:** `record.theme` is a theme id. Anyone who hasn't picked a record starts on it while that theme is on (e.g. Halloween Night → the Halloween record); everyone else starts on the main record. Changing theme never cuts the song that's playing.
+- **Paired theme:** `record.theme` is a theme id. Anyone who hasn't picked a record starts on it while that theme is on (e.g. Halloween Night → the DAS-O-Ween record, in the `halloween` folder); everyone else starts on the main record. Changing theme never cuts the song that's playing.
 - **Order:** records follow `record.order`, then the main record, then name. Within a record, songs follow `order`, then the track number, then the title.
 - **Codes and ids:** selection codes restart per record (A1…). In the mix they run across every record, main record first. Track ids are still slugs of the file name. The loose files get theirs first, so adding a record never changes an existing song's id. A folder named `art` is reserved and never a record.
 - **Room DJ** isn't affected: the room syncs track ids, so the host can play or queue songs from any record (the Room DJ tab has record tabs), and listeners hear them whatever record they've picked.
 
-**Deploy size:** the repo carries the audio itself, about 17 MB today (7 files), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB (about 4.5 MB at 192 kbps) to every clone and deploy, and git history keeps the bytes even after a song is removed. Commit a new record's music in its own commit so it can be reverted on its own.
+**Deploy size:** the repo carries the audio itself, about 46 MB today (14 files on two records), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB (about 4.5 MB at 192 kbps) to every clone and deploy, and git history keeps the bytes even after a song is removed. Commit a new record's music in its own commit so it can be reverted on its own.
 
 ### Room DJ
 
