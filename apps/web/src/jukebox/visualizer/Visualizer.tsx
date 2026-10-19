@@ -16,6 +16,8 @@ import { drawVisualizer, idleBands, type VisFrame, type VisPalette, type Visuali
 const FRAME_MS = 1000 / 30;
 const BANDS = 48;
 const WAVE = 128;
+/** Rolling-waveform memory: one loudness value per frame (~5 s at 30 fps, wider than any canvas needs). */
+const HISTORY = 160;
 const LEVEL_CB_MS = 125;
 
 export interface VisualizerProps {
@@ -76,12 +78,13 @@ export function Visualizer({ active, levelTarget, onLevel, label = 'Music visual
     const bands = new Float32Array(BANDS);
     const peaks = new Float32Array(BANDS);
     const wave = new Float32Array(WAVE);
+    const history = new Float32Array(HISTORY);
     let freqBytes: Uint8Array<ArrayBuffer> | null = null;
     let timeBytes: Uint8Array<ArrayBuffer> | null = null;
     let edges: Int32Array | null = null;
     let lastLevelCb = 0;
     let lastLevelSent = -1;
-    const frame: VisFrame = { bands, peaks, wave, level: 0, levelL: 0, levelR: 0, t: 0, playing: false, still: theme.still, dpr: 1 };
+    const frame: VisFrame = { bands, peaks, wave, history, level: 0, levelL: 0, levelR: 0, t: 0, playing: false, still: theme.still, dpr: 1 };
 
     const resize = () => {
       const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
@@ -104,6 +107,11 @@ export function Visualizer({ active, levelTarget, onLevel, label = 'Music visual
           onLevelRef.current(q);
         }
       }
+    };
+
+    const pushHistory = (v: number) => {
+      history.copyWithin(0, 1);
+      history[HISTORY - 1] = v;
     };
 
     const analyse = (an: AnalyserNode) => {
@@ -142,6 +150,13 @@ export function Visualizer({ active, levelTarget, onLevel, label = 'Music visual
       }
       const step = timeBytes.length / WAVE;
       for (let i = 0; i < WAVE; i++) wave[i] = ((timeBytes[Math.floor(i * step)] ?? 128) - 128) / 128;
+      // Loudness right now (RMS of the samples) for the rolling waveform.
+      let sq = 0;
+      for (let k = 0; k < timeBytes.length; k++) {
+        const d = (timeBytes[k]! - 128) / 128;
+        sq += d * d;
+      }
+      pushHistory(Math.min(1, Math.sqrt(sq / Math.max(1, timeBytes.length)) * 2.6));
       const lvl = Math.min(1, (sum / BANDS) * 1.8);
       frame.level = frame.level * 0.6 + lvl * 0.4;
       frame.levelL = frame.levelL * 0.7 + Math.min(1, (low / (BANDS / 2)) * 1.6) * 0.3;
@@ -181,6 +196,7 @@ export function Visualizer({ active, levelTarget, onLevel, label = 'Music visual
         // No analyser (not unlocked yet): decay towards the idle contour.
         for (let i = 0; i < BANDS; i++) bands[i] = bands[i]! * 0.9;
         frame.level *= 0.9;
+        pushHistory(history[HISTORY - 1]! * 0.9);
       }
       frame.playing = true;
       frame.still = theme.still;

@@ -68,7 +68,7 @@ export interface ThemeEffects {
   /** Ambient weather/particles for backdrops (never over a board). */
   ambient: 'none' | 'rain' | 'stars' | 'dust' | 'confetti' | 'fog' | 'sparkle';
   /** Preferred jukebox visualizer drawing style (the visualizer component implements each). */
-  visualizer: 'neon-bars' | 'pixel-bars' | 'lcd' | 'spectrum' | 'bubbles' | 'reels' | 'hologram' | 'oscilloscope' | 'blocks' | 'vu-meter' | 'glass-wave';
+  visualizer: 'neon-bars' | 'pixel-bars' | 'lcd' | 'spectrum' | 'waveform' | 'reels' | 'hologram' | 'oscilloscope' | 'blocks' | 'vu-meter' | 'glass-wave';
   /** Theme-transition flavour (the transition layer implements each; reduced motion = fade). */
   transition: 'power' | 'boot' | 'shutter' | 'fluorescent' | 'tracking' | 'warp' | 'crt-off' | 'wipe' | 'haunt' | 'fade';
 }

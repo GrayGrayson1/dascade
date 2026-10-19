@@ -42,7 +42,7 @@ const VISUALIZERS: ThemeEffects['visualizer'][] = [
   'pixel-bars',
   'lcd',
   'spectrum',
-  'bubbles',
+  'waveform',
   'reels',
   'hologram',
   'oscilloscope',

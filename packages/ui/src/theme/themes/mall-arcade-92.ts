@@ -28,7 +28,7 @@ export const MALL_ARCADE_92: ThemeDefinition = {
     grain: 0.12,
     analog: 0,
     ambient: 'dust',
-    visualizer: 'bubbles',
+    visualizer: 'waveform',
     transition: 'fluorescent',
   },
   colorScheme: 'dark',

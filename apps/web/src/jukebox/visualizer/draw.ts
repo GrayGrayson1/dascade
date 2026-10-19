@@ -6,6 +6,7 @@
  * Data is pre-digested by the component (see Visualizer.tsx):
  *   bands  0–1 per log-spaced frequency band (smoothed), peaks = slowly-falling peak hold
  *   wave   −1…1 time-domain samples, level = 0–1 loudness, t = seconds (animation clock; frozen when idle)
+ *   history  0–1 loudness of the last few seconds, one value per frame, oldest first (the rolling waveform)
  */
 import type { ThemeEffects } from '@dascade/ui';
 
@@ -16,7 +17,7 @@ export const VISUALIZER_STYLES: readonly VisualizerStyle[] = [
   'pixel-bars',
   'lcd',
   'spectrum',
-  'bubbles',
+  'waveform',
   'reels',
   'hologram',
   'oscilloscope',
@@ -46,6 +47,8 @@ export interface VisFrame {
   bands: Float32Array;
   peaks: Float32Array;
   wave: Float32Array;
+  /** Recent loudness, oldest first; the newest value is the last. */
+  history: Float32Array;
   level: number;
   /** Left/right-ish levels (low vs high half of the spectrum) for the VU pair. */
   levelL: number;
@@ -92,8 +95,13 @@ function clear(ctx: Ctx, w: number, h: number): void {
 }
 
 function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number): void {
-  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();
+  addRoundRect(ctx, x, y, w, h, r);
+}
+
+/** A rounded rectangle added to the current path (several make one path, filled once). */
+function addRoundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.moveTo(x + rr, y);
   ctx.lineTo(x + w - rr, y);
   ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
@@ -249,40 +257,51 @@ function spectrum(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): v
   glowOff(ctx);
 }
 
-function bubbles(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): void {
+/**
+ * The rolling waveform, as a recorder draws it: the music's loudness over the last few seconds as bars
+ * mirrored about a centre line, the newest at the right edge, older ones fading off to the left. Paused, it
+ * holds where it stopped. Still (reduced motion): no scrolling — the bars stand in place, shaped by the
+ * spectrum (low notes in the middle).
+ */
+function waveform(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): void {
   clear(ctx, w, h);
-  const tubes = w > 260 * f.dpr ? 4 : 3;
-  const tw = w / tubes;
-  const colors = [p.accent, p.warning, p.accent2, p.success];
-  for (let k = 0; k < tubes; k++) {
-    const x0 = k * tw + tw * 0.2;
-    const x1 = (k + 1) * tw - tw * 0.2;
-    const cw = x1 - x0;
-    const col = colors[k % colors.length]!;
-    // Tube glass
-    const g = ctx.createLinearGradient(x0, 0, x1, 0);
-    g.addColorStop(0, withAlpha(col, 0.1));
-    g.addColorStop(0.5, withAlpha(col, 0.32 + 0.4 * sample(f.bands, k, tubes)));
-    g.addColorStop(1, withAlpha(col, 0.1));
-    ctx.fillStyle = g;
-    roundRect(ctx, x0, 2 * f.dpr, cw, h - 4 * f.dpr, cw / 2);
-    ctx.fill();
-    // Bubbles: deterministic lanes; rise speed follows the band level.
-    const lvl = sample(f.bands, k * 2 + 1, tubes * 2);
-    const count = 5;
-    for (let b = 0; b < count; b++) {
-      const seed = (k * 7 + b * 13) % 17;
-      const speed = 0.12 + lvl * 0.9;
-      const phase = f.still ? seed / 17 : (seed / 17 + f.t * speed * 0.5) % 1;
-      const y = h - 6 * f.dpr - phase * (h - 12 * f.dpr);
-      const r = (1.4 + (seed % 4) * 0.7 + lvl * 2.2) * f.dpr;
-      const x = x0 + cw / 2 + ((seed % 5) - 2) * cw * 0.1;
-      ctx.beginPath();
-      ctx.arc(x, y, Math.min(r, cw * 0.36), 0, TAU);
-      ctx.fillStyle = withAlpha(p.text, 0.55 + lvl * 0.4);
-      ctx.fill();
-    }
+  const pitch = Math.max(2, Math.round(4 * f.dpr));
+  const bw = Math.max(1, Math.round(pitch * 0.6));
+  const n = Math.max(1, Math.floor(w / pitch));
+  const mid = h / 2;
+  const amp = h * 0.46;
+  const hair = Math.max(1, Math.round(f.dpr));
+  const len = f.history.length;
+  const scroll = f.playing ? !f.still : true;
+  const g = ctx.createLinearGradient(0, mid - amp, 0, mid + amp);
+  g.addColorStop(0, p.accent2);
+  g.addColorStop(0.5, p.accent);
+  g.addColorStop(1, p.accent2);
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    let v: number;
+    if (scroll) v = f.history[len - n + i] ?? 0;
+    else v = sample(f.bands, Math.abs(i / Math.max(1, n - 1) - 0.5) * 2 * (n - 1), n);
+    const half = Math.max(hair, Math.min(1, v) * amp);
+    addRoundRect(ctx, w - (n - i) * pitch + (pitch - bw) / 2, mid - half, bw, half * 2, bw / 2);
   }
+  ctx.fillStyle = g;
+  glowOn(ctx, p.accent, 8 * f.dpr, p);
+  ctx.fill();
+  glowOff(ctx);
+  if (scroll) {
+    // Older moments fade out towards the left.
+    const fade = ctx.createLinearGradient(0, 0, w * 0.45, 0);
+    fade.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+    fade.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, w * 0.45, h);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // The centre line, under everything that's quiet.
+  ctx.fillStyle = withAlpha(p.line, 0.28);
+  ctx.fillRect(0, Math.round(mid - hair / 2), w, hair);
 }
 
 function reels(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): void {
@@ -510,7 +529,7 @@ export const DRAW: Record<VisualizerStyle, (ctx: Ctx, w: number, h: number, f: V
   'pixel-bars': pixelBars,
   lcd,
   spectrum,
-  bubbles,
+  waveform,
   reels,
   hologram,
   oscilloscope,
