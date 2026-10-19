@@ -12,16 +12,21 @@
  *  - Local mute / volume / pause / room opt-out always win over the Room DJ.
  *  - A pause the engine didn't cause (audio focus lost, headphones unplugged, an iOS interruption)
  *    counts as the user pausing: the transport stops claiming "playing" and no later tap restarts it.
+ *  - Records (records.ts): shuffle, next, prev, auto-advance and the broken-track skip play the record in
+ *    effect (`scope`); the queue, search and the Room DJ reach every track. A theme change re-scopes
+ *    without ever touching what's playing.
  */
 import type { StoreApi, UseBoundStore } from 'zustand';
 import {
   DJ,
   DJ_MAX_TRACK_SECONDS,
   JukeboxManifestSchema,
+  TRACK_ID_RE,
   type DjCommand,
   type DjConfig,
   type DjQueueEntry,
   type DjState,
+  type JukeboxRecord,
   type JukeboxTrack,
 } from '@dascade/shared/jukebox';
 import { elementFallbackVolume, visualizerEnabled, type MixSettings, type VisualizerPref } from '../mixPolicy.ts';
@@ -29,6 +34,7 @@ import type { Mixer } from '../mixer.ts';
 import { planDjSync } from './djSync.ts';
 import { moveItem, nextInOrder, prevInOrder, reshuffleAvoiding, shuffleOrder } from './order.ts';
 import { loadPersisted, savePersisted, type PersistedJukebox, type StorageLike } from './persist.ts';
+import { ALL_RECORDS, MAIN_RECORD_ID, recordsOf, resolveRecord, scopeTracks, trackRecord } from './records.ts';
 import { showsPlaying, type JukeboxState, type RepeatMode } from './store.ts';
 
 export interface EngineSettings extends MixSettings {
@@ -85,6 +91,8 @@ export interface JukeboxEngineDeps {
   createMetadata?: ((init: MediaMetadataInit) => MediaMetadata) | null;
   /** Toast hook for track errors. */
   notify?: (message: string) => void;
+  /** The active theme (records paired with a theme are the default in it). Absent → no pairing. */
+  theme?: { get(): string | null; subscribe(cb: () => void): () => void } | null;
 }
 
 export interface DjPermissions {
@@ -115,6 +123,12 @@ export interface JukeboxEngine {
   toggleMute(): void;
   setExpanded(open: boolean): void;
   setRoomOptOut(optOut: boolean): void;
+  /**
+   * Picks the record (a record id, ALL_RECORDS for the mix, or null to follow the theme again). `play`
+   * puts it on: its first song (a random one with shuffle on) starts — unless that record is already
+   * the one playing.
+   */
+  setRecord(id: string | null, opts?: { play?: boolean }): void;
   unlock(): void;
   currentTime(): number;
   analyser(): AnalyserNode | null;
@@ -169,6 +183,10 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
   let gestureSeen = false;
   let tracks: JukeboxTrack[] = [];
   let byId = new Map<string, JukeboxTrack>();
+  let records: JukeboxRecord[] = [];
+  /** The record in effect and its tracks (catalogue order): what shuffle/next/prev/auto-advance play. */
+  let scope = MAIN_RECORD_ID;
+  let scoped: JukeboxTrack[] = [];
   const learnedDuration = new Map<string, number>();
   const broken = new Set<string>();
   let brokenStreak = 0;
@@ -210,49 +228,66 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
   // ---------------------------------------------------------------------------
   // Library
   // ---------------------------------------------------------------------------
-  function setLibrary(list: JukeboxTrack[]): void {
+  function setLibrary(list: JukeboxTrack[], shelf: JukeboxRecord[] | undefined): void {
     tracks = [...list].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
     byId = new Map(tracks.map((t) => [t.id, t]));
+    records = recordsOf(tracks, shelf);
     broken.clear();
     brokenStreak = 0;
-    if (shuffleOrderIds) shuffleOrderIds = shuffleOrder(ids(), deps.random, get().currentId);
+    rescope(true);
   }
 
-  const ids = () => tracks.map((t) => t.id);
+  /** The play scope's ids, in catalogue order. */
+  const ids = () => scoped.map((t) => t.id);
+
+  /**
+   * Re-resolves the record in effect (the pick, else the theme's record). Never touches playback: the
+   * song that's on keeps playing and the next one comes from the new scope. Returns whether it changed.
+   */
+  function rescope(force = false): boolean {
+    const next = resolveRecord(get().recordPick, records, deps.theme?.get() ?? null);
+    if (next === scope && !force) return false;
+    const changed = next !== scope;
+    scope = next;
+    scoped = scopeTracks(tracks, scope);
+    if (shuffleOrderIds) shuffleOrderIds = shuffleOrder(ids(), deps.random, get().currentId);
+    if (get().record !== scope) set({ record: scope });
+    return changed;
+  }
   const libraryReady = () => get().library.status === 'ready';
   const durationOf = (id: string) => learnedDuration.get(id) || byId.get(id)?.duration || 0;
 
   function loadLibrary(): void {
     const gen = ++libraryGeneration;
-    set({ library: { status: 'loading', tracks: get().library.tracks } });
+    set({ library: { ...get().library, status: 'loading' } });
     deps
       .fetchManifest()
       .then((json) => {
         if (gen !== libraryGeneration || disposed) return;
         if (json === null) {
           // No manifest (yet): an empty jukebox, not a crash.
-          set({ library: { status: 'error', tracks: [] } });
+          set({ library: { status: 'error', tracks: [], records: [] } });
           return;
         }
         const parsed = JukeboxManifestSchema.safeParse(json);
         if (!parsed.success) {
-          set({ library: { status: 'error', tracks: [] } });
+          set({ library: { status: 'error', tracks: [], records: [] } });
           return;
         }
-        onLibraryReady(parsed.data.tracks);
+        onLibraryReady(parsed.data.tracks, parsed.data.records);
       })
       .catch(() => {
         if (gen !== libraryGeneration || disposed) return;
-        set({ library: { status: 'error', tracks: [] } });
+        set({ library: { status: 'error', tracks: [], records: [] } });
       });
   }
 
-  function onLibraryReady(list: JukeboxTrack[]): void {
-    setLibrary(list);
+  function onLibraryReady(list: JukeboxTrack[], shelf: JukeboxRecord[] | undefined): void {
+    setLibrary(list, shelf);
     const s = get();
     const queue = s.queue.filter((id) => byId.has(id));
     const currentId = s.currentId && byId.has(s.currentId) ? s.currentId : null;
-    set({ library: { status: 'ready', tracks }, queue, currentId, ...(currentId ? {} : { position: 0, duration: 0 }) });
+    set({ library: { status: 'ready', tracks, records }, queue, currentId, ...(currentId ? {} : { position: 0, duration: 0 }) });
     persistReady = true;
     if (s.source === 'room') {
       // syncRoom() below picks the room's track.
@@ -438,8 +473,8 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     pushMixFlags();
     deps.notify?.(message);
     if (get().source === 'room') return;
-    const playable = tracks.filter((x) => !broken.has(x.id)).length;
-    if (playable === 0 || brokenStreak >= tracks.length) {
+    const playable = scoped.filter((x) => !broken.has(x.id)).length;
+    if (playable === 0 || brokenStreak >= scoped.length) {
       set({ wantPlaying: false, needsGesture: false, error: 'The jukebox couldn’t play any tracks.' });
       return;
     }
@@ -501,7 +536,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
 
   function currentOrder(): string[] {
     if (get().shuffle) {
-      if (!shuffleOrderIds || shuffleOrderIds.length !== tracks.length) shuffleOrderIds = shuffleOrder(ids(), deps.random, get().currentId);
+      if (!shuffleOrderIds || shuffleOrderIds.length !== scoped.length) shuffleOrderIds = shuffleOrder(ids(), deps.random, get().currentId);
       return shuffleOrderIds;
     }
     return ids();
@@ -522,7 +557,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
     if (queue !== s.queue) set({ queue });
     const wrap = auto ? s.repeat === 'all' : true;
     let cursor = s.currentId;
-    for (let i = 0; i < tracks.length; i++) {
+    for (let i = 0; i < scoped.length; i++) {
       let order = currentOrder();
       let id = nextInOrder(order, cursor, false);
       if (id === null) {
@@ -563,9 +598,15 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
         }
         return;
       }
-      if (!byId.has(trackId)) return; // invalid ids are ignored
+      const picked = byId.get(trackId);
+      if (!picked) return; // invalid ids are ignored
       userPaused = false;
       if (get().source === 'room') setRoomOptOut(true);
+      // A song from another record (search) puts that record on, so Next carries on there. The mix keeps it.
+      if (scope !== ALL_RECORDS && trackRecord(picked) !== scope) {
+        set({ recordPick: trackRecord(picked) });
+        rescope();
+      }
       broken.delete(trackId);
       set({ error: null, wantPlaying: true });
       // Picking a track restarts the shuffle lap from it.
@@ -748,6 +789,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       jukeboxMuted: s.jukeboxMuted,
       roomOptOut: s.roomOptOut,
       optOutRoom,
+      record: s.recordPick,
     };
   }
 
@@ -1034,6 +1076,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
         queue: p.queue,
         jukeboxMuted: p.jukeboxMuted,
         roomOptOut: p.roomOptOut,
+        recordPick: p.record,
         // A restored "was playing" waits for the first gesture (no autoplay).
         needsGesture: p.wantPlaying && !gestureSeen,
       });
@@ -1054,11 +1097,14 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
             s.repeat !== prev.repeat ||
             s.queue !== prev.queue ||
             s.jukeboxMuted !== prev.jukeboxMuted ||
-            s.roomOptOut !== prev.roomOptOut
+            s.roomOptOut !== prev.roomOptOut ||
+            s.recordPick !== prev.recordPick
           )
             schedulePersist();
         }),
       );
+      // Following the theme: a theme change re-scopes (the song that's on keeps playing).
+      if (deps.theme) unsubs.push(deps.theme.subscribe(() => libraryReady() && rescope()));
       pushMixFlags();
       loadLibrary();
     },
@@ -1096,7 +1142,7 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
         return;
       }
       if (!libraryReady()) return;
-      if (currentTime() > PREV_RESTART_AFTER || !tracks.length) {
+      if (currentTime() > PREV_RESTART_AFTER || !scoped.length) {
         seekElement(0);
         return;
       }
@@ -1164,6 +1210,22 @@ export function createJukeboxEngine(deps: JukeboxEngineDeps): JukeboxEngine {
       set({ expanded: Boolean(open) });
     },
     setRoomOptOut,
+    setRecord(id, opts) {
+      if (id !== null && (typeof id !== 'string' || !TRACK_ID_RE.test(id))) return;
+      if (libraryReady() && id !== null && id !== ALL_RECORDS && !records.some((r) => r.id === id)) return; // not on the shelf
+      const before = scope;
+      if (get().recordPick !== id) set({ recordPick: id });
+      if (!libraryReady()) return; // applied (and validated again) once the library loads
+      rescope();
+      if (!opts?.play || !scoped.length) return;
+      const s = get();
+      const onAlready = scope === before && s.wantPlaying && s.source === 'personal' && s.currentId !== null && scoped.some((t) => t.id === s.currentId);
+      if (onAlready) return;
+      // Putting a record on starts it from the top — or from a fresh random lap with shuffle on.
+      let first = scoped[0]!.id;
+      if (s.shuffle) first = shuffleOrder(ids(), deps.random)[0] ?? first;
+      play(first);
+    },
     unlock,
     currentTime,
     analyser() {

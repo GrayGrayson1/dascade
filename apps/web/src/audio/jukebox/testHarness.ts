@@ -15,6 +15,24 @@ export const track = (id: string, order: number, duration = 100): JukeboxTrack =
   order,
 });
 
+/** Two records: the main one (a, b, c) and Halloween (h1, h2, h3), paired with the Halloween Night theme. */
+export const RECORDS_MANIFEST: JukeboxManifest = {
+  version: 1,
+  generatedAt: '2026-10-19T00:00:00Z',
+  tracks: [
+    track('a', 0),
+    track('b', 1),
+    track('c', 2),
+    { ...track('h1', 3), record: 'halloween' },
+    { ...track('h2', 4), record: 'halloween' },
+    { ...track('h3', 5), record: 'halloween' },
+  ],
+  records: [
+    { id: 'main', title: 'Cyber Nightpulse', order: 0, tracks: 3, duration: 300 },
+    { id: 'halloween', title: 'Halloween', theme: 'halloween-night', order: 1, tracks: 3, duration: 300 },
+  ],
+};
+
 export const MANIFEST: JukeboxManifest = {
   version: 1,
   generatedAt: '2026-09-27T00:00:00Z',
@@ -42,6 +60,8 @@ export interface HarnessOptions {
   gesture?: boolean;
   settings?: Partial<EngineSettings>;
   random?: () => number;
+  /** The active theme id (records paired with a theme are its default). */
+  theme?: string | null;
 }
 
 /** Deterministic PRNG (mulberry32). */
@@ -70,6 +90,12 @@ export async function setup(opts: HarnessOptions = {}) {
   const clock = { now: 0 };
   const notes: string[] = [];
   const mediaSession = new FakeMediaSession();
+  let themeId: string | null = opts.theme ?? null;
+  const themeSubs = new Set<() => void>();
+  const setTheme = (id: string | null) => {
+    themeId = id;
+    for (const cb of [...themeSubs]) cb();
+  };
   const setSettings = (patch: Partial<EngineSettings>) => {
     settings = { ...settings, ...patch };
     mixer.setSettings(settings);
@@ -100,6 +126,13 @@ export async function setup(opts: HarnessOptions = {}) {
     mediaSession,
     createMetadata: (init) => init as unknown as MediaMetadata,
     notify: (m) => notes.push(m),
+    theme: {
+      get: () => themeId,
+      subscribe: (cb) => {
+        themeSubs.add(cb);
+        return () => themeSubs.delete(cb);
+      },
+    },
   });
   engine.init();
   await flushMicrotasks();
@@ -110,5 +143,5 @@ export async function setup(opts: HarnessOptions = {}) {
   const el = () => FakeAudioElement.instances[0]!;
   const state = () => store.getState();
   const ctx = () => FakeAudioContext.instances[0];
-  return { engine, store, storage, mixer, clock, notes, mediaSession, el, state, ctx, setSettings, settings: () => settings, settingsSubs };
+  return { engine, store, storage, mixer, clock, notes, mediaSession, el, state, ctx, setSettings, settings: () => settings, settingsSubs, setTheme };
 }

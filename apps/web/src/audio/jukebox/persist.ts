@@ -18,6 +18,8 @@ export interface PersistedJukebox {
   roomOptOut: boolean;
   /** Room id the opt-out was made in: opting out is a per-room choice (it survives reconnects/reloads, not new rooms). */
   optOutRoom: string | null;
+  /** The record the listener picked (a record id or ALL_RECORDS); null = follow the theme. */
+  record: string | null;
 }
 
 export const DEFAULT_PERSISTED: PersistedJukebox = {
@@ -30,6 +32,7 @@ export const DEFAULT_PERSISTED: PersistedJukebox = {
   jukeboxMuted: false,
   roomOptOut: false,
   optOutRoom: null,
+  record: null,
 };
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -51,6 +54,8 @@ export function sanitizePersisted(raw: unknown): PersistedJukebox {
     jukeboxMuted: bool(o.jukeboxMuted, DEFAULT_PERSISTED.jukeboxMuted),
     roomOptOut: bool(o.roomOptOut, DEFAULT_PERSISTED.roomOptOut),
     optOutRoom: typeof o.optOutRoom === 'string' && o.optOutRoom.length <= 64 ? o.optOutRoom : null,
+    // Record ids are slugs, like track ids (ALL_RECORDS is one too).
+    record: isId(o.record) ? o.record : null,
   };
 }
 

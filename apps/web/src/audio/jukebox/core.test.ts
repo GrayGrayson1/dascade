@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, FakeAudioElement, MemoryStorage, flushMicrotasks } from '../testFakes.ts';
 import { JUKEBOX_STORAGE_KEY } from './persist.ts';
-import { MANIFEST, seeded, setup, track } from './testHarness.ts';
+import { MANIFEST, RECORDS_MANIFEST, seeded, setup, track } from './testHarness.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -19,7 +19,7 @@ describe('library / manifest', () => {
 
   it('a missing manifest (404) is an empty jukebox with status error, not a crash', async () => {
     const h = await setup({ fetchManifest: () => Promise.resolve(null) });
-    expect(h.state().library).toEqual({ status: 'error', tracks: [] });
+    expect(h.state().library).toEqual({ status: 'error', tracks: [], records: [] });
     h.engine.play();
     h.engine.next();
     expect(h.el().playCalls).toBe(0);
@@ -222,6 +222,159 @@ describe('track end, repeat, shuffle', () => {
       order.push(h.state().currentId!);
     }
     expect(new Set(order).size).toBe(4);
+  });
+});
+
+describe('records', () => {
+  const nexts = (h: Awaited<ReturnType<typeof setup>>, n: number) => {
+    const seen: (string | null)[] = [];
+    for (let i = 0; i < n; i++) {
+      h.engine.next();
+      seen.push(h.state().currentId);
+    }
+    return seen;
+  };
+
+  it('plays only the record in effect: the main record by default; next wraps inside it', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    expect(h.state().record).toBe('main');
+    expect(h.state().library.records.map((r) => r.id)).toEqual(['main', 'halloween']);
+    h.engine.play();
+    expect(h.state().currentId).toBe('a');
+    expect(nexts(h, 4)).toEqual(['b', 'c', 'a', 'b']);
+    h.engine.prev();
+    expect(h.state().currentId).toBe('a');
+    h.el().loadMeta(100);
+    h.engine.play('c');
+    h.el().loadMeta(100);
+    h.el().end();
+    expect(h.state().currentId).toBe('a'); // auto-advance wraps inside the record too
+  });
+
+  it("without a pick, a theme's paired record is the default; a theme change never cuts the song that's on", async () => {
+    const spooky = await setup({ manifest: RECORDS_MANIFEST, theme: 'halloween-night' });
+    expect(spooky.state().record).toBe('halloween');
+    spooky.engine.play();
+    expect(spooky.state().currentId).toBe('h1');
+
+    const h = await setup({ manifest: RECORDS_MANIFEST, theme: 'delta-neon' });
+    h.engine.play('b');
+    h.el().loadMeta(100);
+    const src = h.el().src;
+    h.setTheme('halloween-night');
+    expect(h.state()).toMatchObject({ record: 'halloween', currentId: 'b', wantPlaying: true, recordPick: null });
+    expect(h.el().src).toBe(src); // still the same song, not reloaded
+    h.el().end();
+    expect(h.state().currentId).toBe('h1'); // the next one comes from the theme's record
+    h.setTheme('delta-neon');
+    expect(h.state().record).toBe('main');
+  });
+
+  it("the listener's pick wins over the theme until they pick 'follow the theme' (null) again", async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST, theme: 'halloween-night' });
+    h.engine.setRecord('main');
+    expect(h.state()).toMatchObject({ record: 'main', recordPick: 'main' });
+    h.setTheme('delta-neon');
+    h.setTheme('halloween-night');
+    expect(h.state().record).toBe('main');
+    h.engine.setRecord(null);
+    expect(h.state().record).toBe('halloween');
+  });
+
+  it('setRecord(id, { play }) puts the record on from its first song; shuffle starts a random lap inside it', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.play('b');
+    h.engine.setRecord('halloween', { play: true });
+    expect(h.state()).toMatchObject({ record: 'halloween', currentId: 'h1', wantPlaying: true });
+    expect(h.el().src).toContain('h1');
+
+    const s = await setup({ manifest: RECORDS_MANIFEST, random: seeded(3) });
+    s.engine.setShuffle(true);
+    s.engine.setRecord('halloween', { play: true });
+    const lap = [s.state().currentId, ...nexts(s, 2)];
+    expect(new Set(lap)).toEqual(new Set(['h1', 'h2', 'h3']));
+  });
+
+  it("picking the record that's already playing doesn't restart it; without play it only re-scopes", async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.play('b');
+    h.el().loadMeta(100);
+    h.engine.seek(42);
+    h.engine.setRecord('main', { play: true });
+    expect(h.state()).toMatchObject({ currentId: 'b', position: 42 });
+    h.engine.setRecord('halloween');
+    expect(h.state()).toMatchObject({ record: 'halloween', currentId: 'b', wantPlaying: true });
+  });
+
+  it('"All records" plays everything (the mix); with a single record it is just that record', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.setRecord('all', { play: true });
+    expect(h.state().record).toBe('all');
+    expect([h.state().currentId, ...nexts(h, 6)]).toEqual(['a', 'b', 'c', 'h1', 'h2', 'h3', 'a']);
+    // Playing a song from the rack in the mix stays in the mix.
+    h.engine.play('h2');
+    expect(h.state().record).toBe('all');
+
+    const one = await setup();
+    one.engine.setRecord('all');
+    expect(one.state()).toMatchObject({ record: 'main', recordPick: 'all' });
+  });
+
+  it('playing a song from another record (search) puts that record on, so next carries on there', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.play('a');
+    h.engine.play('h2');
+    expect(h.state()).toMatchObject({ record: 'halloween', recordPick: 'halloween', currentId: 'h2' });
+    expect(nexts(h, 2)).toEqual(['h3', 'h1']);
+  });
+
+  it('the queue reaches every record; afterwards the record in effect carries on', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.play('a');
+    h.engine.enqueue('h3');
+    h.engine.next();
+    expect(h.state()).toMatchObject({ currentId: 'h3', record: 'main' });
+    h.engine.next();
+    expect(h.state().currentId).toBe('a');
+  });
+
+  it('ignores junk and records that are not on the shelf', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    for (const bad of ['../evil', 'NOPE', 'missing-record', 42 as unknown as string]) h.engine.setRecord(bad);
+    expect(h.state()).toMatchObject({ record: 'main', recordPick: null });
+  });
+
+  it('the pick is persisted and restored; a stored pick whose record is gone falls back to the theme (and is kept)', async () => {
+    const h = await setup({ manifest: RECORDS_MANIFEST });
+    h.engine.setRecord('halloween');
+    vi.advanceTimersByTime(1600);
+    expect(JSON.parse(h.storage!.getItem(JUKEBOX_STORAGE_KEY)!).record).toBe('halloween');
+
+    const back = await setup({ manifest: RECORDS_MANIFEST, stored: JSON.stringify({ record: 'halloween' }) });
+    expect(back.state()).toMatchObject({ record: 'halloween', recordPick: 'halloween' });
+
+    const gone = await setup({ manifest: MANIFEST, stored: JSON.stringify({ record: 'halloween' }), theme: 'halloween-night' });
+    expect(gone.state()).toMatchObject({ record: 'main', recordPick: 'halloween' });
+
+    const hostile = await setup({ manifest: RECORDS_MANIFEST, stored: JSON.stringify({ record: '<img onerror>' }) });
+    expect(hostile.state().recordPick).toBeNull();
+  });
+
+  it('a pick made before the library loads is applied once it does', async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    const h = await setup({ fetchManifest: () => new Promise((r) => (resolve = r)) });
+    h.engine.setRecord('halloween');
+    expect(h.state().recordPick).toBe('halloween');
+    resolve(RECORDS_MANIFEST);
+    await flushMicrotasks();
+    expect(h.state().record).toBe('halloween');
+  });
+
+  it('an old manifest without records is one main record named after its album', async () => {
+    const tracks = [{ ...track('x', 0), album: 'Cyber Nightpulse' }, track('y', 1)];
+    const h = await setup({ manifest: { version: 1, generatedAt: 'x', tracks } });
+    expect(h.state().library.records).toEqual([{ id: 'main', title: 'Cyber Nightpulse', order: 0, tracks: 2, duration: 200 }]);
+    expect(h.state().record).toBe('main');
   });
 });
 
@@ -518,7 +671,7 @@ describe('persistence', () => {
     vi.advanceTimersByTime(1600);
     expect(h.storage!.writes).toBe(1);
     const saved = JSON.parse(h.storage!.getItem(JUKEBOX_STORAGE_KEY)!);
-    expect(saved).toEqual({ currentId: 'a', position: 0, wantPlaying: true, shuffle: true, repeat: 'all', queue: ['b'], jukeboxMuted: true, roomOptOut: false, optOutRoom: null });
+    expect(saved).toEqual({ currentId: 'a', position: 0, wantPlaying: true, shuffle: true, repeat: 'all', queue: ['b'], jukeboxMuted: true, roomOptOut: false, optOutRoom: null, record: null });
   });
 
   it('does not overwrite the stored session before the library has loaded', async () => {
