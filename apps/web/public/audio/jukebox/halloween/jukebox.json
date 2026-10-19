@@ -1,6 +1,6 @@
 {
-  "record": { "title": "Halloween", "artist": "beanalicious", "theme": "halloween-night", "accent": "#ff8a3d", "accent2": "#b57bff" },
-  "defaults": { "album": "Halloween" },
+  "record": { "title": "DAS-O-Ween", "artist": "beanalicious", "theme": "halloween-night", "accent": "#ff8a3d", "accent2": "#b57bff" },
+  "defaults": { "album": "DAS-O-Ween" },
   "tracks": {
     "Haunted Arcade.mp3": { "order": 1 },
     "SpoopyWave.mp3": { "order": 2 },
