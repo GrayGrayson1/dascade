@@ -59,6 +59,51 @@ describe('jukebox Vite plugin — build', () => {
   });
 });
 
+describe('jukebox Vite plugin — records', () => {
+  it("keeps a record folder's songs in dist, prunes its sidecar, sleeve source and junk, and serves it in dev", () => {
+    const { root, music, logger } = project();
+    const spooky = path.join(music, 'halloween');
+    fs.mkdirSync(spooky);
+    fs.writeFileSync(path.join(spooky, 'Ghost Song.mp3'), mp3({ salt: 5 }));
+    fs.writeFileSync(path.join(spooky, 'cover.jpg'), JPEG);
+    fs.writeFileSync(path.join(spooky, 'notes.txt'), 'junk');
+    fs.writeFileSync(path.join(spooky, 'jukebox.json'), JSON.stringify({ record: { title: 'Halloween', cover: 'cover.jpg' } }));
+
+    const plugin = jukeboxPlugin();
+    call(plugin, 'configResolved', null, { root, publicDir: path.join(root, 'public'), command: 'build', build: { outDir: 'dist' }, logger });
+    call(plugin, 'buildStart', {});
+    const emitted: { fileName: string; source: string | Uint8Array }[] = [];
+    call(plugin, 'generateBundle', { emitFile: (f: { fileName: string; source: string | Uint8Array }) => emitted.push(f) });
+    const manifest = JukeboxManifestSchema.parse(JSON.parse(String(emitted.find((e) => e.fileName === 'audio/jukebox/manifest.json')!.source)));
+    expect(manifest.records!.map((r) => r.id)).toEqual(['main', 'halloween']);
+    expect(manifest.tracks.find((t) => t.record === 'halloween')!.src).toBe('/audio/jukebox/halloween/Ghost%20Song.mp3');
+    expect(emitted.map((e) => e.fileName)).toContain('audio/jukebox/art/records/halloween.jpg');
+
+    const out = path.join(root, 'dist', 'audio', 'jukebox');
+    fs.cpSync(music, out, { recursive: true });
+    fs.mkdirSync(path.join(out, 'art'));
+    call(plugin, 'closeBundle', {});
+    expect(fs.readdirSync(out).sort()).toEqual(['Neon Cruising.mp3', 'art', 'halloween']);
+    expect(fs.readdirSync(path.join(out, 'halloween'))).toEqual(['Ghost Song.mp3']);
+
+    // Dev: the record's MP3 passes through to Vite's static server; its sidecar and junk don't.
+    const dev = jukeboxPlugin();
+    call(dev, 'configResolved', null, { root, publicDir: path.join(root, 'public'), command: 'serve', build: { outDir: 'dist' }, logger });
+    let middleware: (req: { url: string }, res: any, next: () => void) => void = () => undefined;
+    call(dev, 'configureServer', null, { watcher: { add: vi.fn(), on: vi.fn() }, ws: { send: vi.fn() }, middlewares: { use: (fn: typeof middleware) => (middleware = fn) } });
+    const request = (url: string) => {
+      const res = { statusCode: 200, setHeader: vi.fn(), end: vi.fn() };
+      let passed = false;
+      middleware({ url }, res, () => (passed = true));
+      return { status: res.statusCode, passed };
+    };
+    expect(request('/audio/jukebox/halloween/Ghost%20Song.mp3').passed).toBe(true);
+    expect(request('/audio/jukebox/halloween/jukebox.json').status).toBe(404);
+    expect(request('/audio/jukebox/halloween/notes.txt').status).toBe(404);
+    expect(request('/audio/jukebox/art/records/halloween.jpg').passed).toBe(false);
+  });
+});
+
 describe('jukebox Vite plugin — dev server', () => {
   function devServer() {
     const p = project();

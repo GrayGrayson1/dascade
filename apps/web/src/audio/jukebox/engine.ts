@@ -4,6 +4,7 @@
  * reads `useJukebox`. `installJukebox()` is called once from `installAudio()` at boot.
  */
 import { JUKEBOX_MANIFEST_URL } from '@dascade/shared/jukebox';
+import { activeThemeId, onThemeChange } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
 import { mixer } from '../mixer.ts';
 import { activeSfxVoices } from '../voices.ts';
@@ -53,6 +54,8 @@ export const jukebox: JukeboxEngine = createJukeboxEngine({
   mediaSession,
   createMetadata: typeof MediaMetadata === 'function' ? (init) => new MediaMetadata(init) : null,
   notify: (message) => useApp.getState().toast('warning', message),
+  // Records paired with a theme are the default in it (the theme as applied, e.g. the seasonal invite's).
+  theme: { get: activeThemeId, subscribe: (cb) => onThemeChange(() => cb()) },
 });
 
 /**

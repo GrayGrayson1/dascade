@@ -153,8 +153,12 @@ test.describe('jukebox', () => {
     // Desktop floor: the quick control in the HUD + the physical jukebox in the corner; phones: the control.
     await expect(dock(page)).toHaveCount(isMobile ? 1 : 2);
     await openPlayer(page);
-    // The title-strip rack shows one letter (eight selections) at a time.
-    await expect(panel(page).locator('[data-part="track"]')).toHaveCount(Math.min(n, 8));
+    // The title-strip rack shows the record on the turntable, one letter (eight selections) at a time.
+    const onRecord = await page.evaluate(() => {
+      const s = (window as any).__DASCADE_AUDIO__.store.getState();
+      return s.library.tracks.filter((t: any) => (t.record ?? 'main') === s.record).length as number;
+    });
+    await expect(panel(page).locator('[data-part="track"]')).toHaveCount(Math.min(onRecord, 8));
     await expect(panel(page).locator('[data-part="track"]').first()).toHaveAttribute('data-code', 'A1');
     await expect(page.locator('[data-jukebox] canvas[data-part="visualizer"]')).toHaveCount(1);
     await closePlayer(page);
@@ -558,5 +562,147 @@ test.describe('room DJ', () => {
     expect(await snap(indie)).toMatchObject({ source: 'personal', currentId: B, playing: true });
 
     for (const p of [muted, indie, late]) await p.context().close();
+  });
+});
+
+test.describe('records', () => {
+  const state = (page: Page) =>
+    page.evaluate(() => {
+      const s = (window as any).__DASCADE_AUDIO__.store.getState();
+      return { record: s.record as string, pick: s.recordPick as string | null, records: s.library.records.map((r: any) => r.id) as string[] };
+    });
+
+  /**
+   * A fixed two-record manifest, whatever the music folder holds: the real main record plus "Test Spooks",
+   * three songs paired with Halloween Night that re-use the main record's MP3s.
+   */
+  async function mockRecords(page: Page): Promise<{ main: string[]; spooky: string[] }> {
+    const ids = { main: [] as string[], spooky: [] as string[] };
+    await page.route('**/audio/jukebox/manifest.json', async (route) => {
+      const res = await route.fetch();
+      const m = await res.json();
+      const main = m.tracks.filter((t: any) => !t.record || t.record === 'main');
+      const spooky = ['Ghost Test One', 'Ghost Test Two', 'Ghost Test Three'].map((title, i) => {
+        const { artwork: _a, ...t } = main[i % main.length];
+        return { ...t, id: `spook-test-${i + 1}`, title, album: 'Test Spooks', record: 'spook-test', order: main.length + i };
+      });
+      ids.main = main.map((t: any) => t.id);
+      ids.spooky = spooky.map((t) => t.id);
+      const duration = (list: any[]) => list.reduce((n, t) => n + t.duration, 0);
+      m.tracks = [...main, ...spooky];
+      m.records = [
+        { id: 'main', title: 'Main Record', order: 0, tracks: main.length, duration: duration(main) },
+        { id: 'spook-test', title: 'Test Spooks', theme: 'halloween-night', order: 1, tracks: spooky.length, duration: duration(spooky) },
+      ];
+      await route.fulfill({ response: res, json: m });
+    });
+    return ids;
+  }
+
+  test('the crate puts a record on: the rack flips to its songs, its first song plays, Next stays on it, and the pick survives a reload', async ({ page }) => {
+    const ids = await mockRecords(page);
+    await page.goto('/');
+    await libraryReady(page);
+    expect(await state(page)).toMatchObject({ record: 'main', pick: null, records: ['main', 'spook-test'] });
+    await openPlayer(page);
+    const crate = panel(page).locator('[data-part="crate"]');
+    // Both records and the "All records" mix stand in the crate; the main record is on the turntable.
+    await expect(crate.locator('[data-part="sleeve"]')).toHaveCount(3);
+    await expect(crate.locator('[data-record="main"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(panel(page).locator('[data-part="track"]').first()).toHaveAttribute('data-code', 'A1');
+
+    await crate.locator('[data-record="spook-test"]').click();
+    await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('spook-test');
+    await expect.poll(async () => (await snap(page)).currentId, { timeout: 10_000 }).toBe(ids.spooky[0]);
+    await expect.poll(async () => (await snap(page)).playing, { timeout: 15_000 }).toBe(true);
+    const strips = panel(page).locator('[data-part="track"]');
+    await expect(strips).toHaveCount(3);
+    await expect(strips.first()).toHaveAttribute('data-code', 'A1');
+    await expect(strips.first()).toContainText('Ghost Test One');
+    await expect(crate.locator('[data-record="spook-test"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(panel(page).locator('[data-part="track-artist"]')).toContainText('Test Spooks');
+
+    // Next and auto-advance stay on the record: after its last song comes its first.
+    await panel(page).locator('[data-part="next"]').click();
+    await expect.poll(async () => (await snap(page)).currentId).toBe(ids.spooky[1]);
+    await panel(page).locator('[data-part="next"]').click();
+    await panel(page).locator('[data-part="next"]').click();
+    await expect.poll(async () => (await snap(page)).currentId).toBe(ids.spooky[0]);
+
+    await page.waitForTimeout(1800); // persistence is throttled
+    await page.reload();
+    await libraryReady(page);
+    expect(await state(page)).toMatchObject({ record: 'spook-test', pick: 'spook-test' });
+    await openPlayer(page);
+    await expect(panel(page).locator('[data-part="track"]').first()).toContainText('Ghost Test One');
+  });
+
+  test('without a pick, Halloween Night starts on its paired record; picking another sticks', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('dascade:v1:settings', JSON.stringify({ theme: 'halloween-night' })));
+    await mockRecords(page);
+    await page.goto('/');
+    await libraryReady(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
+    expect(await state(page)).toMatchObject({ record: 'spook-test', pick: null });
+    await openPlayer(page);
+    await panel(page).locator('[data-part="crate"] [data-record="main"]').click();
+    await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('main');
+    expect((await state(page)).pick).toBe('main');
+  });
+
+  test('the "All records" mix shows every record on the rack, each song naming its record', async ({ page }) => {
+    const ids = await mockRecords(page);
+    await page.goto('/');
+    await libraryReady(page);
+    await openPlayer(page);
+    await panel(page).locator('[data-part="crate"] [data-record="all"]').click();
+    await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('all');
+    const total = ids.main.length + ids.spooky.length;
+    await expect(panel(page).locator('[data-part="rack-page"]')).toHaveCount(Math.ceil(total / 8));
+    await panel(page).locator('[data-part="rack-page"]').last().click();
+    const last = panel(page).locator('[data-part="track"]').last();
+    await expect(last).toHaveAttribute('data-record', 'spook-test');
+    await expect(last).toContainText('Test Spooks');
+  });
+
+  test('reduced motion: the record goes on at once and nothing flies', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const ids = await mockRecords(page);
+    await page.goto('/');
+    await libraryReady(page);
+    await openPlayer(page);
+    await panel(page).locator('[data-part="crate"] [data-record="spook-test"]').click();
+    expect(await state(page)).toMatchObject({ record: 'spook-test' });
+    await expect(page.locator('[data-part="flyer"]')).toHaveCount(0);
+    await expect.poll(async () => (await snap(page)).currentId).toBe(ids.spooky[0]);
+  });
+
+  test("Room DJ: the host plays a song from another record for the room; listeners keep their own record", async ({ page, browser }) => {
+    const code = await createLobby(page, 'chess', 'Host');
+    await libraryReady(page);
+    const records = (await state(page)).records;
+    test.skip(records.length < 2, 'needs two records in the music folder');
+    const other = records[1]!;
+    const guest = await joinRoom(browser, code, 'Guest');
+    await libraryReady(guest);
+
+    await openPlayer(page);
+    await panel(page).getByRole('tab', { name: /Room DJ/ }).click();
+    const dj = panel(page).locator('[data-part="dj"]');
+    await dj.getByRole('switch', { name: /^Room DJ/ }).check();
+    await expect.poll(async () => (await snap(page)).room?.enabled, { timeout: 10_000 }).toBe(true);
+    // Browsing the other record in the Room DJ tab doesn't change the host's own record.
+    await dj.locator(`[data-part="record-tabs"] [data-record="${other}"]`).click();
+    const first = dj.locator('.jb-dj__library [data-part="track"]').first();
+    await expect(first).toHaveAttribute('data-record', other);
+    await first.locator('.jb-track__main').click();
+    await expect.poll(async () => (await snap(page)).room?.current, { timeout: 10_000 }).toBeTruthy();
+    const trackId = (await snap(page)).room!.current!;
+    expect((await state(page)).record).toBe('main');
+
+    await expect.poll(async () => (await snap(guest)).currentId, { timeout: 10_000 }).toBe(trackId);
+    await expect.poll(async () => (await snap(guest)).source, { timeout: 10_000 }).toBe('room');
+    expect((await state(guest)).record).toBe('main');
+    await guest.context().close();
   });
 });

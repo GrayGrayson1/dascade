@@ -4,20 +4,38 @@
  * plays, with the tone arm swung onto the groove; idle, the arm rests off to the side.
  * Decorative (aria-hidden): the now-playing text beside it carries the information. Motion is CSS
  * keyed off data-playing (jukebox.css), so reduced motion / effects off keep it still.
+ * Changing records (RecordCrate.tsx): `changing` lifts the arm and takes the disc off the platter while the
+ * new one flies over; `landing` settles the new disc (a short squash) as the needle drops.
  */
 import { memo, useId } from 'react';
-import type { JukeboxTrack } from '@dascade/shared';
+import type { JukeboxRecord, JukeboxTrack } from '@dascade/shared';
 import { Art } from './Art.tsx';
+import { SleeveArt } from './SleeveArt.tsx';
 
 const GROOVES = [46, 41, 36, 31, 26];
 
-export const Record = memo(function Record({ track, playing }: { track: JukeboxTrack | null; playing: boolean }) {
+export const Record = memo(function Record({
+  track,
+  playing,
+  changing = false,
+  landing = false,
+  sleeve = null,
+}: {
+  track: JukeboxTrack | null;
+  playing: boolean;
+  changing?: boolean;
+  landing?: boolean;
+  /** The record the song is on: its sleeve is the label of a song without art of its own. */
+  sleeve?: JukeboxRecord | null;
+}) {
   const uid = `jbr${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   return (
     <span
       className="jb-record"
       data-part="record"
-      data-playing={playing ? 'true' : undefined}
+      data-playing={playing && !changing ? 'true' : undefined}
+      data-changing={changing ? 'true' : undefined}
+      data-landing={landing ? 'true' : undefined}
       data-empty={track ? undefined : 'true'}
       aria-hidden
     >
@@ -29,9 +47,7 @@ export const Record = memo(function Record({ track, playing }: { track: JukeboxT
             <circle key={r} className="jb-record__groove" cx="50" cy="50" r={r} />
           ))}
         </svg>
-        <span className="jb-record__label">
-          <Art track={track} />
-        </span>
+        <span className="jb-record__label">{track && !track.artwork && sleeve ? <SleeveArt record={sleeve} /> : <Art track={track} />}</span>
         <span className="jb-record__spindle" />
       </span>
       <svg className="jb-record__over" viewBox="0 0 130 100" focusable="false">

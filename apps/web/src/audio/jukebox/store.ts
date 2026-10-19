@@ -5,15 +5,20 @@
  * describes the behaviour.
  */
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { DjState, JukeboxTrack } from '@dascade/shared/jukebox';
+import { MAIN_RECORD_ID, type DjState, type JukeboxRecord, type JukeboxTrack } from '@dascade/shared/jukebox';
 
-export type { DjConfig, DjState, JukeboxTrack } from '@dascade/shared/jukebox';
+export type { DjConfig, DjState, JukeboxRecord, JukeboxTrack } from '@dascade/shared/jukebox';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 export type LibraryStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface JukeboxState {
-  library: { status: LibraryStatus; tracks: JukeboxTrack[] };
+  /** Every track, and the shelf of records (records.ts) they're on. */
+  library: { status: LibraryStatus; tracks: JukeboxTrack[]; records: JukeboxRecord[] };
+  /** The record in effect — what the rack shows and shuffle/next/auto-advance play (ALL_RECORDS = the mix). */
+  record: string;
+  /** The listener's own pick (persisted); null = follow the theme. */
+  recordPick: string | null;
   currentId: string | null;
   /** The element is actually playing (audible unless muted). */
   playing: boolean;
@@ -44,7 +49,9 @@ export interface JukeboxState {
 }
 
 export const INITIAL_JUKEBOX_STATE: JukeboxState = {
-  library: { status: 'idle', tracks: [] },
+  library: { status: 'idle', tracks: [], records: [] },
+  record: MAIN_RECORD_ID,
+  recordPick: null,
   currentId: null,
   playing: false,
   wantPlaying: false,
@@ -74,7 +81,7 @@ export function showsPlaying(s: Pick<JukeboxState, 'source' | 'wantPlaying' | 'r
 }
 
 export function createJukeboxStore(): UseBoundStore<StoreApi<JukeboxState>> {
-  return create<JukeboxState>(() => ({ ...INITIAL_JUKEBOX_STATE, library: { status: 'idle', tracks: [] }, queue: [] }));
+  return create<JukeboxState>(() => ({ ...INITIAL_JUKEBOX_STATE, library: { status: 'idle', tracks: [], records: [] }, queue: [] }));
 }
 
 /** The app-wide jukebox store (one per page, ever). */

@@ -4,10 +4,11 @@
  *  - dev:   serves /audio/jukebox/manifest.json and /audio/jukebox/art/<id>.<ext> from memory, re-indexes
  *           when files are added/changed/removed and tells open pages via the HMR event
  *           `dascade:jukebox` (payload { tracks }) — no full reload, so games in progress keep running.
- *           The sidecar and non-MP3 files in the folder answer 404.
+ *           Sidecars and non-MP3 files in the folder (and in record folders) answer 404.
  *  - build: emits audio/jukebox/manifest.json + art into dist/ and prunes everything in
- *           dist/audio/jukebox/ the manifest doesn't reference (sidecar, duplicates, junk, hidden tracks,
- *           sidecar cover sources). Generated files never touch public/ or the source tree.
+ *           dist/audio/jukebox/ (record folders included) the manifest doesn't reference (sidecars,
+ *           duplicates, junk, hidden tracks, sidecar cover sources). Generated files never touch public/ or
+ *           the source tree.
  *
  * MP3s stay plain static files (Vite's public dir), never imported into JS.
  */
@@ -92,8 +93,8 @@ export function jukeboxPlugin(): Plugin {
           res.end(Buffer.from(art.data));
           return;
         }
-        // Only MP3s are music; the sidecar and other junk in the folder aren't served.
-        if (rel === SIDECAR_NAME || !isMp3Name(rel)) return notFound(res);
+        // Only MP3s are music; sidecars and other junk in the folders aren't served.
+        if (rel === SIDECAR_NAME || rel.endsWith(`/${SIDECAR_NAME}`) || !isMp3Name(rel)) return notFound(res);
         next();
       });
     },
@@ -116,22 +117,35 @@ export function jukeboxPlugin(): Plugin {
       // Vite copied the whole public/audio/jukebox folder; keep only what the manifest references.
       const outDir = path.resolve(config.root, config.build.outDir, JUKEBOX_URL_BASE.slice(1));
       const keep = new Set(index.manifest.tracks.map((t) => t.file));
-      let pruned = 0;
-      let entries: fs.Dirent[];
-      try {
-        entries = fs.readdirSync(outDir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const e of entries) {
-        if (e.name === 'manifest.json' || e.name === 'art') continue;
-        if (e.isFile() && keep.has(e.name)) continue;
-        fs.rmSync(path.join(outDir, e.name), { recursive: true, force: true });
-        pruned++;
-      }
-      if (pruned) config.logger.info(`jukebox: left ${pruned} unreferenced file${pruned === 1 ? '' : 's'} out of dist (sidecar, duplicates, non-MP3s)`);
+      const pruned = pruneUnreferenced(outDir, '', keep);
+      if (pruned) config.logger.info(`jukebox: left ${pruned} unreferenced file${pruned === 1 ? '' : 's'} out of dist (sidecars, duplicates, non-MP3s)`);
     },
   };
+}
+
+/** Removes everything under `dir` that isn't a referenced track (or the generated manifest/art); returns how many entries went. */
+function pruneUnreferenced(dir: string, rel: string, keep: Set<string>): number {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let pruned = 0;
+  for (const e of entries) {
+    const relPath = rel ? `${rel}/${e.name}` : e.name;
+    if (!rel && (e.name === 'manifest.json' || e.name === 'art')) continue;
+    if (e.isFile() && keep.has(relPath)) continue;
+    const full = path.join(dir, e.name);
+    // A record's folder: prune inside it, and drop it only if nothing in it is published.
+    if (e.isDirectory() && !rel && [...keep].some((k) => k.startsWith(`${e.name}/`))) {
+      pruned += pruneUnreferenced(full, e.name, keep);
+      continue;
+    }
+    fs.rmSync(full, { recursive: true, force: true });
+    pruned++;
+  }
+  return pruned;
 }
 
 function notFound(res: import('node:http').ServerResponse): void {
@@ -141,8 +155,9 @@ function notFound(res: import('node:http').ServerResponse): void {
 
 function readEmpty(): JukeboxIndex {
   return {
-    manifest: { version: 1, generatedAt: new Date().toISOString(), tracks: [] },
+    manifest: { version: 1, generatedAt: new Date().toISOString(), tracks: [], records: [] },
     tracks: [],
+    records: [],
     art: [],
     found: 0,
     rejected: [],

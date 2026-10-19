@@ -1740,6 +1740,11 @@
   --jb-strip-band: var(--jb-accent);
   --jb-strip-band-2: var(--jb-accent-2);
   --jb-strip-lit: #ffe79a;
+  /* The record crate (RecordCrate.tsx): wood a skin can restyle, and the sleeve size. */
+  --jb-crate: #9b6739;
+  --jb-crate-dark: #6f4424;
+  --jb-crate-post: #5a361c;
+  --jb-sleeve: 86px;
 }
 :where(.jb-player) :where(.jb-panel) {
   isolation: isolate;
@@ -2258,6 +2263,49 @@
   }
 }
 
+/* Record tabs (Room DJ: browse any record for the room): chrome keys that stay down, like the section keys. */
+:where([data-jukebox]) :where(.jb-record-tabs) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 6px;
+}
+:where([data-jukebox]) :where(.jb-record-tab) {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--jb-chrome-hi), var(--jb-chrome-lo));
+  color: var(--jb-chrome-ink);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--shade) 28%, transparent),
+    0 2px 0 color-mix(in srgb, var(--shade) 40%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record-tab[aria-pressed='true']) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jb-accent) 55%, var(--light)), var(--jb-accent));
+  box-shadow:
+    inset 0 2px 3px color-mix(in srgb, var(--shade) 30%, transparent),
+    0 0 10px color-mix(in srgb, var(--jb-accent) 50%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record-tab:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  :where([data-jukebox]) :where(.jb-record-tab) {
+    min-height: 44px;
+  }
+}
+/* A search match from another record names it. */
+:where([data-jukebox]) :where(.jb-strip__record) {
+  color: var(--jb-accent);
+}
+
 /* The plinth: chrome kick plate with an LED strip, under the cabinet. */
 :where(.jb-player) :where(.jb-plinth) {
   position: relative;
@@ -2310,6 +2358,343 @@
   opacity: 0;
 }
 :where(:root[data-reduced-motion='true']) :where([data-jukebox]) :where(.jb-record__arm, .jb-strip, .jb-pillar) {
+  transition: none;
+}
+
+/* ------------------------------------------------------------------ the record crate */
+/*
+ * Records as sleeves standing in a wooden crate under the dome (RecordCrate.tsx). A sleeve tilts forward on
+ * hover/focus; picking one lifts it, the vinyl flies to the turntable (.jb-flyer, Web Animations from the
+ * component) and lands with a squash as the needle drops; the title strips flip in. Reduced motion / effects
+ * off: the component swaps at once, so none of this runs. Sleeve accents: --jb-rec-a1/-a2 (the record's own
+ * colours, set inline) over the theme's.
+ */
+:where([data-jukebox]) :where(.jb-crate) {
+  position: relative;
+  width: fit-content;
+  min-width: min(100%, 320px);
+  max-width: 100%;
+  margin: 2px auto 0;
+}
+:where([data-jukebox]) :where(.jb-crate)::before {
+  /* the crate's back board, behind the sleeves */
+  content: '';
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  bottom: 30px;
+  height: calc(var(--jb-sleeve) * 0.3);
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, var(--jb-crate-dark), color-mix(in srgb, var(--jb-crate-dark) 70%, #000));
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--light) 10%, transparent);
+}
+:where([data-jukebox]) :where(.jb-crate__row) {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: safe center;
+  /* Room above the sleeves for the hover tilt and the lift, without taking that much layout space. */
+  margin-top: -26px;
+  padding: 40px calc(var(--jb-sleeve) * 0.2) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  pointer-events: none;
+}
+:where([data-jukebox]) :where(.jb-sleeve) {
+  position: relative;
+  flex: none;
+  width: var(--jb-sleeve);
+  height: var(--jb-sleeve);
+  margin-inline: calc(var(--jb-sleeve) * -0.05);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transform-origin: 50% 100%;
+  transform: perspective(520px) rotateX(14deg);
+  filter: brightness(0.8) saturate(0.9);
+  transition:
+    transform 460ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 240ms var(--ease-out);
+}
+:where([data-jukebox]) :where(.jb-sleeve[data-state='playing']) {
+  filter: none;
+}
+:where([data-jukebox]) :where(.jb-sleeve:is([data-state='rest'], [data-state='playing']):is(:hover, :focus-visible)) {
+  z-index: 40 !important;
+  transform: perspective(520px) translateY(-12px) rotateX(-5deg);
+  filter: none;
+}
+:where([data-jukebox]) :where(.jb-sleeve[data-state='lift']) {
+  z-index: 50 !important;
+  transform: perspective(520px) translateY(-30px) rotateX(0deg) scale(1.05);
+  filter: brightness(1.06);
+}
+:where([data-jukebox]) :where(.jb-sleeve[data-state='empty']) {
+  transform: perspective(520px) translateY(-4px) rotateX(8deg);
+  filter: brightness(0.7) saturate(0.8);
+}
+:where([data-jukebox]) :where(.jb-sleeve:focus-visible) {
+  outline: none;
+}
+:where([data-jukebox]) :where(.jb-sleeve:focus-visible .jb-sleeve__cover) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+:where([data-jukebox]) :where(.jb-sleeve__cover) {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow:
+    0 8px 16px color-mix(in srgb, var(--shade) 55%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--light) 16%, transparent);
+}
+:where([data-jukebox]) :where(.jb-sleeve__band) {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 3px 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--jb-screen) 84%, transparent);
+  color: var(--jb-rec-a1, var(--jb-accent));
+  font-family: var(--jb-font-label);
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+:where([data-jukebox]) :where(.jb-sleeve[data-state='playing'] .jb-sleeve__band) {
+  background: var(--jb-rec-a1, var(--jb-accent));
+  color: var(--jb-chrome-ink);
+}
+
+/* Sleeve art: the cover, or a drawn sleeve. */
+:where([data-jukebox]) :where(.jb-sleeve-art) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background: var(--jb-screen);
+}
+:where([data-jukebox]) :where(.jb-sleeve-art img, .jb-sleeve-art svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art[data-kind='initial']) {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--jb-rec-a1, var(--jb-accent)), var(--jb-rec-a2, var(--jb-accent-2)));
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__initial) {
+  color: var(--jb-chrome-ink);
+  font-family: var(--jb-font-label);
+  font-size: calc(var(--jb-sleeve) * 0.46);
+  line-height: 1;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art[data-kind='night']) {
+  background: linear-gradient(180deg, #2b1446, #1a0d2c 62%, #0f0818);
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__moon) {
+  fill: #ffd98f;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__hill) {
+  fill: #0b0612;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__bat) {
+  fill: #b57bff;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__pumpkin) {
+  fill: #e8641c;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art[data-kind='mix']) {
+  background: radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--jb-accent) 30%, transparent), transparent 62%), var(--jb-screen);
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__disc) {
+  position: absolute;
+  width: 52%;
+  height: 52%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--jb-chrome-hi) 0 5%, var(--jb-disc-label) 6% 30%, transparent 31%),
+    repeating-radial-gradient(circle, color-mix(in srgb, #fff 8%, transparent) 0 1px, transparent 1px 5px),
+    var(--jb-vinyl);
+  box-shadow: 0 5px 10px color-mix(in srgb, var(--shade) 60%, transparent);
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__disc[data-n='1']) {
+  --jb-disc-label: var(--jb-accent);
+  left: 8%;
+  top: 30%;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__disc[data-n='2']) {
+  --jb-disc-label: var(--jb-accent-2);
+  left: 25%;
+  top: 38%;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__disc[data-n='3']) {
+  --jb-disc-label: color-mix(in srgb, var(--jb-accent) 50%, var(--jb-accent-2));
+  left: 42%;
+  top: 46%;
+}
+:where([data-jukebox]) :where(.jb-sleeve-art__shuffle) {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  display: grid;
+  place-items: center;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: var(--jb-accent);
+  color: var(--jb-chrome-ink);
+}
+
+/* The crate's front board, over the sleeves' feet, with a title-strip card naming the record. */
+:where([data-jukebox]) :where(.jb-crate__front) {
+  position: relative;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  margin-top: calc(var(--jb-sleeve) * -0.26);
+  min-height: 38px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, var(--jb-crate-post) 0 12px, transparent 12px calc(100% - 12px), var(--jb-crate-post) calc(100% - 12px)),
+    repeating-linear-gradient(90deg, color-mix(in srgb, #000 6%, transparent) 0 3px, transparent 3px 13px),
+    linear-gradient(180deg, var(--jb-crate), color-mix(in srgb, var(--jb-crate) 82%, #000));
+  box-shadow:
+    0 10px 20px color-mix(in srgb, var(--shade) 50%, transparent),
+    inset 0 2px 0 color-mix(in srgb, var(--light) 16%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #000 28%, transparent);
+  pointer-events: none;
+}
+:where([data-jukebox]) :where(.jb-crate__card) {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 10px 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--jb-strip-bg);
+  color: var(--jb-strip-fg);
+  box-shadow:
+    inset 0 3px 0 var(--jb-strip-band),
+    0 1px 0 color-mix(in srgb, #000 45%, transparent);
+  white-space: nowrap;
+}
+:where([data-jukebox]) :where(.jb-crate__card[data-on='true']) {
+  background: var(--jb-strip-lit);
+}
+:where([data-jukebox]) :where(.jb-crate__name) {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+:where([data-jukebox]) :where(.jb-crate__meta) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jb-strip-muted);
+  font-size: var(--fs-2xs);
+}
+:where(.jb-player[data-layout='sheet']) {
+  --jb-sleeve: 74px;
+}
+@media (max-height: 820px) {
+  :where([data-jukebox]) {
+    --jb-sleeve: 70px;
+  }
+}
+:where(.jb-player[data-layout='side']) {
+  --jb-sleeve: 46px;
+}
+:where(.jb-player[data-layout='side']) :where(.jb-crate__meta) {
+  display: none;
+}
+
+/* The vinyl on its way to the turntable (positioned and moved by RecordFlyer). */
+:where(.jb-player) :where(.jb-flyer) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  width: var(--jb-record);
+  height: var(--jb-record);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 14px 26px color-mix(in srgb, var(--shade) 60%, transparent);
+  will-change: transform;
+}
+:where(.jb-player) :where(.jb-flyer__vinyl) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+:where(.jb-player) :where(.jb-flyer__label) {
+  position: absolute;
+  inset: 31%;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--shade) 50%, transparent);
+}
+
+/* Changing records on the turntable: the old disc comes off (the arm is up: not playing), the new one lands. */
+:where([data-jukebox]) :where(.jb-record[data-changing='true'] .jb-record__disc) {
+  opacity: 0;
+  translate: 0 -12px;
+  transition:
+    opacity 240ms var(--ease-out),
+    translate 240ms var(--ease-out);
+}
+:where([data-jukebox]) :where(.jb-record[data-landing='true'] .jb-record__disc) {
+  animation: jb-land 420ms var(--ease-out) both;
+}
+:where([data-jukebox]) :where(.jb-record[data-landing='true'][data-playing='true'] .jb-record__disc) {
+  animation:
+    jb-land 420ms var(--ease-out) both,
+    jb-spin 1.8s linear infinite;
+}
+@keyframes jb-land {
+  0% {
+    scale: 1.08 0.92;
+  }
+  45% {
+    scale: 0.97 1.03;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+/* A new record's title strips flip in, one after another. */
+:where([data-jukebox]) :where(.jb-strips[data-flip='true'] > .jb-strip) {
+  transform-origin: 50% 0;
+  animation: jb-strip-flip 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+@keyframes jb-strip-flip {
+  from {
+    opacity: 0;
+    transform: perspective(500px) rotateX(-92deg);
+  }
+}
+:where(:root[data-fx='off'], :root[data-reduced-motion='true']) :where([data-jukebox]) :where(.jb-strips[data-flip='true'] > .jb-strip, .jb-sleeve) {
+  animation: none;
   transition: none;
 }
 

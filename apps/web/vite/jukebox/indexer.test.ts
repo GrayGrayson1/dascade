@@ -4,7 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { JukeboxManifestSchema, TRACK_ID_RE } from '@dascade/shared/jukebox';
-import { assignIds, buildIndex, hasCopySuffix, readJukeboxFolder, slugify, summaryLine, titleFromFileName, type InputFile } from './indexer.ts';
+import {
+  WARN_TRACK_BYTES,
+  assignIds,
+  buildIndex,
+  hasCopySuffix,
+  readJukeboxFolder,
+  slugify,
+  summaryLine,
+  titleFromFileName,
+  titleFromFolder,
+  type BuildIndexOptions,
+  type InputFile,
+} from './indexer.ts';
 import { inspectMp3, parseFrameHeader } from './mp3.ts';
 import { FRAME_BYTES, FRAME_SECONDS, JPEG, PNG, concat, frames, id3v1, id3v2, id3v22, mp3, vbriFrames, xingFrames } from './testMp3.ts';
 
@@ -304,6 +316,137 @@ describe('buildIndex', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('records (sub-folders)', () => {
+  const build = (files: InputFile[], opts: BuildIndexOptions = {}) => buildIndex(files, { now: NOW, ...opts });
+  const tagged = (album: string, salt: number, title?: string, artist = 'beanalicious') =>
+    mp3({ v2: id3v2({ ...(title ? { title } : {}), artist, album }), salt });
+
+  it('the loose files are the main record; each folder with MP3s is another; the main record comes first', () => {
+    const r = build([
+      f('Neon Cruising.mp3', tagged('Cyber Nightpulse', 1, 'Neon Cruising')),
+      f('Arcade Pulse.mp3', tagged('Cyber Nightpulse', 2, 'Arcade Pulse')),
+      f('Spooky Folder/Ghost Song.mp3', mp3({ salt: 3 })),
+      f('Spooky Folder/A Bat Waltz.mp3', mp3({ salt: 4 })),
+      f('Alpha/Early.mp3', mp3({ salt: 5 })),
+    ]);
+    expect(JukeboxManifestSchema.safeParse(r.manifest).success).toBe(true);
+    expect(r.manifest.records!.map((x) => [x.id, x.title, x.tracks, x.order])).toEqual([
+      ['main', 'Cyber Nightpulse', 2, 0],
+      ['alpha', 'Alpha', 1, 1],
+      ['spooky-folder', 'Spooky Folder', 2, 2],
+    ]);
+    // Catalogue order runs record by record (so the main record's first song keeps code A1).
+    expect(r.manifest.tracks.map((t) => [t.title, t.record ?? null, t.order])).toEqual([
+      ['Arcade Pulse', null, 0],
+      ['Neon Cruising', null, 1],
+      ['Early', 'alpha', 2],
+      ['A Bat Waltz', 'spooky-folder', 3],
+      ['Ghost Song', 'spooky-folder', 4],
+    ]);
+    const ghost = r.manifest.tracks.find((t) => t.title === 'Ghost Song')!;
+    expect(ghost).toMatchObject({ id: 'ghost-song', file: 'Spooky Folder/Ghost Song.mp3', src: '/audio/jukebox/Spooky%20Folder/Ghost%20Song.mp3' });
+    // A record's songs without an album tag are on that record.
+    expect(ghost.album).toBe('Spooky Folder');
+    expect(r.manifest.tracks[0]!.album).toBe('Cyber Nightpulse');
+    expect(r.records.map((x) => x.folder)).toEqual(['', 'Alpha', 'Spooky Folder']);
+    expect(r.records[2]!.duration).toBeCloseTo(r.tracks.filter((t) => t.record === 'spooky-folder').reduce((n, t) => n + t.duration, 0));
+    expect(summaryLine(r)).toMatch(/^jukebox: 5 tracks indexed, 3 records, /);
+  });
+
+  it("adding a record never renames an existing song: the loose files keep their ids, folders get the suffix", () => {
+    // "Album/…" sorts before "zed.mp3", and both slug to "zed".
+    const before = build([f('zed.mp3', mp3({ salt: 1 }))]);
+    const after = build([f('zed.mp3', mp3({ salt: 1 })), f('Album/Zed.mp3', mp3({ salt: 2 })), f('Other/zed.mp3', mp3({ salt: 3 }))]);
+    expect(before.tracks[0]!.id).toBe('zed');
+    const ids = Object.fromEntries(after.tracks.map((t) => [t.file, t.id]));
+    expect(ids['zed.mp3']).toBe('zed');
+    expect(ids['Album/Zed.mp3']).toMatch(/^zed-[0-9a-f]{6}$/);
+    expect(ids['Other/zed.mp3']).toMatch(/^zed-[0-9a-f]{6}$/);
+    expect(new Set(Object.values(ids)).size).toBe(3);
+  });
+
+  it("a folder's sidecar names the record, its artist, sleeve, theme, accents and shelf order, and tags its songs", () => {
+    const sidecar = {
+      record: { title: 'Halloween', artist: 'beanalicious', theme: 'halloween-night', accent: '#ff7a18', accent2: '#9b4dff', order: -1, cover: 'sleeve.jpg' },
+      defaults: { artist: 'beanalicious' },
+      tracks: { 'Graveyard Shift.mp3': { order: 1 }, 'Typo.mp3': { order: 2 } },
+    };
+    const r = build(
+      [f('Main.mp3', mp3({ salt: 1 })), f('halloween/Pumpkin Patch Groove.mp3', mp3({ salt: 2 })), f('halloween/Graveyard Shift.mp3', mp3({ salt: 3 }))],
+      { folderSidecars: { halloween: JSON.stringify(sidecar) }, readCover: (p) => (p === 'halloween/sleeve.jpg' ? JPEG : null) },
+    );
+    const [first, second] = r.manifest.records!;
+    expect(first).toMatchObject({ id: 'halloween', title: 'Halloween', artist: 'beanalicious', theme: 'halloween-night', accent: '#ff7a18', accent2: '#9b4dff', order: 0, tracks: 2 });
+    expect(first!.cover).toMatch(/^\/audio\/jukebox\/art\/records\/halloween\.jpg\?v=[0-9a-f]{8}$/);
+    expect(second).toMatchObject({ id: 'main', order: 1 });
+    expect(r.manifest.tracks.map((t) => [t.title, t.artist ?? null, t.album ?? null])).toEqual([
+      ['Graveyard Shift', 'beanalicious', 'Halloween'],
+      ['Pumpkin Patch Groove', 'beanalicious', 'Halloween'],
+      ['Main', null, null],
+    ]);
+    expect(r.warnings).toEqual(['halloween/jukebox.json: no file named "Typo.mp3" in the folder']);
+  });
+
+  it('record names: the sidecar, else the album most songs share, else the folder name', () => {
+    const r = build([
+      f('a/One.mp3', tagged('Night Drive', 1)),
+      f('a/Two.mp3', tagged('Night Drive', 2)),
+      f('a/Three.mp3', tagged('Bonus', 3)),
+      f('spooky_season/x.mp3', mp3({ salt: 4 })),
+    ]);
+    expect(r.records.map((x) => [x.id, x.title, x.artist ?? null])).toEqual([
+      ['a', 'Night Drive', 'beanalicious'],
+      ['spooky-season', 'Spooky Season', null],
+    ]);
+    expect(titleFromFolder('halloween')).toBe('Halloween');
+    expect(titleFromFolder('DAS-O-Ween 2')).toBe('DAS-O-Ween 2');
+    expect(titleFromFolder('  ')).toBe('Untitled Record');
+  });
+
+  it("the sleeve falls back to the first song's art; a bad sidecar sleeve is a warning", () => {
+    const r = build([f('x/Second.mp3', mp3({ v2: id3v2({ track: '2', picture: { data: PNG } }), salt: 1 })), f('x/First.mp3', mp3({ v2: id3v2({ track: '1', picture: { data: JPEG } }), salt: 2 }))], {
+      folderSidecars: { x: JSON.stringify({ record: { cover: '../escape.jpg' } }) },
+    });
+    expect(r.records[0]!.cover).toBe(r.tracks[0]!.artwork);
+    expect(r.tracks[0]!.title).toBe('First');
+    expect(r.warnings[0]).toContain('must be a path inside the jukebox folder');
+  });
+
+  it('duplicates are per record (the same song may be on two records); junk in a record folder is reported', () => {
+    const same = mp3({ salt: 9 });
+    const r = build([f('Song.mp3', same), f('best-of/Song.mp3', same), f('best-of/Song (1).mp3', same), f('best-of/notes.txt', new Uint8Array(0)), f('covers/x.jpg', JPEG)]);
+    expect(r.tracks.map((t) => t.file)).toEqual(['Song.mp3', 'best-of/Song.mp3']);
+    expect(r.duplicates).toEqual([{ file: 'best-of/Song (1).mp3', duplicateOf: 'best-of/Song.mp3' }]);
+    expect(r.ignored).toEqual(['best-of/notes.txt']);
+    expect(r.records.map((x) => x.id)).toEqual(['main', 'best-of']);
+  });
+
+  it('reserved names: art/ is never a record; folders named main or all get a unique id', () => {
+    const r = build([f('art/Song.mp3', mp3({ salt: 1 })), f('Main/One.mp3', mp3({ salt: 2 })), f('All/Two.mp3', mp3({ salt: 3 }))]);
+    expect(r.tracks.map((t) => t.file).sort()).toEqual(['All/Two.mp3', 'Main/One.mp3']);
+    const ids = r.records.map((x) => x.id);
+    expect(ids).not.toContain('main');
+    expect(ids).not.toContain('all');
+    for (const id of ids) expect(TRACK_ID_RE.test(id)).toBe(true);
+    expect(r.warnings.some((w) => w.includes('reserved for cover art'))).toBe(true);
+  });
+
+  it('warns (never fails) about a song too big for the repo', () => {
+    const big = concat(mp3({ salt: 1 }), new Uint8Array(WARN_TRACK_BYTES));
+    const r = build([f('x/Huge.mp3', big)]);
+    expect(r.tracks).toHaveLength(1);
+    expect(r.warnings.some((w) => w.startsWith('x/Huge.mp3 is ') && w.includes('128–192 kbps'))).toBe(true);
+  });
+
+  it('a manifest without records still validates (older builds) and a hidden folder song is left out', () => {
+    expect(JukeboxManifestSchema.safeParse({ version: 1, generatedAt: NOW.toISOString(), tracks: [] }).success).toBe(true);
+    const r = build([f('x/Keep.mp3', mp3({ salt: 1 })), f('x/Drop.mp3', mp3({ salt: 2 }))], { folderSidecars: { x: JSON.stringify({ tracks: { 'Drop.mp3': { hidden: true } } }) } });
+    expect(r.hidden).toEqual(['x/Drop.mp3']);
+    expect(r.manifest.records![0]).toMatchObject({ id: 'x', tracks: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('readJukeboxFolder (disk)', () => {
   const dirs: string[] = [];
   const tmp = () => {
@@ -319,19 +462,28 @@ describe('readJukeboxFolder (disk)', () => {
     expect(readJukeboxFolder(path.join(os.tmpdir(), 'definitely-not-here-dascade')).manifest.tracks).toEqual([]);
   });
 
-  it('picks up newly added and deleted files with stable ids; top level only', () => {
+  it('picks up newly added and deleted files with stable ids; one level of record folders', () => {
     const d = tmp();
     fs.writeFileSync(path.join(d, 'First Song.mp3'), mp3({ salt: 1 }));
-    fs.mkdirSync(path.join(d, 'sub'));
+    fs.mkdirSync(path.join(d, 'sub', 'deeper'), { recursive: true });
     fs.writeFileSync(path.join(d, 'sub', 'Nested.mp3'), mp3({ salt: 2 }));
+    fs.writeFileSync(path.join(d, 'sub', 'deeper', 'Too Deep.mp3'), mp3({ salt: 4 }));
     const one = readJukeboxFolder(d);
-    expect(one.tracks.map((t) => t.id)).toEqual(['first-song']);
+    expect(one.tracks.map((t) => [t.id, t.record])).toEqual([
+      ['first-song', undefined],
+      ['nested', 'sub'],
+    ]);
+    expect(one.records.map((r) => [r.id, r.title, r.tracks])).toEqual([
+      ['main', 'DASCADE Jukebox', 1],
+      ['sub', 'Sub', 1],
+    ]);
 
     fs.writeFileSync(path.join(d, 'Second Song.mp3'), mp3({ salt: 3 }));
     const two = readJukeboxFolder(d);
-    expect(two.tracks.map((t) => t.id)).toEqual(['first-song', 'second-song']);
+    expect(two.tracks.map((t) => t.id)).toEqual(['first-song', 'second-song', 'nested']);
 
     fs.rmSync(path.join(d, 'First Song.mp3'));
+    fs.rmSync(path.join(d, 'sub'), { recursive: true });
     const three = readJukeboxFolder(d);
     expect(three.tracks.map((t) => t.id)).toEqual(['second-song']);
     expect(readJukeboxFolder(d).manifest.tracks).toEqual(three.manifest.tracks.map((t) => ({ ...t })));
@@ -345,7 +497,29 @@ describe('readJukeboxFolder (disk)', () => {
     fs.writeFileSync(path.join(d, 'jukebox.json'), JSON.stringify({ tracks: { 'song.mp3': { title: 'From Sidecar', cover: 'covers/song.jpg' } } }));
     const r = readJukeboxFolder(d);
     expect(r.tracks[0]).toMatchObject({ title: 'From Sidecar', artwork: expect.stringContaining('/art/song.jpg') });
-    expect(r.found).toBe(1); // the sidecar isn't a "file found"
+    expect(r.found).toBe(1); // the sidecar isn't a "file found"; a covers folder isn't a record
+    expect(r.records.map((x) => x.id)).toEqual(['main']);
+  });
+
+  it("reads a record folder's sidecar and sleeve; the reserved art/ folder is never a record", () => {
+    const d = tmp();
+    fs.writeFileSync(path.join(d, 'Main Song.mp3'), mp3({ salt: 1 }));
+    fs.mkdirSync(path.join(d, 'halloween'));
+    fs.writeFileSync(path.join(d, 'halloween', 'Graveyard Shift.mp3'), mp3({ salt: 2 }));
+    fs.writeFileSync(path.join(d, 'halloween', 'cover.png'), PNG);
+    fs.writeFileSync(path.join(d, 'halloween', 'jukebox.json'), JSON.stringify({ record: { title: 'Spooky Season', theme: 'halloween-night', cover: 'cover.png' } }));
+    fs.mkdirSync(path.join(d, 'art'));
+    fs.writeFileSync(path.join(d, 'art', 'Oops.mp3'), mp3({ salt: 3 }));
+    const r = readJukeboxFolder(d);
+    expect(r.records.map((x) => [x.id, x.title, x.theme ?? null])).toEqual([
+      ['main', 'DASCADE Jukebox', null],
+      ['halloween', 'Spooky Season', 'halloween-night'],
+    ]);
+    expect(r.records[1]!.cover).toMatch(/^\/audio\/jukebox\/art\/records\/halloween\.png\?v=/);
+    expect(r.art.map((a) => a.path)).toEqual(['art/records/halloween.png']);
+    expect(r.tracks.map((t) => t.file)).toEqual(['Main Song.mp3', 'halloween/Graveyard Shift.mp3']);
+    expect(r.ignored).toEqual([]); // the sleeve is the record's, not junk
+    expect(r.warnings.some((w) => w.includes('"art" is reserved'))).toBe(true);
   });
 
   // The folder is the library: people drop MP3s in without touching code, so this checks what must hold
