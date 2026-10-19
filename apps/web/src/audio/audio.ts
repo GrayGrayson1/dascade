@@ -151,6 +151,9 @@ function tone({ type = 'square', freq, to, start = 0, dur, gain = 0.2, attack = 
   const t0 = ctx.currentTime + start;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
+  // Silent until its envelope starts: a start time between two samples would otherwise play that
+  // first sample at the GainNode's default gain of 1 (a full-scale click).
+  g.gain.value = 0;
   osc.type = type;
   osc.detune.value = detune;
   osc.frequency.setValueAtTime(freq, t0);
@@ -191,6 +194,8 @@ function noise({ start = 0, dur, gain = 0.2, freq = 2000, q = 1, type = 'bandpas
   if (to) filter.frequency.exponentialRampToValueAtTime(to, t0 + dur);
   filter.Q.value = q;
   const g = ctx.createGain();
+  // See tone(): never a full-gain first sample before the envelope starts.
+  g.gain.value = 0;
   if (attack) {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
