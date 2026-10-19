@@ -5,6 +5,13 @@
  * A presenter-run survey show in the style of a TV family game show: two teams, a big board of up to
  * ten hidden survey answers, strikes, steals, a bank, sound effects and a live audience on phones.
  *
+ * Two formats (the `mode` setting):
+ *   - 'classic' (Team Showdown): the full game — teams, strikes, steals, a bank and scores.
+ *   - 'showcase' (Presenter Showcase): one presenter runs a big Top-10 board for an audience that
+ *     guesses out loud (or in a video-call chat). No teams, no scores: the presenter flips the answers
+ *     people name, buzzes wrong answers (as often as needed, never "strikes"), celebrates a special
+ *     answer (e.g. #5), runs a round clock, and finally reveals what's left from #10 down to #1.
+ *
  * Roles (decided on the server, never by the client):
  *   - Presenter: the room's creator. The only player who receives the answer sheet (`showdown:sheet`)
  *     and the only one whose show controls (`showdown:act`, `showdown:cue`) are accepted. The role never
@@ -41,13 +48,24 @@ export const SHOWDOWN_LIMITS = {
   customRounds: 12,
   promptMin: 5,
   promptMax: 160,
-  answerMax: 36,
+  /** Long song and movie titles ("It's the Great Pumpkin, Charlie Brown") fit. */
+  answerMax: 48,
   aliasMax: 36,
   aliasesPerAnswer: 4,
+  /** A small line under a revealed answer (artist, year…). */
+  noteMax: 40,
+  /** A round's category name ("Halloween Songs"), shown from its title card. */
+  roundTitleMax: 40,
+  /** "According to …" attribution of a round. */
+  sourceMax: 60,
   /** Raw (pre-clean) input bounds for editor payloads. */
   rawText: 400,
   showTitle: 48,
+  /** The holding screen's headline ("Remoties DAS-O-Ween Happy Hour"). */
+  eventName: 60,
   teamName: 22,
+  /** Round clock (Presenter Showcase), whole minutes; 0 = no clock. */
+  minutesMax: 30,
   /** Strikes before the other team may steal. */
   strikes: 3,
   /** Private audience guesses per player per round. */
@@ -102,6 +120,35 @@ export function resolveShowdownLook(setting: ShowdownLookSetting, now: Date | nu
 }
 
 // ---------------------------------------------------------------------------
+// Formats
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_MODES = ['classic', 'showcase'] as const;
+export type ShowdownMode = (typeof SHOWDOWN_MODES)[number];
+
+export const SHOWDOWN_MODE_INFO: Record<ShowdownMode, { title: string; blurb: string }> = {
+  classic: { title: 'Team Showdown', blurb: 'Two teams, strikes, steals and a bank — the full family game show.' },
+  showcase: {
+    title: 'Presenter Showcase',
+    blurb: 'One big Top-10 board for a crowd that shouts its guesses (or types them in a meeting chat). You flip the answers they name — no teams, no scores.',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Stage cards (holding screens the presenter can put up at any time)
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_CARDS = ['welcome', 'break', 'prizes', 'thanks'] as const;
+export type ShowdownCard = (typeof SHOWDOWN_CARDS)[number];
+
+export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: string; icon: string }> = {
+  welcome: { title: 'Welcome', blurb: 'The event’s name and “the show starts soon”.', icon: '🎪' },
+  break: { title: 'Be right back', blurb: 'For a video, a break or technical trouble.', icon: '⏸️' },
+  prizes: { title: 'Prize time', blurb: 'Up next: the prize winners.', icon: '🏆' },
+  thanks: { title: 'Thanks for playing', blurb: 'The closing card.', icon: '👋' },
+};
+
+// ---------------------------------------------------------------------------
 // Question packs (metadata only — the questions live in the server engine package)
 // ---------------------------------------------------------------------------
 
@@ -122,32 +169,68 @@ export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, { title: string; blurb: 
 
 export interface ShowdownAnswer {
   text: string;
+  /** Survey points (0 in a ranked round, which has none). */
   points: number;
   /** Other spellings the audience may type ("post-its" for "Sticky notes"). Never shown. */
   aliases: string[];
+  /** A small line shown under the answer once it's revealed (artist, year…). Hidden until then. */
+  note?: string;
 }
 
 export interface ShowdownRoundDef {
-  /** Pack question id ('office-03') or 'custom-<n>'. */
+  /** Pack question id ('office-03'), event preset id ('dasoween-songs') or 'custom-<n>'. */
   id: string;
   prompt: string;
-  /** Sorted by points, most popular first (slot 1 is the top answer). */
+  /** Sorted by points, most popular first (slot 1 is the top answer) — or, ranked, in the order given. */
   answers: ShowdownAnswer[];
+  /** Category name shown from the round's title card ("Halloween Songs"). */
+  title?: string;
+  /** "According to …" attribution, shown with the question. Never an invented poll. */
+  source?: string;
+  /** Slot (0-based) of the special answer that sets off the big celebration; -1 or absent = none. */
+  special?: number;
+  /** A ranked list (no survey points): the order is the presenter's, the points are all 0. */
+  ranked?: boolean;
 }
 
 const raw = (max: number = SHOWDOWN_LIMITS.rawText) => z.string().max(max);
 
-/** Raw custom round as the presenter's editor sends it (bounded; cleaned by validateShowContent). */
+/**
+ * Raw custom round as the presenter's editor sends it (bounded; cleaned by validateShowContent).
+ * Points: every answer 1–100 (sorted by points), or every answer 0 for a ranked list (kept in order).
+ * `special` is the answer's place on the board, 1–10 (0 or absent = no special answer).
+ */
 export const ShowdownAnswerInputSchema = z.object({
   text: raw(),
   points: z.number().int().min(0).max(1000),
   aliases: z.array(raw()).max(8).optional(),
+  note: raw().optional(),
 });
 export const ShowdownRoundInputSchema = z.object({
   prompt: raw(),
-  answers: z.array(ShowdownAnswerInputSchema).max(16),
+  // A board holds 10; a couple more still reach the validator, which says so ("at most 10").
+  answers: z.array(ShowdownAnswerInputSchema).max(SHOWDOWN_LIMITS.answersMax + 2),
+  title: raw().optional(),
+  source: raw().optional(),
+  special: z.number().int().min(0).max(SHOWDOWN_LIMITS.answersMax).optional(),
 });
 export type ShowdownRoundInput = z.infer<typeof ShowdownRoundInputSchema>;
+
+/** A stored round back in editor form (the inverse of validateShowContent for a valid round). */
+export function roundToInput(round: ShowdownRoundDef): ShowdownRoundInput {
+  return {
+    prompt: round.prompt,
+    ...(round.title ? { title: round.title } : {}),
+    ...(round.source ? { source: round.source } : {}),
+    ...(round.special !== undefined && round.special >= 0 ? { special: round.special + 1 } : {}),
+    answers: round.answers.map((a) => ({
+      text: a.text,
+      points: round.ranked ? 0 : a.points,
+      aliases: [...a.aliases],
+      ...(a.note ? { note: a.note } : {}),
+    })),
+  };
+}
 
 export const ShowdownContentSchema = z.object({
   rounds: z.array(ShowdownRoundInputSchema).max(SHOWDOWN_LIMITS.customRounds * 2),
@@ -157,7 +240,7 @@ export type ShowdownContentPayload = z.infer<typeof ShowdownContentSchema>;
 export interface ShowdownContentIssue {
   /** 0-based round index in the submitted list. */
   index: number;
-  field: 'prompt' | 'answers' | 'list';
+  field: 'prompt' | 'answers' | 'special' | 'list';
   message: string;
 }
 
@@ -173,9 +256,10 @@ const hasWordChar = (s: string) => /[\p{L}\p{N}]/u.test(s);
 /**
  * Cleans and validates custom rounds. Every string is sanitized (control/invisible characters removed,
  * whitespace collapsed, profanity masked) and bounded; blank answers are dropped; answers must be
- * distinct (case/accent-insensitive) with 1–100 points; 3–10 answers per round. Answers are sorted
- * by points (stable), so slot 1 is always the top answer. Invalid rounds are dropped and reported.
- * Pure and isomorphic: the editor runs it for live feedback, the server runs it authoritatively.
+ * distinct (case/accent-insensitive); 3–10 answers per round. Either every answer has 1–100 points
+ * (sorted by points, stable, so slot 1 is the top answer) or every answer has 0 points: a ranked list
+ * kept in the order given. A special answer (1–10) must be on the board. Invalid rounds are dropped
+ * and reported. Pure and isomorphic: the editor runs it for live feedback, the server authoritatively.
  */
 export function validateShowContent(input: readonly ShowdownRoundInput[]): ShowdownContentReport {
   const rounds: ShowdownRoundDef[] = [];
@@ -208,17 +292,34 @@ export function validateShowContent(input: readonly ShowdownRoundInput[]): Showd
         const clean = maskProfanity(cleanText(alias, SHOWDOWN_LIMITS.aliasMax));
         if (clean && hasWordChar(clean) && aliases.length < SHOWDOWN_LIMITS.aliasesPerAnswer && !aliases.includes(clean)) aliases.push(clean);
       }
-      answers.push({ text, points: a.points, aliases });
+      const note = maskProfanity(cleanText(a.note ?? '', SHOWDOWN_LIMITS.noteMax));
+      answers.push({ text, points: a.points, aliases, ...(note && hasWordChar(note) ? { note } : {}) });
     }
     if (answers.length < SHOWDOWN_LIMITS.answersMin) return problem('answers', `Add at least ${SHOWDOWN_LIMITS.answersMin} answers.`);
     if (answers.length > SHOWDOWN_LIMITS.answersMax) return problem('answers', `A board holds at most ${SHOWDOWN_LIMITS.answersMax} answers.`);
-    if (answers.some((a) => a.points < SHOWDOWN_LIMITS.pointsMin || a.points > SHOWDOWN_LIMITS.pointsMax)) {
-      return problem('answers', `Give every answer ${SHOWDOWN_LIMITS.pointsMin}–${SHOWDOWN_LIMITS.pointsMax} points.`);
+    const ranked = answers.every((a) => a.points === 0);
+    if (!ranked && answers.some((a) => a.points < SHOWDOWN_LIMITS.pointsMin || a.points > SHOWDOWN_LIMITS.pointsMax)) {
+      return problem(
+        'answers',
+        `Give every answer ${SHOWDOWN_LIMITS.pointsMin}–${SHOWDOWN_LIMITS.pointsMax} points — or leave every answer at 0 to rank them in the order listed.`,
+      );
     }
     const keys = answers.map((a) => normalizeForCompare(a.text) || a.text);
     if (new Set(keys).size !== keys.length) return problem('answers', 'Each answer must be different.');
-    const sorted = answers.map((a, i) => ({ a, i })).sort((x, y) => y.a.points - x.a.points || x.i - y.i);
-    rounds.push({ id: `custom-${rounds.length + 1}`, prompt, answers: sorted.map((x) => x.a) });
+    const special = round.special ?? 0;
+    if (special > answers.length) return problem('special', `The special answer is #${special}, but this board has ${answers.length} answers.`);
+    const ordered = ranked ? answers : answers.map((a, i) => ({ a, i })).sort((x, y) => y.a.points - x.a.points || x.i - y.i).map((x) => x.a);
+    const title = maskProfanity(cleanText(round.title ?? '', SHOWDOWN_LIMITS.roundTitleMax));
+    const source = maskProfanity(cleanText(round.source ?? '', SHOWDOWN_LIMITS.sourceMax));
+    rounds.push({
+      id: `custom-${rounds.length + 1}`,
+      prompt,
+      answers: ordered,
+      ...(title && hasWordChar(title) ? { title } : {}),
+      ...(source && hasWordChar(source) ? { source } : {}),
+      ...(special > 0 ? { special: special - 1 } : {}),
+      ...(ranked ? { ranked: true } : {}),
+    });
   });
   return { rounds, issues, dropped };
 }
@@ -257,10 +358,15 @@ export function roundMultipliers(rounds: number, scoring: ShowdownScoring): numb
 
 const cleanTitle = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.showTitle));
 const cleanTeamName = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.teamName));
+const cleanEventName = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.eventName));
 
 export const ShowdownSettingsSchema = z.object({
+  /** Team Showdown (teams, strikes, steals, scores) or Presenter Showcase (one board, no teams). */
+  mode: z.enum(SHOWDOWN_MODES),
   /** Marquee title (blank = the default title). */
   title: z.string().max(120).transform(cleanTitle),
+  /** The holding screen's headline (blank = the show title). Presenter Showcase's Welcome card. */
+  eventName: z.string().max(160).transform(cleanEventName),
   look: z.enum(SHOWDOWN_LOOKS),
   /** Built-in packs, or the presenter's own rounds. */
   source: z.enum(['packs', 'custom']),
@@ -277,6 +383,10 @@ export const ShowdownSettingsSchema = z.object({
   /** The audience may lock in private guesses for "called it" points. */
   audience: z.boolean(),
   teamNames: z.tuple([z.string().max(60).transform(cleanTeamName), z.string().max(60).transform(cleanTeamName)]),
+  /** Presenter Showcase: each round's clock in minutes (0 = no clock). It never reveals anything by itself. */
+  minutes: z.number().int().min(0).max(SHOWDOWN_LIMITS.minutesMax),
+  /** Presenter Showcase: the round clock shows on the stage too (the console always has it). */
+  stageClock: z.boolean(),
 });
 export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
@@ -286,7 +396,9 @@ export const SHOWDOWN_DEFAULT_TITLE = 'DAS Survey Showdown';
 export function defaultShowdownSettings(now: Date = new Date()): ShowdownSettings {
   const october = now.getMonth() === 9;
   return {
+    mode: 'classic',
     title: '',
+    eventName: '',
     look: 'auto',
     source: 'packs',
     packs: october ? ['spooky'] : ['office', 'tech', 'food', 'life'],
@@ -295,7 +407,14 @@ export function defaultShowdownSettings(now: Date = new Date()): ShowdownSetting
     steal: true,
     audience: true,
     teamNames: ['', ''],
+    minutes: 10,
+    stageClock: true,
   };
+}
+
+/** The holding screen's headline: the event name, else the show title. */
+export function eventTitle(settings: Pick<ShowdownSettings, 'eventName' | 'title'>): string {
+  return settings.eventName || showTitle(settings);
 }
 
 export function showTitle(settings: Pick<ShowdownSettings, 'title'>): string {
@@ -339,6 +458,13 @@ export const SHOWDOWN_MSG = {
    * server → presenter only: the stored rounds + issues (ShowdownContentPrivate), null for others.
    */
   content: 'showdown:content',
+  /**
+   * client → server (presenter, lobby/results) {id}: load an event preset — its settings and its rounds
+   * (which live on the server, never in the client bundle) become this room's custom rounds.
+   */
+  preset: 'showdown:preset',
+  /** client → server (presenter, any phase) {card}: put a holding card on every stage ('' = none). */
+  card: 'showdown:card',
   /** server → presenter only: the answer sheet (ShowdownSheet), null when you are not (or no longer) the presenter. */
   sheet: 'showdown:sheet',
   /** server → presenter only: {pass} (null for everyone else). */
@@ -384,11 +510,36 @@ export const ShowdownActSchema = z.discriminatedUnion('a', [
   z.object({ a: z.literal('next'), rev }).strict(),
   z.object({ a: z.literal('undo'), rev }).strict(),
   z.object({ a: z.literal('finish'), rev }).strict(),
+  // ---- Presenter Showcase ----
+  /**
+   * A wrong answer: the buzzer and a big ✕ on every screen. Not a strike — it changes nothing on the
+   * board, so it carries the round (not the revision) and may be pressed as often as people miss. The
+   * server drops a second one within SHOWDOWN_MISS_GAP_MS (a double click is one miss).
+   */
+  z.object({ a: z.literal('miss'), round: z.number().int().min(-1).max(1000) }).strict(),
+  /** The current round back to its title card: every tile hidden again, the clock reset. Undoable. */
+  z.object({ a: z.literal('restart'), rev }).strict(),
+  /** The whole show back to the opening marquee. Undoable. */
+  z.object({ a: z.literal('reset'), rev }).strict(),
+  /**
+   * Reveal what's left, from the bottom of the board up (#10, #9 … #1), skipping answers already up.
+   * The server runs the sequence (a drumroll before the special answer), so a busy or hidden console
+   * can't stall it. Ignored if the show has moved on from `round`.
+   */
+  z.object({ a: z.literal('sweep'), round: z.number().int().min(-1).max(1000) }).strict(),
+  /** Stop a running sweep (pressing Reveal remaining again carries on from where it stopped). */
+  z.object({ a: z.literal('halt') }).strict(),
+  /** The round clock: start/resume, pause, back to full time (paused), one minute more or less. */
+  z.object({ a: z.literal('clock'), op: z.enum(['start', 'pause', 'reset', 'plus', 'minus', 'show', 'hide']) }).strict(),
 ]);
 export type ShowdownActPayload = z.infer<typeof ShowdownActSchema>;
 export type ShowdownAction = ShowdownActPayload['a'];
+export type ShowdownClockOp = Extract<ShowdownActPayload, { a: 'clock' }>['op'];
 
-export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense'] as const;
+/** A second wrong-answer press within this window is the same miss (a double click). */
+export const SHOWDOWN_MISS_GAP_MS = 450;
+
+export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense', 'celebrate'] as const;
 export type ShowdownCue = (typeof SHOWDOWN_CUES)[number];
 export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: string }> = {
   intro: { title: 'Intro sting', icon: '🎺' },
@@ -397,6 +548,7 @@ export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: strin
   aww: { title: 'Aww', icon: '😢' },
   ding: { title: 'Ding', icon: '🔔' },
   suspense: { title: 'Suspense', icon: '😬' },
+  celebrate: { title: 'Celebrate!', icon: '🎉' },
 };
 export const ShowdownCueSchema = z.object({ cue: z.enum(SHOWDOWN_CUES) }).strict();
 
@@ -410,6 +562,54 @@ export const ShowdownReactSchema = z.object({ r: z.number().int().min(0).max(SHO
 export const ShowdownClaimSchema = z.object({ pass: z.string().min(1).max(64) }).strict();
 export const ShowdownHandoverSchema = z.object({ playerId: z.string().min(1).max(64) }).strict();
 export const ShowdownTakeoverSchema = z.object({}).strict();
+export const ShowdownCardSchema = z.object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS)]) }).strict();
+
+// ---------------------------------------------------------------------------
+// Event presets (metadata only — their rounds live in the server engine package)
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_EVENT_IDS = ['dasoween-2026', 'dasoween-rehearsal'] as const;
+export type ShowdownEventId = (typeof SHOWDOWN_EVENT_IDS)[number];
+export const ShowdownPresetSchema = z.object({ id: z.enum(SHOWDOWN_EVENT_IDS) }).strict();
+
+export interface ShowdownEventInfo {
+  title: string;
+  blurb: string;
+  /** Rounds it loads. */
+  rounds: number;
+  /** Demo answers for practising: the console and stage say "Rehearsal" while it's loaded. */
+  rehearsal: boolean;
+  /** Settings it applies (the rest stay as they are). */
+  settings: Partial<ShowdownSettings>;
+}
+
+const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
+  mode: 'showcase',
+  look: 'halloween',
+  title: 'DAS-O-Ween Trivia',
+  eventName: 'Remoties DAS-O-Ween Happy Hour',
+  source: 'custom',
+  minutes: 10,
+  stageClock: true,
+  audience: false,
+};
+
+export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
+  'dasoween-2026': {
+    title: 'DAS-O-Ween 2026',
+    blurb: 'Two Top-10 boards — Halloween songs, then Halloween movies — with a celebration on #5, a 10-minute clock per round and the Halloween Night look.',
+    rounds: 2,
+    rehearsal: false,
+    settings: DASOWEEN_SETTINGS,
+  },
+  'dasoween-rehearsal': {
+    title: 'DAS-O-Ween rehearsal',
+    blurb: 'The same show with two practice boards (candy and costumes), so you can try every control without giving the real answers away.',
+    rounds: 2,
+    rehearsal: true,
+    settings: { ...DASOWEEN_SETTINGS, title: 'DAS-O-Ween Rehearsal' },
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Public views
@@ -422,6 +622,7 @@ export const ShowdownTakeoverSchema = z.object({}).strict();
  *   live   — the question is up; the team in control guesses (reveals, strikes)
  *   steal  — three strikes: the other team gets one guess to steal the bank
  *   done   — the round is decided; the presenter may reveal the rest of the board for show
+ * Presenter Showcase uses intro → title → live → done (done = every answer is up).
  */
 export type ShowdownStage = 'intro' | 'title' | 'live' | 'steal' | 'done';
 
@@ -440,6 +641,10 @@ export interface ShowdownSlotView {
   seq: number;
   /** Audience members who called it (aggregate, only once revealed). */
   callers: number;
+  /** Revealed after the round was played (Reveal the rest / Reveal remaining) — nobody found it. */
+  late: boolean;
+  /** The answer's small line (artist, year…), only once revealed. */
+  note?: string;
 }
 
 export interface ShowdownRoundResult {
@@ -447,18 +652,28 @@ export interface ShowdownRoundResult {
   winner: TeamSlot;
   points: number;
   how: ShowdownWin;
+  /** Presenter Showcase: answers found while the round was live, of `total`. */
+  found?: number;
+  total?: number;
 }
 
 /** The public board (`boardJson`): only what every screen may show. */
 export interface ShowdownBoardView {
   rev: number;
+  mode: ShowdownMode;
   stage: ShowdownStage;
   /** 0-based round index (-1 before round 1). */
   round: number;
   totalRounds: number;
   multiplier: number;
+  /** The round's category name ('' = none), public from its title card. */
+  title: string;
   /** '' until the question is shown. */
   prompt: string;
+  /** "According to …" attribution ('' = none), shown with the question. */
+  source: string;
+  /** Slot of the special answer (-1 = none). A position on the board, never the answer. */
+  special: number;
   slots: ShowdownSlotView[];
   control: TeamSlot;
   strikes: number;
@@ -492,6 +707,25 @@ export interface ShowdownPublicState extends BaseRoomView {
   customRounds: number;
   /** JSON ShowdownFinale once the show is over ('' otherwise). */
   finaleJson: string;
+  /** The holding card on every stage ('' = none): ShowdownCard. */
+  card: string;
+  /** Presenter Showcase: the round clock. Running while clockEndsAt > 0 (server epoch ms). */
+  clockEndsAt: number;
+  /** Milliseconds left while paused (negative = overtime). */
+  clockLeft: number;
+  /** The round's full time in ms (0 = no clock this show). */
+  clockMax: number;
+  /** The stage shows the clock. */
+  clockShow: boolean;
+  /** A "Reveal remaining" sweep is running. */
+  sweep: boolean;
+  /** The loaded rounds are an event preset's practice boards. */
+  rehearsal: boolean;
+}
+
+/** Milliseconds left on the round clock (negative = overtime). `now` = serverNow() on clients. */
+export function clockRemaining(s: Pick<ShowdownPublicState, 'clockEndsAt' | 'clockLeft'>, now: number): number {
+  return s.clockEndsAt > 0 ? s.clockEndsAt - now : s.clockLeft;
 }
 
 export function parseBoard(json: string | undefined | null): ShowdownBoardView | null {
@@ -518,6 +752,11 @@ export interface ShowdownSheetRound {
   prompt: string;
   multiplier: number;
   answers: ShowdownAnswer[];
+  title?: string;
+  source?: string;
+  /** Slot of the special answer (-1 = none). */
+  special: number;
+  ranked: boolean;
 }
 
 export interface ShowdownGuessCloudEntry {
@@ -534,6 +773,12 @@ export interface ShowdownSheet {
   round: number;
   prompt: string;
   multiplier: number;
+  /** Slot of the special answer this round (-1 = none). */
+  special: number;
+  /** This round ranks its answers (no survey points to show). */
+  ranked: boolean;
+  title?: string;
+  source?: string;
   answers: ShowdownSheetAnswer[];
   /** Every round of the show (the rundown), including the current one. */
   rundown: ShowdownSheetRound[];
@@ -589,11 +834,30 @@ export type ShowdownEvent =
       callers: number;
       /** Every answer on the board is now showing. */
       cleared: boolean;
+      /** The special answer: the big celebration. */
+      special: boolean;
+      /** Part of a Reveal remaining sweep (#10 → #1). */
+      sweep: boolean;
+      /** The answer's small line, if it has one. */
+      note?: string;
     }
   | { type: 'strike'; rev: number; strikes: number; steal: boolean; stealFailed: boolean }
   | { type: 'award'; rev: number; team: TeamSlot; points: number; how: ShowdownWin }
   | { type: 'adjust'; rev: number; team: TeamIndex; delta: number }
-  | { type: 'undo'; rev: number };
+  | { type: 'undo'; rev: number }
+  // ---- Presenter Showcase ----
+  /** A wrong answer (`n` counts this round's misses, for keys; nothing is scored). */
+  | { type: 'miss'; rev: number; round: number; n: number }
+  /** A sweep started (on) or ended (off: finished, or stopped by the presenter). */
+  | { type: 'sweep'; rev: number; on: boolean }
+  /** The sweep's drumroll beat before the special answer flips. */
+  | { type: 'suspense'; rev: number; slot: number }
+  /** The round clock ran out (once per round; the show carries on — the presenter wraps up). */
+  | { type: 'timeup'; rev: number; round: number }
+  /** The round went back to its title card. */
+  | { type: 'restart'; rev: number; round: number }
+  /** The show went back to the opening. */
+  | { type: 'reset'; rev: number };
 
 export interface ShowdownReactions {
   /** Count per reaction kind in the last moment. */
@@ -602,8 +866,9 @@ export interface ShowdownReactions {
   t: [number, number];
 }
 
-/** Final results (podium extras). */
+/** Final results (podium extras). Presenter Showcase: winner -1, no teams — never an invented winner. */
 export interface ShowdownFinale {
+  mode: ShowdownMode;
   winner: TeamSlot;
   scores: [number, number];
   names: [string, string];

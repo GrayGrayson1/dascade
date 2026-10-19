@@ -8,9 +8,11 @@ export {
   createShow,
   currentRound,
   finalizeShow,
+  nextSweepSlot,
   revealedIn,
   sheetView,
   showWinner,
+  specialSlot,
   step,
   type CreateShowOptions,
   type ShowCommand,
@@ -23,3 +25,4 @@ export {
 } from './engine.ts';
 export { GUESS_REJECTION_TEXT, GuessBook, matchSlot, type GuessRejection, type SubmitResult } from './guesses.ts';
 export { SHOWDOWN_PACKS, pickRounds } from './packs.ts';
+export { SHOWDOWN_EVENT_ROUNDS } from './events.ts';

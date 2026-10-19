@@ -616,7 +616,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     marquee: 'SURVEY SHOWDOWN',
     tagline: 'Survey says… it’s showtime!',
     description:
-      'A presenter-run game show for the big screen: two teams, a ten-answer survey board, strikes, steals and a live audience calling the answers from their phones. Halloween Night in October, DAS Showtime the rest of the year.',
+      'A presenter-run game show for the big screen: two teams, a ten-answer survey board, strikes, steals and a live audience calling the answers from their phones — or a Presenter Showcase for an event crowd, with a special answer, a round clock and no teams. Halloween Night in October, DAS Showtime the rest of the year.',
     category: 'party',
     cabinet: 'stravaganza',
     reconnectGraceSeconds: 180,
@@ -632,12 +632,16 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
       lateJoinAsPlayer: true,
       supportsSolo: false,
     },
-    controls: ['Presenter: reveal answers, strike, steal and score from the console', 'Audience: pick a team, cheer and lock in guesses on your phone'],
+    controls: [
+      'Presenter: reveal answers, strike, steal and score from the console (Presenter Showcase: reveal, buzz wrong answers, run the clock)',
+      'Audience: pick a team, cheer and lock in guesses on your phone',
+    ],
     howToPlay: [
       'The room’s creator is the presenter: only they see the answers, on a private console. Open the stage window or a big-screen link for the audience.',
       'Each round a survey question goes up with up to ten hidden answers. The team in control names answers; the presenter flips the ones on the board.',
       'Three strikes and the other team gets one guess to steal the whole bank. Reveal the full board for a clean sweep.',
       'Everyone else picks a team, cheers it on and locks in private guesses — call an answer before it flips to score Survey Sayer points.',
+      'Presenter Showcase (for events): no teams — the crowd shouts its guesses (or types them in a meeting chat), the presenter flips the answers they name, buzzes wrong ones, celebrates the special answer and finally reveals the rest from #10 up.',
     ],
     virtualChips: false,
     prefersLandscape: false,

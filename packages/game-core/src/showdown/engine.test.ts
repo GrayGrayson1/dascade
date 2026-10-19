@@ -298,8 +298,8 @@ describe('views never leak hidden answers', () => {
     const view = boardView(s, [3, 2, 1, 0]);
     const json = JSON.stringify(view);
     for (const hidden of ['r1-answer-1', 'r1-answer-3', 'r1-answer-4', 'r1-alias', 'r2-', 'r3-']) expect(json).not.toContain(hidden);
-    expect(view.slots[0]).toEqual({ revealed: false, by: -1, seq: 0, callers: 0 });
-    expect(view.slots[1]).toEqual({ revealed: true, text: 'r1-answer-2', points: 30, by: 0, seq: 1, callers: 2 });
+    expect(view.slots[0]).toEqual({ revealed: false, by: -1, seq: 0, callers: 0, late: false });
+    expect(view.slots[1]).toEqual({ revealed: true, text: 'r1-answer-2', points: 30, by: 0, seq: 1, callers: 2, late: false });
     // Aliases are never public, even for revealed answers.
     expect(json).not.toContain('alias');
   });
