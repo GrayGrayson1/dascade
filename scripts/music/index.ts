@@ -2,7 +2,7 @@
  * pnpm music:index — report what the jukebox indexer sees in apps/web/public/audio/jukebox/.
  * Read-only: prints a table, writes nothing (dev serves and `pnpm build` emits the real manifest).
  *
- *   pnpm music:index            # table
+ *   pnpm music:index            # records + table
  *   pnpm music:index --json     # the manifest that would be published
  *   JUKEBOX_DIR=/some/folder pnpm music:index
  */
@@ -28,9 +28,23 @@ console.log(
 );
 console.log('');
 
+if (index.records.length) {
+  // Records = the loose files (main) + one per sub-folder with MP3s; the jukebox shelf shows them in this order.
+  console.log('Records:');
+  for (const r of index.records) {
+    const where = r.folder ? `${r.folder}/` : '(loose files)';
+    const extras = [r.artist, r.theme ? `theme ${r.theme}` : '', r.cover ? 'sleeve' : 'no sleeve'].filter(Boolean).join(' · ');
+    console.log(
+      `  ${r.order + 1}. ${r.title} [${r.id}] — ${where} · ${r.tracks} song${r.tracks === 1 ? '' : 's'} · ${formatDuration(r.duration)} · ${formatBytes(r.bytes ?? 0)}${extras ? ` · ${extras}` : ''}`,
+    );
+  }
+  console.log('');
+}
+
 if (index.tracks.length) {
   const rows = index.tracks.map((t) => [
     String(t.order + 1),
+    t.record ?? 'main',
     t.id,
     t.title,
     t.artist ?? '—',
@@ -41,7 +55,7 @@ if (index.tracks.length) {
     t.artwork ? 'yes' : '—',
     t.titleSource,
   ]);
-  const head = ['#', 'id', 'title', 'artist', 'album', 'trk', 'time', 'size', 'art', 'title from'];
+  const head = ['#', 'record', 'id', 'title', 'artist', 'album', 'trk', 'time', 'size', 'art', 'title from'];
   const widths = head.map((h, i) => Math.min(32, Math.max(h.length, ...rows.map((r) => r[i]!.length))));
   const fmt = (r: string[]) => r.map((c, i) => (c.length > widths[i]! ? `${c.slice(0, widths[i]! - 1)}…` : c.padEnd(widths[i]!))).join('  ');
   console.log(fmt(head));

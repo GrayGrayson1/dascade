@@ -257,7 +257,7 @@ The **jukebox** is a global feature, not a cabinet, and it is a real machine: on
 
 The jukebox plays the MP3s in **`apps/web/public/audio/jukebox/`**. That folder is the whole library, and it takes no code or manifest edits:
 
-1. Drop an `.mp3` into the folder. Only the top level is scanned; sub-folders are ignored, apart from sidecar covers.
+1. Drop an `.mp3` into the folder. The loose files make up the main record; a sub-folder of MP3s is another record (see [Records](#records)).
 2. Run `pnpm dev` (a running dev server re-indexes within a second and tells open pages to refresh the library) or `pnpm build`.
 3. It appears in the jukebox. Run `pnpm music:index` to see exactly what was picked up and why anything wasn't.
 
@@ -269,6 +269,7 @@ The Vite plugin (`apps/web/vite/jukebox-plugin.ts`, indexer in `apps/web/vite/ju
 - **Track ids** are slugs of the file name (`Neon Cruising.mp3` → `neon-cruising`). They stay the same when you re-tag a file, and renaming a file changes its id. If two names give the same slug, the first by name keeps it and the others get a short hash suffix.
 - **Order:** sidecar `order`, then ID3 track number, then title.
 - A build prints one line, e.g. `jukebox: 7 tracks indexed, 1 duplicate skipped, 0 rejected (17.1 MB, 12:42 of music)`, and copies only the files the manifest references into `dist/audio/jukebox/`.
+- **Size warnings** (never errors): `pnpm music:index` and the build warn about a song over 12 MB (probably a lossless or 320 kbps export; 128–192 kbps is plenty) and a jukebox over 150 MB.
 
 **Optional sidecar** `apps/web/public/audio/jukebox/jukebox.json` (every field optional; keys are file names). If it is invalid, you get a warning and it is ignored; it never stops the build.
 
@@ -285,7 +286,37 @@ The Vite plugin (`apps/web/vite/jukebox-plugin.ts`, indexer in `apps/web/vite/ju
 
 Sidecar values beat tags, and tags beat `defaults`. `cover` is a JPEG, PNG, GIF or WebP inside the folder, and it replaces the embedded art. `hidden` keeps a file out of the manifest and out of `dist/`.
 
-**Deploy size:** the repo carries the audio itself, about 17 MB today (7 files), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB to every clone and deploy.
+### Records
+
+A **record** is an album people can put on. The jukebox shelf lets each person pick one; the title strips, shuffle, Next and auto-advance then play that record. There's also an optional **All records** mix. The pick is per device, and only appears once there are two or more records.
+
+```
+apps/web/public/audio/jukebox/
+├── *.mp3              the loose files: the main record (Cyber Nightpulse)
+├── jukebox.json       optional sidecar for the loose files (add a "record" block to name the main record)
+└── halloween/         every sub-folder holding MP3s is a record (one level deep)
+    ├── jukebox.json   optional: the record's name, artist, sleeve, paired theme and shelf order
+    ├── cover.jpg      optional sleeve art
+    └── *.mp3
+```
+
+To add a record: make a folder, drop the MP3s in, and optionally add a `jukebox.json`. There's no code to change. The folder's sidecar works like the top-level one: `defaults` and `tracks` keys are file names in that folder. It also takes a `record` block:
+
+```json
+{
+  "record": { "title": "Halloween", "artist": "beanalicious", "theme": "halloween-night", "cover": "cover.jpg", "order": 2 },
+  "defaults": { "artist": "beanalicious" }
+}
+```
+
+- **Name:** `record.title`, else the album tag most of its songs share, else the folder name (`halloween` → "Halloween"). Songs with no album tag are given the record's name.
+- **Sleeve:** `record.cover` (an image inside the folder), else the first song's embedded art, else a generated sigil.
+- **Paired theme:** `record.theme` is a theme id. Anyone who hasn't picked a record starts on it while that theme is on (e.g. Halloween Night → the Halloween record); everyone else starts on the main record. Changing theme never cuts the song that's playing.
+- **Order:** records follow `record.order`, then the main record, then name. Within a record, songs follow `order`, then the track number, then the title.
+- **Codes and ids:** selection codes restart per record (A1…). In the mix they run across every record, main record first. Track ids are still slugs of the file name. The loose files get theirs first, so adding a record never changes an existing song's id. A folder named `art` is reserved and never a record.
+- **Room DJ** isn't affected: the room syncs track ids, so the host can play or queue songs from any record (the Room DJ tab has record tabs), and listeners hear them whatever record they've picked.
+
+**Deploy size:** the repo carries the audio itself, about 17 MB today (7 files), and every build ships it in `apps/web/dist/audio/jukebox/`. The production server serves these files as static files with `Accept-Ranges`/`206` range responses, a 1-hour `Cache-Control` plus ETag revalidation, and `no-cache` on the manifest. The CSP allows `media-src 'self'`. Keep an eye on the folder size: each ~3-minute song at 128 kbps adds about 3 MB (about 4.5 MB at 192 kbps) to every clone and deploy, and git history keeps the bytes even after a song is removed. Commit a new record's music in its own commit so it can be reverted on its own.
 
 ### Room DJ
 

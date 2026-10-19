@@ -12,6 +12,7 @@ import { useRoomSelector } from '../net/hooks.ts';
 import { formatTime, voteText } from './format.ts';
 import { Glyph } from './icons.tsx';
 import { Library, type LibraryActions } from './Library.tsx';
+import { RecordTabs } from './RecordTabs.tsx';
 
 function Switch({
   checked,
@@ -146,6 +147,10 @@ export default function DjPanel({ active, announce }: { active: boolean; announc
   const source = useJukebox((s) => s.source);
   const optOut = useJukebox((s) => s.roomOptOut);
   const tracks = useJukebox((s) => s.library.tracks);
+  const records = useJukebox((s) => s.library.records);
+  const myRecord = useJukebox((s) => s.record);
+  // The room can play any record: browsing one here never changes the listener's own record.
+  const [browse, setBrowse] = useState<string | null>(null);
   const playerId = useSessionStore((s) => s.playerId);
   // Live host (re-renders on a hand-over; djId can lag while the DJ is off).
   const hostId = useRoomSelector((s) => s.hostId);
@@ -372,7 +377,8 @@ export default function DjPanel({ active, announce }: { active: boolean; announc
       {room.enabled && (perm.control || perm.queue) ? (
         <section className="jb-dj__library" aria-label={perm.control ? 'Play for the room' : 'Queue for the room'}>
           <span className="jb-section-label">{perm.control ? 'Play for the room' : 'Queue for the room'}</span>
-          <Library actions={perm.control ? hostActions : guestActions} compact />
+          <RecordTabs records={records} value={browse ?? myRecord} onChange={setBrowse} label="Browse a record for the room" />
+          <Library actions={perm.control ? hostActions : guestActions} compact scope={browse ?? myRecord} />
         </section>
       ) : null}
     </div>

@@ -7,7 +7,7 @@
  */
 import { lazy, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useThemeId } from '@dascade/ui';
-import { jukebox, showsPlaying, useJukebox } from '../audio/jukebox/index.ts';
+import { hasShelf, jukebox, showsPlaying, trackRecord, useJukebox } from '../audio/jukebox/index.ts';
 import { useApp } from '../app/store.ts';
 import { useSkin } from '../themes/registry.ts';
 import { SkinBoundary } from '../themes/SkinBoundary.tsx';
@@ -18,9 +18,10 @@ import { Glyph } from './icons.tsx';
 import { Library, type LibraryActions } from './Library.tsx';
 import { Queue } from './Queue.tsx';
 import { Record } from './Record.tsx';
+import { RecordCrate, RecordFlyer, swapRecord, useRecordSwap } from './RecordCrate.tsx';
 import { Seek } from './Seek.tsx';
 import { useJukeboxPrefs } from './prefs.ts';
-import { selectionCode } from './strips.ts';
+import { rackCodes } from './rack.ts';
 import { Visualizer } from './visualizer/Visualizer.tsx';
 
 const DjPanel = lazy(() => import('./DjPanel.tsx'));
@@ -95,17 +96,20 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
   const room = useJukebox((s) => s.room);
   const error = useJukebox((s) => s.error);
   const tracks = useJukebox((s) => s.library.tracks);
+  const record = useJukebox((s) => s.record);
+  const records = useJukebox((s) => s.library.records);
   const libraryStatus = useJukebox((s) => s.library.status);
+  const shelf = hasShelf(records);
+  const { swap, pick } = useRecordSwap(announce);
+  const flying = swap?.phase === 'fly' ? swapRecord(records, swap.id) : null;
   const prefs = useJukeboxPrefs();
   const updateSettings = useApp((s) => s.updateSettings);
 
   const track = currentId ? (tracks.find((t) => t.id === currentId) ?? null) : null;
-  // The playing record's selection code (catalogue order, as on the title strips).
-  const code = useMemo(() => {
-    if (!currentId) return null;
-    const i = sortTracks(tracks, 'order').findIndex((t) => t.id === currentId);
-    return i >= 0 ? selectionCode(i) : null;
-  }, [tracks, currentId]);
+  const trackOn = shelf && track ? (records.find((r) => r.id === trackRecord(track)) ?? null) : null;
+  const trackRecordTitle = trackOn?.title;
+  // The playing song's selection code, as on its record's title strips.
+  const code = useMemo(() => (currentId ? (rackCodes(sortTracks(tracks, 'order'), record).get(currentId) ?? null) : null), [tracks, currentId, record]);
   const followingRoom = source === 'room';
   const perm = jukebox.djPermissions();
   const roomLocked = followingRoom && !perm.control;
@@ -242,7 +246,7 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
           <div className="jb-dome" data-part="dome">
             {/* The arched glass on top of the machine, the record turning behind it. */}
             <div className="jb-dome__glass" data-part="dome-glass" aria-hidden>
-              <Record track={track} playing={playing} />
+              <Record track={track} playing={playing} changing={swap !== null && swap.phase !== 'land'} landing={swap?.phase === 'land'} sleeve={trackOn} />
             </div>
             <div className="jb-display" data-part="display" ref={displayRef} style={{ '--jb-level': 0 } as CSSProperties}>
               <div className="jb-decor" data-part="decor" aria-hidden>
@@ -270,6 +274,7 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
                 </p>
                 <p className="jb-now__artist" data-part="track-artist">
                   {track?.artist ?? (track ? 'DASCADE Jukebox' : ' ')}
+                  {trackRecordTitle ? <span className="jb-now__record"> · {trackRecordTitle}</span> : null}
                 </p>
               </div>
               <div className="jb-vis-wrap">
@@ -277,6 +282,13 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
               </div>
             </div>
           </div>
+
+          {shelf ? (
+            <>
+              <RecordCrate records={records} current={record} swap={swap} onPick={pick} />
+              {roomLocked ? <p className="jb-note">Putting on a record stops listening with the room.</p> : null}
+            </>
+          ) : null}
 
           {needsGesture && wantPlaying ? (
             <button type="button" className="jb-enable" data-part="enable-audio" onClick={() => jukebox.unlock()}>
@@ -451,6 +463,7 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
           </div>
         </div>
         <span className="jb-plinth" data-part="plinth" aria-hidden />
+        {swap && flying ? <RecordFlyer swap={swap} record={flying} panel={panelRef.current} /> : null}
       </section>
     </div>
   );

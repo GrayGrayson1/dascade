@@ -35,23 +35,79 @@ export const JukeboxTrackSchema = z.object({
   order: z.number().int(),
   /** Bytes, for reporting/deploy sizing. */
   bytes: z.number().int().min(0).optional(),
+  /** Record (album) the track is on: MAIN_RECORD_ID for the loose files, else its sub-folder's record id. Absent = main. */
+  record: TrackIdSchema.optional(),
 });
 export type JukeboxTrack = z.infer<typeof JukeboxTrackSchema>;
+
+// ---------------------------------------------------------------------------
+// Records
+// ---------------------------------------------------------------------------
+
+/**
+ * A record is an album the listener can put on: the MP3s loose in the jukebox folder make up the main
+ * record, and every sub-folder holding MP3s is another one. Picking a record is a local, per-device
+ * choice — nothing about it is ever sent to the server (Room DJ only ever deals in track ids).
+ */
+export const MAIN_RECORD_ID = 'main';
+/** The listener's "All records" mix (a pick, never a record in the manifest). */
+export const ALL_RECORDS = 'all';
+export const MAX_RECORDS = 50;
+/** Hex colour for a record's sleeve accents ("#ff7a18"). */
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+/** A theme id (`packages/ui` theme registry), e.g. "halloween-night". */
+const ThemeRef = z.string().regex(/^[a-z0-9][a-z0-9-]{0,47}$/);
+
+export const JukeboxRecordSchema = z.object({
+  id: TrackIdSchema,
+  title: z.string().min(1).max(160),
+  artist: z.string().max(160).optional(),
+  /** Same-origin URL of the sleeve art (sidecar cover, else the first track's art), if any. */
+  cover: z.string().max(512).optional(),
+  /** Theme this record goes with: listeners who haven't picked a record start on it in that theme. */
+  theme: ThemeRef.optional(),
+  /** Sleeve accent colours (optional; the paired theme's or the active theme's accents otherwise). */
+  accent: HexColor.optional(),
+  accent2: HexColor.optional(),
+  /** Shelf order (0 = first). */
+  order: z.number().int(),
+  tracks: z.number().int().min(0),
+  /** Seconds of music. */
+  duration: z.number().min(0),
+  bytes: z.number().int().min(0).optional(),
+});
+export type JukeboxRecord = z.infer<typeof JukeboxRecordSchema>;
 
 export const JukeboxManifestSchema = z.object({
   version: z.literal(1),
   generatedAt: z.string(),
   tracks: z.array(JukeboxTrackSchema).max(2000),
+  /** Absent in manifests from before records existed: every track is then on the main record. */
+  records: z.array(JukeboxRecordSchema).max(MAX_RECORDS).optional(),
 });
 export type JukeboxManifest = z.infer<typeof JukeboxManifestSchema>;
 
 export const JUKEBOX_MANIFEST_URL = '/audio/jukebox/manifest.json';
 
 /**
- * Optional sidecar `jukebox.json` in the music folder. Every field optional; an MP3 alone works.
- *   { "tracks": { "Neon Cruising.mp3": { "title": "…", "artist": "…", "order": 1, "cover": "covers/neon.jpg" } } }
+ * Optional sidecar `jukebox.json` in the music folder (and in each record's sub-folder; keys are file names in
+ * that folder). Every field optional; an MP3 alone works.
+ *   { "record": { "title": "Halloween", "theme": "halloween-night" },
+ *     "tracks": { "Neon Cruising.mp3": { "title": "…", "artist": "…", "order": 1, "cover": "covers/neon.jpg" } } }
  */
 export const JukeboxSidecarSchema = z.object({
+  /** The folder's record: name, artist, sleeve (path inside the folder), paired theme, accents, shelf order. */
+  record: z
+    .object({
+      title: z.string().min(1).max(160).optional(),
+      artist: z.string().max(160).optional(),
+      cover: z.string().max(255).optional(),
+      theme: ThemeRef.optional(),
+      accent: HexColor.optional(),
+      accent2: HexColor.optional(),
+      order: z.number().int().optional(),
+    })
+    .optional(),
   defaults: z.object({ artist: z.string().max(160).optional(), album: z.string().max(160).optional() }).optional(),
   tracks: z
     .record(

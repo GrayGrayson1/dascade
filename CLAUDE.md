@@ -35,7 +35,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 - Style with theme tokens; honor `reducedMotion` and `fx` settings in all animation; numbers use `--font-num`.
 - Themes are presentation only and local (never sent to the server). Playfield colours come from materials with the EXACT original colour as fallback: `var(--mat-<key>, #orig)` / `tokens.materials.<key> ?? ORIG` (Delta Neon defines none, so it must stay pixel-identical). Canvas/Phaser games re-colour in place on theme change (`subscribeThemeTokens`/`watchThemeTokens`) — never restart a scene or reset state. Meaningful colours (players, teams, suits, legal moves, hits) stay fixed. Skin CSS is scoped under `:root[data-theme='<id>']` (tested); decorative CSS `content` must be silent (`content: 'x' / ''`).
 - One audio pipeline: play sounds only via `sfx()`/`synth` (`src/audio/audio.ts`); never create another AudioContext or `<audio>` element. Continuous sounds use `synth.hold()` so the mixer can duck the jukebox. Room DJ must never affect game state; local mute/volume/opt-out always win.
-- Jukebox music = MP3s in `apps/web/public/audio/jukebox/` (manifest generated at dev/build; never commit a manifest or import audio into JS).
+- Jukebox music = MP3s in `apps/web/public/audio/jukebox/`: the loose files are the main record, each sub-folder of MP3s another record (README "Records"). The manifest is generated at dev/build; never commit a manifest or import audio into JS. Records are a local, per-device pick: never send them to the server.
 - Don't persist live match state to Postgres; Supabase is optional (migrations 0001–0004) and only mirrors profiles/presets, stats/ratings, tournament history and high scores.
 
 ## Tests
