@@ -16,11 +16,13 @@ import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
   SHOWDOWN_TEAMS,
+  showTitle,
   teamName,
   type ShowdownCue,
   type ShowdownEvent,
   type ShowdownFinale,
   type ShowdownLook,
+  type ShowdownMe,
   type ShowdownPublicState,
   type ShowdownReactions,
   type ShowdownSettings,
@@ -36,14 +38,30 @@ import { Lobby } from '../../shell/Lobby.tsx';
 import type { GameClientModule, SettingsPanelProps } from '../types.ts';
 import { AudienceView, switchToScreen } from './Audience.tsx';
 import { PresenterConsole } from './Console.tsx';
+import { StageCards } from './consoleParts.tsx';
 import { ShowdownPlayerSetup, ShowdownSettingsPanel, TakeoverCard } from './Lobby.tsx';
 import { Stage } from './Stage.tsx';
-import { lineForCue, lineForEvent } from './look.ts';
+import { LOOK_COPY, fill, lineForCue, lineForEvent } from './look.ts';
 import { showFeed } from './fx.ts';
-import { CUE_SOUND, playShowSound, type ShowdownSound } from './sounds.ts';
+import { CUE_SOUND, eventSounds, playShowSound, type ShowdownSound } from './sounds.ts';
+import { themeMusic } from './themeMusic.ts';
 import { canFullscreen, closeStageWindow, toggleFullscreen, useStageWindow } from './stageWindow.ts';
 import { rememberPass, storedPass, takeHashPass, useScreenMode } from './access.ts';
-import { useBoard, useFinale, useLook, useMe, useMotion, usePass, useRole, useShowSounds, useShowdownSettings, type RoleInfo } from './state.ts';
+import {
+  useBoard,
+  useCard,
+  useFinale,
+  useLook,
+  useMe,
+  useMode,
+  useMotion,
+  usePass,
+  useRole,
+  useShowSounds,
+  useShowdownSettings,
+  useThemeMusicPref,
+  type RoleInfo,
+} from './state.ts';
 
 /** The shared lobby with the show's setup panels (the lobby is rendered from here, not the shell). */
 const LOBBY_MODULE: GameClientModule = {
@@ -195,6 +213,7 @@ function Results({ look, settings, role }: { look: ShowdownLook; settings: Showd
   const finale = useFinale();
   const me = useMe();
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
+  if ((finale?.mode ?? settings?.mode) === 'showcase') return <ShowcaseResults look={look} settings={settings} role={role} finale={finale} me={me} />;
   return (
     <GameStage gameId="showdown" className="sd-room sd-results">
       <div className="sd-results__stage">
@@ -212,6 +231,79 @@ function Results({ look, settings, role }: { look: ShowdownLook; settings: Showd
         {/* The presenter left for good: someone has to be able to run the next show. */}
         {role.presenterId === '' && role.role !== 'screen' ? <TakeoverCard /> : null}
         <ResultsActions />
+      </div>
+    </GameStage>
+  );
+}
+
+/**
+ * Presenter Showcase's closing screen: no winner and no leaderboard (there were no teams or
+ * scores) — a friendly wrap with what the crowd found. The presenter gets the stage cards here, to
+ * put up Prize time (or Thanks) for the rest of the event.
+ */
+function ShowcaseResults({
+  look,
+  settings,
+  role,
+  finale,
+  me,
+}: {
+  look: ShowdownLook;
+  settings: ShowdownSettings | null;
+  role: RoleInfo;
+  finale: ShowdownFinale | null;
+  me: ShowdownMe | null;
+}) {
+  const copy = LOOK_COPY[look].showcase;
+  const title = settings ? showTitle(settings) : '';
+  const results = finale?.results ?? [];
+  const presenter = role.role === 'presenter';
+  const closing = (
+    <section className="sd-panel sdc-closing" aria-label="That’s a wrap">
+      <p className="sdc-closing__title">{copy.wrap}</p>
+      <p className="sdc-closing__sub">{title ? `Thanks for playing ${title}!` : copy.wrapSub}</p>
+      {results.length ? (
+        <ul className="sdc-closing__rounds">
+          {results.map((r) => (
+            <li key={r.index}>
+              <span className="sdc-closing__r">Round {r.index + 1}</span>
+              <span>{r.total ? fill(copy.recap, { found: r.found ?? 0, total: r.total }) : 'Skipped'}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {role.role === 'audience' && me && me.calls > 0 ? (
+        <p className="sdc-closing__me">
+          <PixelIcon name="star" /> You called <span className="dc-num">{me.calls}</span> answer{me.calls === 1 ? '' : 's'}!
+        </p>
+      ) : null}
+    </section>
+  );
+  return (
+    <GameStage gameId="showdown" className={`sd-room sd-results sdc-results${presenter ? ' sdc-results--presenter' : ''}`}>
+      <div className="sd-results__stage">
+        <Stage look={look} settings={settings} variant="preview" />
+      </div>
+      <div className="sd-results__below">
+        {presenter ? (
+          // The presenter's next moves first: a stage card for the rest of the event, or another show.
+          <>
+            <section className="sd-panel sdc-afterpanel" aria-label="Stage cards">
+              <h3 className="sd-panel__title">Stage cards</h3>
+              <p className="sd-muted">For the rest of the event: put up Prize time for the winners, then Thanks. Play again goes back to the lobby (the cards stay available there).</p>
+              <StageCards />
+            </section>
+            <ResultsActions />
+            {closing}
+          </>
+        ) : (
+          <>
+            {closing}
+            {/* The presenter left for good: someone has to be able to run the next show. */}
+            {role.presenterId === '' && role.role !== 'screen' ? <TakeoverCard /> : null}
+            <ResultsActions />
+          </>
+        )}
       </div>
     </GameStage>
   );
@@ -249,33 +341,12 @@ function FinaleSummary({ finale }: { finale: ShowdownFinale }) {
 // The per-device show feed
 // ---------------------------------------------------------------------------
 
-function eventSounds(e: ShowdownEvent): Array<[ShowdownSound, number]> {
-  switch (e.type) {
-    case 'intro':
-      return [['intro', 0]];
-    case 'round':
-      return [['round', 0]];
-    case 'question':
-      return [['question', 0]];
-    case 'control':
-      return [['control', 0]];
-    case 'reveal':
-      return e.cleared ? [[e.top ? 'clangTop' : 'clang', 0], ['applause', 600]] : [[e.top ? 'clangTop' : 'clang', 0]];
-    case 'strike':
-      if (e.stealFailed) return [['stealMiss', 0]];
-      return e.steal ? [['strike', 0], ['stealOpen', 950]] : [['strike', 0]];
-    case 'award':
-      if (e.how === 'none') return [['aww', 0]];
-      return e.how === 'steal' ? [['award', 300], ['applause', 700]] : [['award', 300]];
-    case 'undo':
-      return [['undo', 0]];
-    case 'adjust':
-      return [];
-  }
-}
-
 function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings: ShowdownSettings | null, screen: boolean): void {
   const board = useBoard();
+  const mode = useMode(settings);
+  const card = useCard();
+  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
+  const [musicPref] = useThemeMusicPref();
   const motion = useMotion();
   const [sounds] = useShowSounds(role.role);
   const pass = usePass();
@@ -284,8 +355,8 @@ function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings:
   const status = useSessionStore((s) => s.status);
   const loaded = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(s.code)) ?? false;
   const serverScreen = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(role.playerId && s.screens?.[role.playerId])) ?? false;
-  const ctx = useRef({ look, board, names: ['', ''] as [string, string], sounds, particles: motion.particles });
-  ctx.current = { look, board, names: [teamName(settings, 0), teamName(settings, 1)], sounds, particles: motion.particles };
+  const ctx = useRef({ look, board, mode, show: '', names: ['', ''] as [string, string], sounds, particles: motion.particles });
+  ctx.current = { look, board, mode, show: settings ? showTitle(settings) : '', names: [teamName(settings, 0), teamName(settings, 1)], sounds, particles: motion.particles };
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   useEffect(
@@ -306,8 +377,10 @@ function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings:
 
   useRoomMessage<ShowdownEvent>(SHOWDOWN_MSG.event, (e) => {
     showFeed.event(e);
-    showFeed.say(lineForEvent(e, { look: ctx.current.look, board: ctx.current.board, teamNames: ctx.current.names }));
-    play(eventSounds(e));
+    showFeed.say(
+      lineForEvent(e, { look: ctx.current.look, board: ctx.current.board, teamNames: ctx.current.names, mode: ctx.current.mode, show: ctx.current.show }),
+    );
+    play(eventSounds(e, ctx.current.mode));
   });
 
   useRoomMessage<{ cue: ShowdownCue; id: number }>(SHOWDOWN_MSG.cue, ({ cue, id }) => {
@@ -354,11 +427,40 @@ function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings:
     if (!me) return;
     const prev = lastCalls.current;
     lastCalls.current = { calls: me.calls, points: me.points };
-    if (!prev || me.calls <= prev.calls || me.points <= prev.points) return;
-    showFeed.called(me.points - prev.points);
+    // On the calls count: a ranked showcase board has no points, but calling one is still a moment.
+    if (!prev || me.calls <= prev.calls) return;
+    showFeed.called(Math.max(0, me.points - prev.points));
     // Phones default to show sounds off: a room of them chiming with the stage's clang is the echo that avoids.
     if (ctx.current.sounds) playShowSound('calledIt', ctx.current.look);
   }, [me]);
+
+  // A holding card going up gets a soft whoosh (once per change, not for a device that joins on one).
+  const lastCard = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!loaded) return;
+    const prev = lastCard.current;
+    lastCard.current = card;
+    if (prev !== undefined && card && card !== prev) play([['cardIn', 0]]);
+  }, [card, loaded, play]);
+
+  // Theme music (Presenter Showcase): under the opening, the title cards and the holding cards; it
+  // stops the moment a question goes up. Only where show sounds play (presenter, big screens).
+  const stage = board?.stage ?? null;
+  const musicOn =
+    mode === 'showcase' &&
+    musicPref &&
+    sounds &&
+    ((phase === 'PLAYING' && (card !== null || stage === 'intro' || stage === 'title')) || ((phase === 'LOBBY' || phase === 'RESULTS') && card !== null));
+  useEffect(() => {
+    if (!musicOn) {
+      themeMusic.stop();
+      return;
+    }
+    // The opening has its own fanfare: the bed comes in under the marquee once it has played.
+    const t = setTimeout(() => themeMusic.play(look), stage === 'intro' && card === null ? 4200 : 0);
+    return () => clearTimeout(t);
+  }, [musicOn, look, stage, card]);
+  useEffect(() => () => themeMusic.stop(), []);
 
   // The finale: fanfare + applause once per show on this device, as the show ends. A device that
   // joins (or reloads) on the results screen hears nothing: the first finale it sees is already over.
