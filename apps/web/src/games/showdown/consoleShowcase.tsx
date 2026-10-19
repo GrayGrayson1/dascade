@@ -43,6 +43,7 @@ import {
   ThemeMusicToggle,
 } from './consoleParts.tsx';
 import { formatClock, useBoard, useCard, useClock, usePass, useRehearsal, useSheet, useSweep } from './state.ts';
+import { TourButton } from './tour/TourButton.tsx';
 import './chrome-showcase.css';
 
 type BoardAct = 'begin' | 'question' | 'next' | 'undo' | 'finish' | 'restart' | 'reset';
@@ -221,6 +222,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         <span className="dc-spacer" />
         <AudioStatus look={look} />
         <span className="sdc-bar__group">
+          <TourButton look={look} size="sm" compact label="Presenter tour" />
           <StageWindowButton code={code} title={title} size="sm" openLabel="Stage window" />
           <BigScreenLinkButton code={code} size="sm" />
           <ShowSoundToggle />

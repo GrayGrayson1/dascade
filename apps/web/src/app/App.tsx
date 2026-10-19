@@ -17,6 +17,8 @@ const RoomScreen = lazy(() => import('../shell/RoomScreen.tsx').then((m) => ({ d
 const NotFoundScreen = lazy(() => import('../shell/RoomScreen.tsx').then((m) => ({ default: m.NotFoundScreen })));
 const CabinetPicker = lazy(() => import('../shell/CabinetPicker.tsx').then((m) => ({ default: m.CabinetPicker })));
 const TournamentCenter = lazy(() => import('../tournament/TournamentCenter.tsx').then((m) => ({ default: m.TournamentCenter })));
+// The Presenter Tour for DAS Survey Showdown: a standalone page (no room, no connection).
+const ShowdownTour = lazy(() => import('../games/showdown/tour/TourPage.tsx').then((m) => ({ default: m.TourPage })));
 const GlobalModals = lazy(() => import('../shell/modals.tsx').then((m) => ({ default: m.GlobalModals })));
 // The jukebox UI (dock + player) is global and outlives every route; its own chunk, and a failed load renders nothing.
 const Jukebox = lazy(() =>
@@ -96,6 +98,7 @@ export function App() {
             <Route path="/play/:gameId" element={<CabinetEntry />} />
             <Route path="/room/:code" element={<RoomScreen />} />
             <Route path="/r/:code" element={<JoinRedirect />} />
+            <Route path="/tutorial/showdown" element={<ShowdownTour />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Routes>
         </Suspense>
