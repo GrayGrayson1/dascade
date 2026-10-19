@@ -20,7 +20,7 @@ import { Queue } from './Queue.tsx';
 import { Record } from './Record.tsx';
 import { Seek } from './Seek.tsx';
 import { useJukeboxPrefs } from './prefs.ts';
-import { selectionCode } from './strips.ts';
+import { rackCodes } from './rack.ts';
 import { Visualizer } from './visualizer/Visualizer.tsx';
 
 const DjPanel = lazy(() => import('./DjPanel.tsx'));
@@ -95,17 +95,14 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
   const room = useJukebox((s) => s.room);
   const error = useJukebox((s) => s.error);
   const tracks = useJukebox((s) => s.library.tracks);
+  const record = useJukebox((s) => s.record);
   const libraryStatus = useJukebox((s) => s.library.status);
   const prefs = useJukeboxPrefs();
   const updateSettings = useApp((s) => s.updateSettings);
 
   const track = currentId ? (tracks.find((t) => t.id === currentId) ?? null) : null;
-  // The playing record's selection code (catalogue order, as on the title strips).
-  const code = useMemo(() => {
-    if (!currentId) return null;
-    const i = sortTracks(tracks, 'order').findIndex((t) => t.id === currentId);
-    return i >= 0 ? selectionCode(i) : null;
-  }, [tracks, currentId]);
+  // The playing song's selection code, as on its record's title strips.
+  const code = useMemo(() => (currentId ? (rackCodes(sortTracks(tracks, 'order'), record).get(currentId) ?? null) : null), [tracks, currentId, record]);
   const followingRoom = source === 'room';
   const perm = jukebox.djPermissions();
   const roomLocked = followingRoom && !perm.control;

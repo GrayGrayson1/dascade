@@ -2258,6 +2258,49 @@
   }
 }
 
+/* Record tabs (Room DJ: browse any record for the room): chrome keys that stay down, like the section keys. */
+:where([data-jukebox]) :where(.jb-record-tabs) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 6px;
+}
+:where([data-jukebox]) :where(.jb-record-tab) {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--shade) 35%, var(--jb-chrome-lo));
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--jb-chrome-hi), var(--jb-chrome-lo));
+  color: var(--jb-chrome-ink);
+  font-family: var(--jb-font-label);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--shade) 28%, transparent),
+    0 2px 0 color-mix(in srgb, var(--shade) 40%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record-tab[aria-pressed='true']) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--jb-accent) 55%, var(--light)), var(--jb-accent));
+  box-shadow:
+    inset 0 2px 3px color-mix(in srgb, var(--shade) 30%, transparent),
+    0 0 10px color-mix(in srgb, var(--jb-accent) 50%, transparent);
+}
+:where([data-jukebox]) :where(.jb-record-tab:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  :where([data-jukebox]) :where(.jb-record-tab) {
+    min-height: 44px;
+  }
+}
+/* A search match from another record names it. */
+:where([data-jukebox]) :where(.jb-strip__record) {
+  color: var(--jb-accent);
+}
+
 /* The plinth: chrome kick plate with an LED strip, under the cabinet. */
 :where(.jb-player) :where(.jb-plinth) {
   position: relative;

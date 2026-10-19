@@ -1,14 +1,16 @@
 /**
- * The selection rack: the library as a real jukebox's title strips. Every track keeps its selection
- * code (A1, A2 … B1 — see strips.ts) and the rack shows one letter at a time; the letter keys flip
- * it, and typing a code on the keyboard ("B3") finds that strip. Pressing a strip plays it now; its
- * side buttons line it up next or add it to the queue. Searching shows every match at once.
+ * The selection rack: the record on the turntable as a real jukebox's title strips. Every track keeps its
+ * selection code within its record (A1, A2 … B1 — see strips.ts / rack.ts; in the "All records" mix the codes
+ * run across the catalogue) and the rack shows one letter at a time; the letter keys flip it, and typing a
+ * code on the keyboard ("B3") finds that strip. Pressing a strip plays it now; its side buttons line it up
+ * next or add it to the queue. Searching looks through every record and shows every match at once.
  */
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { JukeboxTrack } from '@dascade/shared';
-import { jukebox, useJukebox } from '../audio/jukebox/index.ts';
+import { ALL_RECORDS, hasShelf, jukebox, scopeTracks, trackRecord, useJukebox } from '../audio/jukebox/index.ts';
 import { sortTracks } from './format.ts';
 import { Glyph } from './icons.tsx';
+import { rackCodes } from './rack.ts';
 import { PER_PAGE, pageCount, pageLetter, pageOf, parseCode, selectionCode } from './strips.ts';
 
 export interface LibraryActions {
@@ -21,13 +23,20 @@ export interface LibraryActions {
   currentId: string | null;
 }
 
-/** The rack stays on the page you left it on (per mount point: player vs Room DJ panel). */
-const rememberedPage: Record<'player' | 'dj', number | null> = { player: null, dj: null };
+/** The rack stays on the page you left it on (per mount point — player vs Room DJ panel — and record). */
+const rememberedPage = new Map<string, number>();
 
-export function Library({ actions, compact }: { actions: LibraryActions; compact?: boolean }) {
+/**
+ * `scope`: the record whose strips the rack shows (a record id or ALL_RECORDS); defaults to the record in
+ * effect (the one on the turntable).
+ */
+export function Library({ actions, compact, scope: scopeProp }: { actions: LibraryActions; compact?: boolean; scope?: string }) {
   const status = useJukebox((s) => s.library.status);
   const tracks = useJukebox((s) => s.library.tracks);
+  const records = useJukebox((s) => s.library.records);
+  const recordInEffect = useJukebox((s) => s.record);
   const playing = useJukebox((s) => s.playing);
+  const scope = scopeProp ?? recordInEffect;
   const slot = compact ? 'dj' : 'player';
   const [query, setQuery] = useState('');
   const [finding, setFinding] = useState(false);
@@ -38,21 +47,28 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
 
   // Catalogue order is the jukebox order; codes come from it, so they never change with a search.
   const catalogue = useMemo(() => sortTracks(tracks, 'order'), [tracks]);
-  const codeOf = useMemo(() => new Map(catalogue.map((t, i) => [t.id, selectionCode(i)])), [catalogue]);
-  const pages = pageCount(catalogue.length);
-  const currentIndex = actions.currentId ? catalogue.findIndex((t) => t.id === actions.currentId) : -1;
-  const [page, setPageState] = useState(() => rememberedPage[slot] ?? (currentIndex >= 0 ? pageOf(currentIndex) : 0));
+  const rack = useMemo(() => scopeTracks(catalogue, scope), [catalogue, scope]);
+  const codeOf = useMemo(() => rackCodes(catalogue, scope), [catalogue, scope]);
+  const shelf = hasShelf(records);
+  const recordTitle = useMemo(() => new Map(records.map((r) => [r.id, r.title])), [records]);
+  const pages = pageCount(rack.length);
+  const currentIndex = actions.currentId ? rack.findIndex((t) => t.id === actions.currentId) : -1;
+  const memKey = `${slot}:${scope}`;
+  const initialPage = () => rememberedPage.get(memKey) ?? (currentIndex >= 0 ? pageOf(currentIndex) : 0);
+  const [pageState, setPageState] = useState(() => ({ key: memKey, page: initialPage() }));
+  // Another record on the turntable: its rack opens where you left it (or on the playing song's page).
+  const page = pageState.key === memKey ? pageState.page : initialPage();
   const setPage = (p: number) => {
     const next = Math.max(0, Math.min(pages - 1, p));
-    rememberedPage[slot] = next;
-    setPageState(next);
+    rememberedPage.set(memKey, next);
+    setPageState({ key: memKey, page: next });
   };
   const shownPage = Math.min(page, pages - 1);
 
   const searching = deferred.trim().length > 0;
   const list = useMemo(
-    () => (searching ? sortTracks(catalogue, 'order', deferred) : catalogue.slice(shownPage * PER_PAGE, (shownPage + 1) * PER_PAGE)),
-    [catalogue, searching, deferred, shownPage],
+    () => (searching ? sortTracks(catalogue, 'order', deferred) : rack.slice(shownPage * PER_PAGE, (shownPage + 1) * PER_PAGE)),
+    [catalogue, rack, searching, deferred, shownPage],
   );
 
   // Focus a strip after the rack flips to it from a typed code.
@@ -74,7 +90,7 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
     const now = performance.now();
     const text = (now - typed.current.at < 1200 ? typed.current.text : '') + key;
     typed.current = { text: /^[A-Z]+[1-8]?$/.test(text) ? text : key, at: now };
-    const index = parseCode(typed.current.text, catalogue.length);
+    const index = parseCode(typed.current.text, rack.length);
     if (index !== null) {
       e.preventDefault();
       setPage(pageOf(index));
@@ -82,7 +98,7 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
       typed.current = { text: '', at: 0 };
       return;
     }
-    const letterPage = parseCode(`${typed.current.text}1`, catalogue.length);
+    const letterPage = parseCode(`${typed.current.text}1`, rack.length);
     if (letterPage !== null && /^[A-Z]+$/.test(typed.current.text)) {
       e.preventDefault();
       setPage(pageOf(letterPage));
@@ -119,7 +135,7 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
                 data-part="rack-page"
                 aria-pressed={p === shownPage}
                 onClick={() => setPage(p)}
-                aria-label={`Selections ${pageLetter(p)}1 to ${pageLetter(p)}${Math.min(PER_PAGE, catalogue.length - p * PER_PAGE)}`}
+                aria-label={`Selections ${pageLetter(p)}1 to ${pageLetter(p)}${Math.min(PER_PAGE, rack.length - p * PER_PAGE)}`}
               >
                 {pageLetter(p)}
               </button>
@@ -208,12 +224,16 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
           {list.map((t) => {
             const current = t.id === actions.currentId;
             const code = codeOf.get(t.id) ?? '';
+            const record = trackRecord(t);
+            // A match from another record (or any song in the mix) says which record it's on.
+            const onRecord = shelf && (scope === ALL_RECORDS || record !== scope) ? recordTitle.get(record) : undefined;
             return (
               <li
                 key={t.id}
                 className="jb-track jb-strip"
                 data-part="track"
                 data-code={code}
+                data-record={record}
                 data-current={current ? 'true' : undefined}
                 data-playing={current && playing ? 'true' : undefined}
               >
@@ -221,7 +241,7 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
                   type="button"
                   className="jb-track__main"
                   onClick={() => actions.play(t.id)}
-                  aria-label={`${code}: ${actions.playLabel(t)}`}
+                  aria-label={`${onRecord ? `${onRecord} ` : ''}${code}: ${actions.playLabel(t)}`}
                   aria-current={current ? 'true' : undefined}
                 >
                   <span className="jb-strip__code" aria-hidden>
@@ -229,7 +249,10 @@ export function Library({ actions, compact }: { actions: LibraryActions; compact
                   </span>
                   <span className="jb-track__text">
                     <span className="jb-track__title">{t.title}</span>
-                    <span className="jb-track__artist">{t.artist ?? 'DASCADE Jukebox'}</span>
+                    <span className="jb-track__artist">
+                      {onRecord ? <span className="jb-strip__record">{onRecord} · </span> : null}
+                      {t.artist ?? 'DASCADE Jukebox'}
+                    </span>
                   </span>
                   {current ? (
                     <span className="jb-eq jb-eq--row" data-active={playing ? 'true' : undefined} aria-hidden>
