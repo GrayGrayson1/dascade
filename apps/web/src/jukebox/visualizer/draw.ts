@@ -259,9 +259,9 @@ function spectrum(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): v
 
 /**
  * The rolling waveform, as a recorder draws it: the music's loudness over the last few seconds as bars
- * mirrored about a centre line, the newest at the right edge, older ones fading off to the left. Paused, it
- * holds where it stopped. Still (reduced motion): no scrolling — the bars stand in place, shaped by the
- * spectrum (low notes in the middle).
+ * mirrored about a centre line (scaled to the loudest moment on screen), the newest at the right edge,
+ * older ones fading off to the left. Paused, it holds where it stopped. Still (reduced motion): no
+ * scrolling — the bars stand in place, shaped by the spectrum (low notes in the middle).
  */
 function waveform(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): void {
   clear(ctx, w, h);
@@ -277,10 +277,15 @@ function waveform(ctx: Ctx, w: number, h: number, f: VisFrame, p: VisPalette): v
   g.addColorStop(0, p.accent2);
   g.addColorStop(0.5, p.accent);
   g.addColorStop(1, p.accent2);
+  // Scaled to the loudest moment on screen, as a recorder does, so quiet songs still fill the screen
+  // (near-silence stays low).
+  let loudest = 0;
+  if (scroll) for (let i = Math.max(0, len - n); i < len; i++) loudest = Math.max(loudest, f.history[i] ?? 0);
+  const gain = scroll ? 0.94 / Math.max(0.16, loudest) : 1;
   ctx.beginPath();
   for (let i = 0; i < n; i++) {
     let v: number;
-    if (scroll) v = f.history[len - n + i] ?? 0;
+    if (scroll) v = (f.history[len - n + i] ?? 0) * gain;
     else v = sample(f.bands, Math.abs(i / Math.max(1, n - 1) - 0.5) * 2 * (n - 1), n);
     const half = Math.max(hair, Math.min(1, v) * amp);
     addRoundRect(ctx, w - (n - i) * pitch + (pitch - bw) / 2, mid - half, bw, half * 2, bw / 2);
