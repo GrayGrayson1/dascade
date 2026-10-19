@@ -5,7 +5,11 @@
  * (before its reveal) or the answer sheet, callers scored exactly once, the finale reaches everyone
  * and nobody drops.
  *
- *   LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=showdown pnpm load
+ * `showdown-showcase`: the DAS-O-Ween preset (Presenter Showcase) with a cheering crowd: double-sent
+ * reveals, a burst of Wrong presses (double clicks collapse into one), the server-run Reveal remaining
+ * sweep (#10 → #1), no answer reaching the crowd before it flips, the finale for everyone.
+ *
+ *   LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=showdown,showdown-showcase pnpm load
  */
 import { allConnected, burst, errorCount, json, leaked, timeUntil, type AddScenario, type ScenarioContext } from './helpers.ts';
 
@@ -95,6 +99,72 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
       scenario: `showdown ×${bots.length}`,
       ok: failures === 0 && guessMs >= 0 && duplicatesRefused && !sheetLeak && !textLeak && swept && scoreOk && callersOk && scored && finale && allConnected(bots),
       details: `guesses-in ${guessMs.toFixed(0)}ms board-swept ${revealMs.toFixed(0)}ms dup-refused=${duplicatesRefused} no-leak=${!sheetLeak && !textLeak} score=${scoreOk} callers=${callersOk} scored-once=${scored} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
+    });
+    await ctx.leaveAll(bots);
+  });
+
+  add('showdown-showcase', async () => {
+    const { bots, failures } = await ctx.createBots('showdown', ctx.N, [SHEET, EVENT, REACTIONS], {});
+    const host = bots[0]!;
+    const audience = bots.slice(1);
+    const board = (b = host) => JSON.parse(json(b).boardJson || 'null') as { rev: number; round: number; stage: string; slots: Array<{ revealed: boolean; late: boolean }> } | null;
+    const act = (payload: Record<string, unknown>) => host.room.send('showdown:act', payload);
+    host.room.send('showdown:preset', { id: 'dasoween-2026' });
+    if (!(await ctx.waitFor(() => json(host).customRounds === 2, 4000))) throw new Error('preset never loaded');
+    host.room.send('lobby:start', {});
+    if (!(await ctx.waitFor(() => json(host).phase === 'PLAYING' && board() !== null, 8000))) throw new Error('show never started');
+    act({ a: 'begin', rev: board()!.rev });
+    await ctx.waitFor(() => board()?.stage === 'title', 4000);
+    act({ a: 'question', rev: board()!.rev });
+    await ctx.waitFor(() => board()?.stage === 'live', 4000);
+    const sheets = () => (host.payloads.get(SHEET) ?? []) as Array<Sheet | null>;
+    if (!(await ctx.waitFor(() => (sheets().at(-1)?.answers.length ?? 0) === 10, 4000))) throw new Error('no answer sheet');
+    const answers = sheets().at(-1)!.answers;
+    const errorsBefore = errorCount(bots);
+
+    // The crowd cheers while the presenter finds five answers (each reveal double-sent) and buzzes misses.
+    const cheering = burst(ctx, audience, (b) => {
+      for (let r = 0; r < 6; r++) b.room.send('showdown:react', { r });
+    });
+    const t0 = performance.now();
+    for (const slot of [2, 0, 4, 6, 1]) {
+      act({ a: 'reveal', slot, round: 0 });
+      act({ a: 'reveal', slot, round: 0 });
+      await ctx.sleep(120);
+    }
+    // Ten Wrong presses in pairs (double clicks), 600 ms apart: five misses reach the crowd.
+    for (let i = 0; i < 5; i++) {
+      act({ a: 'miss', round: 0 });
+      act({ a: 'miss', round: 0 });
+      await ctx.sleep(600);
+    }
+    await cheering;
+    const missesSeen = await ctx.waitFor(() => audience.every((b) => ((b.payloads.get(EVENT) ?? []) as Array<{ type: string }>).filter((e) => e.type === 'miss').length === 5), 6000);
+    // Before the sweep: the five hidden answers never reached anyone in the crowd.
+    const hidden = [3, 5, 7, 8, 9].map((i) => answers[i]!.text);
+    const earlyLeak = hidden.some((text) => leaked(audience, `"${text}"`, [SHEET, EVENT, REACTIONS]));
+    const sheetLeak = audience.some((b) => (b.payloads.get(SHEET) ?? []).some((x) => x !== null));
+
+    act({ a: 'sweep', round: 0 });
+    const swept = await ctx.waitFor(() => audience.every((b) => board(b)?.stage === 'done'), 30000);
+    const revealMs = performance.now() - t0;
+    const last = board(audience.at(-1))!;
+    const lateOk = last.slots.every((x, i) => x.revealed && x.late === [3, 5, 7, 8, 9].includes(i));
+    const order = ((audience[0]!.payloads.get(EVENT) ?? []) as Array<{ type: string; slot?: number; sweep?: boolean }>)
+      .filter((e) => e.type === 'reveal' && e.sweep)
+      .map((e) => e.slot);
+    const orderOk = JSON.stringify(order) === JSON.stringify([9, 8, 7, 5, 3]);
+    const reactionsSeen = ((audience[0]!.payloads.get(REACTIONS) ?? []) as Array<{ k: number[] }>).reduce((n, r) => n + r.k.reduce((a, b) => a + b, 0), 0);
+
+    act({ a: 'next', rev: board()!.rev });
+    await ctx.waitFor(() => board()?.round === 1, 4000);
+    act({ a: 'finish', rev: board()!.rev });
+    const finale = await ctx.waitFor(() => audience.every((b) => json(b).phase === 'RESULTS' && json(b).finaleJson !== ''), 8000);
+
+    ctx.results.push({
+      scenario: `showdown-showcase ×${bots.length}`,
+      ok: failures === 0 && missesSeen && !earlyLeak && !sheetLeak && swept && lateOk && orderOk && finale && allConnected(bots),
+      details: `round-played ${revealMs.toFixed(0)}ms misses=${missesSeen} no-leak=${!earlyLeak && !sheetLeak} sweep-order=${orderOk ? order.join('>') : `WRONG ${order.join('>')}`} late-flags=${lateOk} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
     });
     await ctx.leaveAll(bots);
   });
