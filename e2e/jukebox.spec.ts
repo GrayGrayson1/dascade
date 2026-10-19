@@ -665,13 +665,13 @@ test.describe('records', () => {
     await expect(ring.locator('[data-record="spook-test"]')).toBeFocused();
     expect((await state(page)).record).toBe('main');
 
-    // A swipe to the left turns to the next record without picking anything.
+    // A swipe to the left (about one sleeve's step) turns to the next record without picking anything.
     const box = (await ring.locator('.jb-carousel__stage').boundingBox())!;
     const y = box.y + box.height / 2;
-    await page.mouse.move(box.x + box.width / 2 + 60, y);
+    await page.mouse.move(box.x + box.width / 2 + 40, y);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 - 20, y, { steps: 6 });
-    await page.mouse.move(box.x + box.width / 2 - 60, y, { steps: 4 });
+    await page.mouse.move(box.x + box.width / 2, y, { steps: 5 });
+    await page.mouse.move(box.x + box.width / 2 - 40, y, { steps: 5 });
     await page.mouse.up();
     await expect(middle).toHaveAttribute('data-record', 'all');
     expect((await state(page)).record).toBe('main');
