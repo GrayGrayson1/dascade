@@ -5,7 +5,7 @@
  * code on the keyboard ("B3") finds that strip. Pressing a strip plays it now; its side buttons line it up
  * next or add it to the queue. Searching looks through every record and shows every match at once.
  */
-import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { JukeboxTrack } from '@dascade/shared';
 import { ALL_RECORDS, hasShelf, jukebox, scopeTracks, trackRecord, useJukebox } from '../audio/jukebox/index.ts';
 import { sortTracks } from './format.ts';
@@ -64,6 +64,17 @@ export function Library({ actions, compact, scope: scopeProp }: { actions: Libra
     setPageState({ key: memKey, page: next });
   };
   const shownPage = Math.min(page, pages - 1);
+
+  // Another record went on: its title strips flip in (CSS; still under reduced motion / effects off).
+  const [flipping, setFlipping] = useState(false);
+  const lastScope = useRef(scope);
+  useEffect(() => {
+    if (lastScope.current === scope) return;
+    lastScope.current = scope;
+    setFlipping(true);
+    const t = window.setTimeout(() => setFlipping(false), 900);
+    return () => window.clearTimeout(t);
+  }, [scope]);
 
   const searching = deferred.trim().length > 0;
   const list = useMemo(
@@ -217,11 +228,13 @@ export function Library({ actions, compact, scope: scopeProp }: { actions: Libra
         </p>
       ) : (
         <ul
+          key={searching ? 'matches' : scope}
           className="jb-tracks jb-strips"
           data-part="track-list"
+          data-flip={flipping && !searching ? 'true' : undefined}
           aria-label={searching ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `Selections ${pageLetter(shownPage)}`}
         >
-          {list.map((t) => {
+          {list.map((t, i) => {
             const current = t.id === actions.currentId;
             const code = codeOf.get(t.id) ?? '';
             const record = trackRecord(t);
@@ -234,6 +247,7 @@ export function Library({ actions, compact, scope: scopeProp }: { actions: Libra
                 data-part="track"
                 data-code={code}
                 data-record={record}
+                style={{ '--i': i } as CSSProperties}
                 data-current={current ? 'true' : undefined}
                 data-playing={current && playing ? 'true' : undefined}
               >
