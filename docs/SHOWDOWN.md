@@ -15,8 +15,9 @@ rest of the year), and two formats (the `mode` setting):
 
 It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/play/showdown`).
 
-> Status: **experimental spike** on branch `feature/das-survey-showdown-spike`. It is built to be easy
-> to keep or drop. The removal checklist is at the end.
+> Status: **live** on <https://dascade.onrender.com> since 2026-10-15 (PR #4); the Presenter Showcase
+> format and the DAS-O-Ween presets since 2026-10-19 (PR #9). It is still built to be easy to drop:
+> the removal checklist is at the end.
 
 ## How a show runs
 

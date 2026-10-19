@@ -228,6 +228,21 @@ export function openStageWindow(code: string, showTitle: string): boolean {
   return true;
 }
 
+/**
+ * Renames the open stage window after the show (Teams lists windows by their title): the title can
+ * change after the window opened — loading an event preset, editing the show title.
+ */
+export function setStageWindowTitle(showTitle: string): void {
+  const next = `${showTitle} — Stage`;
+  if (next === title) return;
+  title = next;
+  try {
+    if (doc && win && !win.closed) doc.title = title;
+  } catch {
+    /* the window's page can't be reached right now: the next build uses the new title */
+  }
+}
+
 export function closeStageWindow(closeIt = true): void {
   cleanup?.();
   cleanup = null;
