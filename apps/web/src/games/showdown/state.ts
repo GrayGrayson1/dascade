@@ -5,12 +5,16 @@
  * pass messages. The client never decides who presents — it only renders what it was sent. The
  * built-in answers live on the server (@dascade/game-core/showdown is never imported here).
  */
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  SHOWDOWN_CARDS,
   SHOWDOWN_MSG,
+  clockRemaining,
   parseBoard,
   resolveShowdownLook,
   type ShowdownBoardView,
+  type ShowdownCard,
+  type ShowdownMode,
   type ShowdownContentPrivate,
   type ShowdownFinale,
   type ShowdownLook,
@@ -21,7 +25,7 @@ import {
   type TeamIndex,
   type TeamSlot,
 } from '@dascade/shared/games/showdown';
-import { playersEqual, useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
+import { playersEqual, serverNow, useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
@@ -119,6 +123,66 @@ export function useLook(settings: Pick<ShowdownSettings, 'look'> | null | undefi
   return resolveShowdownLook(settings?.look ?? 'auto', seasonClock());
 }
 
+/** The show's format: the board says during a show, the settings before it. */
+export function useMode(settings: Pick<ShowdownSettings, 'mode'> | null | undefined): ShowdownMode {
+  const board = useBoard();
+  return board?.mode ?? settings?.mode ?? 'classic';
+}
+
+/** The holding card on the stage (null = none). */
+export function useCard(): ShowdownCard | null {
+  const card = useRoomSelector<ShowdownPublicState, string>((s) => s.card) ?? '';
+  return (SHOWDOWN_CARDS as readonly string[]).includes(card) ? (card as ShowdownCard) : null;
+}
+
+/** A Reveal remaining sweep is running. */
+export function useSweep(): boolean {
+  return useRoomSelector<ShowdownPublicState, boolean>((s) => s.sweep) ?? false;
+}
+
+/** The loaded rounds are an event preset's practice boards (say "Rehearsal" everywhere). */
+export function useRehearsal(): boolean {
+  return useRoomSelector<ShowdownPublicState, boolean>((s) => s.rehearsal) ?? false;
+}
+
+export interface ClockView {
+  /** The show has a round clock. */
+  on: boolean;
+  running: boolean;
+  /** Ms left (negative = overtime), refreshed 4×/s while running. */
+  left: number;
+  max: number;
+  /** The stage shows it. */
+  stage: boolean;
+}
+
+/** The round clock (Presenter Showcase), counted down locally against the server's time. */
+export function useClock(): ClockView {
+  const endsAt = useRoomSelector<ShowdownPublicState, number>((s) => s.clockEndsAt) ?? 0;
+  const paused = useRoomSelector<ShowdownPublicState, number>((s) => s.clockLeft) ?? 0;
+  const max = useRoomSelector<ShowdownPublicState, number>((s) => s.clockMax) ?? 0;
+  const stage = useRoomSelector<ShowdownPublicState, boolean>((s) => s.clockShow) ?? true;
+  const [now, setNow] = useState(() => serverNow());
+  useEffect(() => {
+    if (!endsAt) return;
+    setNow(serverNow());
+    const t = setInterval(() => setNow(serverNow()), 250);
+    return () => clearInterval(t);
+  }, [endsAt]);
+  const left = clockRemaining({ clockEndsAt: endsAt, clockLeft: paused }, endsAt ? now : 0);
+  return { on: max > 0, running: endsAt > 0, left, max, stage };
+}
+
+/** "9:59", and "+0:12" in overtime. */
+export function formatClock(ms: number): string {
+  const over = ms < 0;
+  // Counting down shows the second still running (9:59.4 → "10:00" would lie); overtime counts up.
+  const total = over ? Math.floor(-ms / 1000) : Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${over ? '+' : ''}${m}:${String(s).padStart(2, '0')}`;
+}
+
 export interface MotionPrefs {
   /** Large motion allowed (not reduced motion, effects not off). */
   motion: boolean;
@@ -163,6 +227,39 @@ function readSoundPref(): 'on' | 'off' | null {
 function subscribeSounds(fn: () => void): () => void {
   soundListeners.add(fn);
   return () => soundListeners.delete(fn);
+}
+
+// ---------------------------------------------------------------------------
+// Theme music (Presenter Showcase): per device, on where show sounds are (presenter, big screens)
+// ---------------------------------------------------------------------------
+
+const MUSIC_KEY = 'dascade:showdown:music';
+let musicMemory: 'on' | 'off' | null = null;
+
+function readMusicPref(): 'on' | 'off' | null {
+  try {
+    const v = localStorage.getItem(MUSIC_KEY);
+    return v === 'on' || v === 'off' ? v : musicMemory;
+  } catch {
+    return musicMemory;
+  }
+}
+
+/** Whether this device plays the show's theme music under the opening, title cards and holding cards. */
+export function useThemeMusicPref(): [boolean, (on: boolean) => void] {
+  useSyncExternalStore(subscribeSounds, () => soundVersion);
+  const pref = readMusicPref();
+  const set = (next: boolean) => {
+    musicMemory = next ? 'on' : 'off';
+    try {
+      localStorage.setItem(MUSIC_KEY, musicMemory);
+    } catch {
+      /* storage unavailable: the choice lasts until reload */
+    }
+    soundVersion++;
+    for (const l of soundListeners) l();
+  };
+  return [pref !== 'off', set];
 }
 
 export function useShowSounds(role: ShowdownRole): [boolean, (on: boolean) => void] {
