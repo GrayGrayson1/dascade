@@ -23,17 +23,15 @@ import {
   type ShowdownCard,
   type ShowdownFinale,
   type ShowdownLook,
-  type ShowdownPublicState,
   type ShowdownSettings,
 } from '@dascade/shared/games/showdown';
 import { cx } from '@dascade/ui';
-import { useRoomSelector } from '../../net/hooks.ts';
 import { Board, SpecialGlyph } from './Board.tsx';
 import { Backdrop, Bulbs } from './Decor.tsx';
 import { HostFigure } from './Host.tsx';
 import { LOOK_COPY, cardLine, categoryLine, farewellLine, fill, idleLine, openingLine, type HostLine, type HostMood, type LookCopy } from './look.ts';
 import { useShowFeed, type ShowFeed } from './fx.ts';
-import { formatClock, useBoard, useCard, useClock, useFinale, useMotion, useRehearsal, useSweep, type ClockView, type MotionPrefs } from './state.ts';
+import { formatClock, useBoard, useCard, useClock, useFinale, useMotion, useRehearsal, useShowCode, useShowPhase, useSweep, type ClockView, type MotionPrefs } from './state.ts';
 import { BatBurst, Beams, Confetti, Reactions, useRecent } from './stageFx.tsx';
 import { CardScene, CategoryScene, FinaleScene, JoinHint, LobbyScene, OpeningScene } from './scenes.tsx';
 
@@ -64,8 +62,8 @@ interface ShowcaseStageProps {
 export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStageProps) {
   const board = useBoard();
   const finale = useFinale();
-  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
-  const code = useRoomSelector<ShowdownPublicState, string>((s) => s.code) ?? '';
+  const phase = useShowPhase();
+  const code = useShowCode();
   const card = useCard();
   const sweep = useSweep();
   const rehearsal = useRehearsal();
