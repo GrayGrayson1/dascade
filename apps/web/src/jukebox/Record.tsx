@@ -4,7 +4,7 @@
  * plays, with the tone arm swung onto the groove; idle, the arm rests off to the side.
  * Decorative (aria-hidden): the now-playing text beside it carries the information. Motion is CSS
  * keyed off data-playing (jukebox.css), so reduced motion / effects off keep it still.
- * Changing records (RecordCrate.tsx): `changing` lifts the arm and takes the disc off the platter while the
+ * Changing records (RecordCarousel.tsx): `changing` lifts the arm and takes the disc off the platter while the
  * new one flies over; `landing` settles the new disc (a short squash) as the needle drops.
  */
 import { memo, useId } from 'react';

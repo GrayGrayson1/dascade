@@ -599,19 +599,20 @@ test.describe('records', () => {
     return ids;
   }
 
-  test('the crate puts a record on: the rack flips to its songs, its first song plays, Next stays on it, and the pick survives a reload', async ({ page }) => {
+  test('the carousel puts a record on: the rack flips to its songs, its first song plays, Next stays on it, and the pick survives a reload', async ({ page }) => {
     const ids = await mockRecords(page);
     await page.goto('/');
     await libraryReady(page);
     expect(await state(page)).toMatchObject({ record: 'main', pick: null, records: ['main', 'spook-test'] });
     await openPlayer(page);
-    const crate = panel(page).locator('[data-part="crate"]');
-    // Both records and the "All records" mix stand in the crate; the main record is on the turntable.
-    await expect(crate.locator('[data-part="sleeve"]')).toHaveCount(3);
-    await expect(crate.locator('[data-record="main"]')).toHaveAttribute('aria-pressed', 'true');
+    const ring = panel(page).locator('[data-part="carousel"]');
+    // Both records and the "All records" mix are on the ring; the main record is on the turntable, in the middle.
+    await expect(ring.locator('[data-part="sleeve"]')).toHaveCount(3);
+    await expect(ring.locator('[data-record="main"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(ring.locator('[data-record="main"]')).toHaveAttribute('data-middle', 'true');
     await expect(panel(page).locator('[data-part="track"]').first()).toHaveAttribute('data-code', 'A1');
 
-    await crate.locator('[data-record="spook-test"]').click();
+    await ring.locator('[data-record="spook-test"]').click();
     await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('spook-test');
     await expect.poll(async () => (await snap(page)).currentId, { timeout: 10_000 }).toBe(ids.spooky[0]);
     await expect.poll(async () => (await snap(page)).playing, { timeout: 15_000 }).toBe(true);
@@ -619,7 +620,8 @@ test.describe('records', () => {
     await expect(strips).toHaveCount(3);
     await expect(strips.first()).toHaveAttribute('data-code', 'A1');
     await expect(strips.first()).toContainText('Ghost Test One');
-    await expect(crate.locator('[data-record="spook-test"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(ring.locator('[data-record="spook-test"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(ring.locator('[data-record="spook-test"]')).toHaveAttribute('data-middle', 'true');
     await expect(panel(page).locator('[data-part="track-artist"]')).toContainText('Test Spooks');
 
     // Next and auto-advance stay on the record: after its last song comes its first.
@@ -637,6 +639,48 @@ test.describe('records', () => {
     await expect(panel(page).locator('[data-part="track"]').first()).toContainText('Ghost Test One');
   });
 
+  test('turning the carousel (arrows, ←/→, a swipe) only browses; the record changes when you pick a sleeve', async ({ page }) => {
+    await mockRecords(page);
+    await page.goto('/');
+    await libraryReady(page);
+    await openPlayer(page);
+    const ring = panel(page).locator('[data-part="carousel"]');
+    const middle = ring.locator('[data-part="sleeve"][data-middle="true"]');
+    await expect(middle).toHaveAttribute('data-record', 'main');
+    await ring.locator('[data-part="carousel-next"]').click();
+    await expect(middle).toHaveAttribute('data-record', 'spook-test');
+    await ring.locator('[data-part="carousel-next"]').click();
+    await expect(middle).toHaveAttribute('data-record', 'all');
+    // Round the ring and back.
+    await ring.locator('[data-part="carousel-next"]').click();
+    await expect(middle).toHaveAttribute('data-record', 'main');
+    await ring.locator('[data-part="carousel-prev"]').click();
+    await expect(middle).toHaveAttribute('data-record', 'all');
+    expect((await state(page)).record).toBe('main');
+
+    // Keyboard: ←/→ on a sleeve turns the ring and moves focus along with it.
+    await ring.locator('[data-record="all"]').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(middle).toHaveAttribute('data-record', 'spook-test');
+    await expect(ring.locator('[data-record="spook-test"]')).toBeFocused();
+    expect((await state(page)).record).toBe('main');
+
+    // A swipe to the left turns to the next record without picking anything.
+    const box = (await ring.locator('.jb-carousel__stage').boundingBox())!;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2 + 60, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 20, y, { steps: 6 });
+    await page.mouse.move(box.x + box.width / 2 - 60, y, { steps: 4 });
+    await page.mouse.up();
+    await expect(middle).toHaveAttribute('data-record', 'all');
+    expect((await state(page)).record).toBe('main');
+
+    // Picking the middle sleeve puts it on.
+    await middle.click();
+    await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('all');
+  });
+
   test('without a pick, Halloween Night starts on its paired record; picking another sticks', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('dascade:v1:settings', JSON.stringify({ theme: 'halloween-night' })));
     await mockRecords(page);
@@ -645,7 +689,7 @@ test.describe('records', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'halloween-night');
     expect(await state(page)).toMatchObject({ record: 'spook-test', pick: null });
     await openPlayer(page);
-    await panel(page).locator('[data-part="crate"] [data-record="main"]').click();
+    await panel(page).locator('[data-part="carousel"] [data-record="main"]').click();
     await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('main');
     expect((await state(page)).pick).toBe('main');
   });
@@ -655,7 +699,7 @@ test.describe('records', () => {
     await page.goto('/');
     await libraryReady(page);
     await openPlayer(page);
-    await panel(page).locator('[data-part="crate"] [data-record="all"]').click();
+    await panel(page).locator('[data-part="carousel"] [data-record="all"]').click();
     await expect.poll(async () => (await state(page)).record, { timeout: 10_000 }).toBe('all');
     const total = ids.main.length + ids.spooky.length;
     await expect(panel(page).locator('[data-part="rack-page"]')).toHaveCount(Math.ceil(total / 8));
@@ -671,7 +715,7 @@ test.describe('records', () => {
     await page.goto('/');
     await libraryReady(page);
     await openPlayer(page);
-    await panel(page).locator('[data-part="crate"] [data-record="spook-test"]').click();
+    await panel(page).locator('[data-part="carousel"] [data-record="spook-test"]').click();
     expect(await state(page)).toMatchObject({ record: 'spook-test' });
     await expect(page.locator('[data-part="flyer"]')).toHaveCount(0);
     await expect.poll(async () => (await snap(page)).currentId).toBe(ids.spooky[0]);

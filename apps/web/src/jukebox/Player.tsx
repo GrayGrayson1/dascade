@@ -18,7 +18,7 @@ import { Glyph } from './icons.tsx';
 import { Library, type LibraryActions } from './Library.tsx';
 import { Queue } from './Queue.tsx';
 import { Record } from './Record.tsx';
-import { RecordCrate, RecordFlyer, swapRecord, useRecordSwap } from './RecordCrate.tsx';
+import { RecordCarousel, RecordFlyer, swapRecord, useRecordSwap } from './RecordCarousel.tsx';
 import { Seek } from './Seek.tsx';
 import { useJukeboxPrefs } from './prefs.ts';
 import { rackCodes } from './rack.ts';
@@ -285,7 +285,7 @@ export function Player({ open, anchor, inRoom, onClose, announce }: PlayerProps)
 
           {shelf ? (
             <>
-              <RecordCrate records={records} current={record} swap={swap} onPick={pick} />
+              <RecordCarousel records={records} current={record} swap={swap} onPick={pick} announce={announce} />
               {roomLocked ? <p className="jb-note">Putting on a record stops listening with the room.</p> : null}
             </>
           ) : null}
