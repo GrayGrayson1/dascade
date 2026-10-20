@@ -25,7 +25,7 @@ export const SPACE_CASINO_2088: ThemeDefinition = {
     swatches: ['#04061a', '#b9c6dc', '#4ff0ff', '#ffd34d'],
     family: 'comedy',
   },
-  effects: { surface: 'chrome', crt: 0.2, grain: 0.05, analog: 0, ambient: 'stars', visualizer: 'hologram', transition: 'warp' },
+  effects: { surface: 'chrome', crt: 0.2, grain: 0.05, analog: 0, ambient: 'stars', visualizer: 'waveform', transition: 'warp' },
   colorScheme: 'dark',
   metaThemeColor: '#04061a',
   materials: {

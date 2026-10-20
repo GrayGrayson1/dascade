@@ -1,7 +1,7 @@
 /**
  * A record's sleeve art: its cover, else a drawn sleeve — the "All records" mixtape, a moonlit Halloween night
  * for a record paired with the Halloween Night theme, or the record's initial on its accents. Decorative
- * (the crate's buttons and card carry the names).
+ * (the carousel's buttons carry the names).
  */
 import { memo, useState } from 'react';
 import type { JukeboxRecord } from '@dascade/shared';

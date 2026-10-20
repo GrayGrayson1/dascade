@@ -42,7 +42,7 @@ const VISUALIZERS: ThemeEffects['visualizer'][] = [
   'pixel-bars',
   'lcd',
   'spectrum',
-  'bubbles',
+  'waveform',
   'reels',
   'hologram',
   'oscilloscope',
@@ -167,6 +167,11 @@ describe('effects and copy', () => {
       expect(SURFACES, t.id).toContain(e.surface);
       for (const k of ['crt', 'grain', 'analog'] as const) expect(e[k] >= 0 && e[k] <= 1, `${t.id}.${k}`).toBe(true);
     }
+  });
+
+  it('every theme draws the jukebox waveform (the other styles stay available)', () => {
+    expect(DEFAULT_EFFECTS.visualizer).toBe('waveform');
+    for (const t of BUILT_IN_THEMES) expect({ ...DEFAULT_EFFECTS, ...t.effects }.visualizer, t.id).toBe('waveform');
   });
 
   it('copy only uses known keys', () => {

@@ -15,7 +15,7 @@ export const DELTA_NEON: ThemeDefinition = {
     swatches: ['#05040b', '#19152f', '#ff4fd8', '#22d3ee'],
     family: 'house',
   },
-  effects: { surface: 'glass', crt: 0.35, grain: 0.15, analog: 0, ambient: 'sparkle', visualizer: 'neon-bars', transition: 'power' },
+  effects: { surface: 'glass', crt: 0.35, grain: 0.15, analog: 0, ambient: 'sparkle', visualizer: 'waveform', transition: 'power' },
   colorScheme: 'dark',
   metaThemeColor: '#05040b',
   tokens: {

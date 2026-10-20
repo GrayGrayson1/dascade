@@ -22,7 +22,7 @@ export const LAN_PARTY: ThemeDefinition = {
     swatches: ['#0f0d0b', BEIGE, PHOSPHOR, AMBER],
     family: 'physical',
   },
-  effects: { surface: 'bevel', crt: 0.7, grain: 0.12, analog: 0.1, ambient: 'dust', visualizer: 'oscilloscope', transition: 'boot' },
+  effects: { surface: 'bevel', crt: 0.7, grain: 0.12, analog: 0.1, ambient: 'dust', visualizer: 'waveform', transition: 'boot' },
   copy: {
     'arcade.tagline': 'Basement LAN · BYOC',
     'arcade.status': 'SWITCH: 8 PORTS LIT|ALL PCs ON THE LAN|PIZZA ETA 20 MIN|MIND THE CABLE|SODA IN THE COOLER|NO ONE TOUCH THE BREAKER',

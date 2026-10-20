@@ -22,7 +22,7 @@ export const NEON_NOIR: ThemeDefinition = {
     swatches: [INK, '#111722', TEAL, ROSE],
     family: 'premium',
   },
-  effects: { surface: 'glass', crt: 0.06, grain: 0.14, analog: 0, ambient: 'rain', visualizer: 'spectrum', transition: 'fade' },
+  effects: { surface: 'glass', crt: 0.06, grain: 0.14, analog: 0, ambient: 'rain', visualizer: 'waveform', transition: 'fade' },
   copy: {
     'arcade.tagline': 'Open until dawn',
     'arcade.status': 'LIGHT RAIN|11 CABINETS LIT|DISTRICT 07|OPEN UNTIL DAWN',

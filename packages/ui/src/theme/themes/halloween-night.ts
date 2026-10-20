@@ -36,7 +36,7 @@ export const HALLOWEEN_NIGHT: ThemeDefinition = {
     swatches: [NIGHT, '#4b0867', '#ff8a3d', '#7df04a'],
     family: 'comedy',
   },
-  effects: { surface: 'plastic', crt: 0.2, grain: 0.08, analog: 0, ambient: 'fog', visualizer: 'bubbles', transition: 'haunt' },
+  effects: { surface: 'plastic', crt: 0.2, grain: 0.08, analog: 0, ambient: 'fog', visualizer: 'waveform', transition: 'haunt' },
   colorScheme: 'dark',
   metaThemeColor: NIGHT,
   materials: {

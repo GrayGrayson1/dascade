@@ -35,7 +35,7 @@ export const SHAREWARE_97: ThemeDefinition = {
     swatches: ['#3a0a14', PUTTY, '#f2c14e', CASINO_RED],
     family: 'retro-desktop',
   },
-  effects: { surface: 'bevel', crt: 0.3, grain: 0.08, analog: 0, ambient: 'sparkle', visualizer: 'lcd', transition: 'boot' },
+  effects: { surface: 'bevel', crt: 0.3, grain: 0.08, analog: 0, ambient: 'sparkle', visualizer: 'waveform', transition: 'boot' },
   copy: {
     'arcade.tagline': 'Fun Pack v3.7 · Delta Alpha Sierra',
     'arcade.status': 'MODEM READY|{cabinets} CABINETS ONLINE|NETWORK {online}|{rooms} ROOMS LIVE|1-30 USERS|SOUND CARD OK|FULL VERSION',

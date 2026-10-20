@@ -43,7 +43,8 @@ const P: VisPalette = {
 function frame(level: number, still = false): VisFrame {
   const bands = new Float32Array(48).map((_, i) => Math.min(1, level * (0.4 + (i % 7) / 10)));
   const wave = new Float32Array(128).map((_, i) => Math.sin(i / 6) * level);
-  return { bands, peaks: bands.slice(), wave, level, levelL: level, levelR: level * 0.8, t: 12.5, playing: level > 0, still, dpr: 2 };
+  const history = new Float32Array(160).map((_, i) => level * (0.5 + 0.5 * Math.sin(i / 4)));
+  return { bands, peaks: bands.slice(), wave, history, level, levelL: level, levelR: level * 0.8, t: 12.5, playing: level > 0, still, dpr: 2 };
 }
 
 describe('visualizer styles', () => {
@@ -53,7 +54,7 @@ describe('visualizer styles', () => {
       'pixel-bars',
       'lcd',
       'spectrum',
-      'bubbles',
+      'waveform',
       'reels',
       'hologram',
       'oscilloscope',
@@ -83,6 +84,21 @@ describe('visualizer styles', () => {
       }
     });
   }
+
+  it('waveform: scrolls the history while playing, stands still under reduced motion, holds when paused', () => {
+    const bars = (f: VisFrame) => {
+      const { ctx, calls } = fakeCtx();
+      drawVisualizer('waveform', ctx, 400, 100, f, P);
+      return calls.filter((c) => c === 'closePath').length;
+    };
+    const loud = frame(0.8);
+    // One bar per 4 css px (8 device px at dpr 2): 400 / 8.
+    expect(bars(loud)).toBe(50);
+    expect(bars({ ...loud, still: true })).toBe(50);
+    expect(bars({ ...loud, playing: false, still: true })).toBe(50);
+    // Too short a history (a fresh canvas) just leaves the left side flat.
+    expect(bars({ ...loud, history: new Float32Array(4).fill(1) })).toBe(50);
+  });
 
   it('handles fx off (no glow) and rgba palette colours', () => {
     const { ctx, calls } = fakeCtx();

@@ -25,7 +25,7 @@ export const SATURDAY_MORNING: ThemeDefinition = {
     swatches: ['#2233b8', '#28157f', '#ffe14d', '#ff4fa3'],
     family: 'comedy',
   },
-  effects: { surface: 'plastic', crt: 0, grain: 0, analog: 0, ambient: 'confetti', visualizer: 'blocks', transition: 'wipe' },
+  effects: { surface: 'plastic', crt: 0, grain: 0, analog: 0, ambient: 'confetti', visualizer: 'waveform', transition: 'wipe' },
   colorScheme: 'dark',
   metaThemeColor: '#2233b8',
   materials: {

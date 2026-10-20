@@ -26,7 +26,7 @@ export const EXECUTIVE: ThemeDefinition = {
     swatches: ['#160b07', MAHOGANY, BRASS, '#1f5a3c'],
     family: 'comedy',
   },
-  effects: { surface: 'wood', crt: 0, grain: 0.08, analog: 0, ambient: 'dust', visualizer: 'vu-meter', transition: 'shutter' },
+  effects: { surface: 'wood', crt: 0, grain: 0.08, analog: 0, ambient: 'dust', visualizer: 'waveform', transition: 'shutter' },
   colorScheme: 'dark',
   metaThemeColor: '#160b07',
   copy: {

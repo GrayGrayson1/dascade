@@ -30,7 +30,7 @@ export const CORPORATE_98: ThemeDefinition = {
     swatches: ['#3f7f82', FACE, NAVY, '#ffffe1'],
     family: 'retro-desktop',
   },
-  effects: { surface: 'bevel', crt: 0.1, grain: 0, analog: 0, ambient: 'none', visualizer: 'blocks', transition: 'boot' },
+  effects: { surface: 'bevel', crt: 0.1, grain: 0, analog: 0, ambient: 'none', visualizer: 'waveform', transition: 'boot' },
   colorScheme: 'light',
   metaThemeColor: '#3f7f82',
   copy: {
