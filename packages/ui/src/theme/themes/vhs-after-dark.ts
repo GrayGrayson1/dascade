@@ -30,7 +30,7 @@ export const VHS_AFTER_DARK: ThemeDefinition = {
     grain: 0.3,
     analog: 0.75,
     ambient: 'dust',
-    visualizer: 'reels',
+    visualizer: 'waveform',
     transition: 'tracking',
   },
   colorScheme: 'dark',

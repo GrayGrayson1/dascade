@@ -169,6 +169,11 @@ describe('effects and copy', () => {
     }
   });
 
+  it('every theme draws the jukebox waveform (the other styles stay available)', () => {
+    expect(DEFAULT_EFFECTS.visualizer).toBe('waveform');
+    for (const t of BUILT_IN_THEMES) expect({ ...DEFAULT_EFFECTS, ...t.effects }.visualizer, t.id).toBe('waveform');
+  });
+
   it('copy only uses known keys', () => {
     for (const t of BUILT_IN_THEMES) {
       for (const key of Object.keys(t.copy ?? {})) expect(THEME_COPY_KEYS as readonly string[], `${t.id}.${key}`).toContain(key);

@@ -79,6 +79,6 @@ export const DEFAULT_EFFECTS: ThemeEffects = {
   grain: 0.15,
   analog: 0,
   ambient: 'sparkle',
-  visualizer: 'neon-bars',
+  visualizer: 'waveform',
   transition: 'power',
 };

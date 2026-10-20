@@ -22,7 +22,7 @@ export const CYBER_CAFE_01: ThemeDefinition = {
     swatches: ['#062047', '#b9cadb', AQUA, LIME],
     family: 'retro-desktop',
   },
-  effects: { surface: 'plastic', crt: 0.4, grain: 0.04, analog: 0, ambient: 'sparkle', visualizer: 'spectrum', transition: 'wipe' },
+  effects: { surface: 'plastic', crt: 0.4, grain: 0.04, analog: 0, ambient: 'sparkle', visualizer: 'waveform', transition: 'wipe' },
   copy: {
     'arcade.tagline': 'Cyber Café · Broadband',
     'arcade.status': 'USER 17 CONNECTED|LAN READY|PING 34ms|BROADBAND ONLINE|SERVER 01|24 STATIONS UP',
