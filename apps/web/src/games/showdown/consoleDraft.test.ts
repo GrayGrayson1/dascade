@@ -3,11 +3,14 @@ import { roundToInput, validateShowContent, type ShowdownRoundDef } from '@dasca
 import {
   blankRound,
   cleanShowSettings,
+  describeShowFile,
   describeShowSettings,
   fromInput,
   move,
   parseShowFile,
   pickShowSettings,
+  showFileData,
+  showFileName,
   toInput,
 } from './consoleDraft.ts';
 
@@ -112,5 +115,38 @@ describe('whole-show files', () => {
     const picked = pickShowSettings({ mode: 'showcase', look: 'halloween', minutes: 10, source: 'packs', packs: ['spooky'], rounds: 4 });
     expect(picked).toEqual({ mode: 'showcase', look: 'halloween', minutes: 10 });
     expect(describeShowSettings(picked)).toBe('Presenter Showcase · Halloween Night · 10-min clock');
+  });
+
+  it('carries the display profile in a show file', () => {
+    expect(pickShowSettings({ mode: 'showcase', display: 'stream' })).toEqual({ mode: 'showcase', display: 'stream' });
+    expect(cleanShowSettings({ display: 'projector' })).toEqual({ display: 'projector' });
+    expect(cleanShowSettings({ display: 'tv' })).toBeUndefined();
+    expect(describeShowSettings({ mode: 'showcase', display: 'stream' })).toBe('Presenter Showcase · Stream-safe display');
+  });
+});
+
+describe('the show file on disk (ADM-01)', () => {
+  const rounds = [roundToInput(ranked), roundToInput(scored)];
+
+  it('names the file after the show', () => {
+    expect(showFileName('DAS-O-Ween Trivia')).toBe('das-o-ween-trivia-show.json');
+    expect(showFileName('Ça va?!')).toBe('ca-va-show.json');
+    expect(showFileName('')).toBe('showdown-show.json');
+    expect(showFileName(null)).toBe('showdown-show.json');
+  });
+
+  it('confirms a load in words, never with an answer', () => {
+    const words = describeShowFile({ rounds, settings: { mode: 'showcase' } });
+    expect(words).toBe('2 rounds, 1 with a special answer, plus its settings');
+    for (const r of rounds) for (const a of r.answers) expect(words).not.toContain(a.text);
+    expect(describeShowFile({ rounds: [roundToInput(ranked)] })).toBe('1 round, with a special answer');
+  });
+
+  it('round-trips a saved file (its tag is ignored on the way back)', () => {
+    const data = showFileData({ rounds, settings: { mode: 'showcase', look: 'halloween' } }, new Date('2026-10-29T18:00:00Z'));
+    expect(data.kind).toBe('dascade-showdown-show');
+    const back = parseShowFile(JSON.parse(JSON.stringify(data)));
+    expect(back?.rounds).toHaveLength(2);
+    expect(back?.settings).toEqual({ mode: 'showcase', look: 'halloween' });
   });
 });

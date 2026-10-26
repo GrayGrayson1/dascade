@@ -130,6 +130,7 @@ export const SHOW_FILE_SETTINGS = [
   'scoring',
   'steal',
   'teamNames',
+  'display',
 ] as const;
 export type ShowFileSettings = Partial<Pick<ShowdownSettings, (typeof SHOW_FILE_SETTINGS)[number]>>;
 
@@ -156,6 +157,7 @@ const SettingsPatch = ShowdownSettingsSchema.pick({
   scoring: true,
   steal: true,
   teamNames: true,
+  display: true,
 }).partial();
 
 /** Only the settings that are valid on their own (a hand-edited file can't break the lobby). */
@@ -190,5 +192,47 @@ export function describeShowSettings(s: ShowFileSettings): string {
   if (s.title) parts.push(`“${s.title}”`);
   if (s.look) parts.push(s.look === 'halloween' ? 'Halloween Night' : s.look === 'showtime' ? 'DAS Showtime' : 'Seasonal look');
   if (s.mode === 'showcase' && s.minutes !== undefined) parts.push(s.minutes > 0 ? `${s.minutes}-min clock` : 'no clock');
+  if (s.display === 'stream') parts.push('Stream-safe display');
+  else if (s.display === 'projector') parts.push('Projector display');
   return parts.join(' · ');
 }
+
+// ---------------------------------------------------------------------------
+// The show file on disk (ADM-01): the event's boards live in a file on the presenter's computer,
+// never in the app or the repo. These helpers never put round content into words.
+// ---------------------------------------------------------------------------
+
+/** Marks a file this editor saved (extra keys are ignored when it's read back). */
+export const SHOW_FILE_KIND = 'dascade-showdown-show';
+
+/** The file a presenter downloads: rounds + settings, tagged. */
+export function showFileData(file: ShowFile, savedAt: Date): ShowFile & { kind: string; version: 1; savedAt: string } {
+  return { kind: SHOW_FILE_KIND, version: 1, savedAt: savedAt.toISOString(), ...file };
+}
+
+/** "das-o-ween-trivia-show.json" (the show title, else "showdown-show.json"). */
+export function showFileName(title: string | null | undefined): string {
+  const slug = (title ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return `${slug || 'showdown'}-show.json`;
+}
+
+/** A load confirmation in words, without any answer: "2 rounds, 2 with a special answer, plus its settings". */
+export function describeShowFile(file: ShowFile): string {
+  const n = file.rounds.length;
+  const specials = file.rounds.filter((r) => (r.special ?? 0) > 0).length;
+  const parts = [`${n} round${n === 1 ? '' : 's'}`];
+  parts.push(
+    specials === n && n > 0 ? (n === 1 ? 'with a special answer' : 'each with a special answer') : `${specials} with a special answer`,
+  );
+  if (file.settings && Object.keys(file.settings).length) parts.push('plus its settings');
+  return parts.join(', ');
+}
+
+/** Show files are small; anything bigger isn't one (and isn't worth parsing). */
+export const SHOW_FILE_MAX_BYTES = 512 * 1024;

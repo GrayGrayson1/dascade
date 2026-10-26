@@ -1,0 +1,981 @@
+/* =====================================================================
+ * DAS Survey Showdown — the event panels (picker strip, Picker / Sound / Names / Crew & log /
+ * Preflight) and the crew screen. Presenter chrome: it follows the viewer's DASCADE theme tokens,
+ * never the stage palette. States always carry a word or an icon; colour only reinforces them.
+ * Namespaced `sdp-`.
+ * ===================================================================== */
+
+.sdp-strip,
+.sdp-panel {
+  --sdp-ok: var(--success);
+  --sdp-warn: var(--warning);
+  --sdp-fail: var(--danger);
+  min-width: 0;
+  color: var(--text-1);
+}
+.sdp-strip :focus-visible,
+.sdp-panel :focus-visible,
+.sdp-crewview :focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+/* ---------- Picker strip (rail, 288 px) ---------- */
+.sdp-strip {
+  /* Its own container: the rail is 290 px at 1280 px wide and 240 px at 1024 px. */
+  container: sdp-strip / inline-size;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+}
+.sdp-strip__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sdp-strip__title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--label-tracking, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-1);
+}
+.sdp-strip__pool {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.sdp-strip__pool .dc-num {
+  color: var(--text-0);
+  font-weight: 700;
+}
+.sdp-strip .dc-btn {
+  min-height: 44px;
+}
+.sdp-strip .dc-btn .dc-kbd {
+  margin-left: auto;
+  height: 20px;
+  min-width: 20px;
+  font-size: 10px;
+}
+.sdp-strip__pick {
+  justify-content: flex-start;
+}
+.sdp-strip__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.sdp-strip__row > .dc-btn {
+  justify-content: center;
+  white-space: nowrap;
+  padding-inline: 6px;
+  gap: 6px;
+}
+.sdp-strip__note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-strip__nudge {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--sdp-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--sdp-warn) 14%, transparent);
+  color: var(--text-0);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+}
+.sdp-strip__reroll {
+  justify-content: center;
+}
+
+/* The hot seat: one line, the name big enough to read at a glance (and to pronounce). */
+.sdp-hot {
+  margin: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong, var(--line));
+  border-left: 4px solid var(--accent);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.sdp-hot__name {
+  font-family: var(--font-ui);
+  font-size: var(--fs-lg);
+  color: var(--text-0);
+}
+.sdp-hot__line {
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+.sdp-hot__line .dc-num {
+  font-family: var(--font-num);
+  color: var(--text-0);
+}
+.sdp-hot[data-nudge] {
+  border-left-color: var(--sdp-warn);
+}
+.sdp-hot[data-nudge] .sdp-hot__line {
+  color: var(--text-0);
+  font-weight: 700;
+}
+.sdp-hot[data-nudge] .sdp-hot__line svg {
+  color: var(--sdp-warn);
+  vertical-align: -2px;
+}
+.sdp-strip__row--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sdp-strip__head .dc-btn {
+  min-height: 30px;
+  padding-inline: 8px;
+}
+
+/* Reroll reason chips (also the assign reasons). */
+.sdp-reroll {
+  display: grid;
+  gap: 8px;
+}
+.sdp-reroll__set {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.sdp-reroll__legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+}
+.sdp-reroll__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sdp-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--surface-sunken);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sdp-chip input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.sdp-chip:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+.sdp-chip.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text-0);
+}
+.sdp-chip.is-on::before {
+  content: '✓' / '';
+  margin-right: 6px;
+}
+@media (pointer: coarse) {
+  .sdp-chip {
+    min-height: 44px;
+  }
+}
+
+/* ---------- Panels (drawer tabs, lobby, crew screen) ---------- */
+.sdp-panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.sdp-panel > .sd-panel__title {
+  margin: 0;
+}
+.sdp-lead,
+.sdp-note,
+.sdp-empty,
+.sdp-rules,
+.sdp-count {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.sdp-note,
+.sdp-count {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-empty {
+  color: var(--text-2);
+  font-style: italic;
+}
+.sdp-rules {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+.sdp-sub {
+  margin: 4px 0 0;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--label-tracking, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.sdp-block {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-divider, var(--line));
+}
+.sdp-block:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.sdp-block__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sdp-block__head .sdp-sub {
+  margin: 0;
+}
+.sdp-notice {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+}
+.sdp-notice:not(:empty) {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--surface-sunken);
+}
+.sdp-notice:not(:empty)::before {
+  content: 'ℹ ' / '';
+  color: var(--info, var(--accent));
+}
+.sdp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-0);
+  white-space: nowrap;
+}
+.sdp-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.sdp-field__label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.sdp-code {
+  font-family: var(--font-tech, ui-monospace, monospace);
+  font-size: var(--fs-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--surface-sunken);
+  color: var(--text-0);
+  overflow-wrap: anywhere;
+}
+
+/* Facts (Picker tab) */
+.sdp-facts {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.sdp-facts > div {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+.sdp-facts dt {
+  color: var(--text-2);
+}
+.sdp-facts dd {
+  margin: 0;
+  color: var(--text-0);
+}
+.sdp-names,
+.sdp-draws {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  font-size: var(--fs-sm);
+}
+.sdp-names {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+.sdp-names li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-0);
+}
+.sdp-draws li {
+  display: flex;
+  gap: 8px;
+  color: var(--text-1);
+}
+.sdp-draws time {
+  flex: none;
+  color: var(--text-2);
+  font-family: var(--font-num);
+  font-size: var(--fs-xs);
+}
+.sdp-draws li[data-how='drawn'] {
+  color: var(--text-0);
+  font-weight: 700;
+}
+
+/* ---------- Sound ---------- */
+.sdp-status {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--surface-sunken);
+  color: var(--text-0);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.sdp-status__icon,
+.sdp-check__icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  border: 2px solid currentColor;
+}
+.sdp-status[data-state='ok'] .sdp-status__icon {
+  color: var(--sdp-ok);
+}
+.sdp-status[data-state='silent'] .sdp-status__icon,
+.sdp-status[data-state='waiting'] .sdp-status__icon {
+  color: var(--sdp-warn);
+}
+.sdp-status[data-state='lost'] .sdp-status__icon {
+  color: var(--sdp-fail);
+}
+.sdp-status[data-state='lost'] {
+  border-color: color-mix(in srgb, var(--sdp-fail) 60%, transparent);
+}
+.sdp-devices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.sdp-devices li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.sdp-devices li[data-holds] {
+  border-color: var(--accent);
+  border-left-width: 4px;
+}
+.sdp-devices__name {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.sdp-devices__name > span {
+  display: grid;
+  min-width: 0;
+}
+.sdp-devices__name b {
+  color: var(--text-0);
+  overflow-wrap: anywhere;
+}
+.sdp-devices__name small {
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.sdp-sound__local {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Names ---------- */
+.sdp-filter {
+  display: grid;
+  gap: 4px;
+}
+.sdp-filter__label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.sdp-people,
+.sdp-links,
+.sdp-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.sdp-people {
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+.sdp-person,
+.sdp-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken-soft, transparent);
+}
+.sdp-person[data-status='hidden'],
+.sdp-person[data-status='offstage'] {
+  border-style: dashed;
+}
+.sdp-person[data-away] .sdp-person__name {
+  color: var(--text-2);
+}
+.sdp-person__who,
+.sdp-link__who {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 140px;
+}
+.sdp-person__name,
+.sdp-link__who b {
+  color: var(--text-0);
+  overflow-wrap: anywhere;
+}
+.sdp-person[data-status='hidden'] .sdp-person__name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.sdp-person__tags,
+.sdp-link__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sdp-link__who small {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-person__actions,
+.sdp-link__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sdp-person__edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.sdp-person__edit .dc-input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.sdp-link[data-revoked] {
+  opacity: 0.7;
+}
+
+/* ---------- Crew & log ---------- */
+.sdp-linkrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sdp-linkrow__url {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  font-family: var(--font-tech, ui-monospace, monospace);
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.sdp-issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: end;
+}
+.sdp-issue > .dc-btn {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+.sdp-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.sdp-confirm--block {
+  display: grid;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--sdp-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--sdp-warn) 10%, transparent);
+}
+.sdp-confirm__q {
+  margin: 0;
+  flex: 1 1 100%;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-0);
+}
+.sdp-logwrap {
+  max-height: min(46vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.sdp-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sdp-log__item {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--panel-divider, var(--line));
+  font-size: var(--fs-sm);
+}
+.sdp-log__item:last-child {
+  border-bottom: 0;
+}
+.sdp-log__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-0);
+}
+.sdp-log__meta time {
+  font-family: var(--font-num);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-log__role {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-log__what {
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.sdp-log__why {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-log__item[data-action$='refused'] .sdp-log__what::before {
+  content: '✕ ' / '';
+  color: var(--sdp-fail);
+}
+
+/* ---------- Preflight ---------- */
+.sdp-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--line-strong, var(--line));
+  background: var(--surface-sunken);
+}
+.sdp-verdict__word {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.08em;
+  color: var(--text-0);
+}
+.sdp-verdict__sub {
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.sdp-verdict[data-verdict='go'],
+.sdp-verdict[data-verdict='go-warn'] {
+  border-color: var(--sdp-ok);
+}
+.sdp-verdict[data-verdict='go'] .sdp-verdict__word::before,
+.sdp-verdict[data-verdict='go-warn'] .sdp-verdict__word::before {
+  content: '✓ ' / '';
+  color: var(--sdp-ok);
+}
+.sdp-verdict[data-verdict='nogo'] {
+  border-color: var(--sdp-fail);
+}
+.sdp-verdict[data-verdict='nogo'] .sdp-verdict__word::before {
+  content: '✕ ' / '';
+  color: var(--sdp-fail);
+}
+.sdp-verdict[data-verdict='notready'] {
+  border-color: var(--sdp-warn);
+}
+.sdp-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'icon body'
+    'icon act';
+  gap: 4px 10px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.sdp-check__icon {
+  grid-area: icon;
+  margin-top: 1px;
+  color: var(--text-2);
+}
+.sdp-check[data-state='ok'] .sdp-check__icon {
+  color: var(--sdp-ok);
+}
+.sdp-check[data-state='warn'] .sdp-check__icon {
+  color: var(--sdp-warn);
+}
+.sdp-check[data-state='fail'] {
+  border-color: color-mix(in srgb, var(--sdp-fail) 70%, transparent);
+  background: color-mix(in srgb, var(--sdp-fail) 8%, transparent);
+}
+.sdp-check[data-state='fail'] .sdp-check__icon {
+  color: var(--sdp-fail);
+}
+.sdp-check[data-state='todo'] .sdp-check__icon,
+.sdp-check[data-state='wait'] .sdp-check__icon {
+  border-style: dashed;
+}
+.sdp-check__body {
+  grid-area: body;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sdp-check__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-0);
+}
+.sdp-check__state {
+  font-size: var(--fs-2xs, 10px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.sdp-check__detail {
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.sdp-check__fix {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-0);
+}
+.sdp-check__extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-check__act {
+  grid-area: act;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sdp-check__act:empty {
+  display: none;
+}
+
+/* ---------- The crew screen ---------- */
+.sdp-crewview__grid {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  grid-template-areas:
+    'bar bar'
+    'note tools'
+    'stage tools';
+  align-items: start;
+}
+.sdp-crewbar {
+  grid-area: bar;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--hud-bg-strong, var(--panel-bg));
+  border: 1px solid var(--hud-border, var(--line));
+}
+.sdp-crewbar__who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sdp-crewbar__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.sdp-crewbar__roles {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--text-0);
+}
+.sdp-crewbar__where {
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.sdp-crewnote {
+  grid-area: note;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.sdp-crewview__stage {
+  grid-area: stage;
+  min-width: 0;
+}
+.sdp-crewview__stage .sd-preview {
+  border-radius: var(--radius);
+}
+.sdp-crewview__tools {
+  grid-area: tools;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.sdp-crewview__tools > .sdp-panel,
+.sdp-crewview__panel > .sdp-panel {
+  padding: 14px;
+  border-radius: var(--panel-radius, var(--radius-lg));
+  background: var(--panel-bg);
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+}
+@media (max-width: 899px) {
+  .sdp-crewview__grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'bar'
+      'note'
+      'stage'
+      'tools';
+  }
+}
+@media (max-width: 480px) {
+  .sdp-issue {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sdp-crewview__tools > .sdp-panel,
+  .sdp-crewview__panel > .sdp-panel {
+    padding: 10px;
+  }
+}
+@media (pointer: coarse) {
+  .sdp-panel .dc-btn {
+    min-height: 44px;
+  }
+}
+
+/* ---------- The lobby's "Crew & checks" section ---------- */
+.sdp-lobbycrew {
+  display: grid;
+  gap: 12px;
+}
+.sdp-lobbycrew > .sdp-panel {
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken-soft, transparent);
+}
+.sdp-crewchecks {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sdp-crewchecks > .dc-field__label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ADM-01: after the settings-only preset, the show file is the next step — said in words. */
+.sdp-showfile-prompt {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text-0);
+}
+.sdp-showfile-prompt p {
+  margin: 0;
+}
+.sdp-showfile-prompt svg {
+  color: var(--warning);
+}
+.sdc-presets__status > p {
+  margin: 0;
+}
+
+/* ---------- The round editor's show file (ADM-01) ---------- */
+.sdp-showfile {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--surface-sunken);
+}
+.sdp-showfile__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--label-tracking, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-0);
+}
+.sdp-showfile .sd-muted {
+  margin: 0;
+}
+.sdp-showfile__status {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+}
+.sdp-showfile__status[data-ok='false'] b {
+  color: var(--danger);
+}
+@media (pointer: coarse) {
+  .sdp-strip__head .dc-btn {
+    min-height: 44px;
+  }
+}
+
+/* Inside the console's drawer the tab already names the panel: keep the heading for screen readers only. */
+.sdc-drawer .sdp-panel > .sd-panel__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A narrow rail (1024×768: 240 px): the shortcut hints go (the console's key legend lists K / D / A),
+   and the buttons tighten so Mark done / No answer and the three reroll reasons fit on one row each. */
+@container sdp-strip (max-width: 259px) {
+  .sdp-strip__row .dc-kbd {
+    display: none;
+  }
+  .sdp-strip__row > .dc-btn {
+    padding-inline: 4px;
+    gap: 4px;
+  }
+  .sdp-strip__row--3 > .dc-btn {
+    padding-inline: 2px;
+    font-size: var(--fs-xs);
+    white-space: normal;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .sdp-hot__name {
+    font-size: var(--fs-md);
+  }
+}
