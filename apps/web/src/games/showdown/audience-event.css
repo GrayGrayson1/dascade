@@ -1,0 +1,615 @@
+/* =====================================================================
+ * DAS Survey Showdown — the guest's side of an event room:
+ *   .sdj   the event join screen at /r/<code> (JOI-01 B, JOI-03 B) and its live name tag
+ *   .sdg   the phone companion: the pool card + Skip me (DSP-03 B, PCK-03 C), the "… is answering"
+ *          strip and the "You're up!" alert
+ *
+ * The join screen is the show's front door: the Halloween stage sky behind it (show art, like the
+ * stage) and a DASCADE panel for the form, so text and controls keep each theme's contrast. The show
+ * palette comes from the --sd-* look variables (showdown.css) with the original colours as fallbacks —
+ * the join page loads before the game's stylesheet. Numbers use --font-num. Nothing here flashes;
+ * motion is off with reduced motion / effects off ([data-motion='off'] and the global rule).
+ * ===================================================================== */
+
+/* ---------- The show palette for these screens (look variables, original colours as fallbacks) ---------- */
+.sdj,
+.sdj-tag {
+  --sdj-sky-top: var(--sd-sky-top, #2a1150);
+  --sdj-sky-bottom: var(--sd-sky-bottom, #07030f);
+  --sdj-ink: var(--sd-ink, #fff3e0);
+  --sdj-ink-dim: var(--sd-ink-dim, #d8c3f0);
+  --sdj-gold: var(--sd-gold, #ff9a3c);
+  --sdj-hot: var(--sd-hot, #b26bff);
+  --sdj-frame-a: var(--sd-frame-a, #ffb366);
+  --sdj-frame-b: var(--sd-frame-b, #6e27c9);
+  --sdj-tile-a: var(--sd-tile-a, #3d1868);
+  --sdj-tile-b: var(--sd-tile-b, #150828);
+  --sdj-face-a: var(--sd-face-a, #ffc164);
+  --sdj-face-b: var(--sd-face-b, #ff7b1c);
+  --sdj-face-ink: var(--sd-face-ink, #24092e);
+  --sdj-edge: var(--sd-panel-edge, #ff9a3c66);
+  --sdj-title-font: var(--sd-title-font, 'Creepster', var(--font-display));
+}
+.sdj[data-look='showtime'],
+.sdj-tag[data-look='showtime'] {
+  --sdj-sky-top: var(--sd-sky-top, #1b0a3c);
+  --sdj-sky-bottom: var(--sd-sky-bottom, #05030f);
+  --sdj-ink: var(--sd-ink, #fff8ec);
+  --sdj-ink-dim: var(--sd-ink-dim, #c9bfe6);
+  --sdj-gold: var(--sd-gold, #ffd36b);
+  --sdj-hot: var(--sd-hot, #ff4fd8);
+  --sdj-frame-a: var(--sd-frame-a, #ffe9a3);
+  --sdj-frame-b: var(--sd-frame-b, #b07a1a);
+  --sdj-tile-a: var(--sd-tile-a, #2047d6);
+  --sdj-tile-b: var(--sd-tile-b, #0a1660);
+  --sdj-face-a: var(--sd-face-a, #4c95ff);
+  --sdj-face-b: var(--sd-face-b, #1747d1);
+  --sdj-face-ink: var(--sd-face-ink, #ffffff);
+  --sdj-edge: var(--sd-panel-edge, #ffd36b66);
+  --sdj-title-font: var(--sd-title-font, 'Audiowide', var(--font-display));
+}
+
+/* =====================================================================
+ * The event join screen
+ * ===================================================================== */
+.sdj {
+  min-height: 100dvh;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding: max(16px, var(--safe-top, 0px)) max(16px, var(--safe-right, 0px)) max(24px, var(--safe-bottom, 0px))
+    max(16px, var(--safe-left, 0px));
+  color: var(--sdj-ink);
+  background:
+    radial-gradient(70% 38% at 50% 0%, color-mix(in srgb, var(--sdj-hot) 40%, transparent), transparent 72%),
+    radial-gradient(120% 50% at 50% 110%, color-mix(in srgb, var(--sdj-gold) 18%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--sdj-sky-top), var(--sdj-sky-bottom) 78%);
+  background-attachment: fixed;
+}
+@media (min-height: 760px) and (min-width: 700px) {
+  .sdj {
+    align-content: center;
+  }
+}
+.sdj__card {
+  width: min(100%, 540px);
+  display: grid;
+  gap: 12px;
+}
+
+/* The show, from the meeting link */
+.sdj__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.sdj__mark {
+  flex: none;
+  font-size: 34px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sdj-gold) 60%, transparent));
+}
+.sdj__heading {
+  min-width: 0;
+}
+.sdj__show {
+  margin: 0;
+  font-family: var(--sdj-title-font);
+  font-size: 26px;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--sdj-gold);
+  text-shadow: 0 2px 0 #0008;
+  overflow-wrap: anywhere;
+}
+.sdj__badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  color: #1a0800;
+  font: 800 11px/1.2 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: none;
+  vertical-align: middle;
+}
+.sdj__room {
+  margin: 3px 0 0;
+  font: 600 14px/1.3 var(--font-ui);
+  color: var(--sdj-ink-dim);
+}
+.sdj__room svg {
+  margin-right: 2px;
+  vertical-align: -2px;
+  color: var(--success);
+}
+.sdj__code {
+  font-family: var(--font-num);
+  letter-spacing: 0.12em;
+  color: var(--sdj-ink);
+}
+
+/* The form: a DASCADE panel with a pumpkin top edge */
+.sdj__form {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--panel-radius, var(--radius-lg));
+  background: var(--panel-bg-opaque, var(--panel-bg-solid, var(--panel-bg)));
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-top: 4px solid var(--sdj-gold);
+  box-shadow:
+    var(--panel-shadow, none),
+    0 18px 50px #0007;
+  color: var(--text-1);
+}
+.sdj__note {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: var(--fs-sm);
+  color: var(--text-0);
+}
+.sdj__ask {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-0);
+}
+.sdj__ask label {
+  cursor: pointer;
+}
+.sdj .sdj__input {
+  min-height: 60px;
+  padding: 0 16px;
+  font-size: 24px;
+  font-weight: 800;
+  border-width: 3px;
+  border-color: color-mix(in srgb, var(--sdj-gold) 70%, var(--input-border));
+  border-radius: 14px;
+}
+.sdj .sdj__input:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.sdj .sdj__input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.sdj__help {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text-1);
+}
+.sdj__error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-0);
+}
+/* Empty live regions stay in the page (so they're announced) but take no room (block flow, no gaps). */
+.sdj-field {
+  display: block;
+  min-width: 0;
+}
+.sdj__error:not(:empty) {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.sdj__error svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+/* JOI-03 B: the duplicate prompt, inline under the field */
+.sdj-dup[data-open] {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text-0);
+}
+.sdj-dup__msg {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.sdj-dup__msg b {
+  font-weight: 800;
+}
+.sdj-dup__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.sdj-dup__initial {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.sdj .sdj-dup__field {
+  width: 56px;
+  min-height: 48px;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-width: 3px;
+  border-radius: 10px;
+}
+.sdj .sdj-dup__keep {
+  margin: 0;
+  padding: 0 6px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* You might be picked · Skip me */
+.sdj-skip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken-soft, color-mix(in srgb, var(--text-0) 6%, transparent));
+}
+.sdj-skip__text {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text-1);
+}
+.sdj-skip__text b {
+  color: var(--text-0);
+}
+.sdj-skip__switch {
+  flex: none;
+  min-height: 44px;
+}
+.sdj-skip__switch .dc-toggle__label {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-0);
+  white-space: nowrap;
+}
+.sdj .sdj__go {
+  margin: 2px 0 0;
+  min-height: 56px;
+  font-size: 19px;
+}
+.sdj__fine {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* ---------- The live name tag (show art: the hot-seat podium and a picker seat) ---------- */
+.sdj-tag {
+  margin: 0;
+  display: grid;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
+  color: var(--sdj-ink);
+  background:
+    radial-gradient(90% 70% at 30% 0%, color-mix(in srgb, var(--sdj-hot) 26%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--sdj-sky-top), var(--sdj-sky-bottom));
+  border: 2px solid var(--sdj-edge);
+}
+.sdj-tag__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+.sdj-tag__where {
+  min-width: 0;
+}
+.sdj-tag__label {
+  display: block;
+  margin-bottom: 6px;
+  font: 600 11px/1 var(--font-ui);
+  color: var(--sdj-ink-dim);
+}
+.sdj-podium {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 8px 9px;
+  border-radius: 12px 12px 6px 6px;
+  background: linear-gradient(180deg, var(--sdj-tile-a), var(--sdj-tile-b));
+  border: 3px solid var(--sdj-frame-a);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--sdj-gold) 35%, transparent);
+  min-width: 0;
+}
+.sdj-podium__kicker {
+  font: 800 10px/1 var(--font-ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sdj-frame-a);
+}
+.sdj-podium__name {
+  max-width: 100%;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: calc(24px * min(1, calc(10 / var(--len, 8))));
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--sdj-ink);
+}
+.sdj-seat {
+  padding: 9px 8px;
+  border-radius: 10px 10px 5px 5px;
+  background: linear-gradient(180deg, var(--sdj-face-a), var(--sdj-face-b));
+  border: 2px solid color-mix(in srgb, var(--sdj-face-a) 50%, #fff);
+  box-shadow: 0 4px 0 #12051f;
+  color: var(--sdj-face-ink);
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: calc(17px * min(1, calc(8 / var(--len, 8))));
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sdj-tag[data-empty] .sdj-podium__name,
+.sdj-tag[data-empty] .sdj-seat {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* Laptops: a little more room for the preview */
+@media (min-width: 700px) {
+  .sdj__form {
+    padding: 22px 24px;
+    gap: 14px;
+  }
+  .sdj__ask {
+    font-size: 28px;
+  }
+  .sdj__show {
+    font-size: 34px;
+  }
+}
+
+/* =====================================================================
+ * The phone companion (Presenter Showcase audience)
+ * ===================================================================== */
+.sdg-bar {
+  display: block;
+}
+/* The strip's live region stays mounted while empty (so it's announced when it fills) and takes no room. */
+.sdg-pick:not(:empty) + .sdg-pool {
+  margin-top: 10px;
+}
+/* Phones: above the mini board (no space left over when there's nothing to show). */
+.sd-aud__main > .sdg-bar {
+  margin-bottom: 12px;
+}
+.sd-aud__main > .sdg-bar:not(:has(.sdg-strip, .sdg-pool)) {
+  margin-bottom: 0;
+}
+
+/* The pool card: an icon and words for every state (never colour alone) */
+.sdg-pool {
+  --sdg-state: var(--success);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  border-left: 6px solid var(--sdg-state);
+}
+.sdg-pool[data-state='skip'],
+.sdg-pool[data-state='out'] {
+  --sdg-state: var(--text-3);
+}
+.sdg-pool[data-state='done'] {
+  --sdg-state: var(--info);
+}
+.sdg-pool[data-state='hot'] {
+  --sdg-state: var(--warning);
+}
+.sdg-pool__icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sdg-state) 22%, transparent);
+  color: var(--sdg-state);
+}
+.sdg-pool__text {
+  margin: 0;
+  min-width: 0;
+}
+.sdg-pool__text b {
+  display: block;
+  font-size: var(--fs-md);
+  line-height: 1.3;
+  color: var(--text-0);
+}
+.sdg-pool__text small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.sdg-pool__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.sdg-pool__me {
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.sdg-pool__me b {
+  color: var(--text-0);
+}
+.sdg-pool__skip {
+  min-height: 44px;
+  margin-left: auto;
+}
+.sdg-pool__skip .dc-toggle__label {
+  font-weight: 800;
+  color: var(--text-0);
+  white-space: nowrap;
+}
+/* Compact (the lobby): one row — icon, the headline, the switch */
+.sdg-pool[data-compact] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 8px 12px;
+}
+.sdg-pool[data-compact] .sdg-pool__icon {
+  grid-row: auto;
+  width: 30px;
+  height: 30px;
+}
+.sdg-pool[data-compact] .sdg-pool__text b {
+  font-size: var(--fs-sm);
+}
+
+/* "<name> is answering" / "You're answering" */
+.sdg-strip {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--sd-face-a, #ffc164), var(--sd-face-b, #ff7b1c));
+  color: var(--sd-face-ink, #24092e);
+  font-size: var(--fs-md);
+  line-height: 1.3;
+  box-shadow: 0 4px 14px #0005;
+  overflow-wrap: anywhere;
+}
+.sdg-strip b {
+  font-weight: 900;
+}
+.sdg-strip__icon {
+  flex: none;
+  font-size: 22px;
+  line-height: 1;
+}
+.sdg-strip[data-mine] {
+  background: linear-gradient(180deg, var(--sd-frame-a, #ffb366), var(--sd-gold, #ff9a3c));
+}
+
+/* "You're up, <name>!" — full screen, text first, no flashing */
+.sdg-up {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 200);
+  display: grid;
+  place-items: center;
+  padding: max(24px, var(--safe-top, 0px)) 20px max(24px, var(--safe-bottom, 0px));
+  overflow-y: auto;
+  text-align: center;
+  color: var(--sd-ink, #fff3e0);
+  background:
+    radial-gradient(70% 55% at 50% 42%, color-mix(in srgb, var(--sd-frame-b, #6e27c9) 92%, transparent), transparent 100%),
+    linear-gradient(180deg, var(--sd-sky-top, #2a1150), var(--sd-sky-bottom, #07030f));
+}
+.sdg-up__card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(100%, 460px);
+}
+.sdg-up__icon {
+  font-size: 60px;
+  line-height: 1;
+}
+.sdg-up__kicker {
+  margin: 0;
+  font-family: var(--sd-title-font, 'Creepster', var(--font-display));
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--sd-gold, #ff9a3c);
+}
+.sdg-up__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: clamp(34px, 11vw, 56px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.sdg-up__text {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--sd-ink-dim, #d8c3f0);
+}
+.sdg-up .sdg-up__ok {
+  min-width: 180px;
+  min-height: 56px;
+  margin-top: 6px;
+  font-size: 19px;
+}
+.sdg-up[data-motion='on'] {
+  animation: sdg-up-in 360ms var(--ease-out) both;
+}
+.sdg-up[data-motion='on'] .sdg-up__card {
+  animation: sdg-up-rise 520ms var(--ease-spring) both;
+}
+@keyframes sdg-up-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sdg-up-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdg-up,
+  .sdg-up .sdg-up__card {
+    animation: none;
+  }
+}

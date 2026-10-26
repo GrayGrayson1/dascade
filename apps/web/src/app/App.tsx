@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router';
-import { normalizeRoomCode } from '@dascade/shared';
+import { isValidRoomCode, normalizeRoomCode } from '@dascade/shared';
 import { Spinner } from '@dascade/ui';
 import { ArcadeFloor } from '../arcade/ArcadeFloor.tsx';
 import { Toasts } from '../shell/Toasts.tsx';
@@ -9,6 +9,7 @@ import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
 import { SeasonalHost } from '../themes/SeasonalHost.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { useApp } from './store.ts';
+import { deviceHasSeat } from '../games/showdown/joinNames.ts';
 
 // Everything beyond the arcade floor is code-split so the landing page stays light
 // (the networking SDK loads when you pick a cabinet, game code when you enter a room).
@@ -17,6 +18,8 @@ const RoomScreen = lazy(() => import('../shell/RoomScreen.tsx').then((m) => ({ d
 const NotFoundScreen = lazy(() => import('../shell/RoomScreen.tsx').then((m) => ({ default: m.NotFoundScreen })));
 const CabinetPicker = lazy(() => import('../shell/CabinetPicker.tsx').then((m) => ({ default: m.CabinetPicker })));
 const TournamentCenter = lazy(() => import('../tournament/TournamentCenter.tsx').then((m) => ({ default: m.TournamentCenter })));
+// The event join screen behind /r/<code> (DAS Survey Showdown event rooms; it looks the room up first).
+const EventJoinRoute = lazy(() => import('../games/showdown/EventJoin.tsx').then((m) => ({ default: m.EventJoinRoute })));
 // The Presenter Tour for DAS Survey Showdown: a standalone page (no room, no connection).
 const ShowdownTour = lazy(() => import('../games/showdown/tour/TourPage.tsx').then((m) => ({ default: m.TourPage })));
 const GlobalModals = lazy(() => import('../shell/modals.tsx').then((m) => ({ default: m.GlobalModals })));
@@ -28,9 +31,16 @@ const Jukebox = lazy(() =>
   ),
 );
 
+/**
+ * /r/<code>, the short join link. A device that already holds a seat there (a refresh, the link opened
+ * again) goes straight back into the room; otherwise an event room shows its one-field join screen and
+ * every other room opens as before (the screen looks the room up and redirects).
+ */
 function JoinRedirect() {
-  const { code } = useParams();
-  return <Navigate to={`/room/${normalizeRoomCode(code ?? '')}`} replace />;
+  const { code: raw } = useParams();
+  const code = normalizeRoomCode(raw ?? '');
+  if (!isValidRoomCode(code) || deviceHasSeat(code)) return <Navigate to={`/room/${code}`} replace />;
+  return <EventJoinRoute code={code} />;
 }
 
 function RouteFallback() {
