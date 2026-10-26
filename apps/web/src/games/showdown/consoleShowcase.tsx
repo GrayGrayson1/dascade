@@ -1,17 +1,26 @@
 /**
  * The Presenter Showcase console — one person runs a Top-10 board for a crowd in a meeting, alone,
- * while reading the meeting chat. Built for one glance and one click:
+ * while reading the meeting chat. Built for one glance and one click (PRS-01 A, "Command Center"):
  *
- *   - the answer sheet (the ten answers, the special one marked) and a huge WRONG button,
- *   - the round clock and "Reveal remaining" (#10 → #1, run by the server),
- *   - one "Next step" line that always says what to do now,
- *   - stage cards, sound cues, undo / restart, the live stage preview.
+ *   - the answer sheet on the left (the ten answers, the special one marked), with the rundown and
+ *     this round's counts under it;
+ *   - the rail: a huge WRONG, the round clock, Reveal remaining, Undo / Next and the picker;
+ *   - a pinned stage preview over a tabbed drawer (Picker, Sound, Cards, Fix, and for the crew:
+ *     Names, Crew & log, Preflight), so nothing needs scrolling at 1280×720;
+ *   - one "Next step" line that always says what to do now.
  *
- * This is the presenter's private screen: it is never shared (the stage window is). Only the
- * presenter's connection ever receives the answer sheet. Every command carries the board revision
- * (or the round) it was made against, so a double click or a stale view never applies twice.
+ * Safety (PRS-02 D, PRS-03 D): every tile flips on the first click, except the special answer, which
+ * arms and waits for TAKE SPECIAL (Space). Actions Undo can take back are press-and-hold (Restart
+ * round / show, Reveal remaining while the clock runs) or act at once with an undo toast (Next or
+ * Skip with answers still hidden). Ending the show — the one thing Undo can't bring back — takes an
+ * inline two-step panel that names what's still hidden and a 1.2 s hold. No modal dialog mid-show.
+ *
+ * This is the presenter's private screen (PRS-05 C): a striped PRIVATE band, a red frame and the tab
+ * title "🔒 PRESENTER — don't share". Only the presenter's connection ever receives the answer sheet.
+ * Every command carries the board revision (or the round) it was made against, so a double click or
+ * a stale view never applies twice.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import {
   SHOWDOWN_CUES,
   SHOWDOWN_CUE_INFO,
@@ -28,26 +37,52 @@ import {
   type ShowdownSheet,
   type ShowdownSheetRound,
 } from '@dascade/shared/games/showdown';
-import { Badge, Button, Kbd, Modal, PixelIcon, Toggle, cx } from '@dascade/ui';
+import { Badge, Button, Kbd, PixelIcon, Toggle } from '@dascade/ui';
 import { serverNow, session, useRoomSelector } from '../../net/hooks.ts';
 import { Stage } from './Stage.tsx';
 import { useShowFeed } from './fx.ts';
 import { useStageWindow } from './stageWindow.ts';
+import { AudioStatus, PresenterTools, PrivateBand, StageCards, StageWindowButton, usePresenterWindowChrome } from './consoleParts.tsx';
 import {
-  AudioStatus,
-  BigScreenLinkButton,
-  PresenterTools,
-  ShowSoundToggle,
-  StageCards,
-  StageWindowButton,
-  ThemeMusicToggle,
-} from './consoleParts.tsx';
-import { formatClock, useBoard, useCard, useClock, usePass, useRehearsal, useSheet, useSweep } from './state.ts';
+  formatClock,
+  useBoard,
+  useCard,
+  useClock,
+  useCrew,
+  useEvent,
+  usePass,
+  usePicker,
+  useRehearsal,
+  useSheet,
+  useShowSounds,
+  useStation,
+  useSweep,
+  useThemeMusicPref,
+  type PickerView,
+} from './state.ts';
+import { CREW_TAB_LABEL, CrewPanel, NamesPanel, PickerPanel, PickerStrip, PreflightPanel, SoundPanel, crewTabs } from './panels/index.ts';
+import { StationBadge } from './StationBadge.tsx';
+import { ConsoleDrawer, type DrawerTab } from './ConsoleDrawer.tsx';
+import { HoldButton, type HoldButtonHandle } from './HoldButton.tsx';
+import { UndoToast, useUndoOffer } from './UndoToast.tsx';
+import { EndShowPanel, type EndKind } from './EndShowPanel.tsx';
+import {
+  HOLD_MS,
+  DIALOG_SELECTOR,
+  armSpecial,
+  armedStillValid,
+  digitSlot,
+  ignoreKey,
+  isSpace,
+  spaceOnArmed,
+  sweepNeedsHold,
+  tileAction,
+  type ArmedSpecial,
+} from './consoleSafety.ts';
 import { TourButton } from './tour/TourButton.tsx';
 import './chrome-showcase.css';
 
 type BoardAct = 'begin' | 'question' | 'next' | 'undo' | 'finish' | 'restart' | 'reset';
-type Confirm = null | 'end' | 'next' | 'finish' | 'restart' | 'reset' | 'sweep';
 
 const STAGE_LABEL: Record<string, string> = {
   intro: 'Opening',
@@ -79,7 +114,23 @@ function useTimeUp(): boolean {
   return max > 0 && left <= 0;
 }
 
+/**
+ * Some dialog owns the keyboard: a native one, or a visible ARIA modal (the jukebox player is a
+ * `div role="dialog" aria-modal`). The console's shortcuts rest until it closes.
+ */
+function dialogOpen(): boolean {
+  if (document.querySelector('dialog[open]')) return true;
+  for (const el of document.querySelectorAll<HTMLElement>('[aria-modal="true"]')) if (el.getClientRects().length > 0) return true;
+  return false;
+}
+
+const hiddenCount = (b: ShowdownBoardView | null) => (b ? b.slots.filter((s) => !s.revealed).length : 0);
+const isLast = (b: ShowdownBoardView) => b.round >= b.totalRounds - 1;
+const canSweep = (b: ShowdownBoardView, sweeping: boolean) => b.stage === 'live' && !sweeping && hiddenCount(b) > 0;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
 export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
+  usePresenterWindowChrome();
   const board = useBoard();
   const sheet = useSheet();
   const pass = usePass();
@@ -87,14 +138,31 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const rehearsal = useRehearsal();
   const card = useCard();
   const timeUp = useTimeUp();
+  const picker = usePicker();
+  const event = useEvent();
+  const station = useStation();
+  const crew = useCrew();
+  const crewTabIds = crewTabs(crew?.perms ?? []);
   const running = useRoomSelector<ShowdownPublicState, boolean>((s) => (s.clockEndsAt ?? 0) > 0) ?? false;
   const clockMax = useRoomSelector<ShowdownPublicState, number>((s) => s.clockMax) ?? 0;
   const stageWin = useStageWindow();
-  const [confirm, setConfirm] = useState<Confirm>(null);
   const title = settings ? showTitle(settings) : 'DAS Survey Showdown';
 
-  const live = useRef({ board, sheet, sweeping, confirm, running, timeUp, clockMax });
-  live.current = { board, sheet, sweeping, confirm, running, timeUp, clockMax };
+  const [armed, setArmedState] = useState<ArmedSpecial | null>(null);
+  const [panel, setPanel] = useState<EndKind | null>(null);
+  const [announce, setAnnounce] = useState('');
+  const undo = useUndoOffer(board?.rev ?? -1, sheet?.undo ?? 0);
+  const sweepHold = useRef<HoldButtonHandle>(null);
+  const panelOpener = useRef<HTMLElement | null>(null);
+  const armedRef = useRef<ArmedSpecial | null>(null);
+
+  const live = useRef({ board, sheet, sweeping, running, timeUp, picker, panel });
+  live.current = { board, sheet, sweeping, running, timeUp, picker, panel };
+
+  const setArmed = useCallback((next: ArmedSpecial | null) => {
+    armedRef.current = next;
+    setArmedState(next);
+  }, []);
 
   const send = useCallback((payload: ShowdownActPayload) => session.send(SHOWDOWN_MSG.act, payload), []);
   const act = useCallback(
@@ -118,73 +186,183 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   }, [send]);
   const clockOp = useCallback((op: ShowdownClockOp) => send({ a: 'clock', op }), [send]);
   const cue = useCallback((c: ShowdownCue) => session.send(SHOWDOWN_MSG.cue, { cue: c }), []);
-
-  const hiddenCount = (b: ShowdownBoardView | null) => (b ? b.slots.filter((s) => !s.revealed).length : 0);
-  const isLast = (b: ShowdownBoardView) => b.round >= b.totalRounds - 1;
-
-  /** Reveal remaining: asks first while the clock still has time on it (a stray R would end the round). */
-  const requestSweep = useCallback(() => {
-    const { board: b, sweeping: on, running: r, timeUp: up } = live.current;
-    if (!b || on || hiddenCount(b) === 0 || b.stage !== 'live') return;
-    if (r && !up) return setConfirm('sweep');
-    send({ a: 'sweep', round: b.round });
-  }, [send]);
   const halt = useCallback(() => send({ a: 'halt' }), [send]);
 
-  /** Next: start round 1, or the next round — asking first when answers would stay hidden or the show would end. */
+  // ---- PRS-02: the special arms; TAKE SPECIAL (Space) sends it ----
+  const onTile = useCallback(
+    (slot: number) => {
+      const { board: b, sweeping: on } = live.current;
+      if (!b) return;
+      const what = tileAction(b, slot, on);
+      if (what === 'reveal') reveal(slot);
+      else if (what === 'arm' && !armedRef.current) {
+        setArmed(armSpecial(b, slot, on));
+        setAnnounce(
+          `Special answer number ${slot + 1} armed. Nobody sees it yet. Press Space or Take special to reveal it; Escape disarms.`,
+        );
+      }
+    },
+    [reveal, setArmed],
+  );
+  const take = useCallback(() => {
+    const a = armedRef.current;
+    if (!a) return;
+    setArmed(null);
+    reveal(a.slot);
+  }, [reveal, setArmed]);
+  const disarm = useCallback(() => {
+    if (!armedRef.current) return;
+    setArmed(null);
+    setAnnounce('Special answer disarmed.');
+  }, [setArmed]);
+  // The armed special stands only on its own round and stage, outside a sweep, while it's hidden.
+  useEffect(() => {
+    if (armed && !armedStillValid(armed, board, sweeping)) {
+      setArmed(null);
+      setAnnounce('Special answer disarmed.');
+    }
+  }, [armed, board, sweeping, setArmed]);
+
+  // ---- PRS-03: holds, the End show panel, the undo toast ----
+  const sweepNow = useCallback(() => {
+    const { board: b, sweeping: on } = live.current;
+    if (b && canSweep(b, on)) send({ a: 'sweep', round: b.round });
+  }, [send]);
+
+  const openPanel = useCallback((kind: EndKind) => {
+    const active = document.activeElement;
+    if (!live.current.panel) panelOpener.current = active instanceof HTMLElement ? active : null;
+    setPanel(kind);
+  }, []);
+  const closePanel = useCallback(() => {
+    setPanel(null);
+    const opener = panelOpener.current;
+    const active = document.activeElement;
+    // Back to the button that opened it (if focus was in the panel, or nowhere).
+    requestAnimationFrame(() => {
+      if (opener?.isConnected && (!active || active === document.body || active.closest('.sdc-endpanel'))) opener.focus();
+    });
+  }, []);
+  // The panel belongs to the board it was opened on.
+  const panelRound = board?.round;
+  useEffect(() => {
+    setPanel(null);
+  }, [panelRound]);
+
+  /** Next: start round 1, or the next round — at once, with an undo toast when answers stay hidden. */
   const requestNext = useCallback(() => {
     const b = live.current.board;
     if (!b) return;
     if (b.stage === 'intro') return act('begin');
-    if (isLast(b)) return setConfirm('finish');
-    if (hiddenCount(b) > 0) return setConfirm('next');
+    if (isLast(b)) return openPanel('finish');
+    const hidden = hiddenCount(b);
+    if (hidden > 0) {
+      if (b.stage === 'title') undo.open(`Skipped round ${b.round + 1}`, 'Its answers stay hidden.', b.rev);
+      else undo.open(`Moved on to round ${b.round + 2}`, `${plural(hidden, 'answer')} stayed hidden.`, b.rev);
+    }
     act('next');
-  }, [act]);
+  }, [act, openPanel, undo]);
 
-  // Keyboard shortcuts: no auto-repeat, ignored while typing or with a dialog open, and a key only
-  // sends what its button would allow (a refused command would just beep).
+  const restartRound = useCallback(() => {
+    const b = live.current.board;
+    if (!b || b.round < 0) return;
+    undo.open(`Round ${b.round + 1} restarted`, 'Every answer went back under its tile.', b.rev);
+    act('restart');
+  }, [act, undo]);
+  const restartShow = useCallback(() => {
+    const b = live.current.board;
+    if (!b || b.stage === 'intro') return;
+    undo.open('The show went back to the opening', 'Every board is hidden again.', b.rev);
+    act('reset');
+  }, [act, undo]);
+
+  // Keyboard shortcuts: no auto-repeat, no chords, ignored while typing or with a dialog open, and a
+  // key only sends what its button would allow (a refused command would just beep). The picker's
+  // K / D / A belong to the PickerStrip in the rail (its own listener; a handled key arrives here
+  // default-prevented and is ignored).
+  //
+  // The listeners mount once: the commands they call change identity (the undo offer moves on), so
+  // they're read through a ref — a re-subscribe mid-hold would lose R's keyup and let the sweep fire.
+  const keyActs = useRef({ act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp });
+  keyActs.current = { act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp };
+  /** Space took the special: its keyup mustn't also press whatever button has focus. */
+  const swallowSpace = useRef(false);
+  /** R is being held (Reveal remaining while the clock runs). */
+  const rHeld = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.altKey || e.metaKey || e.ctrlKey) return;
+      if (ignoreKey(e)) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable]') || t.isContentEditable || t.closest('dialog[open]'))) return;
+      if (t && (t.closest('input, textarea, select, [contenteditable]') || t.isContentEditable || t.closest(DIALOG_SELECTOR))) return;
+      if (dialogOpen()) return;
       const cur = live.current;
-      if (cur.confirm || document.querySelector('dialog[open]')) return;
+      const run = keyActs.current;
       const b = cur.board;
       if (!b) return;
       const k = e.key.toLowerCase();
-      // Digits by key position too, so AZERTY's unshifted top row (&, é, "…) reveals as well.
-      const digit = /^(?:Digit|Numpad)(\d)$/.exec(e.code)?.[1] ?? (/^\d$/.test(k) ? k : null);
-      if (digit !== null) {
-        const slot = digit === '0' ? 9 : Number(digit) - 1;
-        const tile = b.slots[slot];
-        if ((b.stage === 'title' || b.stage === 'live') && tile && !tile.revealed) reveal(slot);
-      } else if (k === 'x') {
-        if (b.stage === 'live' && !cur.sweeping) miss();
-      } else if (k === 'r') {
-        if (cur.sweeping) halt();
-        else requestSweep();
+      const slot = digitSlot(e);
+      if (slot !== null) run.onTile(slot);
+      else if (isSpace(e)) {
+        // Space keeps its usual meaning (press the focused button) unless the special is armed and
+        // focus is nowhere in particular (or on the sheet).
+        if (!armedRef.current || spaceOnArmed(t) !== 'take') return;
+        swallowSpace.current = true;
+        run.take();
       } else if (k === 'escape') {
-        if (!cur.sweeping) return;
-        halt();
-      } else if (k === 'c') cue('celebrate');
+        if (armedRef.current) run.disarm();
+        else if (cur.sweeping) run.halt();
+        else return;
+      } else if (k === 'x') {
+        if (b.stage === 'live' && !cur.sweeping) run.miss();
+      } else if (k === 'r') {
+        if (cur.sweeping) run.halt();
+        else if (!canSweep(b, cur.sweeping)) return;
+        else if (sweepNeedsHold(cur.running, cur.timeUp)) {
+          // While the clock runs, R is a hold (keyup before 0.8 s cancels) — never an instant sweep.
+          if (!sweepHold.current) return;
+          rHeld.current = true;
+          sweepHold.current.start();
+        } else run.sweepNow();
+      } else if (k === 'c') run.cue('celebrate');
       else if (k === 'p') {
         if (b.stage === 'intro') return;
-        clockOp(cur.running ? 'pause' : 'start');
+        run.clockOp(cur.running ? 'pause' : 'start');
       } else if (k === 'q') {
-        if (b.stage === 'intro') act('begin');
-        else if (b.stage === 'title') act('question');
+        if (b.stage === 'intro') run.act('begin');
+        else if (b.stage === 'title') run.act('question');
         else return;
-      } else if (k === 'n') requestNext();
+      } else if (k === 'n') run.requestNext();
       else if (k === 'u') {
-        if ((cur.sheet?.undo ?? 0) > 0) act('undo');
+        if ((cur.sheet?.undo ?? 0) > 0) run.act('undo');
         else return;
       } else return;
       e.preventDefault();
     };
+    const onUp = (e: KeyboardEvent) => {
+      if (isSpace(e) && swallowSpace.current) {
+        swallowSpace.current = false;
+        e.preventDefault();
+      }
+      if (rHeld.current && e.key.toLowerCase() === 'r') {
+        rHeld.current = false;
+        sweepHold.current?.cancel();
+      }
+    };
+    const onBlur = () => {
+      if (rHeld.current) sweepHold.current?.cancel();
+      rHeld.current = false;
+      swallowSpace.current = false;
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [act, reveal, miss, halt, requestSweep, requestNext, cue, clockOp]);
+    // Capture: before the focused button's own keyup (where Space would press it).
+    window.addEventListener('keyup', onUp, true);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onUp, true);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
 
   // The stage preview re-renders on its own feed; keep it out of the console's re-renders.
   const preview = useMemo(() => <Stage look={look} settings={settings} variant="preview" />, [look, settings]);
@@ -196,13 +374,65 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const last = isLast(board);
   const roundTitle = board.title || sheet?.title || '';
   const where = board.round < 0 ? 'Before round 1' : `Round ${board.round + 1} of ${board.totalRounds}`;
-  const confirmDone = (fn: () => void) => () => {
-    setConfirm(null);
-    fn();
-  };
+  const needsHold = sweepNeedsHold(running, timeUp);
+  const armedView = armed && armedStillValid(armed, board, sweeping) ? armed : null;
+  const armedText = armedView && sheet && sheet.round === board.round ? (sheet.answers[armedView.slot]?.text ?? '') : '';
+
+  const tabs: DrawerTab[] = [
+    {
+      id: 'picker',
+      label: 'Picker',
+      icon: 'dice',
+      alert: picker.hotSeat ? `${picker.hotName || 'someone'} is up` : undefined,
+      render: () => <PickerPanel look={look} board={board} />,
+    },
+    { id: 'sound', label: 'Sound', icon: 'music', render: () => <SoundTab look={look} onCue={cue} /> },
+    {
+      id: 'cards',
+      label: 'Cards',
+      icon: 'eye',
+      alert: card ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage` : undefined,
+      render: () => <CardsTab onClock={clockOp} />,
+    },
+    {
+      id: 'fix',
+      label: 'Fix',
+      icon: 'refresh',
+      render: () => (
+        <FixTab
+          board={board}
+          code={code}
+          pass={pass}
+          onRestartRound={restartRound}
+          onRestartShow={restartShow}
+          onUndo={() => act('undo')}
+        />
+      ),
+    },
+  ];
+  if (settings?.audience) tabs.push({ id: 'guesses', label: 'Guesses', icon: 'chat', render: () => <AudienceGuesses sheet={sheet} /> });
+  // Crew tabs, only for those allowed (the server sends the permissions and checks every action again).
+  if (crewTabIds.includes('names')) tabs.push({ id: 'names', label: CREW_TAB_LABEL.names, icon: 'pencil', render: () => <NamesPanel /> });
+  if (crewTabIds.includes('crew'))
+    tabs.push({ id: 'crew', label: CREW_TAB_LABEL.crew, icon: 'crown', render: () => <CrewPanel code={code} /> });
+  if (crewTabIds.includes('preflight'))
+    tabs.push({
+      id: 'preflight',
+      label: CREW_TAB_LABEL.preflight,
+      icon: 'check',
+      render: () => <PreflightPanel look={look} code={code} title={title} />,
+    });
 
   return (
-    <div className="sd-console sdc" data-look={look} data-stage={stage} data-part="showdown-console" data-mode="showcase">
+    <div
+      className="sd-console sdc"
+      data-look={look}
+      data-stage={stage}
+      data-armed={armedView ? 'true' : undefined}
+      data-part="showdown-console"
+      data-mode="showcase"
+    >
+      <PrivateBand />
       <header className="sdc-bar">
         <span className="sd-live" aria-label="Live show">
           <i aria-hidden /> Live
@@ -215,20 +445,25 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
           </span>
         </div>
         {rehearsal ? (
-          <Badge className="sdc-rehearsal" color="var(--warning)" solid title="Demo answers — the real show’s answers are not loaded">
+          <Badge className="sdc-rehearsal" color="var(--warning)" solid title="Practice boards — the real show’s answers are not loaded">
             Rehearsal
           </Badge>
         ) : null}
         <span className="dc-spacer" />
-        <AudioStatus look={look} />
+        {event ? <StationBadge compact /> : null}
+        {!event || station.mine ? <AudioStatus look={look} /> : null}
         <span className="sdc-bar__group">
           <TourButton look={look} size="sm" compact label="Presenter tour" />
           <StageWindowButton code={code} title={title} size="sm" openLabel="Stage window" />
-          <BigScreenLinkButton code={code} size="sm" />
-          <ShowSoundToggle />
-          <ThemeMusicToggle />
         </span>
-        <Button size="sm" variant="danger" icon="flag" onClick={() => setConfirm('end')}>
+        <Button
+          size="sm"
+          variant="danger"
+          icon="flag"
+          aria-expanded={panel === 'end'}
+          data-part="showdown-end-show"
+          onClick={() => (panel === 'end' ? closePanel() : openPanel('end'))}
+        >
           End show
         </Button>
       </header>
@@ -253,21 +488,36 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         timeUp={timeUp}
         sweeping={sweeping}
         minutes={Math.round(clockMax / 60_000)}
+        armed={armedView ? { slot: armedView.slot, text: armedText, mark: specialMark(look) } : null}
         onAct={act}
         onNext={requestNext}
-        onSweep={requestSweep}
+        onSweep={sweepNow}
         onHalt={halt}
+        onTake={take}
+        onDisarm={disarm}
       />
 
       <div className="sdc-main">
-        <section className="sdc-sheet" aria-label="Answer sheet" data-part="showdown-sheet">
-          <AnswerSheet board={board} sheet={sheet} look={look} found={found} onReveal={reveal} />
-        </section>
+        <div className="sdc-sheetcol">
+          <section className="sdc-sheet" aria-label="Answer sheet" data-part="showdown-sheet">
+            <AnswerSheet board={board} sheet={sheet} look={look} found={found} armed={armedView?.slot ?? -1} onTile={onTile} />
+          </section>
+          <RoundStrip board={board} sheet={sheet} look={look} found={found} picker={picker} />
+        </div>
 
         <section className="sdc-rail" aria-label="Show controls">
           <WrongButton board={board} sweeping={sweeping} onMiss={miss} />
           <ClockPanel stage={stage} timeUp={timeUp} sweeping={sweeping} onOp={clockOp} />
-          <SweepButton board={board} hidden={hidden} sweeping={sweeping} timeUp={timeUp} onSweep={requestSweep} onHalt={halt} />
+          <SweepButton
+            board={board}
+            hidden={hidden}
+            sweeping={sweeping}
+            timeUp={timeUp}
+            needsHold={needsHold}
+            holdRef={sweepHold}
+            onSweep={sweepNow}
+            onHalt={halt}
+          />
           <div className="sdc-rail__row">
             <Button
               variant="secondary"
@@ -275,6 +525,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               disabled={(sheet?.undo ?? 0) === 0}
               onClick={() => act('undo')}
               title={`${sheet?.undo ?? 0} step${sheet?.undo === 1 ? '' : 's'} to undo`}
+              data-part="showdown-undo"
             >
               Undo <Kbd>U</Kbd>
             </Button>
@@ -282,14 +533,38 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               variant={stage === 'done' ? 'primary' : 'ghost'}
               icon={stage === 'intro' ? 'play' : last ? 'flag' : 'arrow-right'}
               onClick={requestNext}
+              aria-expanded={last && stage !== 'intro' ? panel === 'finish' : undefined}
+              data-part="showdown-next"
             >
               {stage === 'intro' ? 'Start round 1' : last ? 'Finish show' : 'Next round'} <Kbd>N</Kbd>
             </Button>
           </div>
+          <div className="sdc-rail__picker" data-part="showdown-picker-slot">
+            <PickerStrip look={look} board={board} />
+          </div>
         </section>
 
-        <section className="sdc-side" aria-label="Stage and extras">
-          <div className="sdc-side__preview">
+        <section className="sdc-side" aria-label="Stage preview and tools">
+          {panel ? (
+            <EndShowPanel
+              kind={panel}
+              board={board}
+              sheet={sheet}
+              look={look}
+              sweeping={sweeping}
+              revealNeedsHold={needsHold}
+              onClose={closePanel}
+              onRevealFirst={() => {
+                setPanel(null);
+                sweepNow();
+              }}
+              onConfirm={() => {
+                setPanel(null);
+                act(panel === 'finish' ? 'next' : 'finish');
+              }}
+            />
+          ) : null}
+          <div className="sdc-side__preview" data-part="showdown-preview">
             <div className="sd-preview" aria-hidden inert>
               {preview}
             </div>
@@ -298,49 +573,34 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               {stageWin.open ? ' (live in the stage window)' : ' — open the stage window to share it'}
             </p>
           </div>
-          <div className="sd-panel sdc-panel">
-            <h3 className="sd-panel__title">Stage cards</h3>
-            <StageCards compact />
-          </div>
-          <CuePanel onCue={cue} />
-          <div className="sd-panel sdc-panel sdc-fix">
-            <h3 className="sd-panel__title">Fix a mistake</h3>
-            <div className="sd-row sd-row--wrap">
-              <Button size="sm" variant="ghost" icon="refresh" disabled={board.round < 0} onClick={() => setConfirm('restart')}>
-                Restart this round
-              </Button>
-              <Button size="sm" variant="ghost" icon="refresh" disabled={stage === 'intro'} onClick={() => setConfirm('reset')}>
-                Restart the whole show
-              </Button>
-            </div>
-            <p className="sd-muted">Both can be undone. Undo steps back one action at a time.</p>
-          </div>
-          {settings?.audience ? <AudienceGuesses sheet={sheet} /> : null}
-          <Rundown sheet={sheet} current={board.round} look={look} />
-          <PresenterTools code={code} pass={pass} />
+          <ConsoleDrawer tabs={tabs} />
+          <UndoToast api={undo} onUndo={() => act('undo')} />
         </section>
       </div>
 
-      <Dock board={board} hidden={hidden} sweeping={sweeping} onMiss={miss} onSweep={requestSweep} onHalt={halt} />
+      <Dock board={board} hidden={hidden} sweeping={sweeping} needsHold={needsHold} onMiss={miss} onSweep={sweepNow} onHalt={halt} />
 
       <footer className="sd-console__keys sdc-keys" aria-label="Keyboard shortcuts">
         <span>
           <Kbd>1</Kbd>–<Kbd>0</Kbd> reveal
         </span>
         <span>
+          special: its key arms, <Kbd>Space</Kbd> takes, <Kbd>Esc</Kbd> disarms
+        </span>
+        <span>
           <Kbd>X</Kbd> wrong
         </span>
         <span>
-          <Kbd>R</Kbd> reveal remaining (<Kbd>R</Kbd>/<Kbd>Esc</Kbd> stops)
+          <Kbd>R</Kbd> reveal remaining (hold while the clock runs)
         </span>
         <span>
           <Kbd>C</Kbd> celebrate
         </span>
         <span>
-          <Kbd>P</Kbd> clock start/pause
+          <Kbd>P</Kbd> clock
         </span>
         <span>
-          <Kbd>Q</Kbd> start round / show question
+          <Kbd>Q</Kbd> start / question
         </span>
         <span>
           <Kbd>N</Kbd> next
@@ -348,156 +608,20 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         <span>
           <Kbd>U</Kbd> undo
         </span>
+        <span>
+          <Kbd>K</Kbd> pick
+        </span>
+        <span>
+          <Kbd>D</Kbd> done
+        </span>
+        <span>
+          <Kbd>A</Kbd> no answer
+        </span>
       </footer>
 
-      <Modal
-        open={confirm === 'end'}
-        onClose={() => setConfirm(null)}
-        title="End the show now?"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Keep going
-            </Button>
-            <Button variant="danger" icon="flag" onClick={confirmDone(() => act('finish'))}>
-              End show
-            </Button>
-          </>
-        }
-      >
-        <p>Every screen goes to the closing screen. This ends the show for good — it can’t be undone.</p>
-        {stage !== 'intro' && hidden > 0 ? (
-          <p>
-            <strong>
-              <span className="dc-num">{hidden}</span> answer{hidden === 1 ? ' is' : 's are'} still hidden on this board.
-            </strong>{' '}
-            To show them first, choose Keep going and press Reveal remaining.
-          </p>
-        ) : null}
-      </Modal>
-      <Modal
-        open={confirm === 'finish'}
-        onClose={() => setConfirm(null)}
-        title="Finish the show?"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Keep going
-            </Button>
-            <Button variant="primary" icon="flag" onClick={confirmDone(() => act('next'))}>
-              Finish show
-            </Button>
-          </>
-        }
-      >
-        <p>That was the last board. Everyone sees the closing screen — this ends the show for good.</p>
-        {hidden > 0 && stage !== 'title' ? (
-          <p>
-            <strong>
-              <span className="dc-num">{hidden}</span> answer{hidden === 1 ? ' is' : 's are'} still hidden.
-            </strong>{' '}
-            Press Reveal remaining first if the audience should see them.
-          </p>
-        ) : null}
-        {stage === 'title' ? <p>This round hasn’t been played yet.</p> : null}
-      </Modal>
-      <Modal
-        open={confirm === 'next'}
-        onClose={() => setConfirm(null)}
-        title={stage === 'title' ? `Skip round ${board.round + 1}?` : `Move on to round ${board.round + 2}?`}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Stay here
-            </Button>
-            {stage === 'live' ? (
-              <Button
-                variant="secondary"
-                icon="sparkle"
-                onClick={confirmDone(() => {
-                  const b = live.current.board;
-                  if (b) send({ a: 'sweep', round: b.round });
-                })}
-              >
-                Reveal remaining first
-              </Button>
-            ) : null}
-            <Button variant="primary" icon="arrow-right" onClick={confirmDone(() => act('next'))}>
-              Go to round {board.round + 2}
-            </Button>
-          </>
-        }
-      >
-        {stage === 'title' ? (
-          <p>Round {board.round + 1} hasn’t been played. Its answers stay hidden. (You can Undo this.)</p>
-        ) : (
-          <p>
-            <span className="dc-num">{hidden}</span> answer{hidden === 1 ? ' is' : 's are'} still hidden on this board and will stay hidden.
-            (You can Undo this.)
-          </p>
-        )}
-      </Modal>
-      <Modal
-        open={confirm === 'sweep'}
-        onClose={() => setConfirm(null)}
-        title={`Reveal the remaining ${hidden}?`}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Not yet
-            </Button>
-            <Button
-              variant="primary"
-              icon="sparkle"
-              onClick={confirmDone(() => {
-                const b = live.current.board;
-                if (b) send({ a: 'sweep', round: b.round });
-              })}
-            >
-              Reveal remaining
-            </Button>
-          </>
-        }
-      >
-        <p>
-          The clock is still running. Reveal remaining stops it and flips every hidden answer from the bottom of the board up, with a
-          drumroll before the special one.
-        </p>
-      </Modal>
-      <Modal
-        open={confirm === 'restart'}
-        onClose={() => setConfirm(null)}
-        title={`Restart round ${board.round + 1}?`}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" icon="refresh" onClick={confirmDone(() => act('restart'))}>
-              Restart round
-            </Button>
-          </>
-        }
-      >
-        <p>Every answer goes back under its tile, the round returns to its title card and the clock resets. You can Undo this.</p>
-      </Modal>
-      <Modal
-        open={confirm === 'reset'}
-        onClose={() => setConfirm(null)}
-        title="Restart the whole show?"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" icon="refresh" onClick={confirmDone(() => act('reset'))}>
-              Back to the opening
-            </Button>
-          </>
-        }
-      >
-        <p>The show goes back to its opening marquee, with every board hidden again. You can Undo this.</p>
-      </Modal>
+      <p className="visually-hidden" role="status" aria-live="polite" data-part="showdown-console-announce">
+        {announce}
+      </p>
     </div>
   );
 }
@@ -512,10 +636,13 @@ function NextStep({
   timeUp,
   sweeping,
   minutes,
+  armed,
   onAct,
   onNext,
   onSweep,
   onHalt,
+  onTake,
+  onDisarm,
 }: {
   board: ShowdownBoardView;
   hidden: number;
@@ -524,104 +651,128 @@ function NextStep({
   timeUp: boolean;
   sweeping: boolean;
   minutes: number;
+  armed: { slot: number; text: string; mark: string } | null;
   onAct: (a: BoardAct) => void;
   onNext: () => void;
   onSweep: () => void;
   onHalt: () => void;
+  onTake: () => void;
+  onDisarm: () => void;
 }) {
   const total = board.slots.length;
   let text: ReactNode;
   let action: ReactNode = null;
-  let tone: 'go' | 'live' | 'alert' | 'done' = 'go';
-  switch (board.stage) {
-    case 'intro':
-      text = 'The opening is on the stage. Welcome everyone, then start round 1.';
-      action = (
-        <Button variant="primary" size="lg" icon="play" onClick={() => onAct('begin')}>
-          Start round 1 <Kbd>Q</Kbd>
+  let tone: 'go' | 'live' | 'alert' | 'done' | 'armed' = 'go';
+  let label = 'Next step';
+  if (armed) {
+    tone = 'armed';
+    label = 'Special armed';
+    text = (
+      <>
+        <span aria-hidden>{armed.mark}</span> <b>#{armed.slot + 1}</b>
+        {armed.text ? <> {armed.text}</> : null} is armed — nobody sees it yet. Build the suspense, then take it.
+      </>
+    );
+    action = (
+      <>
+        <Button variant="secondary" icon="close" onClick={onDisarm} data-part="showdown-disarm-special">
+          Disarm <Kbd>Esc</Kbd>
         </Button>
-      );
-      break;
-    case 'title':
-      text = (
-        <>
-          Round {board.round + 1}’s title card is up
-          {board.title ? (
+        <Button variant="primary" size="lg" icon="play" className="sdc-take" onClick={onTake} data-part="showdown-take-special">
+          Take special <Kbd>Space</Kbd>
+        </Button>
+      </>
+    );
+  } else
+    switch (board.stage) {
+      case 'intro':
+        text = 'The opening is on the stage. Welcome everyone, then start round 1.';
+        action = (
+          <Button variant="primary" size="lg" icon="play" onClick={() => onAct('begin')}>
+            Start round 1 <Kbd>Q</Kbd>
+          </Button>
+        );
+        break;
+      case 'title':
+        text = (
+          <>
+            Round {board.round + 1}’s title card is up
+            {board.title ? (
+              <>
+                {' '}
+                — <b>{board.title}</b>
+              </>
+            ) : null}
+            . Show the question when you’re ready
+            {minutes > 0 ? ` — the ${minutes}-minute clock starts with it.` : '.'}
+          </>
+        );
+        action = (
+          <Button variant="primary" size="lg" icon="eye" onClick={() => onAct('question')}>
+            Show the question <Kbd>Q</Kbd>
+          </Button>
+        );
+        break;
+      case 'live':
+      case 'steal':
+        if (sweeping) {
+          tone = 'live';
+          text = (
             <>
-              {' '}
-              — <b>{board.title}</b>
+              Revealing the rest, #{total} up to #1 — <span className="dc-num">{hidden}</span> to go. Enjoy the drumroll.
             </>
-          ) : null}
-          . Show the question when you’re ready
-          {minutes > 0 ? ` — the ${minutes}-minute clock starts with it.` : '.'}
-        </>
-      );
-      action = (
-        <Button variant="primary" size="lg" icon="eye" onClick={() => onAct('question')}>
-          Show the question <Kbd>Q</Kbd>
-        </Button>
-      );
-      break;
-    case 'live':
-    case 'steal':
-      if (sweeping) {
-        tone = 'live';
-        text = (
+          );
+          action = (
+            <Button variant="secondary" size="lg" icon="pause" onClick={onHalt}>
+              Stop <Kbd>Esc</Kbd>
+            </Button>
+          );
+        } else if (timeUp) {
+          tone = 'alert';
+          text = (
+            <>
+              <b>Time’s up</b> — wrap up the last guesses, then Reveal remaining. Nothing flips until you say so.
+            </>
+          );
+          action = hidden ? (
+            <Button variant="primary" size="lg" icon="sparkle" onClick={onSweep}>
+              Reveal remaining (<span className="dc-num">{hidden}</span>) <Kbd>R</Kbd>
+            </Button>
+          ) : null;
+        } else {
+          tone = 'live';
+          text = (
+            <>
+              Read the chat: click the answer someone names, or press <b>Wrong</b>.{' '}
+              <span className="sdc-next__count">
+                <span className="dc-num">{found}</span> of <span className="dc-num">{total}</span> found
+              </span>
+            </>
+          );
+        }
+        break;
+      case 'done':
+        tone = 'done';
+        text = last ? (
           <>
-            Revealing the rest, #{total} up to #1 — <span className="dc-num">{hidden}</span> to go. Enjoy the drumroll.
+            The whole board is up — that was the last one. Finish the show, then put up <b>Prize time</b> or <b>Thanks</b>.
+          </>
+        ) : (
+          <>
+            The whole board is up (<span className="dc-num">{found}</span> found). Take a breath — or put up <b>Be right back</b> — then go
+            to round {board.round + 2}.
           </>
         );
         action = (
-          <Button variant="secondary" size="lg" icon="pause" onClick={onHalt}>
-            Stop <Kbd>Esc</Kbd>
+          <Button variant="primary" size="lg" icon={last ? 'flag' : 'arrow-right'} onClick={onNext}>
+            {last ? 'Finish the show' : 'Next round'} <Kbd>N</Kbd>
           </Button>
         );
-      } else if (timeUp) {
-        tone = 'alert';
-        text = (
-          <>
-            <b>Time’s up</b> — wrap up the last guesses, then Reveal remaining.
-          </>
-        );
-        action = (
-          <Button variant="primary" size="lg" icon="sparkle" onClick={onSweep}>
-            Reveal remaining (<span className="dc-num">{hidden}</span>) <Kbd>R</Kbd>
-          </Button>
-        );
-      } else {
-        tone = 'live';
-        text = (
-          <>
-            Read the chat: click the answer someone names, or press <b>Wrong</b>.{' '}
-            <span className="sdc-next__count">
-              <span className="dc-num">{found}</span> of <span className="dc-num">{total}</span> found
-            </span>
-          </>
-        );
-      }
-      break;
-    case 'done':
-      tone = 'done';
-      text = last ? (
-        <>
-          The whole board is up — that was the last one. Finish the show, then put up <b>Prize time</b> or <b>Thanks</b>.
-        </>
-      ) : (
-        <>
-          The whole board is up (<span className="dc-num">{found}</span> found). Take a breath — or put up <b>Be right back</b> — then go to
-          round {board.round + 2}.
-        </>
-      );
-      action = (
-        <Button variant="primary" size="lg" icon={last ? 'flag' : 'arrow-right'} onClick={onNext}>
-          {last ? 'Finish the show' : 'Next round'} <Kbd>N</Kbd>
-        </Button>
-      );
-      break;
-  }
+        break;
+    }
   return (
     <div className="sdc-next" data-tone={tone} role="status" data-part="showdown-next-step">
-      <span className="sdc-next__label">Next step</span>
+      <span className="sdc-next__label">{label}</span>
       <p className="sdc-next__text">{text}</p>
       {action ? <span className="sdc-next__action">{action}</span> : null}
     </div>
@@ -633,13 +784,15 @@ function AnswerSheet({
   sheet,
   look,
   found,
-  onReveal,
+  armed,
+  onTile,
 }: {
   board: ShowdownBoardView;
   sheet: ShowdownSheet | null;
   look: ShowdownLook;
   found: number;
-  onReveal: (slot: number) => void;
+  armed: number;
+  onTile: (slot: number) => void;
 }) {
   const intro = board.stage === 'intro';
   // Before round 1, the first round's answers as a read-only preview (to get ready).
@@ -663,6 +816,13 @@ function AnswerSheet({
   const open = board.stage === 'title' || board.stage === 'live';
   const rows = Math.ceil(answers.length / 2);
   const mark = specialMark(look);
+  const meta = intro
+    ? 'A preview to get ready — the answers unlock when round 1 starts.'
+    : board.stage === 'title'
+      ? 'The question isn’t on the stage yet — clicking an answer shows it first.'
+      : source
+        ? `According to ${source}`
+        : '';
   return (
     <div className="sd-panel sdc-sheetpanel" data-stage={board.stage}>
       <header className="sdc-sheet__head">
@@ -681,18 +841,19 @@ function AnswerSheet({
           {title ? ` · ${title}` : ''}
         </span>
         <span className="sdc-sheet__qtext">{prompt}</span>
-        {source ? <span className="sdc-sheet__source">According to {source}</span> : null}
+        {meta ? (
+          <span className="sdc-sheet__source" data-hint={intro || board.stage === 'title' ? 'true' : undefined}>
+            {meta}
+          </span>
+        ) : null}
       </p>
-      {board.stage === 'title' ? (
-        <p className="sdc-sheet__hint">The question isn’t on the stage yet — clicking an answer shows it first.</p>
-      ) : null}
-      {intro ? <p className="sdc-sheet__hint">A preview to get ready — the answers unlock when round 1 starts.</p> : null}
       <ol className="sdc-answers" style={{ '--rows': rows } as CSSProperties}>
         {answers.map((a, i) => {
           const slot = board.slots[i];
           const revealed = !intro && (slot?.revealed ?? a.revealed);
           const late = revealed && Boolean(slot?.late);
           const isSpecial = i === special;
+          const isArmed = i === armed && !revealed;
           const n = i + 1;
           return (
             <li key={i}>
@@ -700,22 +861,23 @@ function AnswerSheet({
                 type="button"
                 className="sdc-answer"
                 data-part="showdown-answer"
+                data-slot={i}
                 data-revealed={revealed ? 'true' : undefined}
                 data-late={late ? 'true' : undefined}
                 data-special={isSpecial ? 'true' : undefined}
+                data-armed={isArmed ? 'true' : undefined}
                 disabled={revealed || !open}
-                onClick={() => onReveal(i)}
+                onClick={() => onTile(i)}
                 aria-label={
-                  revealed ? `Answer ${n}: ${a.text}, revealed` : `Reveal answer ${n}: ${a.text}${isSpecial ? ' (special answer)' : ''}`
+                  revealed
+                    ? `Answer ${n}: ${a.text}, revealed`
+                    : isArmed
+                      ? `Answer ${n}: ${a.text} (special answer), armed — press Space or Take special to reveal it`
+                      : `Reveal answer ${n}: ${a.text}${isSpecial ? ' (special answer)' : ''}`
                 }
               >
                 <span className="sdc-answer__num">{n}</span>
                 <span className="sdc-answer__body">
-                  {isSpecial ? (
-                    <span className="sdc-answer__special">
-                      Special <span aria-hidden>{mark}</span>
-                    </span>
-                  ) : null}
                   <span className="sdc-answer__text">{a.text}</span>
                   {a.note || a.aliases.length ? (
                     <span className="sdc-answer__meta">
@@ -730,22 +892,106 @@ function AnswerSheet({
                     <span className="dc-num">{a.guessed}</span>
                   </span>
                 ) : null}
-                <span className="sdc-answer__action" aria-hidden>
-                  {revealed ? (
-                    <>
-                      <PixelIcon name="check" /> {late ? 'Shown' : 'Found'}
-                    </>
-                  ) : intro ? (
-                    <PixelIcon name="lock" />
-                  ) : (
-                    'Reveal'
-                  )}
-                </span>
+                {revealed ? (
+                  <span className="sdc-answer__action" aria-hidden>
+                    <PixelIcon name="check" /> {late ? 'Shown' : 'Found'}
+                  </span>
+                ) : isArmed ? (
+                  <span className="sdc-answer__action sdc-answer__armed" aria-hidden>
+                    Armed · take <Kbd>Space</Kbd>
+                  </span>
+                ) : isSpecial ? (
+                  <span className="sdc-answer__action sdc-answer__special" aria-hidden>
+                    Special <span>{mark}</span>
+                  </span>
+                ) : (
+                  <span className="sdc-answer__action sdc-answer__reveal" aria-hidden>
+                    {intro ? <PixelIcon name="lock" /> : 'Reveal'}
+                  </span>
+                )}
               </button>
             </li>
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/** Under the sheet: the rundown and this round's counts (found, wrong, picked). */
+function RoundStrip({
+  board,
+  sheet,
+  look,
+  found,
+  picker,
+}: {
+  board: ShowdownBoardView;
+  sheet: ShowdownSheet | null;
+  look: ShowdownLook;
+  found: number;
+  picker: PickerView;
+}) {
+  const feed = useShowFeed();
+  const lastMiss = feed.last.miss;
+  const misses = lastMiss && lastMiss.e.round === board.round ? lastMiss.e.n : 0;
+  const picked = Object.keys(picker.done).length + (picker.hotSeat && !picker.done[picker.hotSeat] ? 1 : 0);
+  const rounds = sheet?.rundown ?? [];
+  const mark = specialMark(look);
+  const status = (i: number) => {
+    const res = board.results.find((r) => r.index === i);
+    if (i < board.round || (i === board.round && board.stage === 'done'))
+      return res?.total ? `${res.found ?? 0}/${res.total} found` : 'Done';
+    if (i === board.round) return board.stage === 'title' ? 'Title card' : 'Now';
+    return 'Up next';
+  };
+  return (
+    <div className="sdc-strip">
+      {rounds.length ? (
+        <section className="sd-panel sdc-strip__rundown" aria-label="Rundown">
+          <h3 className="sdc-strip__label">Rundown</h3>
+          <ol className="sdc-strip__rounds">
+            {rounds.map((r) => (
+              <li key={r.index} data-state={r.index < board.round ? 'done' : r.index === board.round ? 'now' : 'next'}>
+                <b className="dc-num">R{r.index + 1}</b>
+                <span className="sdc-strip__title">{r.title || r.prompt}</span>
+                <span className="sdc-strip__status">{status(r.index)}</span>
+              </li>
+            ))}
+          </ol>
+          <details className="sdc-strip__all">
+            <summary>Every round’s answers</summary>
+            <ol>
+              {rounds.map((r) => (
+                <li key={r.index}>
+                  <span className="sd-rundown__q">
+                    R{r.index + 1}
+                    {r.title ? ` · ${r.title}` : ''}
+                  </span>{' '}
+                  <span className="sd-rundown__prompt">{r.prompt}</span>
+                  <span className="sd-rundown__answers">
+                    {r.answers.map((a, i) => `${i + 1}. ${a.text}${i === r.special ? ` ${mark}` : ''}`).join(' · ')}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </details>
+        </section>
+      ) : null}
+      <section className="sd-panel sdc-strip__counts" aria-label="This round">
+        <h3 className="sdc-strip__label">This round</h3>
+        <div className="sdc-strip__stats">
+          <span>
+            <b className="dc-num">{found}</b> found
+          </span>
+          <span>
+            <b className="dc-num">{misses}</b> wrong
+          </span>
+          <span>
+            <b className="dc-num">{picked}</b> picked
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
@@ -813,36 +1059,38 @@ function ClockPanel({
       data-state={!clock.on ? 'off' : timeUp ? 'up' : clock.running ? 'running' : 'paused'}
       data-part="showdown-clock"
     >
-      <div className="sdc-clock__head">
-        <h3 className="sd-panel__title">
-          <PixelIcon name="clock" /> Round clock
-        </h3>
-        <span className="sdc-clock__state">{!clock.on ? 'Off' : timeUp ? 'Time’s up' : clock.running ? 'Running' : 'Paused'}</span>
-      </div>
       {clock.on ? (
         <>
-          <span
-            className="sdc-clock__time"
-            role="timer"
-            aria-label={over ? `Overtime ${formatClock(clock.left)}` : `${formatClock(clock.left)} left`}
-          >
-            {formatClock(clock.left)}
-          </span>
+          <div className="sdc-clock__main">
+            <span className="sdc-clock__readout">
+              <span className="sdc-clock__head">
+                <h3 className="sdc-clock__title">
+                  <PixelIcon name="clock" size={11} /> Round clock
+                </h3>
+                <span className="sdc-clock__state">{timeUp ? 'Time’s up' : clock.running ? 'Running' : 'Paused'}</span>
+              </span>
+              <span
+                className="sdc-clock__time"
+                role="timer"
+                aria-label={over ? `Overtime ${formatClock(clock.left)}` : `${formatClock(clock.left)} left`}
+              >
+                {formatClock(clock.left)}
+              </span>
+            </span>
+            <Button
+              className="sdc-clock__go"
+              variant={startMatters ? 'primary' : 'secondary'}
+              icon={clock.running ? 'pause' : 'play'}
+              disabled={!ready}
+              onClick={() => onOp(clock.running ? 'pause' : 'start')}
+              aria-label={clock.running ? 'Pause clock' : 'Start clock'}
+            >
+              {clock.running ? 'Pause' : 'Start'} <Kbd>P</Kbd>
+            </Button>
+          </div>
           <span className="sdc-clock__bar" aria-hidden>
             <i style={{ transform: `scaleX(${pct})` }} />
           </span>
-          {timeUp ? (
-            <p className="sdc-clock__up">Time’s up — wrap up, then Reveal remaining. Nothing is revealed until you say so.</p>
-          ) : null}
-          <Button
-            className="sdc-clock__go"
-            variant={startMatters ? 'primary' : 'secondary'}
-            icon={clock.running ? 'pause' : 'play'}
-            disabled={!ready}
-            onClick={() => onOp(clock.running ? 'pause' : 'start')}
-          >
-            {clock.running ? 'Pause clock' : 'Start clock'} <Kbd>P</Kbd>
-          </Button>
           <div className="sdc-clock__btns">
             <button type="button" className="sdc-mini" disabled={!ready} onClick={() => onOp('plus')} aria-label="Add one minute">
               +1 min
@@ -860,10 +1108,12 @@ function ClockPanel({
               Reset
             </button>
           </div>
-          <Toggle label="Show the clock on the stage" checked={clock.stage} onChange={(on) => onOp(on ? 'show' : 'hide')} />
         </>
       ) : (
         <>
+          <h3 className="sdc-clock__title">
+            <PixelIcon name="clock" size={11} /> Round clock <span className="sdc-clock__state">Off</span>
+          </h3>
           <p className="sd-muted">This show has no round clock.</p>
           <Button size="sm" variant="secondary" icon="clock" disabled={!ready} onClick={() => onOp('start')}>
             Start a clock now
@@ -879,6 +1129,8 @@ function SweepButton({
   hidden,
   sweeping,
   timeUp,
+  needsHold,
+  holdRef,
   onSweep,
   onHalt,
 }: {
@@ -886,6 +1138,8 @@ function SweepButton({
   hidden: number;
   sweeping: boolean;
   timeUp: boolean;
+  needsHold: boolean;
+  holdRef: RefObject<HoldButtonHandle | null>;
   onSweep: () => void;
   onHalt: () => void;
 }) {
@@ -902,29 +1156,48 @@ function SweepButton({
     );
   }
   const can = board.stage === 'live' && hidden > 0;
+  const count = can ? (
+    <span className="sdc-sweep__count">
+      (<span className="dc-num">{hidden}</span>)
+    </span>
+  ) : null;
   return (
-    <div className="sdc-sweep">
-      <Button
-        variant={timeUp && can ? 'primary' : 'secondary'}
-        size="lg"
-        block
-        icon="sparkle"
-        disabled={!can}
-        onClick={onSweep}
-        className="sdc-sweep__btn"
-        data-urgent={timeUp && can ? 'true' : undefined}
-      >
-        Reveal remaining{' '}
-        {can ? (
-          <span className="sdc-sweep__count">
-            (<span className="dc-num">{hidden}</span>)
-          </span>
-        ) : null}{' '}
-        <Kbd>R</Kbd>
-      </Button>
+    <div className="sdc-sweep" data-hold={can && needsHold ? 'true' : undefined}>
+      {can && needsHold ? (
+        <HoldButton
+          ref={holdRef}
+          ms={HOLD_MS}
+          variant="secondary"
+          size="lg"
+          block
+          kbd="R"
+          label={`Reveal remaining (${hidden}) — hold, the clock is still running`}
+          onFire={onSweep}
+          className="sdc-sweep__btn"
+          data-part="showdown-sweep"
+        >
+          Reveal remaining {count}
+        </HoldButton>
+      ) : (
+        <Button
+          variant={timeUp && can ? 'primary' : 'secondary'}
+          size="lg"
+          block
+          icon="sparkle"
+          disabled={!can}
+          onClick={onSweep}
+          className="sdc-sweep__btn"
+          data-urgent={timeUp && can ? 'true' : undefined}
+          data-part="showdown-sweep"
+        >
+          Reveal remaining {count} <Kbd>R</Kbd>
+        </Button>
+      )}
       <span className="sdc-sweep__hint">
         {can
-          ? `#${board.slots.length} → #1, a drumroll before the special one`
+          ? needsHold
+            ? 'The clock is running: press and hold (or hold R)'
+            : `#${board.slots.length} → #1, a drumroll before the special one`
           : board.stage === 'done'
             ? 'Every answer is up'
             : 'Once the question is up'}
@@ -935,7 +1208,7 @@ function SweepButton({
 
 function CuePanel({ onCue }: { onCue: (c: ShowdownCue) => void }) {
   return (
-    <div className="sd-panel sdc-panel">
+    <div className="sdc-tabsection">
       <h3 className="sd-panel__title">Sound cues</h3>
       <div className="sdc-cues">
         <button type="button" className="sdc-cue sdc-cue--big" onClick={() => onCue('celebrate')}>
@@ -952,11 +1225,103 @@ function CuePanel({ onCue }: { onCue: (c: ShowdownCue) => void }) {
   );
 }
 
+/** Drawer → Sound: the sound station (event rooms), the cue buttons and this device's sound switches. */
+function SoundTab({ look, onCue }: { look: ShowdownLook; onCue: (c: ShowdownCue) => void }) {
+  const [sounds, setSounds] = useShowSounds('presenter');
+  const [music, setMusic] = useThemeMusicPref();
+  return (
+    <div className="sdc-tab">
+      <SoundPanel look={look} />
+      <CuePanel onCue={onCue} />
+      <div className="sdc-tabsection sdc-soundswitches">
+        <h3 className="sd-panel__title">This device</h3>
+        <Toggle label="Show sounds on this device" checked={sounds} onChange={setSounds} />
+        <Toggle label="Theme music (opening, title and holding cards)" checked={music} onChange={setMusic} />
+      </div>
+    </div>
+  );
+}
+
+/** Drawer → Cards: the holding cards, and whether the stage shows the clock. */
+function CardsTab({ onClock }: { onClock: (op: ShowdownClockOp) => void }) {
+  const clock = useClock();
+  return (
+    <div className="sdc-tab">
+      <div className="sdc-tabsection">
+        <h3 className="sd-panel__title">Stage cards</h3>
+        <StageCards compact />
+      </div>
+      {clock.on ? (
+        <div className="sdc-tabsection">
+          <Toggle label="Show the clock on the stage" checked={clock.stage} onChange={(on) => onClock(on ? 'show' : 'hide')} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Drawer → Fix: restart the round or the show (press and hold; both can be undone), presenter tools. */
+function FixTab({
+  board,
+  code,
+  pass,
+  onRestartRound,
+  onRestartShow,
+  onUndo,
+}: {
+  board: ShowdownBoardView;
+  code: string;
+  pass: string | null;
+  onRestartRound: () => void;
+  onRestartShow: () => void;
+  onUndo: () => void;
+}) {
+  const undoSteps = useSheet()?.undo ?? 0;
+  return (
+    <div className="sdc-tab">
+      <div className="sdc-tabsection sdc-fix">
+        <h3 className="sd-panel__title">Fix a mistake</h3>
+        <div className="sdc-fix__btns">
+          <HoldButton
+            ms={HOLD_MS}
+            variant="secondary"
+            icon="refresh"
+            label="Restart this round"
+            disabled={board.round < 0}
+            onFire={onRestartRound}
+            data-part="showdown-restart-round"
+          >
+            Restart this round
+          </HoldButton>
+          <HoldButton
+            ms={HOLD_MS}
+            variant="secondary"
+            icon="refresh"
+            label="Restart the whole show"
+            disabled={board.stage === 'intro'}
+            onFire={onRestartShow}
+            data-part="showdown-restart-show"
+          >
+            Restart the whole show
+          </HoldButton>
+          <Button variant="ghost" icon="refresh" disabled={undoSteps === 0} onClick={onUndo}>
+            Undo the last step <Kbd>U</Kbd>
+          </Button>
+        </div>
+        <p className="sd-muted">
+          Press and hold to restart. Both can be undone: an Undo stays up for 12 seconds, and <Kbd>U</Kbd> steps back one action at a time.
+        </p>
+      </div>
+      <PresenterTools code={code} pass={pass} />
+    </div>
+  );
+}
+
 function AudienceGuesses({ sheet }: { sheet: ShowdownSheet | null }) {
   const guessesIn = useRoomSelector<ShowdownPublicState, number>((s) => s.guessesIn) ?? 0;
   const cloud = sheet?.cloud ?? [];
   return (
-    <div className="sd-panel sdc-panel">
+    <div className="sdc-tab">
       <h3 className="sd-panel__title">
         Phone guesses <Badge>{guessesIn}</Badge>
       </h3>
@@ -981,38 +1346,12 @@ function AudienceGuesses({ sheet }: { sheet: ShowdownSheet | null }) {
   );
 }
 
-function Rundown({ sheet, current, look }: { sheet: ShowdownSheet | null; current: number; look: ShowdownLook }) {
-  if (!sheet?.rundown.length) return null;
-  const mark = specialMark(look);
-  return (
-    <details className="sd-panel sd-rundown sdc-rundown">
-      <summary className="sd-panel__title">
-        Rundown <span className="sd-muted sdc-rundown__count">{sheet.rundown.length} rounds</span>
-      </summary>
-      <ol>
-        {sheet.rundown.map((r) => (
-          <li key={r.index} data-state={r.index < current ? 'done' : r.index === current ? 'now' : 'next'}>
-            <span className="sd-rundown__q">
-              R{r.index + 1}
-              {r.title ? ` · ${r.title}` : ''}
-              {r.index === current ? ' · now' : ''}
-            </span>
-            <span className="sd-rundown__prompt">{r.prompt}</span>
-            <span className="sd-rundown__answers">
-              {r.answers.map((a, i) => `${i + 1}. ${a.text}${i === r.special ? ` ${mark}` : ''}`).join(' · ')}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </details>
-  );
-}
-
 /** Narrow screens: the buzzer and Reveal remaining stay at the bottom of the screen while you scroll the sheet. */
 function Dock({
   board,
   hidden,
   sweeping,
+  needsHold,
   onMiss,
   onSweep,
   onHalt,
@@ -1020,14 +1359,16 @@ function Dock({
   board: ShowdownBoardView;
   hidden: number;
   sweeping: boolean;
+  needsHold: boolean;
   onMiss: () => void;
   onSweep: () => void;
   onHalt: () => void;
 }) {
   const clock = useClock();
   const live = board.stage === 'live';
+  const can = live && hidden > 0;
   return (
-    <div className={cx('sdc-dock')} aria-label="Quick controls">
+    <div className="sdc-dock" aria-label="Quick controls">
       <button type="button" className="sdc-wrong sdc-wrong--dock" disabled={!live || sweeping} onClick={onMiss} aria-label="Wrong answer">
         <span className="sdc-wrong__x" aria-hidden>
           ✕
@@ -1043,8 +1384,12 @@ function Dock({
         <Button variant="secondary" icon="pause" onClick={onHalt}>
           Stop
         </Button>
+      ) : can && needsHold ? (
+        <HoldButton ms={HOLD_MS} variant="secondary" label="Reveal the rest — hold, the clock is still running" onFire={onSweep}>
+          Hold: reveal rest
+        </HoldButton>
       ) : (
-        <Button variant="secondary" icon="sparkle" disabled={!live || hidden === 0} onClick={onSweep}>
+        <Button variant="secondary" icon="sparkle" disabled={!can} onClick={onSweep}>
           Reveal rest
         </Button>
       )}

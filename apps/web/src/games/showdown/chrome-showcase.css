@@ -4,8 +4,9 @@
  * audience's showcase view.
  *
  * Presenter chrome follows the viewer's DASCADE theme (tokens), never the stage palette — except
- * the board-number accents (the Halloween orange), as on the classic answer sheet. Classes are
- * namespaced `sdc-` so nothing here changes Team Showdown's console.
+ * the board-number accents (the Halloween orange), as on the classic answer sheet. The console's
+ * PRIVATE band and frame use the theme's danger red. Classes are namespaced `sdc-` so nothing here
+ * changes Team Showdown's console.
  * ===================================================================== */
 
 /* ---------- Console frame ---------- */
@@ -18,27 +19,80 @@
   --sdc-num-b: #0a1660;
   --sdc-num-ink: #fff6d0;
   --sdc-special: #ff9a2e;
-  gap: 10px;
+  /* PRS-05 C: the PRIVATE band and frame follow the theme's danger red (fallback: a deep warning red). */
+  --sdc-private: var(--danger, #c8102e);
+  --sdc-private-deep: color-mix(in srgb, var(--sdc-private) 45%, var(--shade, #000));
+  --sdc-on-private: var(--light, #fff);
+  /* Dark ink on the special's orange and the armed yellow. */
+  --sdc-special-ink: #2a0f05;
+  --sdc-armed: var(--yellow, #ffd23f);
+  /* The answer sheet's row height (PRS-01 A: 70 px; shorter screens get a little less). */
+  --sdc-row: 70px;
+  --sdc-gap: 10px;
+}
+/* (`.sd-console.sdc`: chrome.css's .sd-console loads after this file and would win a tie.) */
+.sd-console.sdc {
+  position: relative;
+  gap: var(--sdc-gap);
   width: 100%;
   max-width: 1720px;
+  /* PRS-05 C: a red frame around the whole console (outside its box: no layout cost). */
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 3px var(--sdc-private);
 }
 .sdc[data-look='halloween'] {
   --sdc-num-a: #ffa24a;
   --sdc-num-b: #c54a00;
-  --sdc-num-ink: #2a0f05;
+  --sdc-num-ink: var(--sdc-special-ink);
 }
 .sdc :focus-visible {
   outline: 2px solid var(--focus-ring, var(--accent));
   outline-offset: 2px;
 }
+/* The room around the console: a touch less padding (every pixel of height counts at 1280×720). */
+.sd-room:has(> .sdc) {
+  padding: 8px clamp(8px, 1.4vw, 16px) calc(8px + var(--safe-bottom));
+}
+
+/* ---------- PRS-05 C: the PRIVATE band ---------- */
+.sdc-private-band {
+  display: grid;
+  place-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: var(--radius-lg) var(--radius-lg) 4px 4px;
+  background: repeating-linear-gradient(-45deg, var(--sdc-private) 0 10px, var(--sdc-private-deep) 10px 20px);
+  color: var(--sdc-on-private);
+  overflow: hidden;
+}
+.sdc-private-band__text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 12px;
+  border-radius: 99px;
+  /* Solid behind the words: the stripes never cut into the contrast (light on the deep red ≥ 10:1). */
+  background: var(--sdc-private-deep);
+  font: 600 var(--fs-xs) / 1.3 var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sdc-private-band__text b {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
 
 /* ---------- Top bar ---------- */
 .sdc-bar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
-  padding: 8px 12px;
+  gap: 6px 10px;
+  padding: 5px 10px;
   border-radius: var(--radius-lg);
   background: var(--hud-bg-strong, var(--panel-bg));
   border: 1px solid var(--hud-border, var(--line));
@@ -46,7 +100,25 @@
 .sdc-bar__title {
   display: grid;
   min-width: 0;
+  flex: 0 1 auto;
   max-width: min(46ch, 100%);
+}
+/* Laptops: one line — the title gives way (ellipsis) before anything wraps. */
+@media (min-width: 900px) {
+  .sdc-bar {
+    flex-wrap: nowrap;
+  }
+  .sdc-bar > * {
+    flex-shrink: 0;
+  }
+  .sdc-bar > .sdc-bar__title {
+    flex: 0 1 auto;
+    min-width: 80px;
+  }
+  .sdc-bar > .dc-spacer {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 .sdc-bar__show {
   font-family: var(--font-display);
@@ -80,8 +152,13 @@
   color: var(--accent);
 }
 /* Narrower windows: the bar's secondary buttons keep their icon (and accessible name) only. */
-@media (max-width: 1279px) {
+@media (max-width: 1439px) {
   .sdc-bar .sdc-lbl {
+    display: none;
+  }
+}
+@media (max-width: 1179px) {
+  .sdc-bar .sdc-lbl-wide {
     display: none;
   }
 }
@@ -131,16 +208,16 @@ button.sdc-audio {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 8px 12px;
+  gap: 4px 12px;
+  padding: 4px 12px;
   border-radius: var(--radius);
   border: 1px solid color-mix(in srgb, var(--warning) 60%, transparent);
   background: color-mix(in srgb, var(--warning) 14%, var(--panel-bg));
   color: var(--text-0);
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
 }
 .sdc-cardup > span:first-child {
-  font-size: 22px;
+  font-size: 20px;
 }
 .sdc-cardup > span:nth-child(2) {
   flex: 1 1 260px;
@@ -152,9 +229,9 @@ button.sdc-audio {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px 16px;
-  min-height: 64px;
-  padding: 10px 14px;
+  gap: 6px 16px;
+  min-height: 60px;
+  padding: 6px 12px;
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--tone) 12%, var(--panel-bg));
   border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
@@ -169,6 +246,10 @@ button.sdc-audio {
 .sdc-next[data-tone='done'] {
   --tone: var(--success);
 }
+.sdc-next[data-tone='armed'] {
+  --tone: var(--sdc-special);
+  background: color-mix(in srgb, var(--sdc-special) 18%, var(--panel-bg));
+}
 .sdc-next__label {
   font-family: var(--font-pixel);
   font-size: var(--fs-2xs);
@@ -181,7 +262,7 @@ button.sdc-audio {
   margin: 0;
   color: var(--text-0);
   font-size: var(--fs-lg);
-  line-height: 1.35;
+  line-height: 1.3;
   text-wrap: pretty;
 }
 .sdc-next__count {
@@ -198,8 +279,29 @@ button.sdc-audio {
 .sdc-next__action {
   display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   justify-content: flex-end;
+}
+/* PRS-02 D: TAKE SPECIAL pulses (with its words: "Special armed", "Take special"); reduced motion = a still ring. */
+.sdc-take {
+  animation: sdc-take 1.4s ease-in-out infinite;
+}
+@keyframes sdc-take {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--sdc-special) 45%, transparent);
+  }
+}
+:root[data-reduced-motion='true'] .sdc-take,
+:root[data-fx='off'] .sdc-take {
+  animation: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sdc-special) 60%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdc-take {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sdc-special) 60%, transparent);
+  }
 }
 @media (max-width: 760px) {
   .sdc-next {
@@ -213,48 +315,292 @@ button.sdc-audio {
   }
 }
 
-/* ---------- Main grid ---------- */
+/* ---------- PRS-03 D: End show / Finish show, two steps (inline, not a modal) ---------- */
+.sdc-endpanel {
+  /* Over the stage preview and the drawer: never over the sheet, WRONG or the clock. */
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-height: 100%;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--danger, var(--sdc-wrong));
+  background: var(--panel-bg-opaque, var(--panel-bg-solid, var(--bg-2, #120c22)));
+  color: var(--text-0);
+  box-shadow: var(--shadow-3, 0 18px 50px #000c);
+}
+.sdc-endpanel[data-kind='finish'] {
+  border-color: var(--accent);
+}
+.sdc-endpanel:focus-visible {
+  outline: 3px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+.sdc-endpanel__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+.sdc-endpanel__state,
+.sdc-endpanel__what {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--text-1);
+}
+.sdc-endpanel__what b {
+  color: var(--text-0);
+}
+.sdc-endpanel__hidden {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 6px;
+}
+.sdc-endpanel__hidden li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+}
+.sdc-endpanel__n {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border-radius: 5px;
+  font-weight: 800;
+  color: var(--sdc-num-ink);
+  background: linear-gradient(180deg, var(--sdc-num-a), var(--sdc-num-b));
+}
+.sdc-endpanel__t {
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+.sdc-endpanel__sp {
+  grid-column: 2;
+  justify-self: start;
+  padding: 0 6px;
+  border-radius: 99px;
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--sdc-special-ink, #2a0f05);
+  background: var(--sdc-special);
+}
+.sdc-endpanel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* ---------- PRS-03 D: press-and-hold ---------- */
+.sdc-hold {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.sdc-hold__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--hold, 0));
+  background: color-mix(in srgb, currentColor 22%, transparent);
+  pointer-events: none;
+}
+.sdc-hold[data-motion='off'] .sdc-hold__fill {
+  /* Reduced motion: no growing bar either — the words say how far along it is. */
+  transform: none;
+  opacity: 0;
+}
+.sdc-hold[data-motion='off'][data-phase='holding'] .sdc-hold__fill {
+  opacity: 1;
+}
+.sdc-hold > :not(.sdc-hold__fill):not(.sdc-hold__status) {
+  position: relative;
+}
+.sdc-hold__ring {
+  display: inline-grid;
+  flex: none;
+}
+.sdc-hold__ring svg {
+  width: 20px;
+  height: 20px;
+  transform: rotate(-90deg);
+}
+.sdc-hold__ring circle {
+  fill: none;
+  stroke: color-mix(in srgb, currentColor 30%, transparent);
+  stroke-width: 3;
+}
+.sdc-hold__ring .sdc-hold__arc {
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-dasharray: 50.27;
+}
+.sdc-hold__text {
+  white-space: nowrap;
+}
+.sdc-hold[data-phase='done'] {
+  filter: brightness(1.15);
+}
+/* "Press and hold" after a click or an early release: a small note just under the button. */
+.sdc-hold__status {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  z-index: 5;
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transform: translateX(-50%);
+  font: 600 var(--fs-xs) / 1.3 var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+  color: var(--text-0);
+  background: var(--panel-bg-opaque, var(--bg-3, #1a1230));
+  border: 1px solid var(--warning);
+  box-shadow: 0 6px 18px #0008;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.sdc-hold__status[data-on] {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ---------- PRS-03 D: the undo toast ---------- */
+.sdc-undotoast {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 14px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--success) 70%, var(--line));
+  background: var(--panel-bg-opaque, var(--panel-bg-solid, var(--bg-2, #120c22)));
+  box-shadow: 0 -8px 30px #0009;
+  color: var(--text-0);
+  overflow: hidden;
+}
+.sdc-undotoast__icon {
+  color: var(--success);
+}
+.sdc-undotoast__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+.sdc-undotoast__text span {
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+}
+.sdc-undotoast__undo {
+  white-space: nowrap;
+}
+.sdc-undotoast__left {
+  min-width: 3ch;
+  font-size: var(--fs-xs);
+  opacity: 0.85;
+}
+.sdc-undotoast__close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.sdc-undotoast__close:hover {
+  background: var(--surface-hover);
+  color: var(--text-0);
+}
+.sdc-undotoast__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  transform-origin: 0 50%;
+  background: var(--success);
+  transition: transform 0.25s linear;
+}
+:root[data-reduced-motion='true'] .sdc-undotoast__bar,
+:root[data-fx='off'] .sdc-undotoast__bar {
+  transition: none;
+}
+
+/* ---------- Main grid: sheet | rail 288 | side 372 ---------- */
 .sdc-main {
   display: grid;
   gap: 12px;
   align-items: start;
-  grid-template-columns: minmax(0, 1fr) 290px 340px;
+  grid-template-columns: minmax(0, 1fr) 288px 372px;
   grid-template-areas: 'sheet rail side';
 }
-.sdc-sheet {
+.sdc-sheetcol {
   grid-area: sheet;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sdc-gap);
+  min-width: 0;
+}
+.sdc-sheet {
   min-width: 0;
   container-type: inline-size;
 }
 .sdc-rail {
   grid-area: rail;
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sdc-gap);
   min-width: 0;
   container-type: inline-size;
 }
 .sdc-side {
   grid-area: side;
-  display: grid;
-  gap: 10px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
 }
-@media (max-width: 1359px) {
+@media (max-width: 1179px) {
   .sdc-main {
-    grid-template-columns: minmax(0, 1fr) 290px;
-    grid-template-areas:
-      'sheet rail'
-      'side side';
-  }
-  /* The extras go under the controls, in columns. */
-  .sdc-side {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    align-items: start;
-  }
-}
-@media (max-width: 1023px) {
-  .sdc-main {
-    grid-template-columns: minmax(0, 1fr) 250px;
+    /* 308 px: seven icon tabs at 44 px each. */
+    grid-template-columns: minmax(0, 1fr) 240px 308px;
+    gap: 10px;
   }
 }
 @media (max-width: 899px) {
@@ -264,17 +610,110 @@ button.sdc-audio {
   }
 }
 
+/*
+ * The whole console fits the window (laptops and up): the columns share the height under the bars,
+ * the drawer scrolls inside itself, and nothing that runs the show needs the page to scroll.
+ */
+@media (min-width: 900px) and (min-height: 600px) {
+  .sd-console.sdc {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--topbar-h) - var(--safe-top) - var(--safe-bottom) - 16px);
+    min-height: 560px;
+  }
+  .sdc > * {
+    flex: none;
+  }
+  .sdc > .sdc-main {
+    flex: 1 1 0;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .sdc-sheetcol,
+  .sdc-rail {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    /* Room for focus rings at the edges of a scrolling column. */
+    padding: 3px;
+    margin: -3px;
+  }
+  .sdc-side {
+    min-height: 0;
+  }
+  .sdc-side > .sdc-drawer {
+    flex: 1 1 0;
+    min-height: 120px;
+  }
+}
+/* Shorter laptop screens (1280×720, 1366×768): every part a little tighter. */
+@media (min-width: 900px) and (max-height: 820px) {
+  .sd-console.sdc {
+    --sdc-row: 62px;
+    --sdc-gap: 8px;
+    gap: 8px;
+  }
+  .sdc-next {
+    min-height: 52px;
+    padding: 4px 10px;
+  }
+  .sdc-next__text {
+    font-size: var(--fs-md);
+  }
+  .sdc-next .dc-btn--lg {
+    min-height: 44px;
+    padding-inline: var(--sp-5);
+    font-size: var(--fs-md);
+  }
+  /* The show's name and where it is share one line. */
+  .sdc-bar__title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    max-width: min(70ch, 100%);
+  }
+  .sdc-bar__show {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: var(--fs-sm);
+  }
+  .sdc-bar__where {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .sdc-rail {
+    gap: 6px;
+  }
+  .sdc-clock__time {
+    font-size: clamp(26px, 12cqi, 34px);
+  }
+  .sdc-sweep:not([data-hold]) .sdc-sweep__hint {
+    display: none;
+  }
+  /*
+   * The keys legend hangs just below the window here (scroll to read it): the height above goes to
+   * the controls that run the show.
+   */
+  .sdc > .sdc-keys {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 0;
+    right: 0;
+    padding-bottom: 8px;
+  }
+}
+
 /* ---------- Answer sheet ---------- */
-.sdc-sheetpanel {
-  padding: 12px;
+.sd-panel.sdc-sheetpanel {
+  padding: 10px 12px 12px;
 }
 .sdc-sheet__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 12px;
-  margin-bottom: 6px;
+  gap: 4px 12px;
+  margin-bottom: 4px;
 }
 .sdc-sheet__head .sd-panel__title {
   margin: 0;
@@ -301,7 +740,7 @@ button.sdc-audio {
 }
 .sdc-sheet__prompt {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   margin: 0 0 8px;
 }
 .sdc-sheet__q {
@@ -314,7 +753,7 @@ button.sdc-audio {
 .sdc-sheet__qtext {
   font-size: var(--fs-lg);
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--text-0);
   overflow-wrap: anywhere;
 }
@@ -326,26 +765,23 @@ button.sdc-audio {
   font-style: italic;
   color: var(--text-2);
 }
-.sdc-sheet__hint {
-  margin: 0 0 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: var(--fs-sm);
+.sdc-sheet__source[data-hint] {
+  font-style: normal;
+  font-weight: 600;
   color: var(--text-1);
-  background: var(--surface-sunken);
 }
 .sdc-answers {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px 10px;
+  gap: 6px 10px;
   /* Like the stage's board: 1–5 down the left, 6–10 down the right. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(var(--rows, 5), auto);
   grid-auto-flow: column;
 }
-@container (max-width: 560px) {
+@container (max-width: 400px) {
   .sdc-answers {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
@@ -358,12 +794,12 @@ button.sdc-audio {
 }
 .sdc-answer {
   width: 100%;
-  min-height: 64px;
+  min-height: var(--sdc-row);
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px 8px 8px;
+  padding: 6px 10px 6px 8px;
   border-radius: var(--radius);
   border: 1px solid var(--line-strong, var(--line));
   background: var(--surface-raised);
@@ -401,7 +837,7 @@ button.sdc-audio {
 }
 .sdc-answer__body {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 .sdc-answer__text {
@@ -434,26 +870,6 @@ button.sdc-audio {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sdc-answer__special {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: 99px;
-  font-family: var(--font-pixel);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #2a0f05;
-  background: var(--sdc-special);
-}
-.sdc-answer[data-special] {
-  border: 2px solid var(--sdc-special);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--sdc-special) 35%, transparent),
-    0 0 18px color-mix(in srgb, var(--sdc-special) 28%, transparent);
-}
 .sdc-answer__guessed {
   display: inline-flex;
   align-items: center;
@@ -479,6 +895,98 @@ button.sdc-audio {
   background: var(--accent);
   white-space: nowrap;
 }
+/* A narrower sheet drops the "Reveal" pill (the whole tile is the button); state labels always stay. */
+@container (max-width: 639px) {
+  .sdc-answer__reveal {
+    display: none;
+  }
+}
+/* Narrower still (a 13-inch laptop): the state label moves under the answer, in place of its notes. */
+@container (max-width: 599px) {
+  .sdc-answer {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    padding: 4px 8px 4px 6px;
+  }
+  .sdc-answer__num {
+    grid-row: 1 / span 2;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    font-size: 17px;
+  }
+  .sdc-answer__body {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+  .sdc-answer__text {
+    font-size: 15px;
+  }
+  .sdc-answer__action {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    padding: 1px 6px;
+    font-size: 9px;
+  }
+  .sdc-answer[data-revealed] .sdc-answer__action {
+    padding-inline: 0;
+  }
+  .sdc-answer__guessed {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .sdc-answer:is([data-revealed], [data-special], [data-armed]) .sdc-answer__meta {
+    display: none;
+  }
+}
+.sdc-answer__special {
+  color: var(--sdc-special-ink, #2a0f05);
+  background: var(--sdc-special);
+}
+.sdc-answer__special span {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.sdc-answer[data-special] {
+  border: 2px solid var(--sdc-special);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sdc-special) 35%, transparent),
+    0 0 18px color-mix(in srgb, var(--sdc-special) 28%, transparent);
+}
+/* PRS-02 D: the special, armed — waiting for TAKE SPECIAL (the pill says so in words). */
+.sdc-answer[data-armed] {
+  background: color-mix(in srgb, var(--sdc-special) 22%, var(--surface-raised));
+  border-width: 3px;
+  animation: sdc-armed 1.4s ease-in-out infinite;
+}
+@keyframes sdc-armed {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--sdc-special) 40%, transparent);
+  }
+}
+:root[data-reduced-motion='true'] .sdc-answer[data-armed],
+:root[data-fx='off'] .sdc-answer[data-armed] {
+  animation: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sdc-special) 55%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdc-answer[data-armed] {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sdc-special) 55%, transparent);
+  }
+}
+.sdc-answer__armed {
+  color: var(--sdc-special-ink, #2a0f05);
+  background: var(--sdc-armed);
+}
+.sdc-answer__armed .dc-kbd {
+  height: 18px;
+  min-width: 18px;
+  font-size: 9px;
+}
 .sdc-answer[data-revealed] {
   border-color: color-mix(in srgb, var(--success) 45%, var(--line));
   background: color-mix(in srgb, var(--success) 9%, var(--surface-sunken));
@@ -502,8 +1010,8 @@ button.sdc-audio {
 .sdc-answer[data-late] .sdc-answer__action {
   color: var(--text-2);
 }
-/* The sheet before the question is up / before round 1: readable, but plainly not live. */
-.sdc-sheetpanel[data-stage='intro'] .sdc-answer__action {
+/* The sheet before round 1: readable, but plainly not live. */
+.sdc-sheetpanel[data-stage='intro'] .sdc-answer__action:not(.sdc-answer__special) {
   color: var(--text-2);
   background: none;
 }
@@ -511,24 +1019,132 @@ button.sdc-audio {
   opacity: 0.8;
 }
 
-/* ---------- Rail: wrong, clock, reveal remaining ---------- */
-.sdc-wrongbox {
+/* ---------- Under the sheet: the rundown and this round's counts ---------- */
+.sdc-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--sdc-gap);
+  align-items: start;
+}
+.sdc-strip > .sd-panel {
+  padding: 8px 12px 10px;
+}
+.sdc-strip > :only-child {
+  grid-column: 1 / -1;
+}
+.sdc-strip__label {
+  margin: 0 0 6px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.sdc-strip__rounds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   gap: 4px;
+}
+.sdc-strip__rounds li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+}
+.sdc-strip__rounds li[data-state='now'] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.sdc-strip__rounds li[data-state='done'] {
+  color: var(--text-2);
+}
+.sdc-strip__rounds b {
+  color: var(--accent);
+}
+.sdc-strip__title {
+  font-weight: 700;
+  color: var(--text-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sdc-strip__status {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.sdc-strip__all {
+  margin-top: 6px;
+  font-size: var(--fs-sm);
+}
+.sdc-strip__all summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.sdc-strip__all ol {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sdc-strip__all li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  line-height: 1.45;
+}
+.sdc-strip__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.sdc-strip__stats span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdc-strip__stats b {
+  font-size: var(--fs-xl);
+  line-height: 1;
+  color: var(--text-0);
+}
+
+/* ---------- Rail: wrong, clock, reveal remaining, undo / next, picker ---------- */
+.sdc-wrongbox {
+  display: grid;
+  gap: 2px;
 }
 .sdc-wrong {
   position: relative;
   width: 100%;
-  min-height: 108px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 16px;
   border: 2px solid var(--sdc-wrong-hi);
   background: linear-gradient(180deg, var(--sdc-wrong-hi), var(--sdc-wrong-lo));
-  color: #fff;
+  color: var(--light, #fff);
   font: 900 clamp(20px, 10.5cqi, 32px) / 1 var(--font-ui);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -545,7 +1161,7 @@ button.sdc-audio {
   text-shadow: 0 2px 0 var(--sdc-wrong-edge);
 }
 .sdc-wrong .dc-kbd {
-  color: #fff;
+  color: var(--light, #fff);
   border-color: #fff8;
   background: #0003;
 }
@@ -566,7 +1182,7 @@ button.sdc-audio {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: #fff;
+  background: var(--light, #fff);
   opacity: 0;
   pointer-events: none;
   animation: sdc-pulse 0.45s ease-out;
@@ -585,29 +1201,73 @@ button.sdc-audio {
 }
 .sdc-wrongbox__note {
   min-height: 1.3em;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
   text-align: center;
   color: var(--text-2);
 }
+@media (min-width: 900px) and (max-height: 820px) {
+  .sdc-wrong {
+    min-height: 56px;
+    border-radius: 14px;
+  }
+  /* The miss count is in "This round" under the sheet; screen readers still hear the note. */
+  .sdc-wrongbox__note {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sd-panel.sdc-clock {
+    gap: 4px;
+    padding: 6px 8px 8px;
+  }
+  .sdc-wrong {
+    font-size: 24px;
+  }
+  .sdc-clock__time {
+    font-size: 30px;
+  }
+  .sdc-bar {
+    padding-block: 3px;
+  }
+}
 
-.sdc-clock {
+.sd-panel.sdc-clock {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+.sdc-clock__readout {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
 }
 .sdc-clock__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 2px 6px;
 }
-.sdc-clock__head .sd-panel__title {
+.sdc-clock__title {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--label-tracking, 0.06em);
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 .sdc-clock__state {
   font-family: var(--font-pixel);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.12em;
+  font-size: 9px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-2);
 }
@@ -617,13 +1277,21 @@ button.sdc-audio {
 .sdc-clock[data-state='up'] .sdc-clock__state {
   color: var(--warning);
 }
+/* The time and its Start / Pause button side by side. */
+.sdc-clock__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
 .sdc-clock__time {
+  min-width: 4ch;
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  font-size: clamp(40px, 20cqi, 60px);
+  font-size: clamp(28px, 13cqi, 40px);
   font-weight: 800;
   line-height: 1;
-  text-align: center;
+  text-align: left;
   color: var(--text-0);
 }
 .sdc-clock[data-state='paused'] .sdc-clock__time {
@@ -634,7 +1302,7 @@ button.sdc-audio {
 }
 .sdc-clock__bar {
   position: relative;
-  height: 6px;
+  height: 5px;
   border-radius: 99px;
   background: var(--surface-sunken);
   overflow: hidden;
@@ -649,19 +1317,12 @@ button.sdc-audio {
 .sdc-clock[data-state='up'] .sdc-clock__bar i {
   background: var(--warning);
 }
-.sdc-clock__up {
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--text-0);
-  background: color-mix(in srgb, var(--warning) 20%, var(--surface-sunken));
-  border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
-}
 .sdc-clock__go {
   min-height: 44px;
+  margin: 0;
+  padding-inline: 10px;
   justify-content: center;
+  font-size: var(--fs-sm);
 }
 .sdc-clock__btns {
   display: grid;
@@ -690,13 +1351,27 @@ button.sdc-audio {
 .sdc-clock .dc-toggle {
   font-size: var(--fs-sm);
 }
+.sdc-clock .sd-muted {
+  margin: 0;
+}
+.sdc-clock[data-state='off'] .sdc-clock__title {
+  gap: 6px;
+}
 
 .sdc-sweep {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 .sdc-sweep__btn {
-  min-height: 60px;
+  min-height: 56px;
+  margin: 0;
+  padding-inline: 12px;
+}
+@media (min-width: 900px) and (max-height: 820px) {
+  .sdc-sweep__btn {
+    min-height: 50px;
+    font-size: var(--fs-md);
+  }
 }
 .sdc-sweep__count {
   font-weight: 700;
@@ -720,6 +1395,9 @@ button.sdc-audio {
   text-align: center;
   color: var(--text-2);
 }
+.sdc-sweep[data-hold] .sdc-sweep__hint {
+  color: var(--text-1);
+}
 .sdc-sweep__status {
   display: inline-flex;
   align-items: center;
@@ -736,15 +1414,168 @@ button.sdc-audio {
 }
 .sdc-rail__row > * {
   min-height: 44px;
+  margin: 0;
+  padding-inline: 8px;
   justify-content: center;
   white-space: nowrap;
 }
+.sdc-rail__picker {
+  display: grid;
+  min-width: 0;
+}
+.sdc-rail__picker:empty {
+  display: none;
+}
 
-/* ---------- Side: preview, cards, cues, fixes ---------- */
+/* ---------- Side: the pinned stage preview over the drawer ---------- */
+.sdc-side__preview {
+  flex: none;
+}
 .sdc-side__preview .sd-preview {
   border-radius: var(--radius);
 }
-.sdc-panel {
+.sdc-side__preview .sd-preview__caption {
+  margin-top: 4px;
+}
+.sd-panel.sdc-drawer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.sdc-drawer__tabs {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+}
+.sdc-drawer__tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 1px 3px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-2);
+  font: 700 10px / 1.05 var(--font-ui);
+  letter-spacing: 0;
+  text-align: center;
+  cursor: pointer;
+}
+.sdc-drawer__label {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.sdc-drawer__tab:hover {
+  color: var(--text-0);
+  background: var(--surface-hover);
+}
+.sdc-drawer__tab.is-on {
+  color: var(--text-0);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.sdc-drawer__tab:focus-visible {
+  outline-offset: -3px;
+}
+.sdc-drawer__dot {
+  position: absolute;
+  top: 5px;
+  right: calc(50% - 16px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 2px var(--panel-bg);
+}
+/* Below 1180 px the tabs show their icons only (the name stays the tab's accessible name). */
+@media (max-width: 1179px) {
+  .sdc-drawer__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sdc-drawer__tab {
+    min-height: 40px;
+  }
+  .sdc-drawer__tab svg {
+    width: 18px;
+    height: 18px;
+  }
+  .sdc-drawer__dot {
+    top: 4px;
+    right: calc(50% - 14px);
+  }
+}
+.sdc-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px 12px;
+}
+.sdc-drawer__body:focus-visible {
+  outline-offset: -3px;
+}
+.sdc-tab {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.sdc-tab > .sd-panel__title,
+.sdc-tabsection > .sd-panel__title {
+  margin-bottom: 6px;
+}
+.sdc-tabsection {
+  display: grid;
+  gap: 4px;
+}
+.sdc-tab .sd-muted {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+.sdc-fix__btns {
+  display: grid;
+  gap: 6px;
+}
+.sdc-fix__btns > * {
+  margin: 0;
+  justify-content: flex-start;
+}
+.sdc-soundswitches .dc-toggle {
+  min-height: 44px;
+  font-size: var(--fs-sm);
+}
+/* Presenter tools inside the Fix tab: no second panel frame. */
+.sdc-tab .sd-tools {
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.sdc-tab .sd-tools > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.sd-panel.sdc-panel {
   padding: 12px;
 }
 .sdc-panel .sd-panel__title {
@@ -855,7 +1686,20 @@ button.sdc-audio {
   box-shadow: none;
 }
 
-/* ---------- Narrow screens: the quick controls stay at the bottom ---------- */
+/* ---------- Keys legend ---------- */
+.sd-console__keys.sdc-keys {
+  gap: 2px 14px;
+  font-size: var(--fs-2xs);
+  line-height: 1.6;
+}
+.sd-console__keys.sdc-keys .dc-kbd {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+/* ---------- Narrow screens: one column, the quick controls stay at the bottom ---------- */
 .sdc-dock {
   display: none;
 }
@@ -885,6 +1729,7 @@ button.sdc-audio {
   }
   .sdc-dock .dc-btn {
     min-height: 56px;
+    margin: 0;
   }
   .sdc-dock__clock {
     font-size: 26px;
@@ -894,12 +1739,36 @@ button.sdc-audio {
   .sdc-dock__clock[data-over] {
     color: var(--warning);
   }
+  .sdc-side .sdc-drawer__body {
+    max-height: 60vh;
+  }
+  /* The undo toast rides above the dock. */
+  .sdc-undotoast {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(84px + var(--safe-bottom));
+  }
+  .sdc-endpanel {
+    position: fixed;
+    top: auto;
+    bottom: calc(8px + var(--safe-bottom));
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 80vh;
+  }
+  .sdc-private-band__text {
+    white-space: normal;
+    text-align: center;
+  }
 }
 
-/* A narrow rail (the console next to a meeting window): fewer hints, stacked buttons. */
+/* A narrow rail (the console next to a meeting window): fewer hints, tighter buttons. */
 @container (max-width: 279px) {
   .sdc-wrong .dc-kbd,
-  .sdc-rail__row .dc-kbd {
+  .sdc-rail__row .dc-kbd,
+  .sdc-clock__go .dc-kbd {
     display: none;
   }
   .sdc-rail__row > * {
@@ -1239,7 +2108,7 @@ button.sdc-audio {
   width: 34px;
 }
 .sdc-arow[data-special] .sdc-arow__n {
-  color: #2a0f05;
+  color: var(--sdc-special-ink, #2a0f05);
   background: var(--orange, #ff9a2e);
 }
 .sdc-arow__n {
@@ -1338,7 +2207,7 @@ button.sdc-audio {
   font-family: var(--font-num);
   font-weight: 800;
   font-size: 13px;
-  color: #2a0f05;
+  color: var(--sdc-special-ink, #2a0f05);
   background: linear-gradient(180deg, #ffa24a, #c54a00);
 }
 .sdc-preview__t {

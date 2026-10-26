@@ -10,6 +10,8 @@ import type { ShowdownLook, ShowdownSettings } from '@dascade/shared/games/showd
 import { PixelIcon } from '@dascade/ui';
 import { Stage } from '../Stage.tsx';
 import { Camera } from './MockConsole.tsx';
+import { CONSOLE_WINDOW_TITLE } from '../consoleParts.tsx';
+import { stageWindowTitle } from '../stageWindow.ts';
 import { DEMO_ROUNDS } from './script.ts';
 import type { ChatLine } from './timeline.ts';
 
@@ -40,7 +42,7 @@ export function StageWindow({
         <i />
         <i />
         <i />
-        <span className="tour-window__title">{open ? `${title} — Stage` : 'No stage window'}</span>
+        <span className="tour-window__title">{open ? stageWindowTitle(title) : 'No stage window'}</span>
       </div>
       <div className="tour-window__body">
         {open ? (
@@ -104,8 +106,8 @@ export function BigPicture({
               data-focus={step === 1 ? 'true' : undefined}
               data-dim={step === 2 || step === 3 ? 'true' : undefined}
             >
-              <div className="tour-big__winbar">
-                <PixelIcon name="lock" /> Presenter console
+              <div className="tour-big__winbar tour-big__winbar--private">
+                <PixelIcon name="lock" /> {CONSOLE_WINDOW_TITLE.replace(/^🔒 /, '')}
               </div>
               <div className="tour-big__sheet">
                 {answers.slice(0, 6).map((a, i) => (
@@ -126,7 +128,7 @@ export function BigPicture({
               data-dim={step === 1 ? 'true' : undefined}
             >
               <div className="tour-big__winbar">
-                <PixelIcon name="eye" /> {title} — Stage
+                <PixelIcon name="eye" /> {stageWindowTitle(title)}
               </div>
               <StageBox look={look} settings={settings} />
               <span className="tour-big__badge tour-big__badge--share" data-on={on(2)}>
@@ -246,16 +248,16 @@ export function ShareMock({
             <div className="tour-share__win" data-picked={step >= 2 ? 'true' : undefined} data-tour="window-stage">
               <StageBox look={look} settings={settings} />
               <span className="tour-share__wintitle">
-                {step >= 2 ? <PixelIcon name="check" /> : null} {title} — Stage
+                {step >= 2 ? <PixelIcon name="check" /> : null} {stageWindowTitle(title)}
               </span>
             </div>
             <div className="tour-share__win tour-share__win--no">
-              <div className="tour-share__fakeconsole" aria-hidden>
+              <div className="tour-share__fakeconsole tour-share__fakeconsole--private" aria-hidden>
                 {Array.from({ length: 6 }, (_, i) => (
                   <i key={i} />
                 ))}
               </div>
-              <span className="tour-share__wintitle">DASCADE — Presenter console</span>
+              <span className="tour-share__wintitle">{CONSOLE_WINDOW_TITLE}</span>
               <span className="tour-share__never">
                 <PixelIcon name="lock" /> Never this one
               </span>
