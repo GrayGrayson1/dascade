@@ -49,7 +49,10 @@ describe('built-in packs', () => {
 
   it('survive the custom-content validator unchanged (same rules for everyone)', () => {
     for (const round of all) {
-      const input: ShowdownRoundInput = { prompt: round.prompt, answers: round.answers.map((a) => ({ text: a.text, points: a.points, aliases: a.aliases })) };
+      const input: ShowdownRoundInput = {
+        prompt: round.prompt,
+        answers: round.answers.map((a) => ({ text: a.text, points: a.points, aliases: a.aliases })),
+      };
       const report = validateShowContent([input]);
       expect(report.issues, round.id).toEqual([]);
       expect(report.rounds[0]!.answers.map((a) => a.text)).toEqual(round.answers.map((a) => a.text));
@@ -85,7 +88,13 @@ describe('validateShowContent', () => {
 
   it('cleans text, drops blank answers and sorts by points', () => {
     const report = validateShowContent([
-      { prompt: '  Name a\u0000 fruit  ', answers: [...answers(['Banana', 20], ['  ', 50], ['Apple', 40], ['Kiwi', 20]), { text: 'Mango', points: 5, aliases: [' mangoes ', '', 'mangoes', 'a', 'b', 'c', 'd'] }] },
+      {
+        prompt: '  Name a\u0000 fruit  ',
+        answers: [
+          ...answers(['Banana', 20], ['  ', 50], ['Apple', 40], ['Kiwi', 20]),
+          { text: 'Mango', points: 5, aliases: [' mangoes ', '', 'mangoes', 'a', 'b', 'c', 'd'] },
+        ],
+      },
     ]);
     expect(report.issues).toEqual([]);
     const r = report.rounds[0]!;
@@ -120,7 +129,10 @@ describe('validateShowContent', () => {
   });
 
   it('keeps at most the custom round limit', () => {
-    const many = Array.from({ length: SHOWDOWN_LIMITS.customRounds + 3 }, (_, i) => ({ prompt: `Question number ${i}`, answers: answers(['A', 3], ['B', 2], ['C', 1]) }));
+    const many = Array.from({ length: SHOWDOWN_LIMITS.customRounds + 3 }, (_, i) => ({
+      prompt: `Question number ${i}`,
+      answers: answers(['A', 3], ['B', 2], ['C', 1]),
+    }));
     const report = validateShowContent(many);
     expect(report.rounds).toHaveLength(SHOWDOWN_LIMITS.customRounds);
     expect(report.dropped).toBe(3);
@@ -159,7 +171,11 @@ describe('validateShowContent: Presenter Showcase rounds', () => {
         title: '  Halloween\u0000 Songs ',
         source: ' DAS-O-Ween   Host Picks ',
         special: 5,
-        answers: Array.from({ length: 10 }, (_, i) => ({ text: `Song ${i + 1}`, points: 0, note: i === 0 ? '  Michael\u200b Jackson ' : '' })),
+        answers: Array.from({ length: 10 }, (_, i) => ({
+          text: `Song ${i + 1}`,
+          points: 0,
+          note: i === 0 ? '  Michael\u200b Jackson ' : '',
+        })),
       }),
     ]).rounds[0]!;
     expect(r).toMatchObject({ title: 'Halloween Songs', source: 'DAS-O-Ween Host Picks', special: 4 });
@@ -178,7 +194,14 @@ describe('validateShowContent: Presenter Showcase rounds', () => {
   it('roundToInput turns a stored round back into the same input', () => {
     const rounds = validateShowContent([
       ranked(10, { title: 'Songs', source: 'Host Picks', special: 5 }),
-      { prompt: 'Name a pizza topping', answers: [{ text: 'Cheese', points: 50, aliases: ['mozzarella'] }, { text: 'Ham', points: 30 }, { text: 'Corn', points: 20, note: 'Really' }] },
+      {
+        prompt: 'Name a pizza topping',
+        answers: [
+          { text: 'Cheese', points: 50, aliases: ['mozzarella'] },
+          { text: 'Ham', points: 30 },
+          { text: 'Corn', points: 20, note: 'Really' },
+        ],
+      },
     ]).rounds;
     const again = validateShowContent(rounds.map(roundToInput)).rounds;
     expect(again).toEqual(rounds);
@@ -186,7 +209,16 @@ describe('validateShowContent: Presenter Showcase rounds', () => {
 
   it('long titles fit (up to the answer limit)', () => {
     const long = 'It’s the Great Pumpkin, Charlie Brown: The Movie!';
-    const r = validateShowContent([{ prompt: 'Name a Halloween classic', answers: [{ text: long, points: 0 }, { text: 'B', points: 0 }, { text: 'C', points: 0 }] }]).rounds[0]!;
+    const r = validateShowContent([
+      {
+        prompt: 'Name a Halloween classic',
+        answers: [
+          { text: long, points: 0 },
+          { text: 'B', points: 0 },
+          { text: 'C', points: 0 },
+        ],
+      },
+    ]).rounds[0]!;
     expect(r.answers[0]!.text).toBe(long.slice(0, SHOWDOWN_LIMITS.answerMax));
   });
 });
@@ -197,29 +229,40 @@ describe('event presets', () => {
       const info = SHOWDOWN_EVENT_INFO[id];
       const report = validateShowContent(SHOWDOWN_EVENT_ROUNDS[id]);
       expect(report.issues).toEqual([]);
-      expect(report.rounds).toHaveLength(info.rounds);
+      // A settings-only preset brings no rounds: its boards come from the presenter's show file.
+      expect(report.rounds).toHaveLength(info.settingsOnly ? 0 : info.rounds);
       expect(ShowdownSettingsSchema.safeParse({ ...defaultShowdownSettings(new Date(2026, 10, 2)), ...info.settings }).success).toBe(true);
       expect(info.settings.mode).toBe('showcase');
+      expect(info.event).toBe(true);
     }
   });
 
-  it('DAS-O-Ween: two ranked Top-10 boards, #5 special, attributed as host picks (not a poll)', () => {
-    const rounds = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-2026']).rounds;
-    expect(rounds.map((r) => r.prompt)).toEqual(['Name the Top 10 Halloween Songs.', 'Name the Top 10 Halloween Movies.']);
+  it('ADM-01: no real show content in the repo — every preset but the practice boards is settings only', () => {
+    for (const id of SHOWDOWN_EVENT_IDS) {
+      const info = SHOWDOWN_EVENT_INFO[id];
+      if (info.rehearsal) continue;
+      expect(info.settingsOnly, id).toBe(true);
+      expect(SHOWDOWN_EVENT_ROUNDS[id], id).toEqual([]);
+    }
+    expect(SHOWDOWN_EVENT_INFO['dasoween-2026'].settings).toMatchObject({
+      mode: 'showcase',
+      look: 'halloween',
+      title: 'DAS-O-Ween Trivia',
+      minutes: 10,
+    });
+  });
+
+  it('the rehearsal: two ranked practice boards, #5 special, attributed as host picks (not a poll)', () => {
+    const rounds = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-rehearsal']).rounds;
+    expect(rounds).toHaveLength(2);
     for (const r of rounds) {
       expect(r.answers).toHaveLength(10);
       expect(r.ranked).toBe(true);
       expect(r.special).toBe(4);
-      expect(r.source).toBe('DAS-O-Ween Host Picks');
-      expect(r.answers.every((a) => a.note)).toBe(true);
+      expect(r.source).toBeTruthy();
     }
-    expect(SHOWDOWN_EVENT_INFO['dasoween-2026'].settings).toMatchObject({ mode: 'showcase', look: 'halloween', title: 'DAS-O-Ween Trivia', minutes: 10 });
-  });
-
-  it('the rehearsal boards share no answer with the real show', () => {
-    const real = new Set(SHOWDOWN_EVENT_ROUNDS['dasoween-2026'].flatMap((r) => r.answers.map((a) => normalizeForCompare(a.text))));
-    for (const r of SHOWDOWN_EVENT_ROUNDS['dasoween-rehearsal']) for (const a of r.answers) expect(real.has(normalizeForCompare(a.text))).toBe(false);
     expect(SHOWDOWN_EVENT_INFO['dasoween-rehearsal'].rehearsal).toBe(true);
+    expect(SHOWDOWN_EVENT_INFO['dasoween-rehearsal'].settingsOnly).toBe(false);
   });
 
   it('every answer and alias is matched back to its own slot', () => {

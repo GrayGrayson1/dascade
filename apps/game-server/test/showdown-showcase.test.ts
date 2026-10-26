@@ -18,7 +18,7 @@ import {
   type ShowdownFinale,
   type ShowdownSheet,
 } from '@dascade/shared/games/showdown';
-import { SHOWDOWN_EVENT_ROUNDS } from '@dascade/game-core/showdown';
+import { TEST_SHOW_FILE } from './fixtures/showdownShowFile.ts';
 import { onOutcome } from '../src/platform/hub.ts';
 import { bootTestServer, collect, quiet, sleep, waitFor } from './helpers.ts';
 
@@ -73,8 +73,8 @@ const json = (c: Client): Json => (c.room.state as unknown as { toJSON(): Json }
 const board = (c: Client): ShowdownBoardView => JSON.parse(json(c).boardJson) as ShowdownBoardView;
 type Server = Record<string, any>;
 
-/** Every answer and note of the DAS-O-Ween boards (as quoted JSON strings, so "Halloween" the title doesn't match). */
-const DASOWEEN = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-2026']).rounds;
+/** Every answer and note of the test show file (as quoted JSON strings, so a title doesn't match). */
+const DASOWEEN = validateShowContent(TEST_SHOW_FILE).rounds;
 const secretsOf = (round: number, except: number[] = []) =>
   DASOWEEN[round]!.answers.flatMap((a, i) => (except.includes(i) ? [] : [`"${a.text}"`, `"${a.note}"`]));
 
@@ -98,13 +98,12 @@ async function setup(): Promise<Show> {
   return { server, host, a, b, join };
 }
 
+/** The DAS-O-Ween preset (settings only, ADM-01) plus the show file with the boards; the rehearsal preset carries its own. */
 async function loadPreset(t: Show, id = 'dasoween-2026'): Promise<void> {
   t.host.room.send(SHOWDOWN_MSG.preset, { id });
-  await waitFor(
-    () => t.server.state.customRounds === 2 && JSON.parse(t.server.state.settingsJson).mode === 'showcase',
-    2000,
-    'preset loaded',
-  );
+  await waitFor(() => JSON.parse(t.server.state.settingsJson).mode === 'showcase', 2000, 'preset settings');
+  if (id === 'dasoween-2026') t.host.room.send(SHOWDOWN_MSG.content, { rounds: TEST_SHOW_FILE });
+  await waitFor(() => t.server.state.customRounds === 2, 2000, 'preset loaded');
 }
 
 async function synced(t: Show, clients: Client[] = [t.host, t.a, t.b]): Promise<void> {
@@ -159,8 +158,8 @@ describe('Presenter Showcase — presets, roles and secrecy', () => {
     expect(json(t.a).rehearsal).toBe(false);
     const content = t.host.contents.at(-1)!;
     expect(content.rounds.map((r) => [r.title, r.special, r.ranked, r.answers.length])).toEqual([
-      ['Halloween Songs', 4, true, 10],
-      ['Halloween Movies', 4, true, 10],
+      ['Test Tunes', 4, true, 10],
+      ['Test Films', 4, true, 10],
     ]);
     for (const c of [t.a, t.b]) {
       expect(c.contents.filter(Boolean)).toEqual([]);
@@ -174,7 +173,7 @@ describe('Presenter Showcase — presets, roles and secrecy', () => {
     await waitFor(() => t.a.errors.some((e) => e.type === SHOWDOWN_MSG.preset && e.code === 'not_host'), 2000, 'preset refused');
     expect(t.server.state.rehearsal).toBe(true);
     // Saving your own rounds ends the rehearsal.
-    t.host.room.send(SHOWDOWN_MSG.content, { rounds: SHOWDOWN_EVENT_ROUNDS['dasoween-2026'] });
+    t.host.room.send(SHOWDOWN_MSG.content, { rounds: TEST_SHOW_FILE });
     await waitFor(() => t.server.state.rehearsal === false, 2000, 'own rounds');
   });
 
@@ -202,9 +201,9 @@ describe('Presenter Showcase — presets, roles and secrecy', () => {
     await start(t);
     expect(board(t.a)).toMatchObject({ mode: 'showcase', stage: 'intro' });
     await act(t, { a: 'begin' });
-    expect(board(t.a)).toMatchObject({ stage: 'title', title: 'Halloween Songs', prompt: '', source: '', special: 4 });
+    expect(board(t.a)).toMatchObject({ stage: 'title', title: 'Test Tunes', prompt: '', source: '', special: 4 });
     await act(t, { a: 'question' });
-    expect(board(t.a)).toMatchObject({ stage: 'live', prompt: 'Name the Top 10 Halloween Songs.', source: 'DAS-O-Ween Host Picks' });
+    expect(board(t.a)).toMatchObject({ stage: 'live', prompt: 'Name the Top 10 test tunes.', source: 'Test Host Picks' });
     await act(t, { a: 'reveal', slot: 2 });
     await act(t, { a: 'reveal', slot: 4 });
     await waitFor(() => t.a.events.filter((e) => e.type === 'reveal').length === 2, 2000, 'reveals');

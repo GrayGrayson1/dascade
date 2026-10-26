@@ -1,12 +1,13 @@
 /**
  * The hidden answers stay on the server: no web source file imports the engine package (built-in
- * packs, event presets) and none contains an answer of the DAS-O-Ween boards, so the browser bundle
- * can't carry them. (e2e/showdown-showcase.spec.ts checks the served bundle itself.)
+ * packs, the rehearsal boards), and no real show content is in the repo at all — event presets carry
+ * settings only and the real boards load from the presenter's show file (ADM-01). (e2e checks the
+ * served bundle itself.)
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { validateShowContent } from '@dascade/shared/games/showdown';
+import { SHOWDOWN_EVENT_IDS, SHOWDOWN_EVENT_INFO } from '@dascade/shared/games/showdown';
 import { SHOWDOWN_EVENT_ROUNDS } from '@dascade/game-core/showdown';
 
 const WEB_SRC = join(import.meta.dirname, '..', '..');
@@ -29,14 +30,11 @@ describe('Showdown secrecy', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('no web source contains an answer of the DAS-O-Ween boards', () => {
-    // (The rehearsal boards are practice material — candy and costumes — not secrets.)
-    const answers = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-2026'])
-      .rounds.flatMap((r) => r.answers.map((a) => a.text))
-      // Single common words ("Ghost", "Witch") are fair game in decor and copy; titles are not.
-      .filter((text) => text.includes(' ') && text.length > 8);
-    expect(answers.length).toBeGreaterThan(10);
-    const hits = files.flatMap((f) => answers.filter((a) => f.text.toLowerCase().includes(a.toLowerCase())).map((a) => `${f.path}: ${a}`));
-    expect(hits).toEqual([]);
+  it('ADM-01: no event preset but the practice boards carries rounds (the real boards live in a show file outside git)', () => {
+    for (const id of SHOWDOWN_EVENT_IDS) {
+      if (SHOWDOWN_EVENT_INFO[id].rehearsal) continue;
+      expect(SHOWDOWN_EVENT_INFO[id].settingsOnly, id).toBe(true);
+      expect(SHOWDOWN_EVENT_ROUNDS[id], id).toEqual([]);
+    }
   });
 });
