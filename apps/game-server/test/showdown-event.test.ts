@@ -526,6 +526,23 @@ describe('the round clock’s cues (AUD-01)', () => {
   });
 });
 
+describe('the Pick the Answer song (soundboard)', () => {
+  it('plays on a press; a second press while it plays is ignored (never two songs at once)', async () => {
+    const t = await eventRoom(['Ada']);
+    const cues = collect<{ cue: string; id: number }>(t.guests[0]!.room, SHOWDOWN_MSG.cue);
+    await start(t);
+    t.host.room.send(SHOWDOWN_MSG.cue, { cue: 'pickAnswer' });
+    t.host.room.send(SHOWDOWN_MSG.cue, { cue: 'pickAnswer' });
+    t.host.room.send(SHOWDOWN_MSG.cue, { cue: 'ding' });
+    await waitFor(() => cues.some((c) => c.cue === 'ding'), 2000, 'cues');
+    await sleep(150);
+    expect(cues.filter((c) => c.cue === 'pickAnswer')).toHaveLength(1);
+    // Guests can't play it.
+    t.guests[0]!.room.send(SHOWDOWN_MSG.cue, { cue: 'pickAnswer' });
+    await waitFor(() => t.guests[0]!.errors.some((e) => e.type === SHOWDOWN_MSG.cue), 2000, 'refused');
+  });
+});
+
 describe('Room DJ lock (AUD-04 C)', () => {
   it('a running Room DJ switches off when the event show starts and can’t start until the show ends', async () => {
     const t = await eventRoom(['Ada']);

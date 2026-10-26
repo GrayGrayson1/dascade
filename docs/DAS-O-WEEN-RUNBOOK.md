@@ -171,6 +171,9 @@ skipped; only the pool count shows).
   The top bar says so: "Sound: this console ✓ heard 2 s ago". To play the sound from a big screen
   instead, open **Sound** → **Make this the sound station** next to it. If that screen drops or goes
   quiet, your console takes over within 5 seconds and tells you.
+- The **Sound** tab's cue buttons play recorded sounds (applause, aww, ding, a snare drumroll, a
+  "dun dun dunnn" suspense), and **Pick the Answer** plays Brian's ~10-second song — a second press while
+  it plays is ignored, so it never stacks.
 - Phones never play the show's sounds.
 - The **jukebox** plays in breaks: it pauses itself when a question goes live and resumes on title
   cards, holding cards and the results — only if the show paused it. Room DJ is locked while the show runs.

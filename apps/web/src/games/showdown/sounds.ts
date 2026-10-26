@@ -86,10 +86,20 @@ export type ShowdownSound =
   /** The picker's sweep, from the draw to just before the landing (~3 s). */
   | 'spin'
   /** The picker lands on a name (Halloween: a bell and a D-major organ chord). */
-  | 'land';
+  | 'land'
+  /** The presenter's "Pick the Answer" button: Brian's song (recorded); a short jingle if the file can't load. */
+  | 'pickAnswer';
 
 /** Recorded overrides: `<sound>` for both looks, `<look>:<sound>` for one look. Empty = all procedural. */
-export const SHOWDOWN_SOUND_FILES: Partial<Record<ShowdownSound | `${ShowdownLook}:${ShowdownSound}`, string>> = {};
+export const SHOWDOWN_SOUND_FILES: Partial<Record<ShowdownSound | `${ShowdownLook}:${ShowdownSound}`, string>> = {
+  // Brian's soundboard picks (2026-10-26); sources and licences: apps/web/public/audio/showdown/README.md.
+  applause: '/audio/showdown/applause.mp3',
+  aww: '/audio/showdown/aww.mp3',
+  ding: '/audio/showdown/ding.mp3',
+  drumroll: '/audio/showdown/drumroll.mp3',
+  suspense: '/audio/showdown/suspense.mp3',
+  pickAnswer: '/audio/showdown/pick-the-answer.mp3',
+};
 
 export type Voice = (k: SfxKit, rand: () => number) => number;
 
@@ -462,6 +472,13 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
     }
     k.noise({ dur: 1.15, gain: 0.05, freq: 950, to: 480, q: 2.4, attack: 0.14 });
     return 1.2;
+  },
+  // "Pick the Answer" without its recording: a short game-show jingle (up a major arpeggio, a held chord).
+  pickAnswer: (k) => {
+    [72, 76, 79, 84].forEach((n, i) => k.tone({ type: 'triangle', freq: k.note(n), start: i * 0.14, dur: 0.22, gain: 0.07 }));
+    for (const n of [72, 76, 79, 84]) k.tone({ type: 'square', freq: k.note(n), start: 0.6, dur: 0.9, gain: 0.018, attack: 0.02 });
+    k.tone({ type: 'sine', freq: k.note(48), start: 0.6, dur: 0.9, gain: 0.06 });
+    return 1.6;
   },
   ding: (k) => {
     k.tone({ type: 'sine', freq: k.note(88), dur: 0.95, gain: 0.13 });
@@ -1010,6 +1027,7 @@ export const CUE_SOUND: Record<ShowdownCue, ShowdownSound> = {
   ding: 'ding',
   suspense: 'suspense',
   celebrate: 'special',
+  pickAnswer: 'pickAnswer',
 };
 
 // ---------------------------------------------------------------------------
@@ -1155,6 +1173,22 @@ function hold(seconds: number): void {
   const key = `showdown:${++holdSeq}`;
   synth.hold(key, true);
   setTimeout(() => synth.hold(key, false), seconds * 1000);
+}
+
+/**
+ * Decodes this look's recorded sounds ahead of time (once the AudioContext exists), so the first press
+ * of a recorded cue isn't late. Safe to call often: decode() caches per file.
+ */
+export function preloadShowSounds(look: ShowdownLook): void {
+  const ctx = synth.context;
+  if (!ctx) return;
+  const urls = new Set<string>();
+  for (const [key, url] of Object.entries(SHOWDOWN_SOUND_FILES)) {
+    if (!url) continue;
+    const [scope] = key.split(':');
+    if (!key.includes(':') || scope === look) urls.add(url);
+  }
+  for (const url of urls) void decode(url, ctx);
 }
 
 /** Plays a show sound now (a recorded override if one is mapped, else the procedural voice). */

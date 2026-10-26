@@ -41,7 +41,7 @@ import { jukeboxShowPause } from '../../audio/jukebox/engine.ts';
 import { useJukebox } from '../../audio/jukebox/store.ts';
 import { lineForCue, lineForEvent } from './look.ts';
 import { showFeed } from './fx.ts';
-import { CUE_SOUND, playShowSound, type ShowdownSound } from './sounds.ts';
+import { CUE_SOUND, playShowSound, preloadShowSounds, type ShowdownSound } from './sounds.ts';
 import { themeMusic } from './themeMusic.ts';
 import { rememberPass, storedPass, takeHashPass } from './access.ts';
 import { showdownApi } from './api.ts';
@@ -179,6 +179,11 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
     const t = setInterval(send, SHOWDOWN_AUDIO_BEAT_MS);
     return () => clearInterval(t);
   }, [beat, ready, silenced, sounds]);
+
+  // Recorded show sounds (Brian's soundboard) are decoded once audio is unlocked, so the first press isn't late.
+  useEffect(() => {
+    if (ready && sounds && mode === 'showcase') preloadShowSounds(look);
+  }, [ready, sounds, mode, look]);
 
   // Remember the presenter pass in this browser (for a refreshed tab or a second device).
   useEffect(() => {

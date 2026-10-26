@@ -37,6 +37,7 @@ import {
   SHOWDOWN_REACTION_KINDS,
   SHOWDOWN_REROLL_INFO,
   SHOWDOWN_ROLE_INFO,
+  SHOWDOWN_SONG_MS,
   SHOWDOWN_STATION_TIMEOUT_MS,
   ShowdownActSchema,
   ShowdownAssignSchema,
@@ -186,6 +187,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private reactions: ShowdownReactions = emptyReactions();
   private reactionsPending = false;
   private cueSeq = 0;
+  /** When the "Pick the Answer" song last started (it isn't stacked). */
+  private songAt = 0;
   /** Wrong answers this round (Presenter Showcase) and when the last one landed. */
   private misses = 0;
   private lastMissAt = 0;
@@ -765,6 +768,12 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   private cue(player: PlayerRecord, cue: string): void {
     if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.cue, 'not_host', 'Only the presenter plays sound cues.');
+    if (cue === 'pickAnswer') {
+      // A song: a second press while it's still playing is the same press.
+      const now = Date.now();
+      if (now - this.songAt < SHOWDOWN_SONG_MS) return;
+      this.songAt = now;
+    }
     this.broadcast(SHOWDOWN_MSG.cue, { cue, id: ++this.cueSeq });
   }
 

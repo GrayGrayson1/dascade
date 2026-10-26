@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NoiseSpec, ToneSpec } from '../../audio/voices.ts';
 
@@ -281,10 +283,41 @@ describe('show voices', () => {
     }
   });
 
-  it('every presenter cue has a sound, and no recorded file is mapped by default', () => {
-    for (const cue of SHOWDOWN_CUES) expect(SHOWDOWN_VOICES.showtime[CUE_SOUND[cue]]).toBeTypeOf('function');
+  it('every presenter cue has a sound (a procedural fallback too, for the recorded ones)', () => {
+    for (const cue of SHOWDOWN_CUES) {
+      for (const look of LOOKS) expect(SHOWDOWN_VOICES[look][CUE_SOUND[cue]], `${look} ${cue}`).toBeTypeOf('function');
+    }
     expect(CUE_SOUND.celebrate).toBe('special');
-    expect(SHOWDOWN_SOUND_FILES).toEqual({});
+    expect(CUE_SOUND.pickAnswer).toBe('pickAnswer');
+  });
+
+  it('every recorded file maps a real sound (or look:sound), exists in public/audio/showdown, and has a licence entry', () => {
+    const dir = join(import.meta.dirname, '..', '..', '..', 'public', 'audio', 'showdown');
+    const licences = readFileSync(join(dir, 'README.md'), 'utf8');
+    const sounds = new Set(Object.keys(SHOWDOWN_VOICES.showtime));
+    for (const [key, url] of Object.entries(SHOWDOWN_SOUND_FILES)) {
+      const [first, second] = key.split(':') as [string, string | undefined];
+      if (second !== undefined) {
+        expect(LOOKS as readonly string[], key).toContain(first);
+        expect(sounds.has(second), key).toBe(true);
+      } else expect(sounds.has(first), key).toBe(true);
+      expect(url, key).toMatch(/^\/audio\/showdown\/[a-z0-9-]+\.mp3$/);
+      const file = url!.replace('/audio/showdown/', '');
+      expect(existsSync(join(dir, file)), `${file} is missing`).toBe(true);
+      expect(licences, `${file} has no licence entry`).toContain(`\`${file}\``);
+    }
+  });
+
+  it('the Pick the Answer fallback jingle ends, has no NaN and stays short', () => {
+    for (const look of LOOKS) {
+      const { seconds, tones, noises } = record(look, 'pickAnswer');
+      expect(seconds).toBeGreaterThan(0);
+      expect(seconds).toBeLessThanOrEqual(2);
+      for (const o of [...tones, ...noises]) {
+        expect(Number.isFinite(o.dur) && Number.isFinite(o.gain ?? 0.2) && Number.isFinite(o.start ?? 0)).toBe(true);
+        expect((o.start ?? 0) + o.dur).toBeLessThanOrEqual(seconds + 0.05);
+      }
+    }
   });
 });
 

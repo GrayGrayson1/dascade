@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import {
   SHOWDOWN_CUES,
   SHOWDOWN_CUE_INFO,
+  SHOWDOWN_SONG_MS,
   SHOWDOWN_CARD_INFO,
   SHOWDOWN_MSG,
   showTitle,
@@ -38,7 +39,7 @@ import {
   type ShowdownSheetRound,
 } from '@dascade/shared/games/showdown';
 import { Badge, Button, Kbd, PixelIcon, Toggle } from '@dascade/ui';
-import { serverNow, session, useRoomSelector } from '../../net/hooks.ts';
+import { serverNow, session, useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
 import { Stage } from './Stage.tsx';
 import { useShowFeed } from './fx.ts';
 import { useStageWindow } from './stageWindow.ts';
@@ -1214,14 +1215,38 @@ function CuePanel({ onCue }: { onCue: (c: ShowdownCue) => void }) {
         <button type="button" className="sdc-cue sdc-cue--big" onClick={() => onCue('celebrate')}>
           <span aria-hidden>{SHOWDOWN_CUE_INFO.celebrate.icon}</span> Celebrate! <Kbd>C</Kbd>
         </button>
-        {SHOWDOWN_CUES.filter((c) => c !== 'celebrate').map((c) => (
-          <button key={c} type="button" className="sdc-cue" onClick={() => onCue(c)}>
-            <span aria-hidden>{SHOWDOWN_CUE_INFO[c].icon}</span>
-            {SHOWDOWN_CUE_INFO[c].title}
-          </button>
-        ))}
+        {SHOWDOWN_CUES.filter((c) => c !== 'celebrate').map((c) =>
+          c === 'pickAnswer' ? (
+            <SongCue key={c} onCue={onCue} />
+          ) : (
+            <button key={c} type="button" className="sdc-cue" onClick={() => onCue(c)}>
+              <span aria-hidden>{SHOWDOWN_CUE_INFO[c].icon}</span>
+              {SHOWDOWN_CUE_INFO[c].title}
+            </button>
+          ),
+        )}
       </div>
     </div>
+  );
+}
+
+/** "Pick the Answer": a ~10 s song, so it reads "Playing…" (and can't be stacked) until it's done. */
+function SongCue({ onCue }: { onCue: (c: ShowdownCue) => void }) {
+  const [playingUntil, setPlayingUntil] = useState(0);
+  useRoomMessage<{ cue: ShowdownCue }>(SHOWDOWN_MSG.cue, ({ cue }) => {
+    if (cue === 'pickAnswer') setPlayingUntil(Date.now() + SHOWDOWN_SONG_MS);
+  });
+  useEffect(() => {
+    if (!playingUntil) return;
+    const t = setTimeout(() => setPlayingUntil(0), Math.max(0, playingUntil - Date.now()));
+    return () => clearTimeout(t);
+  }, [playingUntil]);
+  const playing = playingUntil > 0;
+  return (
+    <button type="button" className="sdc-cue" disabled={playing} aria-live="polite" onClick={() => onCue('pickAnswer')}>
+      <span aria-hidden>{SHOWDOWN_CUE_INFO.pickAnswer.icon}</span>
+      {playing ? 'Playing…' : SHOWDOWN_CUE_INFO.pickAnswer.title}
+    </button>
   );
 }
 

@@ -620,7 +620,7 @@ export type ShowdownClockOp = Extract<ShowdownActPayload, { a: 'clock' }>['op'];
 /** A second wrong-answer press within this window is the same miss (a double click). */
 export const SHOWDOWN_MISS_GAP_MS = 450;
 
-export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense', 'celebrate'] as const;
+export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense', 'celebrate', 'pickAnswer'] as const;
 export type ShowdownCue = (typeof SHOWDOWN_CUES)[number];
 export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: string }> = {
   intro: { title: 'Intro sting', icon: '🎺' },
@@ -630,7 +630,13 @@ export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: strin
   ding: { title: 'Ding', icon: '🔔' },
   suspense: { title: 'Suspense', icon: '😬' },
   celebrate: { title: 'Celebrate!', icon: '🎉' },
+  pickAnswer: { title: 'Pick the Answer', icon: '🎵' },
 };
+/**
+ * "Pick the Answer" is a ~10-second song: a second press while it plays is ignored (by the server, so
+ * a double press never stacks two songs on the stage).
+ */
+export const SHOWDOWN_SONG_MS = 10_500;
 export const ShowdownCueSchema = z.object({ cue: z.enum(SHOWDOWN_CUES) }).strict();
 
 export const ShowdownTeamSchema = z.object({ team }).strict();
