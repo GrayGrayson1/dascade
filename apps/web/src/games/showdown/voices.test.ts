@@ -14,8 +14,9 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock('../../audio/audio.ts', () => ({ synth: mock.synth }));
 
-const { SHOWDOWN_VOICES, SHOWDOWN_SOUND_FILES, CUE_SOUND, FLIP_LAND_MS, eventSounds, playShowSound } = await import('./sounds.ts');
-const { SHOWDOWN_CUES } = await import('@dascade/shared/games/showdown');
+const { SHOWDOWN_VOICES, SHOWDOWN_SOUND_FILES, CUE_SOUND, FLIP_LAND_MS, SPIN_MIN_MS, eventSounds, pickSounds, playShowSound } =
+  await import('./sounds.ts');
+const { SHOWDOWN_CUES, SHOWDOWN_PICK_LAND_MS } = await import('@dascade/shared/games/showdown');
 type ShowdownEvent = import('@dascade/shared/games/showdown').ShowdownEvent;
 type ShowdownSound = import('./sounds.ts').ShowdownSound;
 
@@ -35,7 +36,14 @@ const SHOWCASE: ShowdownSound[] = [
   'timeup',
   'complete',
   'cardIn',
+  // AUD-01: the clock and the picker.
+  'oneMin',
+  'tick',
+  'spin',
+  'land',
 ];
+/** AUD-01's new cues (the Haunted Organ in Halloween Night, their own set in DAS Showtime). */
+const CLOCK_AND_PICKER: ShowdownSound[] = ['oneMin', 'tick', 'spin', 'land'];
 
 /** A deterministic random source (the voices get Math.random in the app). */
 function seeded(seed = 7): () => number {
@@ -187,6 +195,83 @@ describe('show voices', () => {
     }
   });
 
+  it('the clock and picker cues (AUD-01) end, stay finite and fit the shared noise buffer', () => {
+    for (const look of LOOKS) {
+      for (const name of CLOCK_AND_PICKER) {
+        const id = `${look}:${name}`;
+        const { seconds, tones, noises } = record(look, name);
+        expect(Number.isFinite(seconds) && seconds > 0, id).toBe(true);
+        for (const o of [...tones, ...noises]) {
+          for (const v of [o.start ?? 0, o.dur, o.gain ?? 0.2, o.attack ?? 0]) expect(Number.isNaN(v), id).toBe(false);
+        }
+        for (const o of tones) expect(Number.isNaN(o.freq) || Number.isNaN(o.to ?? 0) || Number.isNaN(o.detune ?? 0), id).toBe(false);
+        // Each noise layer plays whole: none outlasts the shared noise buffer.
+        for (const o of noises) expect(o.dur, id).toBeLessThanOrEqual(NOISE_BUFFER_S);
+        // Everything has stopped by the length the voice reports (plus the envelope's last 50 ms).
+        expect(span(tones, noises), id).toBeLessThanOrEqual(seconds + 0.05);
+      }
+    }
+  });
+
+  it('the clock and picker cues are paced for the show', () => {
+    for (const look of LOOKS) {
+      const len = (name: ShowdownSound) => record(look, name).seconds;
+      // 1:00 left: one toll (the studio's Haunted Organ prototype: 2.2 s).
+      expect(len('oneMin'), look).toBeGreaterThanOrEqual(1.5);
+      expect(len('oneMin'), look).toBeLessThanOrEqual(2.4);
+      // A tick is over well before the next one, a second later.
+      const tick = record(look, 'tick');
+      expect(tick.seconds, look).toBeLessThanOrEqual(0.5);
+      expect(span(tick.tones, tick.noises), look).toBeLessThanOrEqual(0.5);
+      // The spin runs under the stage's sweep and is over before the landing (SHOWDOWN_PICK_LAND_MS).
+      const spin = record(look, 'spin');
+      expect(spin.seconds, look).toBeGreaterThanOrEqual(2.5);
+      expect(span(spin.tones, spin.noises), look).toBeLessThanOrEqual(SHOWDOWN_PICK_LAND_MS / 1000 - 0.3);
+      // The land: a short hit, never as long as the special's celebration.
+      expect(len('land'), look).toBeGreaterThanOrEqual(1);
+      expect(len('land'), look).toBeLessThan(len('special'));
+    }
+  });
+
+  it('the clock and picker cues sit under the big moments: a tick is quiet, the toll and the land stay under the special', () => {
+    // Energy proxy over the loudest 400 ms window (the render check in .scratch/das-o-ween/audio measures LUFS).
+    const loudest = (look: (typeof LOOKS)[number], name: ShowdownSound) => {
+      const { tones, noises } = record(look, name);
+      const step = 0.005;
+      const frame: number[] = [];
+      for (let t = 0; t < 4; t += step) {
+        let e = 0;
+        for (const o of tones) e += envelope(o, t, 0.005) ** 2;
+        for (const o of noises) e += (envelope(o, t, 0, NOISE_BUFFER_S) * passed(o)) ** 2;
+        frame.push(e);
+      }
+      const win = Math.round(0.4 / step);
+      let best = 0;
+      for (let i = 0; i + win <= frame.length; i++) {
+        let sum = 0;
+        for (let j = i; j < i + win; j++) sum += frame[j]!;
+        best = Math.max(best, sum);
+      }
+      return best;
+    };
+    for (const look of LOOKS) {
+      const special = loudest(look, 'special');
+      const found = loudest(look, 'clang');
+      expect(loudest(look, 'oneMin'), look).toBeLessThan(special);
+      expect(loudest(look, 'land'), look).toBeLessThan(special);
+      expect(loudest(look, 'spin'), look).toBeLessThan(found);
+      // A tick is at least ~10 dB under a found answer.
+      expect(loudest(look, 'tick'), look).toBeLessThan(found / 10);
+    }
+  });
+
+  it('a Halloween wail resolves: the land is a D-major chord (F♯, never F)', () => {
+    const { tones } = record('halloween', 'land');
+    const has = (midi: number) => tones.some((o) => Math.abs(o.freq - NOTE(midi)) < 0.5);
+    expect(has(62) && has(66) && has(69), 'D F♯ A').toBe(true);
+    expect(has(65) || has(77), 'no F natural').toBe(false);
+  });
+
   it('a miss repeats cleanly: nothing loud rings past its buzz', () => {
     for (const look of LOOKS) {
       const { tones, noises } = record(look, 'miss');
@@ -252,12 +337,19 @@ const EVERY_EVENT: ShowdownEvent[] = [
   { type: 'timeup', rev: 1, round: 0 },
   { type: 'restart', rev: 1, round: 0 },
   { type: 'reset', rev: 1 },
+  { type: 'clockWarn', rev: 1, round: 0 },
+  { type: 'tick', rev: 1, round: 0, n: 10 },
+  { type: 'tick', rev: 1, round: 0, n: 1 },
+  { type: 'pick', rev: 1, drawNo: 1, winnerId: 'p1', name: 'Priya', poolSize: 12, landAt: 1_000_000, reroll: false },
+  { type: 'pick', rev: 1, drawNo: 2, winnerId: 'p2', name: 'Sam', poolSize: 11, landAt: 1_000_000, reroll: true },
+  { type: 'pickEnd', rev: 1, drawNo: 1, playerId: 'p1', how: 'done' },
+  { type: 'station', rev: 1, playerId: '', lost: true },
 ];
 
 describe('eventSounds', () => {
   it('covers every event type in both modes with real sounds and sane delays', () => {
     const types = new Set(EVERY_EVENT.map((e) => e.type));
-    expect(types.size).toBe(15);
+    expect(types.size).toBe(20);
     for (const mode of MODES) {
       for (const e of EVERY_EVENT) {
         const list = eventSounds(e, mode);
@@ -267,7 +359,9 @@ describe('eventSounds', () => {
           expect(Number.isFinite(delay) && delay >= 0 && delay <= 4000, `${mode}:${e.type} ${delay}`).toBe(true);
         }
         // Silent only where it should be.
-        if (e.type !== 'adjust' && !(e.type === 'sweep' && !e.on)) expect(list.length, `${mode}:${e.type}`).toBeGreaterThan(0);
+        const silent = e.type === 'adjust' || (e.type === 'sweep' && !e.on) || e.type === 'pickEnd' || e.type === 'station';
+        if (silent) expect(list, `${mode}:${e.type}`).toEqual([]);
+        else expect(list.length, `${mode}:${e.type}`).toBeGreaterThan(0);
       }
     }
   });
@@ -337,6 +431,47 @@ describe('eventSounds', () => {
     expect(eventSounds({ type: 'sweep', rev: 1, on: false }, 'showcase')).toEqual([]);
     expect(eventSounds({ type: 'suspense', rev: 1, slot: 4 }, 'showcase')).toEqual([['rollIn', 0]]);
     expect(eventSounds({ type: 'timeup', rev: 1, round: 0 }, 'showcase')).toEqual([['timeup', 0]]);
+  });
+
+  it('the clock: 1:00 left tolls once, each of the last ten seconds ticks', () => {
+    for (const mode of MODES) {
+      expect(eventSounds({ type: 'clockWarn', rev: 1, round: 1 }, mode)).toEqual([['oneMin', 0]]);
+      for (let n = 10; n >= 1; n--) expect(eventSounds({ type: 'tick', rev: 1, round: 1, n }, mode)).toEqual([['tick', 0]]);
+    }
+  });
+
+  it('the picker: the spin at once, the land as the stage lands (landAt); the end of a turn and a station move are silent', () => {
+    const landAt = 5_000_000;
+    const pick: ShowdownEvent = { type: 'pick', rev: 1, drawNo: 3, winnerId: 'p', name: 'Priya', poolSize: 9, landAt, reroll: false };
+    expect(eventSounds(pick, 'showcase')).toEqual([
+      ['spin', 0],
+      ['land', SHOWDOWN_PICK_LAND_MS],
+    ]);
+    // A reroll draws again: the same sweep.
+    expect(eventSounds({ ...pick, reroll: true } as ShowdownEvent, 'showcase')).toEqual(eventSounds(pick, 'showcase'));
+    expect(eventSounds({ type: 'pickEnd', rev: 1, drawNo: 3, playerId: 'p', how: 'noAnswer' }, 'showcase')).toEqual([]);
+    expect(eventSounds({ type: 'station', rev: 1, playerId: 'tv', lost: false }, 'showcase')).toEqual([]);
+  });
+
+  it('pickSounds times the land against the server clock, and drops the spin when it is too late for it', () => {
+    const landAt = 9_000_000;
+    // Heard the moment it was drawn.
+    expect(pickSounds(landAt, landAt - 3500)).toEqual([
+      ['spin', 0],
+      ['land', 3500],
+    ]);
+    // 400 ms late on a slow link: the land still lands with the stage.
+    expect(pickSounds(landAt, landAt - 3100)).toEqual([
+      ['spin', 0],
+      ['land', 3100],
+    ]);
+    // Too late for the sweep: the land alone.
+    expect(pickSounds(landAt, landAt - (SPIN_MIN_MS - 1))).toEqual([['land', SPIN_MIN_MS - 1]]);
+    // After the landing (a tab that woke up late): the land at once, never a negative delay.
+    expect(pickSounds(landAt, landAt + 800)).toEqual([['land', 0]]);
+    // A wild clock never schedules a land far in the future, and a bad value never throws.
+    expect(pickSounds(landAt, landAt - 60_000)[1]).toEqual(['land', 2 * SHOWDOWN_PICK_LAND_MS]);
+    expect(pickSounds(Number.NaN, landAt)).toEqual([['land', 0]]);
   });
 
   it('builds the crescendo: a found answer < the board complete < the special answer (more sound, for longer)', () => {
