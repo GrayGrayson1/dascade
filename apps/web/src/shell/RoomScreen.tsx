@@ -3,7 +3,7 @@
  * Lobby or the game's GameView based on phase. Handles every connection /
  * error / removal state with a friendly screen.
  */
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GAME_CATALOG, isGameId, isValidRoomCode, normalizeRoomCode, type GameId } from '@dascade/shared';
 import { Button, GameTheme, Panel, Spinner, type IconName } from '@dascade/ui';
@@ -18,6 +18,8 @@ import { Lobby } from './Lobby.tsx';
 import { ShellMenu, TopBar } from './TopBar.tsx';
 import { NoticeCard, ProfileEditor, commitProfileName } from './common.tsx';
 import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './Reconnect.tsx';
+import { ShowRecovery, canRecover } from './ShowRecovery.tsx';
+import { recoveringCode, subscribeRecovery } from '../net/recovery.ts';
 import { crumbCabinet } from './crumbs.ts';
 import { shouldLeaveBeforeResolving, shouldLeaveOnExit } from './roomPath.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
@@ -38,6 +40,10 @@ export function RoomScreen() {
   const removed = useSessionStore((s) => s.removed);
   const [resolving, setResolving] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
+  /** The player stopped waiting for a restarted event room to come back (or it couldn't be). */
+  const [gaveUp, setGaveUp] = useState(false);
+  const [recoveryFailed, setRecoveryFailed] = useState<string | null>(null);
+  const recovering = useSyncExternalStore(subscribeRecovery, recoveringCode, () => null) === code;
 
   // Resolve: existing session → resume from stored seat → prompt to join.
   useEffect(() => {
@@ -114,6 +120,37 @@ export function RoomScreen() {
     // room's replayed private messages, Phaser scene or local state.
     return <ActiveRoom key={code} gameId={gameId} code={code} />;
   }
+  // A restarted server ended an event room this device can bring back (or wait for): do that first.
+  // Only a restart counts — not "this seat was opened in another tab" (idle + reconnect_failed), which
+  // would make two tabs take the seat from each other forever.
+  const restartError = status === 'lost' || Boolean(error && RECOVERABLE_ERRORS.has(error.kind));
+  if (noticeHere && !gaveUp && (recovering || (restartError && canRecover(code)))) {
+    return (
+      <ShowRecovery
+        code={code}
+        onGiveUp={() => {
+          setGaveUp(true);
+          session.clearNotices();
+          navigate('/');
+        }}
+        onFailed={(message) => {
+          setGaveUp(true);
+          setRecoveryFailed(message);
+        }}
+      />
+    );
+  }
+  if (recoveryFailed && noticeHere) {
+    return (
+      <ErrorScreen
+        error={{ kind: 'restore_failed', title: 'The show couldn’t be brought back', message: recoveryFailed, retryable: false }}
+        onBack={() => {
+          session.clearNotices();
+          navigate('/');
+        }}
+      />
+    );
+  }
   if ((status === 'lost' || error) && noticeHere) {
     const err: FriendlyError = error ?? friendly('reconnect_failed');
     if (err.kind === 'reconnect_failed') {
@@ -156,6 +193,9 @@ export function RoomScreen() {
   }
   return <LoadingScreen label="Loading…" />;
 }
+
+/** Errors a restarted server leaves behind (the room is gone, or not back yet). */
+const RECOVERABLE_ERRORS: ReadonlySet<string> = new Set(['server_restarted', 'not_found', 'server_unavailable']);
 
 function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
   const navigate = useNavigate();
@@ -291,14 +331,7 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
               Arcade
             </Button>
             <span className="dc-spacer" />
-            <Button
-              variant="primary"
-              size="lg"
-              icon="play"
-              loading={busy}
-              disabled={!canPlay || lookup?.exists === false}
-              onClick={join}
-            >
+            <Button variant="primary" size="lg" icon="play" loading={busy} disabled={!canPlay || lookup?.exists === false} onClick={join}>
               Join game
             </Button>
           </div>

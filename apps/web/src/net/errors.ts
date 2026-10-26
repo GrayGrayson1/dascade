@@ -11,6 +11,8 @@ export type FriendlyErrorKind =
   | 'match_ended'
   | 'rate_limited'
   | 'reconnect_failed'
+  | 'name_taken'
+  | 'restore_failed'
   | 'unknown';
 
 export interface FriendlyError {
@@ -52,6 +54,14 @@ export const ERRORS: Record<FriendlyErrorKind, Omit<FriendlyError, 'kind'>> = {
     message: 'We couldn’t reconnect you to the room automatically.',
     retryable: true,
   },
+  // strictName joins: `message` is the name the room would give instead ("Sam 2").
+  name_taken: { title: 'That name is taken', message: '', retryable: true },
+  restore_failed: {
+    title: 'The show couldn’t be restored',
+    message:
+      'The server refused the saved show (it may be too old, or the room code is in use again). Start a new room and load your show file.',
+    retryable: false,
+  },
   unknown: { title: 'Something went wrong', message: 'An unexpected error occurred. Please try again.', retryable: true },
 };
 
@@ -78,6 +88,10 @@ export function toFriendlyError(err: unknown): FriendlyError {
       return friendly('match_ended');
     case JoinErrorCode.RATE_LIMITED:
       return friendly('rate_limited', msg || undefined);
+    case JoinErrorCode.NAME_TAKEN:
+      return friendly('name_taken', msg);
+    case JoinErrorCode.RESTORE_FAILED:
+      return friendly('restore_failed');
     case 522: // MATCHMAKE_INVALID_ROOM_ID
       if (/locked/i.test(msg)) return friendly('room_full', 'This room is full or locked right now.');
       return friendly('not_found');

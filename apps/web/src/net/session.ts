@@ -38,6 +38,7 @@ import { useApp } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { sfx } from '../audio/audio.ts';
 import { registerDjSession } from '../audio/jukebox/roomDj.ts';
+import { forgetRoom, isRecoverable, loadBlackBox } from './recovery.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 
@@ -300,6 +301,8 @@ function resetBus(): void {
 }
 
 const RECONNECT_MAX_DELAY_MS = 4000;
+/** How often a reconnecting client asks whether its room still exists (see attach()). */
+const RESTART_PROBE_MS = 5000;
 
 /** Auto-reconnect attempts that cover a seat held for `graceSeconds` (retries back off to 4 s apart). */
 function retriesFor(graceSeconds: number): number {
@@ -372,6 +375,7 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
         // navigation in between must not try to rejoin a closed room / a seat we were kicked from.
         removalNotified = true;
         clearSeat(room.roomId);
+        forgetRoom(room.roomId);
         useSessionStore.setState({ removed: payload as RemovedPayload });
         break;
       case CHAT.history:
@@ -390,12 +394,43 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
     bumpState();
   });
 
+  // While the SDK retries, ask the server about the room every few seconds. A restart (a crash or a
+  // deploy) leaves a reconnection token nothing can honour: retrying would only wait out the seat's
+  // whole grace period (30 minutes for an event room's presenter) in front of a dead screen.
+  let probe: ReturnType<typeof setInterval> | null = null;
+  let answeredWhileDown = 0;
+  const stopProbe = () => {
+    if (probe) clearInterval(probe);
+    probe = null;
+  };
+  const roomGone = (kind: 'server_restarted' | 'reconnect_failed') => {
+    stopProbe();
+    attachGeneration++;
+    stopClockSync();
+    room.reconnection.maxRetries = 0;
+    useSessionStore.setState({ status: 'lost', room: null, error: friendly(kind) });
+  };
   room.onDrop(() => {
     if (!alive()) return;
     useSessionStore.setState({ status: 'reconnecting' });
+    stopProbe();
+    answeredWhileDown = 0;
+    probe = setInterval(() => {
+      if (!alive() || useSessionStore.getState().status !== 'reconnecting') return stopProbe();
+      lookup(room.roomId)
+        .then((info) => {
+          if (!alive() || useSessionStore.getState().status !== 'reconnecting') return;
+          // The server answers and the room is gone: it restarted.
+          if (!info.exists) return roomGone('server_restarted');
+          // It's back (an event room restored from its black box) but our old session can't be: rejoin by seat.
+          if (++answeredWhileDown >= 2 && (isRecoverable(room.roomId) || loadBlackBox(room.roomId))) roomGone('reconnect_failed');
+        })
+        .catch(() => undefined); // unreachable: keep retrying
+    }, RESTART_PROBE_MS);
   });
 
   room.onReconnect(() => {
+    stopProbe();
     // An in-flight retry can still succeed after the player left or moved to another room:
     // leave properly instead of keeping a ghost connection on the old seat.
     if (!alive()) {
@@ -410,6 +445,7 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
   });
 
   room.onLeave((code: number) => {
+    stopProbe();
     if (!alive()) return;
     stopClockSync();
     const state = useSessionStore.getState();
@@ -433,7 +469,11 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
     }
     if (code === CLOSE_CONSENTED) {
       // Consented close initiated by the server (e.g. seat reclaimed elsewhere).
-      useSessionStore.setState({ status: 'idle', room: null, error: friendly('reconnect_failed', 'This seat was opened in another tab or window.') });
+      useSessionStore.setState({
+        status: 'idle',
+        room: null,
+        error: friendly('reconnect_failed', 'This seat was opened in another tab or window.'),
+      });
       return;
     }
     if (code === CLOSE_SERVER_SHUTDOWN) {
@@ -492,6 +532,7 @@ async function leaveCurrent(): Promise<void> {
   if (!room) return;
   leavingIntentionally = true;
   clearSeat(room.roomId);
+  forgetRoom(room.roomId);
   attachGeneration++;
   stopClockSync();
   // Drop the old room's cached private payloads/snapshot now, not only when the next room attaches
@@ -515,7 +556,15 @@ export const session = {
   /** Look up a room code before joining (for routing to the right cabinet). */
   lookup,
 
-  async createRoom(gameId: GameId, extra: { solo?: boolean; settings?: Record<string, unknown>; roomName?: string } = {}): Promise<string | null> {
+  /** This browser holds a seat for that room (it can rejoin it by seat token). */
+  hasSeat(rawCode: string): boolean {
+    return loadSeat(normalizeRoomCode(rawCode)) !== null;
+  },
+
+  async createRoom(
+    gameId: GameId,
+    extra: { solo?: boolean; settings?: Record<string, unknown>; roomName?: string } = {},
+  ): Promise<string | null> {
     const my = ++intent;
     await leaveCurrent();
     if (my !== intent) return null;
@@ -533,7 +582,10 @@ export const session = {
   },
 
   /** Join by code. Reuses a stored seat token for this code when present (rejoin). */
-  async joinRoom(rawCode: string, extra: { spectator?: boolean; ticket?: string } = {}): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
+  async joinRoom(
+    rawCode: string,
+    extra: { spectator?: boolean; ticket?: string; strictName?: boolean } = {},
+  ): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
     const code = normalizeRoomCode(rawCode);
     if (!isValidRoomCode(code)) {
       const error = friendly('invalid_code');
@@ -566,6 +618,30 @@ export const session = {
     } catch (err) {
       const error = toFriendlyError(err);
       // A newer create/join/leave owns the store now: don't paint this failure over it.
+      if (my === intent) useSessionStore.setState({ status: 'idle', error, code });
+      return { ok: false, error };
+    }
+  },
+
+  /**
+   * After a server restart: hand a sealed room snapshot (a black box, see ./recovery.ts) back to the
+   * server, which recreates the room under its old code; this browser rejoins its own seat in it.
+   */
+  async restoreRoom(gameId: GameId, rawCode: string, blob: string): Promise<{ ok: true } | { ok: false; error: FriendlyError }> {
+    const code = normalizeRoomCode(rawCode);
+    // Read the seat before anything else: it's how the restored room recognises this browser.
+    const seat = loadSeat(code);
+    const my = ++intent;
+    await leaveCurrent();
+    if (my !== intent) return { ok: false, error: friendly('unknown', 'The restore was cancelled.') };
+    useSessionStore.setState({ ...initial, status: 'connecting', code, gameId });
+    try {
+      const room = await getClient().create(gameId, await joinOptions({ restore: blob, ...(seat ? { seatToken: seat.seatToken } : {}) }));
+      if (superseded(my, room)) return { ok: false, error: friendly('unknown', 'The restore was cancelled.') };
+      attach(room, gameId);
+      return { ok: true };
+    } catch (err) {
+      const error = toFriendlyError(err);
       if (my === intent) useSessionStore.setState({ status: 'idle', error, code });
       return { ok: false, error };
     }
@@ -614,7 +690,8 @@ export const session = {
     spectate: (spectator: boolean) => session.send(LOBBY.spectate, { spectator }),
     profile: (patch: { name?: string; avatar?: string }) => session.send(LOBBY.profile, patch),
     settings: (settings: Record<string, unknown>) => session.send(LOBBY.settings, { settings }),
-    room: (patch: { roomName?: string; locked?: boolean; maxPlayers?: number; allowSpectators?: boolean }) => session.send(LOBBY.room, patch),
+    room: (patch: { roomName?: string; locked?: boolean; maxPlayers?: number; allowSpectators?: boolean }) =>
+      session.send(LOBBY.room, patch),
     kick: (playerId: string) => session.send(LOBBY.kick, { playerId }),
     transferHost: (playerId: string) => session.send(LOBBY.transferHost, { playerId }),
     start: () => session.send(LOBBY.start, {}),
