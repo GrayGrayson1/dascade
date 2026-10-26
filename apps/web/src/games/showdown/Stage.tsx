@@ -9,9 +9,11 @@
  * Sizes use container units (the stage is a size container), so the same stage fills a projector,
  * a laptop window or a 16:9 preview card.
  */
-// The stage's stylesheets, in cascade order: the base stage, then the showcase layer on top of it.
+// The stage's stylesheets, in cascade order: the base stage, the showcase layer on top of it, then the
+// showcase's pick layers (the Spotlight picker and the hot-seat podium).
 import './showdown.css';
 import './stageShowcase.css';
+import './picker.css';
 import { type CSSProperties, type ReactNode } from 'react';
 import {
   SHOWDOWN_TEAMS,
@@ -30,10 +32,22 @@ import { Backdrop, Bulbs, Pumpkin } from './Decor.tsx';
 import { HostFigure } from './Host.tsx';
 import { LOOK_COPY, cardLine, idleLine, joinAddress, lineForFinale, type HostLine } from './look.ts';
 import { useShowFeed, type ShowFeed } from './fx.ts';
-import { useBoard, useCard, useFinale, useHype, useMode, useMotion, useRosters, useShowCode, useShowPhase, type MotionPrefs } from './state.ts';
+import {
+  useBoard,
+  useCard,
+  useFinale,
+  useHype,
+  useMode,
+  useMotion,
+  useRosters,
+  useShowCode,
+  useShowPhase,
+  type MotionPrefs,
+} from './state.ts';
 import { Confetti, Reactions, useRecent } from './stageFx.tsx';
 import { ShowcaseStage } from './stageShowcase.tsx';
 import { CardScene } from './scenes.tsx';
+import type { DisplayContext } from './display.ts';
 
 export { useRecent } from './stageFx.tsx';
 
@@ -45,6 +59,11 @@ export interface StageProps {
   variant: StageVariant;
   /** Extra controls in the corner (fullscreen button on big screens). */
   corner?: ReactNode;
+  /**
+   * Presenter Showcase: where this stage is drawn, for its display profile (DSP-02). Optional — the
+   * stage works it out from the page (the stage window, the console, a big screen, else its size).
+   */
+  display?: DisplayContext;
 }
 
 export function Stage(props: StageProps) {
@@ -76,7 +95,10 @@ function ClassicStage({ look, settings, variant, corner }: StageProps) {
   const cleared = ev?.e.type === 'reveal' && ev.e.cleared;
   const bigAward = ev?.e.type === 'award' && (ev.e.how === 'sweep' || ev.e.how === 'steal');
   const party = useRecent(cleared || bigAward ? ev?.at : feed.cue?.cue === 'applause' ? feed.cue.at : undefined, 3600);
-  const cueFx = useRecent(feed.cue && (feed.cue.cue === 'drumroll' || feed.cue.cue === 'suspense') ? feed.cue.at : undefined, feed.cue?.cue === 'drumroll' ? 3200 : 2800);
+  const cueFx = useRecent(
+    feed.cue && (feed.cue.cue === 'drumroll' || feed.cue.cue === 'suspense') ? feed.cue.at : undefined,
+    feed.cue?.cue === 'drumroll' ? 3200 : 2800,
+  );
 
   const inShow = phase === 'PLAYING' && board !== null;
   const stage = inShow ? board.stage : phase === 'RESULTS' ? 'finale' : 'lobby';
@@ -103,7 +125,15 @@ function ClassicStage({ look, settings, variant, corner }: StageProps) {
             <TopRow board={board} settings={settings} code={code} look={look} />
             <Arena board={board} names={names} look={look} motion={motion} copy={copy.bank} hype={copy.hype} topFlash={top} />
             {board.stage === 'intro' ? <IntroCard settings={settings} code={code} look={look} names={names} /> : null}
-            {roundSplash && ev?.e.type === 'round' ? <RoundSplash key={ev.e.rev} round={ev.e.round} total={board.totalRounds} multiplier={ev.e.multiplier} answers={board.slots.length} /> : null}
+            {roundSplash && ev?.e.type === 'round' ? (
+              <RoundSplash
+                key={ev.e.rev}
+                round={ev.e.round}
+                total={board.totalRounds}
+                multiplier={ev.e.multiplier}
+                answers={board.slots.length}
+              />
+            ) : null}
             {board.stage === 'steal' && stealSplash ? <StealBanner board={board} names={names} /> : null}
             {strike && ev?.e.type === 'strike' ? <StrikeX key={ev.e.rev} count={ev.e.stealFailed ? 1 : ev.e.strikes} /> : null}
             {award && ev?.e.type === 'award' && ev.e.team !== -1 && ev.e.points > 0 ? (
@@ -118,7 +148,9 @@ function ClassicStage({ look, settings, variant, corner }: StageProps) {
       </div>
       <HostCorner look={look} feed={feed} board={board} names={names} finale={phase === 'RESULTS' ? finale : null} card={card} />
       <Reactions feed={feed} look={look} motion={motion} />
-      {party && motion.particles > 0 ? <Confetti key={`${ev?.at ?? 0}-${feed.cue?.id ?? 0}`} count={Math.round(motion.particles * 1.2)} look={look} /> : null}
+      {party && motion.particles > 0 ? (
+        <Confetti key={`${ev?.at ?? 0}-${feed.cue?.id ?? 0}`} count={Math.round(motion.particles * 1.2)} look={look} />
+      ) : null}
       {corner ? <div className="sd-stage__corner">{corner}</div> : null}
     </div>
   );
@@ -126,7 +158,17 @@ function ClassicStage({ look, settings, variant, corner }: StageProps) {
 
 // ---------------------------------------------------------------------------
 
-function TopRow({ board, settings, code, look }: { board: ShowdownBoardView; settings: ShowdownSettings | null; code: string; look: ShowdownLook }) {
+function TopRow({
+  board,
+  settings,
+  code,
+  look,
+}: {
+  board: ShowdownBoardView;
+  settings: ShowdownSettings | null;
+  code: string;
+  look: ShowdownLook;
+}) {
   const join = joinAddress(code);
   const mult = board.multiplier > 1;
   const title = settings ? showTitle(settings).replace(/^DAS\s+/i, '') : 'Survey Showdown';
@@ -201,7 +243,9 @@ function Arena({
       ))}
       <section className="sd-center">
         <div className="sd-question" data-shown={promptShown ? 'true' : undefined}>
-          <span className="sd-question__text">{promptShown ? board.prompt : board.stage === 'title' ? `Round ${board.round + 1} — get ready!` : LOOK_COPY[look].waiting}</span>
+          <span className="sd-question__text">
+            {promptShown ? board.prompt : board.stage === 'title' ? `Round ${board.round + 1} — get ready!` : LOOK_COPY[look].waiting}
+          </span>
         </div>
         <div className="sd-boardframe" data-top={topFlash ? 'true' : undefined}>
           <Board board={board} highlight={topFlash ? 0 : -1} />
@@ -313,7 +357,10 @@ function IntroCard({
   const rosters = useRosters();
   const join = joinAddress(code);
   const title = settings ? showTitle(settings) : 'DAS Survey Showdown';
-  const words = title.replace(/^DAS\s+/i, '').split(/\s+/).filter(Boolean);
+  const words = title
+    .replace(/^DAS\s+/i, '')
+    .split(/\s+/)
+    .filter(Boolean);
   return (
     <section className="sd-intro" data-waiting={waiting ? 'true' : undefined}>
       <div className="sd-intro__rays" aria-hidden />
@@ -330,7 +377,12 @@ function IntroCard({
       <p className="sd-intro__tagline">{LOOK_COPY[look].tagline}</p>
       <div className="sd-versus">
         {([0, 1] as const).map((team) => (
-          <div key={team} className="sd-versus__team" data-team={SHOWDOWN_TEAMS[team].id} style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}>
+          <div
+            key={team}
+            className="sd-versus__team"
+            data-team={SHOWDOWN_TEAMS[team].id}
+            style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}
+          >
             <span className="sd-versus__name">{names[team]}</span>
             <span className="sd-versus__count">
               <span className="sd-num">{rosters[team].length}</span> {rosters[team].length === 1 ? 'player' : 'players'}
@@ -371,7 +423,12 @@ function RoundSplash({ round, total, multiplier, answers }: { round: number; tot
 function StealBanner({ board, names }: { board: ShowdownBoardView; names: [string, string] }) {
   const stealer = board.control === 0 ? 1 : 0;
   return (
-    <div className="sd-steal" data-team={SHOWDOWN_TEAMS[stealer].id} style={{ '--team': SHOWDOWN_TEAMS[stealer].color } as CSSProperties} role="status">
+    <div
+      className="sd-steal"
+      data-team={SHOWDOWN_TEAMS[stealer].id}
+      style={{ '--team': SHOWDOWN_TEAMS[stealer].color } as CSSProperties}
+      role="status"
+    >
       <span className="sd-steal__word">Steal!</span>
       <span className="sd-steal__who">{names[stealer]} — one guess to take the bank</span>
     </div>
@@ -392,7 +449,12 @@ function StrikeX({ count }: { count: number }) {
 
 function AwardFlight({ team, points, name }: { team: TeamIndex; points: number; name: string }) {
   return (
-    <div className="sd-flight" data-side={team === 0 ? 'left' : 'right'} style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties} aria-hidden>
+    <div
+      className="sd-flight"
+      data-side={team === 0 ? 'left' : 'right'}
+      style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}
+      aria-hidden
+    >
       <span className="sd-flight__chip">
         +<span className="sd-num">{points}</span>
       </span>
@@ -410,14 +472,22 @@ function FinaleCard({ finale, look, motion }: { finale: ShowdownFinale; look: Sh
       <p className="sd-finale__kicker">{LOOK_COPY[look].winner}</p>
       <h2
         className="sd-finale__winner"
-        style={{ '--len': Array.from(winnerText).length, ...(winner === -1 ? {} : { '--team': SHOWDOWN_TEAMS[winner].color }) } as CSSProperties}
+        style={
+          { '--len': Array.from(winnerText).length, ...(winner === -1 ? {} : { '--team': SHOWDOWN_TEAMS[winner].color }) } as CSSProperties
+        }
         data-motion={motion.motion ? 'on' : 'off'}
       >
         {winnerText}
       </h2>
       <div className="sd-finale__scores">
         {([0, 1] as const).map((team) => (
-          <div key={team} className="sd-finale__team" data-team={SHOWDOWN_TEAMS[team].id} data-won={winner === team ? 'true' : undefined} style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}>
+          <div
+            key={team}
+            className="sd-finale__team"
+            data-team={SHOWDOWN_TEAMS[team].id}
+            data-won={winner === team ? 'true' : undefined}
+            style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}
+          >
             <span className="sd-finale__name">{finale.names[team]}</span>
             <span className="sd-num sd-finale__score">{finale.scores[team]}</span>
             <span className="sd-finale__members">{finale.members[team].slice(0, 10).join(' · ')}</span>

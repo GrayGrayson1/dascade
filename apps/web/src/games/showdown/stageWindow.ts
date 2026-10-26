@@ -8,10 +8,21 @@
  * instantly, plays no sound of its own (the console plays it once) and needs no join.
  *
  * The window starts as about:blank (same origin). We copy the page's stylesheets and <html>
- * attributes (theme, motion, effects) into it and keep them in sync, so it looks exactly like the app.
- * Devices that aren't the presenter's (a TV, a conference-room PC) use the big-screen link instead.
+ * attributes (motion, effects) into it and keep them in sync, so it looks exactly like the app — but
+ * the stage's fonts are pinned to the show's (DSP-02, finding F8): the presenter's DASCADE theme never
+ * changes the type on the share. Devices that aren't the presenter's (a TV, a conference-room PC) use
+ * the big-screen link instead.
+ *
+ * Its title says what it is in any window picker: "<show> — STAGE (share this)" (PRS-05 C), against
+ * the console's "🔒 PRESENTER — don't share".
+ *
+ * Continuity (OPS-01 C): when the console page loses its room for a moment (a connection loss in an
+ * event room), holdStageWindow() keeps the window open and puts a calm "We'll be right back" card in
+ * it; the window, its document and the portal container stay as they are, so the next ShowdownView to
+ * mount portals the stage straight back into the same window — and that clears the card.
  */
 import { useSyncExternalStore } from 'react';
+import { SHOW_FONTS } from './display.ts';
 
 export interface StageWindowState {
   /** Where the portal renders (null while closed). */
@@ -29,10 +40,18 @@ let state: StageWindowState = { container: null, open: false };
 const listeners = new Set<() => void>();
 let cleanup: (() => void) | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
+/** The look the stage was last drawn in (the hold card wears it), and the watcher that notes it. */
+let lastLook = '';
+let containerObserver: MutationObserver | null = null;
 
 function emit(next: StageWindowState): void {
   state = next;
   for (const l of [...listeners]) l();
+}
+
+/** "DAS-O-Ween Trivia — STAGE (share this)": the window to pick in Teams' share dialog. */
+export function stageWindowTitle(showTitle: string): string {
+  return `${showTitle || 'DAS Survey Showdown'} — STAGE (share this)`;
 }
 
 const COPY_ATTR = 'data-sd-copy';
@@ -108,8 +127,39 @@ function prepare(w: Window): HTMLElement {
   target.body.className = 'sd-window';
   const root = target.createElement('div');
   root.className = 'sd-window__root';
+  pinShowFonts(root);
   target.body.appendChild(root);
   return root;
+}
+
+/** The show's fonts on an element (inline: no theme stylesheet copied into the window can override them). */
+function pinShowFonts(el: HTMLElement): void {
+  for (const [name, value] of Object.entries(SHOW_FONTS)) el.style.setProperty(name, value);
+}
+
+const HOLD_CLASS = 'sd-window__hold';
+
+/** Takes the hold card down (the stage is back). */
+function clearHold(target: Document): void {
+  for (const card of [...target.querySelectorAll(`.${HOLD_CLASS}`)]) card.remove();
+}
+
+/**
+ * Watches the portal container: notes the look the stage is drawn in, and takes the hold card down
+ * the moment a stage renders into the container again.
+ */
+function watchContainer(container: HTMLElement): void {
+  containerObserver?.disconnect();
+  const view = container.ownerDocument.defaultView as (Window & typeof globalThis) | null;
+  const Observer = view?.MutationObserver ?? MutationObserver;
+  const note = () => {
+    const look = container.querySelector('[data-look]')?.getAttribute('data-look');
+    if (look) lastLook = look;
+    if (container.firstElementChild) clearHold(container.ownerDocument);
+  };
+  containerObserver = new Observer(note);
+  containerObserver.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-look'] });
+  note();
 }
 
 /** A notice left in the stage window when the console page goes away (reload, navigation). */
@@ -139,7 +189,13 @@ function watch(w: Window): () => void {
     }
     sync(changed);
   });
-  headObserver.observe(document.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'media', 'rel', 'disabled'] });
+  headObserver.observe(document.head, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['href', 'media', 'rel', 'disabled'],
+  });
   const rootObserver = new MutationObserver(() => copyRootAttributes(w.document));
   rootObserver.observe(document.documentElement, { attributes: true });
   const onUnload = () => orphan(w);
@@ -168,6 +224,7 @@ function build(w: Window): boolean {
     const container = prepare(w);
     cleanup?.();
     cleanup = watch(w);
+    watchContainer(container);
     doc = w.document;
     renavigated = false;
     emit({ container, open: true });
@@ -214,7 +271,7 @@ export function openStageWindow(code: string, showTitle: string): boolean {
   }
   if (!w) return false;
   win = w;
-  title = `${showTitle} — Stage`;
+  title = stageWindowTitle(showTitle);
   doc = null;
   renavigated = false;
   if (!build(w)) check();
@@ -233,7 +290,7 @@ export function openStageWindow(code: string, showTitle: string): boolean {
  * change after the window opened — loading an event preset, editing the show title.
  */
 export function setStageWindowTitle(showTitle: string): void {
-  const next = `${showTitle} — Stage`;
+  const next = stageWindowTitle(showTitle);
   if (next === title) return;
   title = next;
   try {
@@ -246,6 +303,8 @@ export function setStageWindowTitle(showTitle: string): void {
 export function closeStageWindow(closeIt = true): void {
   cleanup?.();
   cleanup = null;
+  containerObserver?.disconnect();
+  containerObserver = null;
   if (poll) clearInterval(poll);
   poll = null;
   if (closeIt && win && !win.closed) {
@@ -258,6 +317,56 @@ export function closeStageWindow(closeIt = true): void {
   win = null;
   doc = null;
   if (state.open) emit({ container: null, open: false });
+}
+
+/** The stage window is open (the presenter shares it in the meeting). */
+export function stageWindowOpen(): boolean {
+  try {
+    return Boolean(win && !win.closed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keeps the stage window open through a moment without the room (OPS-01 C) and shows a calm, still
+ * card in it — "We'll be right back" — in the show's look, instead of a blank window on the share.
+ * Nothing else changes: the window, its document and the portal container stay, so the next stage
+ * that renders into the container (a remounted ShowdownView re-portals into this same window) takes
+ * the card down by itself. A no-op when no stage window is open.
+ *
+ * Plain DOM in a sibling of the portal container (React owns the container's children), text only,
+ * no animation.
+ */
+export function holdStageWindow(card: { title: string; line: string }): void {
+  if (!win || win.closed || !state.container) return;
+  try {
+    const target = state.container.ownerDocument;
+    clearHold(target);
+    const hold = target.createElement('div');
+    hold.className = `${HOLD_CLASS} sd-stage`;
+    hold.setAttribute('data-mode', 'showcase');
+    hold.setAttribute('data-look', lastLook === 'showtime' ? 'showtime' : 'halloween');
+    hold.setAttribute('data-motion', 'off');
+    hold.setAttribute('role', 'status');
+    pinShowFonts(hold);
+    const plate = target.createElement('div');
+    plate.className = 'sd-window__hold-plate';
+    const badge = target.createElement('span');
+    badge.className = 'sd-logo-badge';
+    badge.textContent = 'DAS';
+    const heading = target.createElement('p');
+    heading.className = 'sd-window__hold-title';
+    heading.textContent = card.title;
+    const line = target.createElement('p');
+    line.className = 'sd-window__hold-line';
+    line.textContent = card.line;
+    plate.append(badge, heading, line);
+    hold.append(plate);
+    target.body.append(hold);
+  } catch {
+    /* the window's page can't be reached right now: nothing to hold */
+  }
 }
 
 export function useStageWindow(): StageWindowState {

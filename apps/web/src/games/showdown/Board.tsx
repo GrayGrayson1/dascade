@@ -5,7 +5,8 @@
  * Team Showdown tiles show the survey points. Presenter Showcase tiles show the answer's rank, its
  * small note (artist, year…) and no points; a tile nobody found (revealed by Reveal remaining) is
  * muted, and the special answer's slot (a public position, never its text) carries a marker the
- * crowd can hunt for, then a permanent frame once it's up.
+ * crowd can hunt for, then a permanent frame once it's up. A tile flipped while someone was in the
+ * hot seat credits them ("called by Priya S."): the server sends `calledBy` only once it's revealed.
  *
  * Fresh reveals only: a tile animates when it turns while mounted, so a late joiner (or a refreshed
  * screen) sees tiles already turned. Every tile animates on its own, so overlapping reveals (a fast
@@ -29,9 +30,18 @@ export interface BoardProps {
   spotlight?: number;
   /** The special label (look copy). */
   specialLabel?: string;
+  /** The hot-seat credit's words (look copy): "called by". */
+  creditLabel?: string;
 }
 
-export function Board({ board, compact = false, highlight = -1, spotlight = -1, specialLabel = 'Special' }: BoardProps) {
+export function Board({
+  board,
+  compact = false,
+  highlight = -1,
+  spotlight = -1,
+  specialLabel = 'Special',
+  creditLabel = 'called by',
+}: BoardProps) {
   const n = board.slots.length;
   const cols = compact || n < 4 ? 1 : 2;
   const rows = Math.ceil(n / cols);
@@ -57,6 +67,7 @@ export function Board({ board, compact = false, highlight = -1, spotlight = -1, 
           highlight={highlight === i}
           spotlight={spotlight === i && !slot.revealed}
           specialLabel={specialLabel}
+          creditLabel={creditLabel}
         />
       ))}
     </ol>
@@ -71,6 +82,7 @@ function Tile({
   highlight,
   spotlight,
   specialLabel,
+  creditLabel,
 }: {
   index: number;
   slot: ShowdownSlotView;
@@ -79,6 +91,7 @@ function Tile({
   highlight: boolean;
   spotlight: boolean;
   specialLabel: string;
+  creditLabel: string;
 }) {
   // The flip is a transition (or, fresh, an animation), so it only plays on a change seen while
   // mounted: a late joiner's revealed tiles are simply already turned.
@@ -87,9 +100,11 @@ function Tile({
   const len = Array.from(text).length;
   const wlen = Math.max(4, ...text.split(/\s+/).map((w) => Array.from(w).length));
   const rank = index + 1;
+  // Only ever on a revealed tile (the server adds it with the answer); never on a classic board.
+  const credit = showcase && slot.revealed && slot.calledBy ? slot.calledBy : '';
   const label = slot.revealed
     ? showcase
-      ? `Answer ${rank}: ${text}${slot.note ? ` (${slot.note})` : ''}${special ? ', the special answer' : ''}${slot.late ? ', not found' : ''}`
+      ? `Answer ${rank}: ${text}${slot.note ? ` (${slot.note})` : ''}${special ? ', the special answer' : ''}${slot.late ? ', not found' : ''}${credit ? `, ${creditLabel} ${credit}` : ''}`
       : `Answer ${rank}: ${text}, ${slot.points} points`
     : `Answer ${rank}: hidden${showcase && special ? ' (the special answer)' : ''}`;
   return (
@@ -102,6 +117,7 @@ function Tile({
       data-late={showcase && slot.revealed && slot.late ? 'true' : undefined}
       data-fresh={fresh ? 'true' : undefined}
       data-spot={spotlight ? 'true' : undefined}
+      data-credit={credit ? 'true' : undefined}
       style={{ '--i': index, '--len': Math.max(8, len), '--wlen': wlen } as CSSProperties}
       aria-label={label}
     >
@@ -148,6 +164,11 @@ function Tile({
         </div>
       </div>
       {fresh ? <i key={fresh} className="sd-tile__burst" aria-hidden /> : null}
+      {credit ? (
+        <span className="sd-tile__credit" data-fresh={fresh ? 'true' : undefined} aria-hidden>
+          {creditLabel} <b>{credit}</b>
+        </span>
+      ) : null}
     </li>
   );
 }
@@ -189,7 +210,10 @@ export function SpecialGlyph() {
         <ellipse cx="12.5" cy="22" rx="9" ry="12" fill="#e8650f" />
         <ellipse cx="27.5" cy="22" rx="9" ry="12" fill="#e8650f" />
         <ellipse cx="20" cy="22" rx="9.5" ry="13" fill="#ff8a24" />
-        <path d="M12 19 l4 -4 l1.6 5.4 z M28 19 l-4 -4 l-1.6 5.4 z M11 26 Q20 33 29 26 L26 27.5 L23.5 26 L21 28.5 L19 26 L16.5 28.5 L14 26 Z" fill="#ffe08a" />
+        <path
+          d="M12 19 l4 -4 l1.6 5.4 z M28 19 l-4 -4 l-1.6 5.4 z M11 26 Q20 33 29 26 L26 27.5 L23.5 26 L21 28.5 L19 26 L16.5 28.5 L14 26 Z"
+          fill="#ffe08a"
+        />
       </g>
       <path
         className="sd-glyph__star"

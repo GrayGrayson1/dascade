@@ -29,7 +29,19 @@ import type {
  */
 export type HostMood = 'idle' | 'happy' | 'wow' | 'oops' | 'cheer' | 'think' | 'celebrate' | 'bye' | 'shiver' | 'peek' | 'startled';
 
-export const HOST_MOODS: readonly HostMood[] = ['idle', 'happy', 'wow', 'oops', 'cheer', 'think', 'celebrate', 'bye', 'shiver', 'peek', 'startled'];
+export const HOST_MOODS: readonly HostMood[] = [
+  'idle',
+  'happy',
+  'wow',
+  'oops',
+  'cheer',
+  'think',
+  'celebrate',
+  'bye',
+  'shiver',
+  'peek',
+  'startled',
+];
 
 export interface HostLine {
   /** Unique per moment (re-keys the speech bubble). */
@@ -85,6 +97,26 @@ export interface ShowcaseCopy {
   playAlongShort: string;
   /** The tag on a stage running practice boards. */
   rehearsal: string;
+  // ---- The pick (the Spotlight picker) and the hot seat ----
+  /** The spotlight overlay's title. */
+  pickTitle: string;
+  /** "{n} in the pool". */
+  pickPool: string;
+  /** The landing card: the kicker over the name, and the line under it. */
+  pickUp: string;
+  pickAsk: string;
+  /** The words on a seat: away, their turn counted this round, the one picked. */
+  seatAway: string;
+  seatDone: string;
+  seatHot: string;
+  /** The hot-seat podium: its kicker, the timer's word ("answering · 0:12"), and when their answer flips. */
+  hotSeat: string;
+  answering: string;
+  calledIt: string;
+  /** "#{n} found". */
+  foundRank: string;
+  /** The credit on a tile someone in the hot seat called ("called by Priya"). */
+  calledBy: string;
 }
 
 export interface LookCopy {
@@ -136,6 +168,18 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       playAlong: 'Cheer along on your phone',
       playAlongShort: 'Cheer along',
       rehearsal: 'Rehearsal',
+      pickTitle: 'Spotlight on…',
+      pickPool: '{n} in the pool',
+      pickUp: 'You’re up!',
+      pickAsk: 'Unmute and give us your answer!',
+      seatAway: 'away',
+      seatDone: 'done',
+      seatHot: 'hot seat',
+      hotSeat: 'In the hot seat',
+      answering: 'answering',
+      calledIt: 'Called it!',
+      foundRank: '#{n} found',
+      calledBy: 'called by',
     },
     cards: {
       welcome: { kicker: 'Welcome to', title: '', sub: '{show} starts soon' },
@@ -175,6 +219,18 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       playAlong: 'Cheer along on your phone',
       playAlongShort: 'Cheer along',
       rehearsal: 'Rehearsal',
+      pickTitle: 'The spotlight is searching…',
+      pickPool: '{n} in the pool',
+      pickUp: 'You’re up!',
+      pickAsk: 'Unmute and give us your answer, ghoul!',
+      seatAway: 'away',
+      seatDone: 'done',
+      seatHot: 'hot seat',
+      hotSeat: 'In the hot seat',
+      answering: 'answering',
+      calledIt: 'Called it!',
+      foundRank: '#{n} found',
+      calledBy: 'called by',
     },
     cards: {
       welcome: { kicker: 'Welcome, boils & ghouls', title: '', sub: '{show} starts soon' },
@@ -244,6 +300,21 @@ interface ShowcaseBook {
   reset: Lines;
   farewell: Lines;
   cards: Record<ShowdownCard, Lines>;
+  // ---- The pick (placeholders: {name}) ----
+  /** The spotlight starts searching (never the name: the stage hasn't landed yet). */
+  pick: Lines;
+  /** A reroll's new search. */
+  reroll: Lines;
+  /** The landing: "{name}, you're up!" */
+  land: Lines;
+  /** Their turn counted ("Thanks, {name}!")… */
+  done: Lines;
+  /** …and the same without a name (a screen that doesn't know it). */
+  doneAnon: Lines;
+  /** No answer: back in the pool, no harm done. */
+  noAnswer: Lines;
+  /** One minute left on the round clock. */
+  oneMinute: Lines;
 }
 
 const SHOWTIME_LINES: LineBook = {
@@ -324,10 +395,21 @@ const HALLOWEEN_LINES: LineBook = {
 
 const SHOWTIME_SHOWCASE: ShowcaseBook = {
   opening: ['Welcome, everybody, to {show}!', 'Lights! Camera! It’s {show}!', 'Good evening and welcome to {show}!'],
-  category: ['Round {n}: {title}! Ten answers are hiding up here.', 'Round {n} — the category is… {title}!', 'Here we go! Round {n}: {title}!'],
+  category: [
+    'Round {n}: {title}! Ten answers are hiding up here.',
+    'Round {n} — the category is… {title}!',
+    'Here we go! Round {n}: {title}!',
+  ],
   round: ['Round {n}! {k} answers are hiding on the board.', 'Here comes round {n}…', 'Round {n} — get those guesses ready!'],
   question: ['Shout your guesses in the chat!', 'The board is live — type your answers!', 'What’s up there? Let’s find out!'],
-  found: ['Show me {answer}!', 'It’s on the board!', '{answer}! Great call!', 'Good answer! Good answer!', 'The crowd knows its stuff!', 'There it is — {answer}!'],
+  found: [
+    'Show me {answer}!',
+    'It’s on the board!',
+    '{answer}! Great call!',
+    'Good answer! Good answer!',
+    'The crowd knows its stuff!',
+    'There it is — {answer}!',
+  ],
   top: ['NUMBER ONE! {answer}!', 'Right at the top — {answer}!', 'The top answer! Take a bow!'],
   special: ['THE SPECIAL ANSWER! {answer}!', 'You found it! The special one!', 'Stop the show — it’s the special answer!'],
   miss: [
@@ -358,14 +440,36 @@ const SHOWTIME_SHOWCASE: ShowcaseBook = {
     prizes: ['Who’s taking home the prizes? Let’s find out!', 'Prize time! Drumroll, please…'],
     thanks: ['Thanks for playing — good night, everybody!', 'You’ve been a wonderful crowd!'],
   },
+  pick: ['The spotlight’s looking for someone…', 'Who’s next? Let’s find out!', 'Lights, please… who’s up?'],
+  reroll: ['Let’s try someone else!', 'One more sweep of the spotlight!'],
+  land: ['{name}, you’re up!', 'Come on down, {name}!', '{name} — it’s your turn!'],
+  done: ['Thanks, {name}!', 'Great job, {name}!', 'Give it up for {name}!'],
+  doneAnon: ['Thanks for playing along!', 'Give them a big hand!'],
+  noAnswer: ['No answer? No problem — back in the pool!', 'That’s fine — you might get another turn!'],
+  oneMinute: ['One minute left!', 'Sixty seconds on the clock!'],
 };
 
 const HALLOWEEN_SHOWCASE: ShowcaseBook = {
   opening: ['Welcome, boils and ghouls, to {show}!', 'Boo! Welcome to {show}!', 'Lights down, spirits up — it’s {show}!'],
-  category: ['Round {n}: {title}! Ten answers lurk on the board…', 'Round {n}… the category is {title}! Mwa-ha-ha!', 'Dare you face round {n}? {title}!'],
+  category: [
+    'Round {n}: {title}! Ten answers lurk on the board…',
+    'Round {n}… the category is {title}! Mwa-ha-ha!',
+    'Dare you face round {n}? {title}!',
+  ],
   round: ['Round {n}! {k} answers lurk on the board.', 'Round {n}… if you dare!', 'Here comes round {n}! Mwa-ha-ha!'],
-  question: ['Shout your guesses in the chat, ghouls!', 'The board is haunted — type your answers!', 'What lurks up there? Let’s find out!'],
-  found: ['Show me {answer}!', 'It’s on the board! Boo-tiful!', '{answer}! Fang-tastic!', 'Wicked good — {answer}!', 'The spirits agree!', 'Spook-tacular call!'],
+  question: [
+    'Shout your guesses in the chat, ghouls!',
+    'The board is haunted — type your answers!',
+    'What lurks up there? Let’s find out!',
+  ],
+  found: [
+    'Show me {answer}!',
+    'It’s on the board! Boo-tiful!',
+    '{answer}! Fang-tastic!',
+    'Wicked good — {answer}!',
+    'The spirits agree!',
+    'Spook-tacular call!',
+  ],
   top: ['NUMBER ONE! {answer}! Fang-tastic!', 'Top of the tombstones — {answer}!', 'The number one answer rises!'],
   special: ['THE SPECIAL ANSWER! {answer}!', 'You summoned the special one!', 'Stop the séance — it’s the special answer!'],
   miss: [
@@ -396,6 +500,13 @@ const HALLOWEEN_SHOWCASE: ShowcaseBook = {
     prizes: ['Who’s taking home the treats? Let’s find out!', 'Prize time! The spirits are restless…'],
     thanks: ['Thanks for haunting with us! Happy Halloween!', 'Boo-bye, everybody! Happy Halloween!'],
   },
+  pick: ['The spotlight’s looking for someone…', 'Ooh, who will the spirits choose?', 'The lights are searching the crowd…'],
+  reroll: ['Let’s try someone else…', 'The spirits will pick again!'],
+  land: ['{name}, you’re up!', 'Boo! {name}, it’s your turn!', '{name} — the spotlight found you!'],
+  done: ['Thanks, {name}!', 'Fang-tastic, {name}!', 'Give it up for {name}!'],
+  doneAnon: ['Thanks for that answer!', 'Give them a ghostly round of applause!'],
+  noAnswer: ['No answer? No boo-hoo — back in the pool!', 'That’s okay — the spirits may call again!'],
+  oneMinute: ['One minute left, ghouls!', 'Tick-tock… one spooky minute to go!'],
 };
 
 const BOOKS: Record<ShowdownLook, LineBook> = { showtime: SHOWTIME_LINES, halloween: HALLOWEEN_LINES };
@@ -418,6 +529,8 @@ export interface LineContext {
   mode?: ShowdownMode;
   /** The show's title, for the opening line. */
   show?: string;
+  /** A player's display name (the pick lines thank people by name); '' or absent = unknown. */
+  nameOf?: (playerId: string) => string;
 }
 
 const teamOf = (ctx: LineContext, team: TeamSlot) => (team === 0 || team === 1 ? ctx.teamNames[team] : 'Nobody');
@@ -438,7 +551,10 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
     case 'round': {
       // From the event: it arrives before the patch that carries the new board.
       const k = e.answers;
-      const text = e.multiplier > 1 ? `${fill(pick(book.round, e.rev), { n: e.round + 1, k })} ${fill(pick(book.double, e.rev), { m: e.multiplier })}` : fill(pick(book.round, e.rev), { n: e.round + 1, k });
+      const text =
+        e.multiplier > 1
+          ? `${fill(pick(book.round, e.rev), { n: e.round + 1, k })} ${fill(pick(book.double, e.rev), { m: e.multiplier })}`
+          : fill(pick(book.round, e.rev), { n: e.round + 1, k });
       return { key, text, mood: 'happy' };
     }
     case 'question':
@@ -450,7 +566,9 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
       if (e.cleared && e.late) return { key, text: pick(book.cleared, e.rev), mood: 'cheer' };
       if (e.late) return { key, text: pick(book.late, e.rev), mood: 'happy' };
       const answer = e.text || b?.slots[e.slot]?.text || '';
-      return e.top ? { key, text: pick(book.top, e.rev), mood: 'wow' } : { key, text: fill(pick(book.good, e.rev), { answer: answer || 'it' }), mood: 'happy' };
+      return e.top
+        ? { key, text: pick(book.top, e.rev), mood: 'wow' }
+        : { key, text: fill(pick(book.good, e.rev), { answer: answer || 'it' }), mood: 'happy' };
     }
     case 'strike':
       if (e.stealFailed) return null; // the award line follows
@@ -461,7 +579,16 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
       return { key, text: fill(pick(book.strike, e.rev), { s: e.strikes }), mood: 'oops' };
     case 'award': {
       const vars = { team: teamOf(ctx, e.team), points: e.points };
-      const lines = e.how === 'steal' ? book.stolen : e.how === 'defend' ? book.defended : e.how === 'sweep' ? book.sweep : e.how === 'none' ? book.lost : book.manual;
+      const lines =
+        e.how === 'steal'
+          ? book.stolen
+          : e.how === 'defend'
+            ? book.defended
+            : e.how === 'sweep'
+              ? book.sweep
+              : e.how === 'none'
+                ? book.lost
+                : book.manual;
       return { key, text: fill(pick(lines, e.rev), vars), mood: e.how === 'none' ? 'oops' : 'cheer' };
     }
     case 'undo':
@@ -480,6 +607,17 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
       return { key, text: pick(book.restart, e.rev), mood: 'think' };
     case 'reset':
       return { key, text: pick(book.reset, e.rev), mood: 'think' };
+    // The picker and the clock cues exist only in Presenter Showcase; Boo has lines for them in both looks.
+    case 'pick':
+      return pickLine(ctx.look, e);
+    case 'pickEnd':
+      return pickEndLine(ctx.look, e, ctx.nameOf?.(e.playerId) ?? '');
+    case 'clockWarn':
+      return clockWarnLine(ctx.look, e.round);
+    // The last ten seconds tick and the sound station moves without a word from the host.
+    case 'tick':
+    case 'station':
+      return null;
   }
 }
 
@@ -509,7 +647,9 @@ function showcaseLine(e: ShowdownEvent, ctx: LineContext): HostLine | null | und
         return { key, text: pick(allFound ? book.allFound : book.complete, e.rev), mood: 'cheer' };
       }
       if (e.late) return { key, text: fill(pick(e.top ? book.lateTop : book.late, e.rev), vars), mood: e.top ? 'wow' : 'happy' };
-      return e.top ? { key, text: fill(pick(book.top, e.rev), vars), mood: 'wow' } : { key, text: fill(pick(book.found, e.rev), vars), mood: 'happy' };
+      return e.top
+        ? { key, text: fill(pick(book.top, e.rev), vars), mood: 'wow' }
+        : { key, text: fill(pick(book.found, e.rev), vars), mood: 'happy' };
     }
     case 'miss':
       // Keyed by the miss count: back-to-back misses never repeat a line.
@@ -529,8 +669,50 @@ function showcaseLine(e: ShowdownEvent, ctx: LineContext): HostLine | null | und
   }
 }
 
+/**
+ * The spotlight starts searching. Never the name: the pick event carries it, but the stage hasn't
+ * landed yet, and Boo mustn't spoil the moment.
+ */
+export function pickLine(look: ShowdownLook, e: { drawNo: number; reroll?: boolean }): HostLine {
+  const book = SHOWCASE[look];
+  return { key: `pick:${e.drawNo}`, text: pick(e.reroll ? book.reroll : book.pick, e.drawNo), mood: 'peek' };
+}
+
+/** The landing: the stage has found them ("Priya, you're up!"). */
+export function landLine(look: ShowdownLook, drawNo: number, name: string): HostLine {
+  const book = SHOWCASE[look];
+  return name
+    ? { key: `land:${drawNo}`, text: fill(pick(book.land, drawNo), { name }), mood: 'cheer' }
+    : { key: `land:${drawNo}`, text: pick(book.pick, drawNo), mood: 'cheer' };
+}
+
+/**
+ * The hot seat emptied: thanks (their turn counted) or a kind word (no answer). A reroll says nothing
+ * here (its new search speaks), and a guest a moderator hid leaves quietly.
+ */
+export function pickEndLine(
+  look: ShowdownLook,
+  e: { drawNo: number; how: 'done' | 'noAnswer' | 'reroll' | 'cleared' },
+  name: string,
+): HostLine | null {
+  const book = SHOWCASE[look];
+  const key = `pickEnd:${e.drawNo}:${e.how}`;
+  if (e.how === 'done')
+    return name
+      ? { key, text: fill(pick(book.done, e.drawNo), { name }), mood: 'cheer' }
+      : { key, text: pick(book.doneAnon, e.drawNo), mood: 'cheer' };
+  if (e.how === 'noAnswer') return { key, text: pick(book.noAnswer, e.drawNo), mood: 'happy' };
+  return null;
+}
+
+/** One minute left on the round clock. */
+export function clockWarnLine(look: ShowdownLook, round: number): HostLine {
+  return { key: `clockWarn:${round}`, text: pick(SHOWCASE[look].oneMinute, round), mood: 'wow' };
+}
+
 export function lineForCue(cue: ShowdownCue, id: number, look: ShowdownLook): HostLine {
-  const mood: HostMood = cue === 'aww' ? 'oops' : cue === 'suspense' || cue === 'drumroll' ? 'think' : cue === 'celebrate' ? 'celebrate' : 'cheer';
+  const mood: HostMood =
+    cue === 'aww' ? 'oops' : cue === 'suspense' || cue === 'drumroll' ? 'think' : cue === 'celebrate' ? 'celebrate' : 'cheer';
   return { key: `cue:${cue}:${id}`, text: pick(BOOKS[look].cue[cue], id), mood };
 }
 
@@ -549,7 +731,11 @@ export function farewellLine(look: ShowdownLook, finale: Pick<ShowdownFinale, 'r
 
 /** Presenter Showcase: what the host says on a holding card. */
 export function cardLine(look: ShowdownLook, card: ShowdownCard): HostLine {
-  return { key: `card:${card}`, text: pick(SHOWCASE[look].cards[card], 0), mood: card === 'thanks' ? 'bye' : card === 'prizes' ? 'cheer' : card === 'break' ? 'think' : 'happy' };
+  return {
+    key: `card:${card}`,
+    text: pick(SHOWCASE[look].cards[card], 0),
+    mood: card === 'thanks' ? 'bye' : card === 'prizes' ? 'cheer' : card === 'break' ? 'think' : 'happy',
+  };
 }
 
 /** Presenter Showcase: the opening's welcome (the show title, which the intro event doesn't carry). */
@@ -576,12 +762,26 @@ export function idleLine(look: ShowdownLook, board: ShowdownBoardView | null, na
     return { key: `idle:q:${board.round}`, text: pick(SHOWCASE[look].question, board.round), mood: 'happy' };
   }
   if (!board || board.stage === 'intro') return { key: 'idle:intro', text: pick(book.intro, 0), mood: 'happy' };
-  if (board.stage === 'title') return { key: `idle:round:${board.round}`, text: fill(pick(book.round, board.round), { n: board.round + 1, k: board.slots.length }), mood: 'happy' };
+  if (board.stage === 'title')
+    return {
+      key: `idle:round:${board.round}`,
+      text: fill(pick(book.round, board.round), { n: board.round + 1, k: board.slots.length }),
+      mood: 'happy',
+    };
   if (board.stage === 'steal') {
     const stealer: TeamSlot = board.control === 0 ? 1 : board.control === 1 ? 0 : -1;
-    return { key: `idle:steal:${board.round}`, text: fill(pick(book.steal, board.round), { team: stealer === -1 ? 'Team' : names[stealer] }), mood: 'think' };
+    return {
+      key: `idle:steal:${board.round}`,
+      text: fill(pick(book.steal, board.round), { team: stealer === -1 ? 'Team' : names[stealer] }),
+      mood: 'think',
+    };
   }
-  if (board.stage === 'live' && board.control !== -1) return { key: `idle:control:${board.round}`, text: fill(pick(book.control, board.round), { team: names[board.control] }), mood: 'happy' };
+  if (board.stage === 'live' && board.control !== -1)
+    return {
+      key: `idle:control:${board.round}`,
+      text: fill(pick(book.control, board.round), { team: names[board.control] }),
+      mood: 'happy',
+    };
   return { key: `idle:q:${board.round}`, text: pick(book.question, board.round), mood: 'think' };
 }
 
@@ -592,8 +792,15 @@ export function joinAddress(code: string): { short: string; url: string } {
   return { short: `${host}/r/${code}`, url: `${origin}/r/${code}` };
 }
 
+/** The line book's keys of a showcase look (for tests: both looks must carry the same ones). */
+export function showcaseBookKeys(look: ShowdownLook): string[] {
+  return Object.keys(SHOWCASE[look]).sort();
+}
+
 /** Every line a showcase look can say (for tests). */
 export function showcaseBookLines(look: ShowdownLook): string[] {
   const book = SHOWCASE[look];
-  return Object.values(book).flatMap((v: Lines | Record<ShowdownCard, Lines>) => (Array.isArray(v) ? [...(v as Lines)] : Object.values(v as Record<ShowdownCard, Lines>).flat()));
+  return Object.values(book).flatMap((v: Lines | Record<ShowdownCard, Lines>) =>
+    Array.isArray(v) ? [...(v as Lines)] : Object.values(v as Record<ShowdownCard, Lines>).flat(),
+  );
 }
