@@ -36,6 +36,23 @@ export const ShowdownState = BaseRoomState.extend(
     sweep: t.boolean().default(false),
     /** The rounds loaded are an event preset's practice boards. */
     rehearsal: t.boolean().default(false),
+    /** The event preset that made this an event room ('' = an ordinary room). */
+    event: t.string().default(''),
+    // The picker: public (a pick is public the moment it lands). Who skipped is never here.
+    drawNo: t.uint32().default(0),
+    hotSeat: t.string().default(''),
+    pickAt: t.number().default(0),
+    landAt: t.number().default(0),
+    poolSize: t.uint16().default(0),
+    /** playerIds whose turn counted this round. */
+    done: t.map('boolean'),
+    /** playerIds on the stage's spotlight grid (participants who aren't hidden). */
+    seats: t.map('boolean'),
+    // Sound station (event rooms).
+    soundStation: t.string().default(''),
+    soundSeenAt: t.number().default(0),
+    /** playerId → 1 (can play) | 2 (silent), for consoles and big screens that report. */
+    audio: t.map('uint8'),
   },
   'ShowdownState',
 );

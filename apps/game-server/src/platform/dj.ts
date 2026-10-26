@@ -116,7 +116,10 @@ export class RoomDj {
   }
 
   private positionNow(): number {
-    return djPositionAt({ current: this.current, playing: this.playing, position: this.position, anchorServerTime: this.anchor }, this.deps.now());
+    return djPositionAt(
+      { current: this.current, playing: this.playing, position: this.position, anchorServerTime: this.anchor },
+      this.deps.now(),
+    );
   }
 
   private skipNeeded(): number {
@@ -184,6 +187,21 @@ export class RoomDj {
     if (!changed) return OK_SAME;
     this.bump();
     return OK_CHANGED;
+  }
+
+  /**
+   * Switch the DJ off on the room's behalf (e.g. a Survey Showdown event locks it while a show is
+   * live), freezing playback where it was, like the host turning it off. True if it was on.
+   */
+  disable(): boolean {
+    if (!this.enabled) return false;
+    this.enabled = false;
+    this.position = this.positionNow();
+    this.anchor = this.deps.now();
+    this.playing = false;
+    this.votes.clear();
+    this.bump();
+    return true;
   }
 
   // ---------------------------------------------------------------------------
