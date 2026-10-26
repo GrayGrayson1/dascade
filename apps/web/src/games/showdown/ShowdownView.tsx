@@ -11,25 +11,23 @@
  * every stage on this device reads, sounds play once here, and a presenter link (#presenter=…) or a
  * pass remembered in this browser reclaims the presenter role.
  */
-import { useCallback, useEffect, useRef, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
   SHOWDOWN_TEAMS,
   showTitle,
   teamName,
-  type ShowdownCue,
-  type ShowdownEvent,
   type ShowdownFinale,
   type ShowdownLook,
   type ShowdownMe,
   type ShowdownPublicState,
-  type ShowdownReactions,
   type ShowdownSettings,
+  type ShowdownBlackBox,
 } from '@dascade/shared/games/showdown';
 import { Button, GameTheme, IconButton, PixelIcon } from '@dascade/ui';
 import { GAME_CATALOG } from '@dascade/shared';
-import { session, useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
+import { useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
 import { audioReady, onAudioReadyChange } from '../../audio/audio.ts';
@@ -41,27 +39,34 @@ import { PresenterConsole } from './Console.tsx';
 import { StageCards } from './consoleParts.tsx';
 import { ShowdownPlayerSetup, ShowdownSettingsPanel, TakeoverCard } from './Lobby.tsx';
 import { Stage } from './Stage.tsx';
-import { LOOK_COPY, fill, lineForCue, lineForEvent } from './look.ts';
+import { LOOK_COPY, fill } from './look.ts';
 import { showFeed } from './fx.ts';
-import { CUE_SOUND, eventSounds, playShowSound, type ShowdownSound } from './sounds.ts';
-import { themeMusic } from './themeMusic.ts';
-import { canFullscreen, closeStageWindow, setStageWindowTitle, toggleFullscreen, useStageWindow } from './stageWindow.ts';
-import { rememberPass, storedPass, takeHashPass, useScreenMode } from './access.ts';
+import { useShowSync } from './useShowSync.ts';
+import { CrewView } from './CrewView.tsx';
+import { StationBadge } from './StationBadge.tsx';
+import { showdownApi } from './api.ts';
+import { clearBlackBox, forgetRecoverable, markRecoverable, onRecoveryGiveUp, saveBlackBox } from '../../net/recovery.ts';
+import { canRecover } from '../../shell/ShowRecovery.tsx';
+import { serverUrl } from '../../net/serverUrl.ts';
+
+/** How often an event room's console pings the server's health check (keep-warm). */
+const KEEP_WARM_MS = 4 * 60_000;
+
+// Nobody is bringing the room back after all: a stage window held through the outage closes.
+onRecoveryGiveUp(() => {
+  if (stageWindowOpen()) closeStageWindow();
+});
 import {
-  useBoard,
-  useCard,
-  useFinale,
-  useLook,
-  useMe,
-  useMode,
-  useMotion,
-  usePass,
-  useRole,
-  useShowSounds,
-  useShowdownSettings,
-  useThemeMusicPref,
-  type RoleInfo,
-} from './state.ts';
+  canFullscreen,
+  closeStageWindow,
+  holdStageWindow,
+  setStageWindowTitle,
+  stageWindowOpen,
+  toggleFullscreen,
+  useStageWindow,
+} from './stageWindow.ts';
+import { takeHashCrew, useScreenMode } from './access.ts';
+import { useCrew, useEvent, useFinale, useLook, useMe, useRole, useShowSounds, useShowdownSettings, type RoleInfo } from './state.ts';
 
 /** The shared lobby with the show's setup panels (the lobby is rendered from here, not the shell). */
 const LOBBY_MODULE: GameClientModule = {
@@ -81,19 +86,33 @@ export function ShowdownView() {
   const stageWin = useStageWindow();
 
   useShowSync(role, look, code, settings, screen);
+  useEventRoom(code, role);
+  const crew = useCrew();
 
-  // Leaving the room closes the stage window and clears the feed.
+  // Leaving the room closes the stage window and clears the feed. Losing the connection to an event
+  // room doesn't (OPS-01): Teams keeps sharing the window, which holds a calm card until the room is
+  // back (restored from the black box) and this view portals into the same window again.
+  const codeRef = useRef(code);
+  codeRef.current = code;
   useEffect(
     () => () => {
-      closeStageWindow();
+      const status = useSessionStore.getState().status;
+      const lost = status === 'lost' || status === 'reconnecting';
+      if (lost && canRecover(codeRef.current) && stageWindowOpen()) {
+        holdStageWindow({ title: 'We’ll be right back', line: 'The show is reconnecting — stay tuned.' });
+      } else closeStageWindow();
       showFeed.reset();
     },
     [],
   );
-  // The stage window belongs to the presenter: close it if the role moves elsewhere.
+  // The stage window belongs to the presenter: close it if the role moves to someone else. (A fresh
+  // mount — e.g. a room just restored from its black box — can see the room's state before its own
+  // player id arrives, or no presenter yet: neither is a move.)
+  const loaded = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(s.code)) ?? false;
+  const otherPresents = loaded && Boolean(role.playerId) && role.presenterId !== '' && role.presenterId !== role.playerId;
   useEffect(() => {
-    if (role.role !== 'presenter' && stageWin.open) closeStageWindow();
-  }, [role.role, stageWin.open]);
+    if (otherPresents && stageWin.open) closeStageWindow();
+  }, [otherPresents, stageWin.open]);
   // Its title follows the show's (a preset loaded with the window already open renames it).
   const showName = settings ? showTitle(settings) : '';
   useEffect(() => {
@@ -115,6 +134,9 @@ export function ShowdownView() {
   // per browser), and the console it would show carries the answers. Never put that on a big screen.
   if (role.role === 'presenter' && screen) body = <PresenterScreenGuard code={code} />;
   else if (role.role === 'screen') body = <BigScreen look={look} settings={settings} code={code} />;
+  // Crew who aren't presenting (a moderator, a producer on a second device) get the crew screen in every phase.
+  else if (role.role === 'audience' && crew?.event && crew.roles.length > 0)
+    body = <CrewView look={look} settings={settings} code={code} />;
   else if (phase === 'LOBBY' || phase === 'COUNTDOWN') body = <Lobby gameId="showdown" module={LOBBY_MODULE} />;
   else if (phase === 'RESULTS') body = <Results look={look} settings={settings} role={role} />;
   else if (role.role === 'presenter')
@@ -136,6 +158,54 @@ export function ShowdownView() {
       {portal}
     </>
   );
+}
+
+/**
+ * Event rooms (OPS-01, ADM-04): redeem a crew link from the address bar, keep the presenter's black
+ * box on this device, and remember that this room is worth waiting for after a server restart.
+ */
+function useEventRoom(code: string, role: RoleInfo): void {
+  const event = useEvent();
+  const status = useSessionStore((s) => s.status);
+  const loaded = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(s.code)) ?? false;
+
+  // `#crew=<id>.<secret>`: read once, stripped from the address bar, sent over the room connection.
+  const claimed = useRef(false);
+  useEffect(() => {
+    if (claimed.current || status !== 'connected' || !loaded || !role.playerId) return;
+    const link = takeHashCrew();
+    claimed.current = true;
+    if (link) showdownApi.claimCrew(link);
+  }, [status, loaded, role.playerId]);
+
+  useEffect(() => {
+    if (event && code) markRecoverable(code, 'showdown');
+  }, [event, code]);
+
+  // Only the presenter carries a black box: a former presenter's device drops its old one (it must
+  // never win a restore), and once the show is over a guest has nothing to wait for after a restart.
+  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? '';
+  useEffect(() => {
+    if (!code || !loaded) return;
+    if (role.playerId && role.presenterId && role.presenterId !== role.playerId) clearBlackBox(code);
+    if (phase === 'RESULTS' && role.role !== 'presenter') forgetRecoverable(code);
+  }, [code, loaded, role.role, role.playerId, role.presenterId, phase]);
+
+  // Keep-warm (OPS-01): Render's free plan sleeps without inbound HTTP traffic, and nobody has checked
+  // whether WebSocket traffic counts. The presenter's console pings the health check while an event runs.
+  const presenting = role.role === 'presenter';
+  useEffect(() => {
+    if (!event || !presenting) return;
+    const ping = () => void fetch(`${serverUrl()}/api/health`, { cache: 'no-store' }).catch(() => undefined);
+    const t = setInterval(ping, KEEP_WARM_MS);
+    return () => clearInterval(t);
+  }, [event, presenting]);
+
+  useRoomMessage<ShowdownBlackBox | null>(SHOWDOWN_MSG.blackbox, (box) => {
+    if (!code) return;
+    if (!box) clearBlackBox(code);
+    else if (box.code === code) saveBlackBox({ code, gameId: 'showdown', takenAt: box.takenAt, blob: box.blob });
+  });
 }
 
 function FullscreenButton() {
@@ -176,12 +246,10 @@ function PresenterScreenGuard({ code }: { code: string }) {
         <h2 className="sd-panel__title">
           <PixelIcon name="eye" /> This browser is the presenter’s
         </h2>
+        <p>This tab took over your presenter seat, so it won’t show the big screen: your console (with the answers) would end up on it.</p>
         <p>
-          This tab took over your presenter seat, so it won’t show the big screen: your console (with the answers) would end up on it.
-        </p>
-        <p>
-          For a second screen on this computer, press <b>Stage window</b> in the console. For a TV or projector computer, open the big-screen link on
-          that device.
+          For a second screen on this computer, press <b>Stage window</b> in the console. For a TV or projector computer, open the
+          big-screen link on that device.
         </p>
         <Button variant="primary" icon="crown" onClick={() => switchToScreen(code, false)}>
           Use this tab as the presenter console
@@ -202,6 +270,7 @@ function BigScreen({ look, settings, code }: { look: ShowdownLook; settings: Sho
         variant="screen"
         corner={
           <>
+            <StationBadge compact />
             <FullscreenButton />
             <Button size="sm" variant="ghost" onClick={() => switchToScreen(code, false)}>
               Exit big screen
@@ -218,7 +287,8 @@ function Results({ look, settings, role }: { look: ShowdownLook; settings: Showd
   const finale = useFinale();
   const me = useMe();
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
-  if ((finale?.mode ?? settings?.mode) === 'showcase') return <ShowcaseResults look={look} settings={settings} role={role} finale={finale} me={me} />;
+  if ((finale?.mode ?? settings?.mode) === 'showcase')
+    return <ShowcaseResults look={look} settings={settings} role={role} finale={finale} me={me} />;
   return (
     <GameStage gameId="showdown" className="sd-room sd-results">
       <div className="sd-results__stage">
@@ -295,7 +365,10 @@ function ShowcaseResults({
           <>
             <section className="sd-panel sdc-afterpanel" aria-label="Stage cards">
               <h3 className="sd-panel__title">Stage cards</h3>
-              <p className="sd-muted">For the rest of the event: put up Prize time for the winners, then Thanks. Play again goes back to the lobby (the cards stay available there).</p>
+              <p className="sd-muted">
+                For the rest of the event: put up Prize time for the winners, then Thanks. Play again goes back to the lobby (the cards stay
+                available there).
+              </p>
               <StageCards />
             </section>
             <ResultsActions />
@@ -340,142 +413,4 @@ function FinaleSummary({ finale }: { finale: ShowdownFinale }) {
       ) : null}
     </section>
   );
-}
-
-// ---------------------------------------------------------------------------
-// The per-device show feed
-// ---------------------------------------------------------------------------
-
-function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, settings: ShowdownSettings | null, screen: boolean): void {
-  const board = useBoard();
-  const mode = useMode(settings);
-  const card = useCard();
-  const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
-  const [musicPref] = useThemeMusicPref();
-  const motion = useMotion();
-  const [sounds] = useShowSounds(role.role);
-  const pass = usePass();
-  const me = useMe();
-  const finale = useFinale();
-  const status = useSessionStore((s) => s.status);
-  const loaded = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(s.code)) ?? false;
-  const serverScreen = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(role.playerId && s.screens?.[role.playerId])) ?? false;
-  const ctx = useRef({ look, board, mode, show: '', names: ['', ''] as [string, string], sounds, particles: motion.particles });
-  ctx.current = { look, board, mode, show: settings ? showTitle(settings) : '', names: [teamName(settings, 0), teamName(settings, 1)], sounds, particles: motion.particles };
-  const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-
-  useEffect(
-    () => () => {
-      for (const t of timers.current) clearTimeout(t);
-    },
-    [],
-  );
-
-  const play = useCallback((list: Array<[ShowdownSound, number]>) => {
-    if (!ctx.current.sounds) return;
-    timers.current = timers.current.slice(-20);
-    for (const [sound, delay] of list) {
-      if (delay <= 0) playShowSound(sound, ctx.current.look);
-      else timers.current.push(setTimeout(() => playShowSound(sound, ctx.current.look), delay));
-    }
-  }, []);
-
-  useRoomMessage<ShowdownEvent>(SHOWDOWN_MSG.event, (e) => {
-    showFeed.event(e);
-    showFeed.say(
-      lineForEvent(e, { look: ctx.current.look, board: ctx.current.board, teamNames: ctx.current.names, mode: ctx.current.mode, show: ctx.current.show }),
-    );
-    play(eventSounds(e, ctx.current.mode));
-  });
-
-  useRoomMessage<{ cue: ShowdownCue; id: number }>(SHOWDOWN_MSG.cue, ({ cue, id }) => {
-    showFeed.cue(cue, id);
-    showFeed.say(lineForCue(cue, id, ctx.current.look));
-    play([[CUE_SOUND[cue], 0]]);
-  });
-
-  useRoomMessage<ShowdownReactions>(SHOWDOWN_MSG.reactions, (batch) => showFeed.reactions(batch, Math.min(14, Math.round(ctx.current.particles / 4))));
-
-  // Remember the presenter pass in this browser (for a refreshed tab or a second device).
-  useEffect(() => {
-    if (pass && code) rememberPass(code, pass);
-  }, [pass, code]);
-
-  // Presenter link (#presenter=…) or a pass this browser remembers, while nobody presents.
-  const claimed = useRef(false);
-  useEffect(() => {
-    if (claimed.current || status !== 'connected' || !loaded || !role.playerId || !code) return;
-    const fromLink = takeHashPass();
-    if (fromLink) {
-      claimed.current = true;
-      if (role.role !== 'presenter') session.send(SHOWDOWN_MSG.claim, { pass: fromLink });
-      return;
-    }
-    if (role.presenterId === '' && !screen) {
-      const remembered = storedPass(code);
-      if (remembered) {
-        claimed.current = true;
-        session.send(SHOWDOWN_MSG.claim, { pass: remembered });
-      }
-    }
-  }, [status, loaded, role.playerId, role.presenterId, role.role, code, screen]);
-
-  // Keep the server's stage-display list in step with this device's choice.
-  useEffect(() => {
-    if (status !== 'connected' || !loaded || !role.playerId || role.role === 'presenter') return;
-    if (screen !== serverScreen) session.send(SHOWDOWN_MSG.screen, { on: screen });
-  }, [screen, serverScreen, status, loaded, role.playerId, role.role]);
-
-  // "You called it!" — a private flash + chime when one of your guesses flips.
-  const lastCalls = useRef<{ calls: number; points: number } | null>(null);
-  useEffect(() => {
-    if (!me) return;
-    const prev = lastCalls.current;
-    lastCalls.current = { calls: me.calls, points: me.points };
-    // On the calls count: a ranked showcase board has no points, but calling one is still a moment.
-    if (!prev || me.calls <= prev.calls) return;
-    showFeed.called(Math.max(0, me.points - prev.points));
-    // Phones default to show sounds off: a room of them chiming with the stage's clang is the echo that avoids.
-    if (ctx.current.sounds) playShowSound('calledIt', ctx.current.look);
-  }, [me]);
-
-  // A holding card going up gets a soft whoosh (once per change, not for a device that joins on one).
-  const lastCard = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (!loaded) return;
-    const prev = lastCard.current;
-    lastCard.current = card;
-    if (prev !== undefined && card && card !== prev) play([['cardIn', 0]]);
-  }, [card, loaded, play]);
-
-  // Theme music (Presenter Showcase): under the opening, the title cards and the holding cards; it
-  // stops the moment a question goes up. Only where show sounds play (presenter, big screens).
-  const stage = board?.stage ?? null;
-  const musicOn =
-    mode === 'showcase' &&
-    musicPref &&
-    sounds &&
-    ((phase === 'PLAYING' && (card !== null || stage === 'intro' || stage === 'title')) || ((phase === 'LOBBY' || phase === 'RESULTS') && card !== null));
-  useEffect(() => {
-    if (!musicOn) {
-      themeMusic.stop();
-      return;
-    }
-    // The opening has its own fanfare: the bed comes in under the marquee once it has played.
-    const t = setTimeout(() => themeMusic.play(look), stage === 'intro' && card === null ? 4200 : 0);
-    return () => clearTimeout(t);
-  }, [musicOn, look, stage, card]);
-  useEffect(() => () => themeMusic.stop(), []);
-
-  // The finale: fanfare + applause once per show on this device, as the show ends. A device that
-  // joins (or reloads) on the results screen hears nothing: the first finale it sees is already over.
-  const finaleKey = useRef<string | null>(null);
-  useEffect(() => {
-    if (!loaded) return;
-    const key = finale ? JSON.stringify(finale.scores) + finale.results.length : '';
-    const prev = finaleKey.current;
-    finaleKey.current = key;
-    if (prev === null || !key || key === prev) return;
-    play([['finale', 250]]);
-  }, [finale, loaded, play]);
 }

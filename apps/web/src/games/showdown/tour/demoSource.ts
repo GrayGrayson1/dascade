@@ -83,6 +83,14 @@ export function createDemoSource(code: string, initial: DemoShow = EMPTY_SHOW): 
       hype1: 0,
       teams: {},
       players: {},
+      event: '',
+      drawNo: 0,
+      hotSeat: '',
+      pickAt: 0,
+      landAt: 0,
+      poolSize: 0,
+      done: {},
+      seats: {},
     };
   }
 

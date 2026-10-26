@@ -30,6 +30,15 @@ export type ShowState = Pick<
   | 'hype1'
   | 'teams'
   | 'players'
+  // The picker (Presenter Showcase): the spotlight grid and the hot seat.
+  | 'event'
+  | 'drawNo'
+  | 'hotSeat'
+  | 'pickAt'
+  | 'landAt'
+  | 'poolSize'
+  | 'done'
+  | 'seats'
 >;
 
 export interface ShowSource {

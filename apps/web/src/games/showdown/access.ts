@@ -51,6 +51,62 @@ export function takeHashPass(): string | null {
   return match[1];
 }
 
+// ---------------------------------------------------------------------------
+// Crew links (event rooms): `#crew=<id>.<secret>`, read once and stripped from the address bar
+// ---------------------------------------------------------------------------
+
+/** A crew link in the address bar, removed from the URL once read (the secret never reaches server logs). */
+export function takeHashCrew(): string | null {
+  if (typeof location === 'undefined') return null;
+  const match = /(?:^#|&)crew=([A-Za-z0-9_-]{6,24}\.[A-Za-z0-9_-]{22,64})/.exec(location.hash);
+  if (!match?.[1]) return null;
+  try {
+    history.replaceState(history.state, '', `${location.pathname}${location.search}`);
+  } catch {
+    /* keep the hash */
+  }
+  return match[1];
+}
+
+export function crewLink(code: string, link: string): string {
+  return `${location.origin}/room/${code}#crew=${link}`;
+}
+
+export interface StoredCrewLink {
+  id: string;
+  role: string;
+  name: string;
+  link: string;
+}
+
+const CREW_KEY = (code: string) => `dascade:showdown:crew:${code}`;
+
+/**
+ * Crew links minted on this device (the server keeps only their hashes, and sends a secret once): kept
+ * per room for 24 hours so the producer can copy a link again later.
+ */
+export function rememberCrewLink(code: string, link: StoredCrewLink): void {
+  try {
+    const list = storedCrewLinks(code).filter((l) => l.id !== link.id);
+    localStorage.setItem(CREW_KEY(code), JSON.stringify({ savedAt: Date.now(), links: [...list, link] }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function storedCrewLinks(code: string): StoredCrewLink[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CREW_KEY(code)) ?? 'null') as { savedAt?: unknown; links?: unknown } | null;
+    if (!raw || typeof raw.savedAt !== 'number' || Date.now() - raw.savedAt > PASS_TTL_MS || !Array.isArray(raw.links)) return [];
+    return raw.links.filter(
+      (l): l is StoredCrewLink =>
+        Boolean(l) && typeof l.id === 'string' && typeof l.role === 'string' && typeof l.name === 'string' && typeof l.link === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function presenterLink(code: string, pass: string): string {
   return `${location.origin}/room/${code}#presenter=${pass}`;
 }
@@ -109,7 +165,11 @@ function subscribeScreen(fn: () => void): () => void {
 }
 
 export function useScreenMode(code: string | null): boolean {
-  useSyncExternalStore(subscribeScreen, () => version, () => version);
+  useSyncExternalStore(
+    subscribeScreen,
+    () => version,
+    () => version,
+  );
   return code ? readScreen(code) : false;
 }
 
