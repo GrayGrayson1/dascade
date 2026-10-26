@@ -1,0 +1,47 @@
+/* =====================================================================
+ * DAS Survey Showdown — the sound station's status (StationBadge.tsx, AUD-02 C). Console chrome and
+ * the big screen's corner: DASCADE theme tokens, the same pill as the console's sound chip. The state
+ * is always in the words and the icon (✓ / ✗, sound on / off); colour only backs them up.
+ * ===================================================================== */
+.sd-station {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  color: var(--text-1);
+  font: 600 var(--fs-sm) / 1.1 var(--font-ui);
+  white-space: nowrap;
+}
+.sd-station__icon {
+  flex: none;
+}
+.sd-station__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd-station[data-good='true'] .sd-station__icon {
+  color: var(--success);
+}
+/* The console's warning states: silent, not heard lately, not heard yet. */
+.sd-station[data-view='console'][data-good='false'],
+.sd-station[data-view='screen'][data-mine='true'][data-good='false'] {
+  color: var(--text-0);
+  border-color: color-mix(in srgb, var(--warning) 70%, transparent);
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-sunken));
+}
+/* A big screen that isn't the station: calm, it's how it should be. */
+.sd-station[data-view='screen'][data-mine='false'] {
+  color: var(--text-2);
+}
+.sd-station--compact {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: var(--fs-xs);
+}

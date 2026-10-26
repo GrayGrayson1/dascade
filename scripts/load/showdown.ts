@@ -5,9 +5,11 @@
  * (before its reveal) or the answer sheet, callers scored exactly once, the finale reaches everyone
  * and nobody drops.
  *
- * `showdown-showcase`: the DAS-O-Ween preset (Presenter Showcase) with a cheering crowd: double-sent
- * reveals, a burst of Wrong presses (double clicks collapse into one), the server-run Reveal remaining
- * sweep (#10 → #1), no answer reaching the crowd before it flips, the finale for everyone.
+ * `showdown-showcase`: the DAS-O-Ween rehearsal preset (an event room, Presenter Showcase) with a
+ * cheering crowd: double-sent reveals, a burst of Wrong presses (double clicks collapse into one), the
+ * audience picker (some guests on Skip me, double-sent picks and Mark done: never twice, never a
+ * skipper, every pick reaches every phone, "you're up" only to the winner), the server-run Reveal
+ * remaining sweep (#10 → #1), no answer reaching the crowd before it flips, the finale for everyone.
  *
  *   LOAD_URL=http://localhost:2567 LOAD_SCENARIOS=showdown,showdown-showcase pnpm load
  */
@@ -36,7 +38,8 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
     const act = (payload: Record<string, unknown>) => host.room.send('showdown:act', { ...payload, rev: json(host).rev });
 
     host.room.send('lobby:start', {});
-    if (!(await ctx.waitFor(() => json(host).phase === 'PLAYING' && json(host).boardJson !== '', 8000))) throw new Error('show never started');
+    if (!(await ctx.waitFor(() => json(host).phase === 'PLAYING' && json(host).boardJson !== '', 8000)))
+      throw new Error('show never started');
     act({ a: 'begin' });
     await ctx.waitFor(() => JSON.parse(json(host).boardJson).stage === 'title', 4000);
     act({ a: 'question' });
@@ -90,26 +93,47 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
         }),
       6000,
     );
-    const reactionsSeen = ((audience[0]!.payloads.get(REACTIONS) ?? []) as Array<{ k: number[] }>).reduce((n, r) => n + r.k.reduce((a, b) => a + b, 0), 0);
+    const reactionsSeen = ((audience[0]!.payloads.get(REACTIONS) ?? []) as Array<{ k: number[] }>).reduce(
+      (n, r) => n + r.k.reduce((a, b) => a + b, 0),
+      0,
+    );
 
     act({ a: 'finish' });
     const finale = await ctx.waitFor(() => audience.every((b) => json(b).phase === 'RESULTS' && json(b).finaleJson !== ''), 8000);
 
     ctx.results.push({
       scenario: `showdown ×${bots.length}`,
-      ok: failures === 0 && guessMs >= 0 && duplicatesRefused && !sheetLeak && !textLeak && swept && scoreOk && callersOk && scored && finale && allConnected(bots),
+      ok:
+        failures === 0 &&
+        guessMs >= 0 &&
+        duplicatesRefused &&
+        !sheetLeak &&
+        !textLeak &&
+        swept &&
+        scoreOk &&
+        callersOk &&
+        scored &&
+        finale &&
+        allConnected(bots),
       details: `guesses-in ${guessMs.toFixed(0)}ms board-swept ${revealMs.toFixed(0)}ms dup-refused=${duplicatesRefused} no-leak=${!sheetLeak && !textLeak} score=${scoreOk} callers=${callersOk} scored-once=${scored} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
     });
     await ctx.leaveAll(bots);
   });
 
   add('showdown-showcase', async () => {
-    const { bots, failures } = await ctx.createBots('showdown', ctx.N, [SHEET, EVENT, REACTIONS], {});
+    const { bots, failures } = await ctx.createBots('showdown', ctx.N, [SHEET, EVENT, REACTIONS, ME], {});
     const host = bots[0]!;
     const audience = bots.slice(1);
-    const board = (b = host) => JSON.parse(json(b).boardJson || 'null') as { rev: number; round: number; stage: string; slots: Array<{ revealed: boolean; late: boolean }> } | null;
+    const board = (b = host) =>
+      JSON.parse(json(b).boardJson || 'null') as {
+        rev: number;
+        round: number;
+        stage: string;
+        slots: Array<{ revealed: boolean; late: boolean }>;
+      } | null;
     const act = (payload: Record<string, unknown>) => host.room.send('showdown:act', payload);
-    host.room.send('showdown:preset', { id: 'dasoween-2026' });
+    // The rehearsal boards: an event room with practice content (the real boards never live in the repo).
+    host.room.send('showdown:preset', { id: 'dasoween-rehearsal' });
     if (!(await ctx.waitFor(() => json(host).customRounds === 2, 4000))) throw new Error('preset never loaded');
     host.room.send('lobby:start', {});
     if (!(await ctx.waitFor(() => json(host).phase === 'PLAYING' && board() !== null, 8000))) throw new Error('show never started');
@@ -139,11 +163,47 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
       await ctx.sleep(600);
     }
     await cheering;
-    const missesSeen = await ctx.waitFor(() => audience.every((b) => ((b.payloads.get(EVENT) ?? []) as Array<{ type: string }>).filter((e) => e.type === 'miss').length === 5), 6000);
+    const missesSeen = await ctx.waitFor(
+      () => audience.every((b) => ((b.payloads.get(EVENT) ?? []) as Array<{ type: string }>).filter((e) => e.type === 'miss').length === 5),
+      6000,
+    );
     // Before the sweep: the five hidden answers never reached anyone in the crowd.
     const hidden = [3, 5, 7, 8, 9].map((i) => answers[i]!.text);
     const earlyLeak = hidden.some((text) => leaked(audience, `"${text}"`, [SHEET, EVENT, REACTIONS]));
     const sheetLeak = audience.some((b) => (b.payloads.get(SHEET) ?? []).some((x) => x !== null));
+
+    // The picker: a few guests switch Skip me on; the presenter draws, double-sending every act.
+    const skippers = audience.slice(0, Math.min(5, Math.max(0, audience.length - 2)));
+    for (const b of skippers) b.room.send('showdown:skip', { on: true });
+    const skipIds = new Set(skippers.map((b) => b.playerId));
+    await ctx.waitFor(() => json(host).poolSize === audience.length - skippers.length, 4000);
+    const picks = Math.min(8, audience.length - skippers.length);
+    const winners: string[] = [];
+    const tp = performance.now();
+    for (let i = 0; i < picks; i++) {
+      const drawNo = json(host).drawNo as number;
+      host.room.send('showdown:pick', { a: 'pick', round: 0, drawNo });
+      host.room.send('showdown:pick', { a: 'pick', round: 0, drawNo });
+      if (!(await ctx.waitFor(() => json(host).drawNo === drawNo + 1 && json(host).hotSeat !== '', 4000))) break;
+      winners.push(json(host).hotSeat as string);
+      host.room.send('showdown:pick', { a: 'done', drawNo: drawNo + 1 });
+      host.room.send('showdown:pick', { a: 'done', drawNo: drawNo + 1 });
+      await ctx.waitFor(() => json(host).hotSeat === '', 4000);
+      // A brisk presenter, every act double-sent: about 3 picker messages a second (the limit is 4/s).
+      await ctx.sleep(1100);
+    }
+    const pickMs = performance.now() - tp;
+    const picksOk = winners.length === picks && new Set(winners).size === picks && winners.every((id) => !skipIds.has(id));
+    const picksSeen = await ctx.waitFor(
+      () =>
+        audience.every((b) => ((b.payloads.get(EVENT) ?? []) as Array<{ type: string }>).filter((e) => e.type === 'pick').length === picks),
+      6000,
+    );
+    const pickedPrivately = audience
+      .filter((b) => ((b.payloads.get(ME) ?? []) as Array<{ picked?: boolean }>).some((m) => m.picked))
+      .map((b) => b.playerId);
+    const youreUpOk = pickedPrivately.length === picks && pickedPrivately.every((id) => winners.includes(id));
+    const skipLeak = audience.some((b) => !skipIds.has(b.playerId) && leaked([b], '"skip":true', [ME]));
 
     act({ a: 'sweep', round: 0 });
     const swept = await ctx.waitFor(() => audience.every((b) => board(b)?.stage === 'done'), 30000);
@@ -154,7 +214,10 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
       .filter((e) => e.type === 'reveal' && e.sweep)
       .map((e) => e.slot);
     const orderOk = JSON.stringify(order) === JSON.stringify([9, 8, 7, 5, 3]);
-    const reactionsSeen = ((audience[0]!.payloads.get(REACTIONS) ?? []) as Array<{ k: number[] }>).reduce((n, r) => n + r.k.reduce((a, b) => a + b, 0), 0);
+    const reactionsSeen = ((audience[0]!.payloads.get(REACTIONS) ?? []) as Array<{ k: number[] }>).reduce(
+      (n, r) => n + r.k.reduce((a, b) => a + b, 0),
+      0,
+    );
 
     act({ a: 'next', rev: board()!.rev });
     await ctx.waitFor(() => board()?.round === 1, 4000);
@@ -163,8 +226,21 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
 
     ctx.results.push({
       scenario: `showdown-showcase ×${bots.length}`,
-      ok: failures === 0 && missesSeen && !earlyLeak && !sheetLeak && swept && lateOk && orderOk && finale && allConnected(bots),
-      details: `round-played ${revealMs.toFixed(0)}ms misses=${missesSeen} no-leak=${!earlyLeak && !sheetLeak} sweep-order=${orderOk ? order.join('>') : `WRONG ${order.join('>')}`} late-flags=${lateOk} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
+      ok:
+        failures === 0 &&
+        missesSeen &&
+        !earlyLeak &&
+        !sheetLeak &&
+        picksOk &&
+        picksSeen &&
+        youreUpOk &&
+        !skipLeak &&
+        swept &&
+        lateOk &&
+        orderOk &&
+        finale &&
+        allConnected(bots),
+      details: `round-played ${revealMs.toFixed(0)}ms misses=${missesSeen} no-leak=${!earlyLeak && !sheetLeak} picks=${winners.length}/${picks} in ${pickMs.toFixed(0)}ms unique-no-skippers=${picksOk} seen-by-all=${picksSeen} youre-up-private=${youreUpOk} skip-private=${!skipLeak} sweep-order=${orderOk ? order.join('>') : `WRONG ${order.join('>')}`} late-flags=${lateOk} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
     });
     await ctx.leaveAll(bots);
   });

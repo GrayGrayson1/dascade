@@ -700,32 +700,54 @@
   pointer-events: none;
 }
 .tour-console {
+  position: relative;
   height: 100%;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tour-console > * {
+  flex: none;
 }
 .tour-console > .sdc-next {
   margin: 0;
 }
+/* The console's red PRIVATE frame (PRS-05 C), drawn inside the picture. */
+.tour-mock[data-screen='console'] {
+  box-shadow: inset 0 0 0 4px var(--sdc-private, var(--danger, #c8102e));
+}
 .tour-console__main {
+  flex: 1 1 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 262px 262px;
+  grid-template-columns: minmax(0, 1fr) 250px 292px;
   gap: 10px;
   align-items: start;
 }
+.tour-console__sheetcol,
 .tour-console__rail,
 .tour-console__side {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
+}
+.tour-console__side {
+  position: relative;
+  height: 100%;
+}
+.tour-console__side > .sdc-drawer {
+  flex: 1 1 0;
+  min-height: 0;
 }
 .tour-console__rail {
   container-type: inline-size;
 }
 .tour-sheet .sdc-answer {
   min-height: 60px;
+}
+.tour-mock .sdc-wrong {
+  min-height: 72px;
 }
 .tour-mock .sdc-wrong[data-off] {
   filter: saturate(0.35) brightness(0.7);
@@ -739,6 +761,13 @@
   align-items: center;
   gap: 6px;
 }
+.tour-mock .sdc-drawer__label {
+  /* The picture is always drawn at laptop width: the tabs keep their names. */
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+}
 .tour-tools {
   display: grid;
   gap: 8px;
@@ -747,6 +776,86 @@
 .tour-mock .sdc-bar .sdc-audio,
 .tour-mock .sdc-bar .dc-btn {
   white-space: nowrap;
+}
+/* The stage preview, as a picture (the real stage plays on the right). */
+.tour-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: radial-gradient(90% 80% at 50% 10%, color-mix(in srgb, var(--accent) 30%, #1a0b2e), #07040f);
+}
+.tour-preview__board {
+  display: grid;
+  grid-template-columns: repeat(2, 54px);
+  grid-template-rows: repeat(5, 12px);
+  grid-auto-flow: column;
+  gap: 4px 8px;
+}
+.tour-preview__board i {
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--sdc-num-a, #ffa24a) 70%, transparent);
+  background: #0006;
+}
+.tour-preview__board i[data-on] {
+  background: linear-gradient(180deg, var(--sdc-num-a, #ffa24a), var(--sdc-num-b, #c54a00));
+}
+.tour-picker {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-radius: var(--panel-radius, var(--radius-lg));
+  border: 1px solid var(--panel-border, var(--line));
+  background: var(--panel-bg);
+}
+.tour-picker__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-1);
+}
+.tour-picker__head > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+.tour-pickertab__row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  font-size: 13px;
+  color: var(--text-1);
+}
+.tour-pickertab__row b {
+  color: var(--text-0);
+}
+/* A press-and-hold in the picture: the ring fills (instantly full in stills). */
+.tour-holdring .sdc-hold__arc {
+  stroke-dashoffset: 50.27;
+}
+[data-holding] .tour-holdring .sdc-hold__arc {
+  animation: tour-holdfill 1.1s linear forwards;
+}
+[data-holding] .sdc-hold__fill,
+.tour-mock [data-holding] {
+  --hold: 1;
+}
+.tour-mock [data-holding] {
+  filter: brightness(1.12);
+}
+@keyframes tour-holdfill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.tour[data-motion='off'] [data-holding] .tour-holdring .sdc-hold__arc {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+.tour-undobar {
+  transform: scaleX(0.85);
 }
 
 /* The lobby */
@@ -1109,6 +1218,18 @@
   font-size: 15px;
   color: #d8d2ee;
   background: linear-gradient(180deg, #2c2445, #1d1630);
+}
+/* PRS-05 C: the console is the striped PRIVATE window, as on the real one. */
+.tour-big__winbar--private {
+  color: var(--light, #fff);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--danger, #c8102e) 0 10px,
+    color-mix(in srgb, var(--danger, #c8102e) 45%, var(--shade, #000)) 10px 20px
+  );
+}
+.tour-big__win--console {
+  border-color: var(--danger, #c8102e);
 }
 .tour-big__sheet {
   display: grid;
@@ -1592,6 +1713,18 @@
   padding: 8px;
   border-radius: 6px;
   background: #0d0a18;
+}
+.tour-share__fakeconsole--private {
+  padding-top: 18px;
+  background:
+    repeating-linear-gradient(
+        -45deg,
+        var(--danger, #c8102e) 0 6px,
+        color-mix(in srgb, var(--danger, #c8102e) 45%, var(--shade, #000)) 6px 12px
+      )
+      top / 100% 12px no-repeat,
+    #0d0a18;
+  box-shadow: inset 0 0 0 2px var(--danger, #c8102e);
 }
 .tour-share__fakeconsole i {
   border-radius: 4px;

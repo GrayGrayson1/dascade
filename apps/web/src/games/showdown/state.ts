@@ -24,6 +24,12 @@ import {
   type ShowdownSheet,
   type TeamIndex,
   type TeamSlot,
+  type ShowdownAuditView,
+  type ShowdownCrewPrivate,
+  type ShowdownPermission,
+  type ShowdownPreflightData,
+  type ShowdownSeatState,
+  isSoundStation,
 } from '@dascade/shared/games/showdown';
 import { playersEqual, serverNow, useGame, useLatestMessage, useRoomSelector, useSettings } from '../../net/hooks.ts';
 import { useShowSelector } from './source.ts';
@@ -89,7 +95,8 @@ export function useRole(localScreen: boolean): RoleInfo {
   const presenterId = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId) ?? '';
   const spectator = useRoomSelector<ShowdownPublicState, boolean>((s) => Boolean(playerId && s.players[playerId]?.spectator)) ?? false;
   const team = useRoomSelector<ShowdownPublicState, number | null>((s) => (playerId ? (s.teams?.[playerId] ?? null) : null));
-  const role: ShowdownRole = playerId && presenterId === playerId ? 'presenter' : localScreen ? 'screen' : spectator ? 'spectator' : 'audience';
+  const role: ShowdownRole =
+    playerId && presenterId === playerId ? 'presenter' : localScreen ? 'screen' : spectator ? 'spectator' : 'audience';
   return { role, playerId, presenterId, team: team === 0 || team === 1 ? team : null };
 }
 
@@ -292,3 +299,123 @@ export function useShowSounds(role: ShowdownRole): [boolean, (on: boolean) => vo
   };
   return [on, set];
 }
+
+// ---------------------------------------------------------------------------
+// Event rooms: the picker, crew, audit, sound station and preflight
+// (contract: "Picker", "Crew", "Audit", "Sound station" and "Preflight" in @dascade/shared/games/showdown)
+// ---------------------------------------------------------------------------
+
+/** The event preset that made this an event room ('' = an ordinary room). Stage-safe (reads the show source). */
+export function useEvent(): string {
+  return useShowSelector((s) => s.event) ?? '';
+}
+
+export interface PickerView {
+  /** Draws so far this show: send it with every picker act. */
+  drawNo: number;
+  /** The hot seat ('' = nobody) and their name. */
+  hotSeat: string;
+  hotName: string;
+  /** When the draw was made / when the stage lands on it (server epoch ms, 0 = no draw). */
+  pickAt: number;
+  landAt: number;
+  poolSize: number;
+  /** playerIds whose turn counted this round. */
+  done: Record<string, boolean>;
+}
+
+/** The picker's public state. Stage-safe (reads the show source, so the tour can drive it). */
+export function usePicker(): PickerView {
+  const drawNo = useShowSelector((s) => s.drawNo) ?? 0;
+  const hotSeat = useShowSelector((s) => s.hotSeat) ?? '';
+  const hotName = useShowSelector((s) => (s.hotSeat ? (s.players?.[s.hotSeat]?.name ?? '') : '')) ?? '';
+  const pickAt = useShowSelector((s) => s.pickAt) ?? 0;
+  const landAt = useShowSelector((s) => s.landAt) ?? 0;
+  const poolSize = useShowSelector((s) => s.poolSize) ?? 0;
+  const done = useShowSelector((s) => s.done) ?? EMPTY_FLAGS;
+  return { drawNo, hotSeat, hotName, pickAt, landAt, poolSize, done };
+}
+
+const EMPTY_FLAGS: Record<string, boolean> = {};
+
+export interface GridSeat {
+  id: string;
+  name: string;
+  state: ShowdownSeatState;
+}
+
+/**
+ * The stage's spotlight grid: every seat in `seats` (participants who aren't hidden), in join order,
+ * labelled pool / hot / done / away. Nothing here says who chose Skip me (a skipping seat shows as
+ * 'pool' like everyone else — only the pool count knows). Stage-safe.
+ */
+export function useSeatGrid(): GridSeat[] {
+  const seats = useShowSelector((s) => s.seats) ?? EMPTY_FLAGS;
+  const players = useShowSelector((s) => s.players, playersEqual);
+  const hot = useShowSelector((s) => s.hotSeat) ?? '';
+  const done = useShowSelector((s) => s.done) ?? EMPTY_FLAGS;
+  return useMemo(() => {
+    const out: GridSeat[] = [];
+    for (const id of Object.keys(seats)) {
+      const p = players?.[id];
+      if (!p) continue;
+      const state: ShowdownSeatState = id === hot ? 'hot' : done[id] ? 'done' : p.connected ? 'pool' : 'away';
+      out.push({ id, name: p.name, state });
+    }
+    out.sort((a, b) => (players?.[a.id]?.joinOrder ?? 0) - (players?.[b.id]?.joinOrder ?? 0));
+    return out;
+  }, [seats, players, hot, done]);
+}
+
+/** Your crew view (null: no crew role and not presenting, or not sent yet). */
+export function useCrew(): ShowdownCrewPrivate | null {
+  return useLatestMessage<ShowdownCrewPrivate | null>(SHOWDOWN_MSG.crew) ?? null;
+}
+
+/** Whether you may do this right now (the server checks again; this only shapes the screen). */
+export function useCan(perm: ShowdownPermission): boolean {
+  const crew = useCrew();
+  return Boolean(crew?.perms.includes(perm));
+}
+
+/** The latest audit entries (crew with audit.read only). */
+export function useAudit(): ShowdownAuditView | null {
+  return useLatestMessage<ShowdownAuditView>(SHOWDOWN_MSG.audit) ?? null;
+}
+
+/** The last preflight answer from the server (ask with showdownApi.preflight()). */
+export function usePreflightData(): ShowdownPreflightData | null {
+  return useLatestMessage<ShowdownPreflightData>(SHOWDOWN_MSG.preflight) ?? null;
+}
+
+export interface StationView {
+  /** This is an event room: exactly one device plays the show's sound. */
+  event: boolean;
+  /** The station's playerId ('' = the presenter's console). */
+  station: string;
+  /** The device that actually plays (the presenter's id when station is ''). */
+  holderId: string;
+  holderName: string;
+  /** Server epoch ms of the station's last heartbeat (0 = none). */
+  seenAt: number;
+  /** This connection is the station. */
+  mine: boolean;
+  /** Per-device audio status (SHOWDOWN_AUDIO_READY | SHOWDOWN_AUDIO_SILENT). */
+  audio: Record<string, number>;
+}
+
+/** The sound station (AUD-02). Outside event rooms every device keeps today's behaviour (mine = true). */
+export function useStation(): StationView {
+  const playerId = useSessionStore((s) => s.playerId);
+  const event = useRoomSelector<ShowdownPublicState, string>((s) => s.event ?? '') ?? '';
+  const station = useRoomSelector<ShowdownPublicState, string>((s) => s.soundStation ?? '') ?? '';
+  const presenterId = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId) ?? '';
+  const seenAt = useRoomSelector<ShowdownPublicState, number>((s) => s.soundSeenAt ?? 0) ?? 0;
+  const audio = useRoomSelector<ShowdownPublicState, Record<string, number>>((s) => s.audio ?? EMPTY_AUDIO) ?? EMPTY_AUDIO;
+  const holderId = station || presenterId;
+  const holderName = useRoomSelector<ShowdownPublicState, string>((s) => (holderId ? (s.players?.[holderId]?.name ?? '') : '')) ?? '';
+  const mine = event ? isSoundStation({ event, soundStation: station, presenterId }, playerId) : true;
+  return { event: Boolean(event), station, holderId, holderName, seenAt, mine, audio };
+}
+
+const EMPTY_AUDIO: Record<string, number> = {};

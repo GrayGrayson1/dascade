@@ -102,6 +102,12 @@ export const JoinOptionsSchema = /* @__PURE__ */ lazy(() =>
     accessToken: z.string().max(4096).optional(),
     /** Tournament match ticket: seats a registered participant in a Tournament Center match room. */
     ticket: z.string().max(128).optional(),
+    /**
+     * Refuse a new seat whose name someone in the room already has (JoinErrorCode.NAME_TAKEN, with the
+     * name the room would give instead as the message) instead of silently adding " 2" — so a join
+     * screen can ask for an initial first. A seat-token rejoin ignores it.
+     */
+    strictName: z.boolean().optional(),
   }),
 );
 export type JoinOptions = z.infer<typeof JoinOptionsSchema>;
@@ -114,6 +120,12 @@ export const CreateOptionsSchema = /* @__PURE__ */ lazy(() =>
     settings: z.record(z.string(), z.unknown()).optional(),
     /** Private solo room (auto-locked, no lobby wait). */
     solo: z.boolean().optional(),
+    /**
+     * A room snapshot the server sealed earlier (a game's "black box", e.g. a Survey Showdown event
+     * room): the room is recreated from it under its old code. Opaque to clients; only the server can
+     * read or verify it.
+     */
+    restore: z.string().max(120_000).optional(),
   }),
 );
 export type CreateOptions = z.infer<typeof CreateOptionsSchema>;
@@ -180,14 +192,7 @@ export interface ActionErrorPayload {
 }
 
 export type ActionErrorCode =
-  | 'invalid_payload'
-  | 'rate_limited'
-  | 'not_host'
-  | 'wrong_phase'
-  | 'not_allowed'
-  | 'not_your_turn'
-  | 'insufficient_chips'
-  | 'server_error';
+  'invalid_payload' | 'rate_limited' | 'not_host' | 'wrong_phase' | 'not_allowed' | 'not_your_turn' | 'insufficient_chips' | 'server_error';
 
 export interface RemovedPayload {
   reason: 'kicked' | 'room_closed' | 'idle';
@@ -222,6 +227,13 @@ export const JoinErrorCode = {
   NOT_FOUND: 4404,
   MATCH_ENDED: 4405,
   INVALID_OPTIONS: 4406,
+  /** strictName join: the name is taken (the message is the name the room would give instead). */
+  NAME_TAKEN: 4407,
+  /**
+   * A restore snapshot was refused (expired, forged, or its room code is in use again). Thrown while a
+   * room is created, so it travels as the HTTP status of the create request: an HTTP code, like 429.
+   */
+  RESTORE_FAILED: 422,
   RATE_LIMITED: 429,
 } as const;
 export type JoinErrorCode = (typeof JoinErrorCode)[keyof typeof JoinErrorCode];
@@ -284,6 +296,8 @@ export interface RoomLookup {
   locked?: boolean;
   full?: boolean;
   allowSpectators?: boolean;
+  /** The event this room runs (e.g. a Survey Showdown event preset id); absent for ordinary rooms. */
+  event?: string;
 }
 
 /** Matchmaking metadata the server keeps on each room listing. */
@@ -296,4 +310,6 @@ export interface RoomMetadata {
   locked: boolean;
   allowSpectators: boolean;
   solo: boolean;
+  /** See RoomLookup.event. */
+  event?: string;
 }

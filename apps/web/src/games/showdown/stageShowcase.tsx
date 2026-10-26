@@ -10,13 +10,20 @@
  *     banner with the answer, Halloween-shaped confetti, bats, the board glowing, the host celebrating;
  *   - Reveal remaining: the lights dim, a "Revealing the rest…" strip, the hidden special tile in a
  *     pulsing spotlight during the drumroll; the swept tiles flip in as muted "late" tiles;
- *   - the whole board up: "Board complete!" (bigger when the crowd found everything).
+ *   - the whole board up: "Board complete!" (bigger when the crowd found everything);
+ *   - a pick (PCK-01 D): the Spotlight overlay sweeps the audience's seats and lands on the person the
+ *     server drew (PickerSpotlight.tsx), then the hot-seat podium holds their name in the host's
+ *     column for the whole turn while Boo steps aside (HotSeat.tsx, VIS-02 C).
+ *
+ * Display profiles (DSP-02 C, display.ts): the stage picks Stream-safe or Projector for the way it's
+ * watched (`data-display` on the root; the CSS does the rest) and caps its particles on Stream-safe.
+ * Its fonts are pinned to the show's (never the viewer's DASCADE theme).
  *
  * Public data only: the board, settings, the synchronized show state and the feed. Sizes are
  * container units (the stage is a size container), so 1920×1080, 1280×720, 4:3 and the console's
  * small preview all compose the same way.
  */
-import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   showTitle,
   type ShowdownBoardView,
@@ -29,11 +36,44 @@ import { cx } from '@dascade/ui';
 import { Board, SpecialGlyph } from './Board.tsx';
 import { Backdrop, Bulbs } from './Decor.tsx';
 import { HostFigure } from './Host.tsx';
-import { LOOK_COPY, cardLine, categoryLine, farewellLine, fill, idleLine, openingLine, type HostLine, type HostMood, type LookCopy } from './look.ts';
+import {
+  LOOK_COPY,
+  cardLine,
+  categoryLine,
+  farewellLine,
+  fill,
+  idleLine,
+  landLine,
+  openingLine,
+  pickEndLine,
+  pickLine,
+  type HostLine,
+  type HostMood,
+  type LookCopy,
+} from './look.ts';
 import { useShowFeed, type ShowFeed } from './fx.ts';
-import { formatClock, useBoard, useCard, useClock, useFinale, useMotion, useRehearsal, useShowCode, useShowPhase, useSweep, type ClockView, type MotionPrefs } from './state.ts';
+import {
+  formatClock,
+  useBoard,
+  useCard,
+  useClock,
+  useFinale,
+  useMotion,
+  useRehearsal,
+  useShowCode,
+  useShowPhase,
+  useSweep,
+  type ClockView,
+  type MotionPrefs,
+} from './state.ts';
 import { BatBurst, Beams, Confetti, Reactions, useRecent } from './stageFx.tsx';
 import { CardScene, CategoryScene, FinaleScene, JoinHint, LobbyScene, OpeningScene } from './scenes.tsx';
+import { playersEqual } from '../../net/hooks.ts';
+import { useShowSelector } from './source.ts';
+import { SHOW_FONTS, useDisplay, type DisplayContext } from './display.ts';
+import { PickerSpotlight, usePickMoment, type PickMoment } from './PickerSpotlight.tsx';
+import { HotSeat, hotSeatUp } from './HotSeat.tsx';
+import type { ShowdownDisplay } from '@dascade/shared/games/showdown';
 
 export type ShowcaseScene = 'lobby' | 'card' | 'opening' | 'category' | 'board' | 'finale';
 
@@ -51,15 +91,19 @@ const BUBBLE_MS = 5600;
 /** When the host has walked on in the opening (matches sd-host-enter + the bubble delay in the CSS). */
 const OPENING_HOST_MS = 4300;
 const TALK_MS = 2600;
+/** Stream-safe caps the particles at the "low" effects level. */
+const STREAM_PARTICLES = 18;
 
 interface ShowcaseStageProps {
   look: ShowdownLook;
   settings: ShowdownSettings | null;
   variant: 'screen' | 'preview';
   corner?: ReactNode;
+  /** Where this stage is drawn, when the caller knows (otherwise display.ts works it out from the page). */
+  display?: DisplayContext;
 }
 
-export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStageProps) {
+export function ShowcaseStage({ look, settings, variant, corner, display: displayContext }: ShowcaseStageProps) {
   const board = useBoard();
   const finale = useFinale();
   const phase = useShowPhase();
@@ -69,7 +113,12 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
   const rehearsal = useRehearsal();
   const clock = useClock();
   const feed = useShowFeed();
-  const motion = useMotion();
+  const viewer = useMotion();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const display = useDisplay(rootRef, settings?.display, displayContext);
+  const motion = useStageMotion(viewer, display);
+  const pick = usePickMoment();
+  const nameOf = useNameOf(pick);
   const titles = useRoundTitles(board, code);
   const copy = LOOK_COPY[look];
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
@@ -87,6 +136,8 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
         ? 'finale'
         : 'lobby';
   const sceneAt = useSince(scene);
+  // The podium holds the name on the board (a holding card or a title card hides it, the turn goes on).
+  const podium = hotSeatUp(pick) && scene === 'board';
 
   // ---- moments ----
   const miss = feed.last.miss;
@@ -101,7 +152,14 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
   const complete = useRecent(clearedAt, COMPLETE_MS + completeDelay) && scene === 'board';
   const suspense = feed.last.suspense;
   const suspenseSlot =
-    useRecent(suspense?.at, SUSPENSE_MS) && sweep && board && suspense && board.slots[suspense.e.slot] && !board.slots[suspense.e.slot]!.revealed ? suspense.e.slot : -1;
+    useRecent(suspense?.at, SUSPENSE_MS) &&
+    sweep &&
+    board &&
+    suspense &&
+    board.slots[suspense.e.slot] &&
+    !board.slots[suspense.e.slot]!.revealed
+      ? suspense.e.slot
+      : -1;
   const timeupOn = useRecent(feed.last.timeup?.at, TIMEUP_MS);
   const crowd = useRecent(feed.cheer && feed.cheer.count >= CROWD_COUNT ? feed.cheer.at : undefined, 1400);
   const finaleFx = useRecent(scene === 'finale' ? sceneAt : undefined, FINALE_FX_MS);
@@ -112,8 +170,11 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
 
   return (
     <div
+      ref={rootRef}
       className={cx('sd-stage', `sd-stage--${variant}`)}
+      style={SHOW_FONTS as CSSProperties}
       data-mode="showcase"
+      data-display={display}
       data-look={look}
       data-scene={scene}
       data-stage={inShow ? board.stage : phase === 'RESULTS' ? 'finale' : 'lobby'}
@@ -123,6 +184,8 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
       data-suspense={suspenseSlot >= 0 && scene === 'board' ? 'true' : undefined}
       data-celebrate={celebrating ? 'true' : undefined}
       data-shake={shake}
+      data-picking={pick.phase !== 'idle' && pick.hotSeat ? pick.phase : undefined}
+      data-hotseat={podium ? 'true' : undefined}
     >
       <Backdrop look={look} fx={motion.fx} />
       <Bulbs />
@@ -140,6 +203,7 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
             sweep={sweep}
             suspenseSlot={suspenseSlot}
             timeup={timeupOn}
+            hotseat={podium ? <HotSeat moment={pick} board={board} copy={copy.showcase} /> : null}
           />
         ) : scene === 'card' && card ? (
           <CardScene card={card} settings={settings} look={look} code={code} />
@@ -168,9 +232,14 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
         timeup={timeupOn}
         crowd={crowd}
         motion={motion.motion}
+        pick={pick}
+        nameOf={nameOf}
       />
+      <PickerSpotlight moment={pick} copy={copy.showcase} motion={motion} />
       {missOn && miss ? <MissX key={`${miss.e.round}:${miss.e.n}:${miss.at}`} /> : null}
-      {celebrating && cel ? <Celebration key={cel.key} look={look} copy={copy} text={cel.slot >= 0 ? cel.text : ''} motion={motion} /> : null}
+      {celebrating && cel ? (
+        <Celebration key={cel.key} look={look} copy={copy} text={cel.slot >= 0 ? cel.text : ''} motion={motion} />
+      ) : null}
       {complete && board ? (
         <Complete
           key={`complete:${clearedAt}`}
@@ -192,6 +261,32 @@ export function ShowcaseStage({ look, settings, variant, corner }: ShowcaseStage
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * The viewer's motion settings, as this stage uses them: Stream-safe caps the particles (and the bats,
+ * the beams) at the "low" effects level — a Teams share spends its bitrate on the board, not confetti.
+ */
+function useStageMotion(viewer: MotionPrefs, display: ShowdownDisplay): MotionPrefs {
+  const { motion, fx, reduced, particles } = viewer;
+  return useMemo(
+    () =>
+      display === 'stream'
+        ? { motion, reduced, fx: fx === 'high' ? 'low' : fx, particles: Math.min(particles, STREAM_PARTICLES) }
+        : { motion, reduced, fx, particles },
+    [display, motion, fx, reduced, particles],
+  );
+}
+
+/**
+ * Players' names for the host's pick lines ("Thanks, Priya!"). The room's feed has no names, so the
+ * stage fills them in; someone who left mid-turn is still remembered from the hot seat.
+ */
+function useNameOf(pick: PickMoment): (playerId: string) => string {
+  const players = useShowSelector((s) => s.players, playersEqual);
+  const lastHot = useRef({ id: '', name: '' });
+  if (pick.hotSeat && pick.name) lastHot.current = { id: pick.hotSeat, name: pick.name };
+  return useCallback((id: string) => players?.[id]?.name ?? (id && id === lastHot.current.id ? lastHot.current.name : ''), [players]);
+}
 
 /** The performance.now() time `key` last changed (undefined for a null key). */
 function useSince(key: string | null): number | undefined {
@@ -239,6 +334,7 @@ function BoardScene({
   sweep,
   suspenseSlot,
   timeup,
+  hotseat,
 }: {
   board: ShowdownBoardView;
   show: string;
@@ -250,6 +346,8 @@ function BoardScene({
   sweep: boolean;
   suspenseSlot: number;
   timeup: boolean;
+  /** The hot-seat podium (in the host's column, never over the board). */
+  hotseat: ReactNode;
 }) {
   const sc = copy.showcase;
   const n = board.round + 1;
@@ -289,7 +387,9 @@ function BoardScene({
         </span>
       </header>
       <div className="sd-sc__main">
-        <div className="sd-sc__hostcol" aria-hidden />
+        <div className="sd-sc__hostcol" data-hot={hotseat ? 'true' : undefined}>
+          {hotseat}
+        </div>
         <section className="sd-sc__center">
           <header className="sd-sc__header">
             {board.source ? (
@@ -302,7 +402,7 @@ function BoardScene({
             </h2>
           </header>
           <div className="sd-sc__frame">
-            <Board board={board} spotlight={suspenseSlot} specialLabel={sc.special} />
+            <Board board={board} spotlight={suspenseSlot} specialLabel={sc.special} creditLabel={sc.calledBy} />
           </div>
         </section>
         <StatusColumn board={board} copy={copy} look={look} code={code} clock={clock} timeup={timeup} />
@@ -344,7 +444,12 @@ function StatusColumn({
         <span className="sd-status__label">{sc.found}</span>
         <span className="sd-found__pips" aria-hidden>
           {board.slots.map((s, i) => (
-            <i key={i} data-on={s.revealed && !s.late ? 'true' : undefined} data-late={s.revealed && s.late ? 'true' : undefined} data-special={i === board.special ? 'true' : undefined} />
+            <i
+              key={i}
+              data-on={s.revealed && !s.late ? 'true' : undefined}
+              data-late={s.revealed && s.late ? 'true' : undefined}
+              data-special={i === board.special ? 'true' : undefined}
+            />
           ))}
         </span>
       </div>
@@ -415,6 +520,8 @@ function ShowHost({
   timeup,
   crowd,
   motion,
+  pick,
+  nameOf,
 }: {
   look: ShowdownLook;
   copy: LookCopy;
@@ -430,9 +537,14 @@ function ShowHost({
   timeup: boolean;
   crowd: boolean;
   motion: boolean;
+  pick: PickMoment;
+  nameOf: (playerId: string) => string;
 }) {
   const fresh = useRecent(feed.line ? feed.lineAt : undefined, BUBBLE_MS);
-  const ev = fresh ? feed.line : null;
+  let ev = fresh ? feed.line : null;
+  // The room's feed thanks people without a name (it doesn't know players): say it with their name.
+  const ended = feed.last.pickEnd;
+  if (ev && ended && ev.key === `pickEnd:${ended.e.drawNo}:${ended.e.how}`) ev = pickEndLine(look, ended.e, nameOf(ended.e.playerId)) ?? ev;
   // A cue (Celebrate!, applause…) speaks over any scene; otherwise each scene has its own words.
   const cue = ev && ev.key.startsWith('cue:') ? ev : null;
   let line: HostLine | null;
@@ -441,6 +553,9 @@ function ShowHost({
   else if (scene === 'lobby') line = cue ?? cardLine(look, 'welcome');
   else if (scene === 'opening') line = ev && !/^(intro|reset|undo):/.test(ev.key) ? ev : openingLine(look, show);
   else if (scene === 'category' && board) line = ev && !/^(round|restart|undo):/.test(ev.key) ? ev : categoryLine(look, board);
+  // The pick, over the board: the search (never the name), then the landing calls them up.
+  else if (pick.phase === 'sweep') line = ev && ev.key === `pick:${pick.drawNo}` ? ev : pickLine(look, { drawNo: pick.drawNo });
+  else if (pick.phase === 'card') line = landLine(look, pick.drawNo, pick.name);
   else line = ev ?? (feed.line ? null : idleLine(look, board, ['', ''], show));
   const at = useSince(line?.key ?? null);
   // The opening's welcome waits for the host to walk on (stageShowcase.css delays the bubble to match).
@@ -514,7 +629,21 @@ function Celebration({ look, copy, text, motion }: { look: ShowdownLook; copy: L
 }
 
 /** The whole board is up. */
-function Complete({ copy, found, total, delay, particles, look }: { copy: LookCopy; found: number; total: number; delay: number; particles: number; look: ShowdownLook }) {
+function Complete({
+  copy,
+  found,
+  total,
+  delay,
+  particles,
+  look,
+}: {
+  copy: LookCopy;
+  found: number;
+  total: number;
+  delay: number;
+  particles: number;
+  look: ShowdownLook;
+}) {
   const sc = copy.showcase;
   const all = found === total && total > 0;
   return (
@@ -523,7 +652,15 @@ function Complete({ copy, found, total, delay, particles, look }: { copy: LookCo
       <span className="sd-complete__sub">
         {fill(sc.completeSub, { found, total })
           .split(/(\d+)/)
-          .map((part, i) => (/^\d+$/.test(part) ? <span key={i} className="sd-num">{part}</span> : part))}
+          .map((part, i) =>
+            /^\d+$/.test(part) ? (
+              <span key={i} className="sd-num">
+                {part}
+              </span>
+            ) : (
+              part
+            ),
+          )}
       </span>
       {particles > 0 && !delay ? <Confetti count={all ? particles : Math.round(particles * 0.6)} look={look} big={all} /> : null}
     </div>

@@ -26,3 +26,4 @@ export {
 export { GUESS_REJECTION_TEXT, GuessBook, matchSlot, type GuessRejection, type SubmitResult } from './guesses.ts';
 export { SHOWDOWN_PACKS, pickRounds } from './packs.ts';
 export { SHOWDOWN_EVENT_ROUNDS } from './events.ts';
+export { drawPick, inPool, pickPool, type PickSeat } from './picker.ts';

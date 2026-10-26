@@ -1,0 +1,601 @@
+/* =====================================================================
+ * DAS Survey Showdown — the pick layers on the Presenter Showcase stage
+ *   - the Spotlight picker overlay (PickerSpotlight.tsx, PCK-01 D), z 14 over the board;
+ *   - the hot-seat podium in the host's column (HotSeat.tsx, VIS-02 C), Boo stepping aside for it;
+ *   - the "called by" credit on a tile the hot seat called (Board.tsx).
+ * Game art like the rest of the stage: each look declares its palette once (--pk-*, --hs-*).
+ * Seat states are words on the seat (away, done, hot seat), never colour alone. Every entrance runs
+ * only with [data-motion='on']; light changes (the room dimming) take about 1.5 s and nothing flashes.
+ * Sizes are container units (the stage is the `sd` size container); the seats themselves are sized
+ * in px by spotlight.ts from the area they fill.
+ * Loaded after stageShowcase.css (Stage.tsx imports the three stage sheets in order).
+ * ===================================================================== */
+
+/* ---------- Palettes: Halloween = gold seats, orange beams; Showtime = blue seats, white beams ---------- */
+[data-look='halloween'] {
+  --pk-veil: #07020ff5;
+  --pk-seat-a: #2c1250;
+  --pk-seat-b: #170828;
+  --pk-seat-edge: #e9a93a;
+  --pk-seat-ink: #ffd98a;
+  --pk-lit-a: #fff1b0;
+  --pk-lit-b: #ffc84a;
+  --pk-lit-edge: #fff6d6;
+  --pk-lit-ink: #24092e;
+  --pk-lit-glow: #ffcf6a;
+  --pk-beam: #ff9a3c;
+  --pk-lamp: #ffb366;
+  --pk-lamp-body: #1a0b2e;
+  --pk-credit: #6e27c9;
+  --hs-a: #3a1466;
+  --hs-b: #1c0833;
+  --hs-edge: #ff9a3c;
+  --hs-meter: #ffc164;
+  --hs-meter-ink: #24092e;
+}
+[data-look='showtime'] {
+  --pk-veil: #03061af5;
+  --pk-seat-a: #13286e;
+  --pk-seat-b: #0a1440;
+  --pk-seat-edge: #6f9bff;
+  --pk-seat-ink: #dbe6ff;
+  --pk-lit-a: #7fb0ff;
+  --pk-lit-b: #2a5bd6;
+  --pk-lit-edge: #ffffff;
+  --pk-lit-ink: #ffffff;
+  --pk-lit-glow: #a9c8ff;
+  --pk-beam: #ffffff;
+  --pk-lamp: #e8f0ff;
+  --pk-lamp-body: #0a1030;
+  --pk-credit: #1747d1;
+  --hs-a: #24125e;
+  --hs-b: #0c0626;
+  --hs-edge: #ffd36b;
+  --hs-meter: #ffd36b;
+  --hs-meter-ink: #1b0f33;
+}
+
+/* =====================================================================
+ * The Spotlight picker
+ * ===================================================================== */
+.sd-pick {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+.sd-pick[data-phase='out'] {
+  opacity: 0;
+}
+/* The room dims (≈ 1.5 s), a little further once the stage lands. */
+.sd-pick__veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(70% 80% at 58% 56%, color-mix(in srgb, var(--pk-veil) 95%, transparent), var(--pk-veil));
+  animation: sd-pick-fade 1.5s ease both;
+}
+@keyframes sd-pick-fade {
+  from {
+    opacity: 0;
+  }
+}
+.sd-pick__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Right of the host's column (Boo stays beside the seats and speaks for the moment). */
+.sd-pick__stage {
+  position: absolute;
+  top: 4.4cqh;
+  bottom: 3.6cqh;
+  left: calc(var(--sc-pad-x) + var(--sc-host-w) + var(--sc-gap));
+  right: var(--sc-pad-x);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4.2cqh;
+}
+.sd-pick__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2cqw;
+  min-width: 0;
+  animation: sd-pick-fade 0.8s ease both;
+}
+.sd-pick__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sd-title-font);
+  font-size: calc(5.2cqh * var(--sd-title-k, 1) + 0.8cqh);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sd-gold);
+  -webkit-text-stroke: 0.25cqh #1b0730;
+  paint-order: stroke fill;
+  text-shadow: 0 0.4cqh 0 #1b0730;
+}
+.sd-pick__pool {
+  flex: none;
+  padding: 0.7cqh 1.4cqw;
+  border-radius: 99px;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: calc(2.3cqh * var(--sd-type, 1));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #1b0f33;
+  background: linear-gradient(180deg, #fff6d6, var(--sd-gold));
+}
+.sd-pick__pool .sd-num {
+  font-size: 1.2em;
+  letter-spacing: 0;
+}
+.sd-pick__area {
+  position: relative;
+  min-height: 0;
+}
+.sd-pick__house,
+.sd-pick__lit {
+  position: absolute;
+  inset: 0;
+}
+.sd-pick__house {
+  filter: brightness(0.62) saturate(0.85);
+  transition: filter 1.5s ease;
+  animation: sd-pick-house 1.5s ease backwards;
+}
+@keyframes sd-pick-house {
+  from {
+    filter: none;
+  }
+}
+.sd-pick:is([data-phase='card'], [data-phase='out']) .sd-pick__house {
+  filter: brightness(0.42) saturate(0.7);
+}
+/* The lit copy: dark until the spots paint their mask (PickerSpotlight sets it on the element). */
+.sd-pick__lit {
+  z-index: 2;
+  -webkit-mask-image: linear-gradient(transparent, transparent);
+  mask-image: linear-gradient(transparent, transparent);
+}
+.sd-pick__beams {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.sd-pick__beam-top {
+  stop-color: var(--pk-beam);
+  stop-opacity: 0.5;
+}
+.sd-pick__beam-end {
+  stop-color: var(--pk-beam);
+  stop-opacity: 0.06;
+}
+.sd-pick__lamp rect {
+  fill: var(--pk-lamp-body);
+  stroke: var(--pk-lamp);
+  stroke-width: 2;
+}
+.sd-pick__lamp circle {
+  fill: #4a3a63;
+  transition: fill 0.4s ease;
+}
+.sd-pick__lamp circle[data-on='true'] {
+  fill: var(--pk-lamp);
+}
+
+/* ---------- Seats ---------- */
+.sd-seat {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  /* In px from the seat's own width (a % would follow the whole room's width). */
+  padding: 0 var(--seat-pad, 6px);
+  border-radius: 1.2cqh 1.2cqh 0.6cqh 0.6cqh;
+  background: linear-gradient(180deg, var(--pk-seat-a), var(--pk-seat-b));
+  border: max(2px, 0.3cqh) solid var(--pk-seat-edge);
+  box-shadow: 0 0.5cqh 0 #0009;
+  color: var(--pk-seat-ink);
+  text-align: center;
+}
+.sd-seat__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  /* The full width (a centred -webkit-box would shrink to a guess of its content and clip names). */
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: var(--seat-font, 2cqh);
+  line-height: 1.06;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+/* Away and done: dimmer AND said in words (the tag), with a dashed edge for away. */
+.sd-seat:is([data-state='away'], [data-state='done']) .sd-seat__name {
+  opacity: 0.55;
+}
+.sd-seat[data-state='away'] {
+  border-style: dashed;
+}
+.sd-seat__tag {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  padding: 0.25em 0.65em;
+  border-radius: 99px;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: var(--seat-tag, 1.4cqh);
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff3e0;
+  background: #0b0614;
+  box-shadow: 0 0 0 1px #fff3e055;
+}
+.sd-seat[data-state='hot'] .sd-seat__tag {
+  color: #1b0f33;
+  background: var(--sd-gold);
+  box-shadow: 0 0 0 1px #1b0f33;
+}
+.sd-pick__lit .sd-seat {
+  background: linear-gradient(180deg, var(--pk-lit-a), var(--pk-lit-b));
+  border-color: var(--pk-lit-edge);
+  color: var(--pk-lit-ink);
+  box-shadow:
+    0 0 2.4cqh color-mix(in srgb, var(--pk-lit-glow) 70%, transparent),
+    0 0.5cqh 0 #0009;
+}
+[data-look='showtime'] .sd-pick__lit .sd-seat__name {
+  text-shadow: 0 0.2cqh 0 #0b1a5299;
+}
+/* The landing: the winner's seat rises out of the light. */
+.sd-pick__lit .sd-seat[data-win] {
+  z-index: 4;
+  box-shadow:
+    0 0 0 0.5cqh #1b0730,
+    0 0 0 0.9cqh var(--pk-lamp),
+    0 0 5cqh var(--pk-lit-glow);
+}
+.sd-stage[data-motion='on'] .sd-pick__lit .sd-seat {
+  transform-origin: var(--seat-origin, center);
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.sd-stage[data-motion='on'] .sd-pick__lit .sd-seat[data-win] {
+  transform: translateY(-8%) scale(1.14);
+}
+
+/* ---------- The landing card ---------- */
+.sd-pick__card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  animation: sd-pick-fade 0.6s ease both;
+}
+/* The card sits in the half of the room away from the winner's seat, so their lit seat stays in view. */
+.sd-pick__card[data-side='low'] {
+  align-items: end;
+}
+.sd-pick__card[data-side='high'] {
+  align-items: start;
+}
+.sd-pick__plate {
+  display: grid;
+  justify-items: center;
+  gap: 1.6cqh;
+  max-width: 100%;
+  padding: 3.4cqh 4cqw 3.8cqh;
+  border-radius: 3cqh;
+  text-align: center;
+  background: color-mix(in srgb, var(--sd-sky-bottom) 92%, transparent);
+  box-shadow:
+    0 0 0 0.3cqh color-mix(in srgb, var(--pk-lamp) 60%, transparent),
+    0 3cqh 8cqh #000c;
+}
+.sd-stage[data-motion='on'] .sd-pick__plate {
+  animation: sd-pick-pop 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+@keyframes sd-pick-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.sd-pick__kicker {
+  font-family: var(--sd-title-font);
+  font-size: calc(5.6cqh * var(--sd-title-k, 1) + 0.6cqh);
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sd-gold);
+  -webkit-text-stroke: 0.22cqh #1b0730;
+  paint-order: stroke fill;
+  text-shadow: 0 0.4cqh 0 #1b0730;
+}
+.sd-pick__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1.6cqh 3cqw 1.8cqh;
+  border-radius: 2cqh;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  /* As large as the stage allows: a short name is huge, the longest (20 characters) still fits. */
+  font-size: clamp(5cqh, calc(96cqw / (var(--len, 10) + 2)), 11cqh);
+  line-height: 1;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  color: #1b0f33;
+  background: linear-gradient(180deg, #fff6d6, var(--sd-gold));
+  box-shadow:
+    0 0 0 0.6cqh #1b0730,
+    0 0 0 1.1cqh var(--pk-lamp),
+    0 0 7cqh color-mix(in srgb, var(--pk-lit-glow) 70%, transparent);
+}
+.sd-pick__ask {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: calc(2.8cqh * var(--sd-type, 1));
+  color: var(--sd-ink);
+  text-shadow: 0 0.3cqh 0.6cqh #000a;
+}
+
+/* Boo stays by the seats (above the dimmed room) and speaks for the moment — on the board, where he
+   has his own column. */
+.sd-stage[data-picking][data-scene='board'] .sd-sc-host {
+  z-index: 15;
+}
+
+/* =====================================================================
+ * The hot-seat podium (the host's column, for the whole turn)
+ * ===================================================================== */
+.sd-sc__hostcol {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+/* Wide stages only: on narrow ones the host's column is hidden (stageShowcase.css) unless the podium is up. */
+@container sd (aspect-ratio >= 1.45) {
+  .sd-sc__hostcol {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+}
+.sd-hotseat {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin-bottom: 1.6cqh;
+}
+.sd-hotseat__light {
+  position: absolute;
+  left: 50%;
+  bottom: 55%;
+  z-index: -1;
+  width: 150%;
+  height: 64cqh;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 100% at 50% 100%, color-mix(in srgb, var(--sd-gold) 32%, transparent), transparent 72%);
+  pointer-events: none;
+}
+.sd-hotseat__box {
+  position: relative;
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 1.2cqh;
+  padding: 2.4cqh 0.8cqw 2.2cqh;
+  border-radius: 2.4cqh 2.4cqh 1.2cqh 1.2cqh;
+  text-align: center;
+  color: #fff3e0;
+  background: linear-gradient(180deg, var(--hs-a), var(--hs-b));
+  border: max(3px, 0.42cqh) solid var(--hs-edge);
+  box-shadow:
+    0 0 4cqh color-mix(in srgb, var(--hs-edge) 45%, transparent),
+    inset 0 0 2cqh #0008;
+}
+.sd-hotseat__kicker {
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: calc(1.9cqh * var(--sd-type, 1));
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hs-edge);
+}
+/* 34 px on a 1280×720 stage (4.7cqh) for a short name; longer ones take up to three balanced lines. */
+.sd-hotseat__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: clamp(2.6cqh, min(calc(80cqh / var(--len, 8)), calc(40cqh / var(--wlen, 8))), 4.7cqh);
+  line-height: 1.08;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: #fff3e0;
+}
+.sd-hotseat__meter {
+  padding: 0.7cqh 1cqw;
+  border-radius: 99px;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: calc(2cqh * var(--sd-type, 1));
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--hs-meter-ink);
+  background: var(--hs-meter);
+}
+.sd-hotseat__meter .sd-num {
+  font-weight: 700;
+}
+.sd-hotseat__base {
+  width: 112%;
+  height: 2.4cqh;
+  margin-top: -0.3cqh;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hs-edge) 55%, black), #0d0418);
+  clip-path: polygon(5% 0, 95% 0, 100% 100%, 0 100%);
+}
+.sd-hotseat[data-credit] .sd-hotseat__box {
+  border-color: var(--sd-special);
+  box-shadow:
+    0 0 6cqh color-mix(in srgb, var(--sd-special) 65%, transparent),
+    inset 0 0 2cqh #0008;
+}
+.sd-hotseat[data-credit] .sd-hotseat__kicker {
+  color: var(--sd-special);
+}
+.sd-stage[data-motion='on'] .sd-hotseat {
+  animation: sd-hotseat-rise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sd-hotseat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40cqh);
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* Boo steps aside while the podium is up (and comes back when the turn ends). */
+.sd-stage[data-hotseat] .sd-sc-host[data-scene='board'] {
+  opacity: 0;
+  transform: translateX(-70%) scale(0.9);
+}
+.sd-stage[data-motion='off'][data-hotseat] .sd-sc-host[data-scene='board'] {
+  transform: none;
+}
+
+/* =====================================================================
+ * The "called by" credit on a tile the hot seat called (only ever on a revealed tile)
+ * ===================================================================== */
+.sd-tile[data-credit] {
+  z-index: 2;
+}
+.sd-tile__credit {
+  position: absolute;
+  right: 1cqw;
+  bottom: 0;
+  z-index: 3;
+  max-width: 82%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(50%);
+  padding: 0.35cqh 0.8cqw;
+  border-radius: 99px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: calc(1.6cqh * var(--sd-type, 1));
+  line-height: 1.15;
+  color: #fff3e0;
+  background: var(--pk-credit);
+  box-shadow:
+    0 0 0 0.22cqh #fff3e0,
+    0 0.4cqh 0.8cqh #0008;
+  pointer-events: none;
+}
+.sd-tile__credit b {
+  font-weight: 900;
+}
+.sd-stage[data-motion='on'] .sd-tile__credit[data-fresh] {
+  animation: sd-credit-in 0.4s ease-out 0.75s both;
+}
+@keyframes sd-credit-in {
+  from {
+    opacity: 0;
+    transform: translateY(80%);
+  }
+}
+.sd-mini .sd-tile__credit {
+  right: 8px;
+  padding: 2px 7px;
+  font-size: 11px;
+  box-shadow: 0 0 0 1.5px #fff3e0;
+}
+
+/* =====================================================================
+ * Narrow stages (4:3): the seats take the full width; the podium starts the status row
+ * ===================================================================== */
+@container sd (aspect-ratio < 1.45) {
+  .sd-pick__stage {
+    left: var(--sc-pad-x);
+  }
+  .sd-stage[data-picking][data-scene='board'] .sd-sc-host {
+    z-index: 7;
+  }
+  /* Shares the status row's first cell (the status keeps its left padding free for the host / podium). */
+  .sd-sc__hostcol[data-hot] {
+    display: flex;
+    flex-direction: column;
+    grid-row: 2;
+    grid-column: 1;
+    justify-self: start;
+    align-self: stretch;
+    justify-content: center;
+    width: 17cqw;
+    z-index: 1;
+  }
+  .sd-hotseat {
+    height: 100%;
+    margin: 0;
+  }
+  .sd-hotseat__light,
+  .sd-hotseat__base {
+    display: none;
+  }
+  .sd-hotseat__box {
+    height: 100%;
+    align-content: center;
+    gap: 0.6cqh;
+    padding: 1cqh 0.8cqw;
+    border-radius: 2cqh;
+  }
+  .sd-hotseat__kicker {
+    font-size: 1.4cqh;
+  }
+  .sd-hotseat__name {
+    font-size: clamp(2cqh, min(calc(53cqw / var(--len, 8)), calc(26cqw / var(--wlen, 8))), 3.6cqh);
+  }
+  .sd-hotseat__meter {
+    font-size: 1.6cqh;
+  }
+}
+
+/* The board's own top bar steps back while the overlay has the stage (its title takes that place). */
+.sd-stage[data-picking] .sd-sc__top {
+  transition: opacity 0.6s ease;
+}
+.sd-stage:is([data-picking='sweep'], [data-picking='card']) .sd-sc__top {
+  opacity: 0;
+}

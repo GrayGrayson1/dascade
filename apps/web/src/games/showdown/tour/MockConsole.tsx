@@ -12,14 +12,16 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import {
   SHOWDOWN_CARDS,
   SHOWDOWN_CARD_INFO,
+  SHOWDOWN_CUES,
+  SHOWDOWN_CUE_INFO,
   type ShowdownBoardView,
   type ShowdownCard,
   type ShowdownLook,
 } from '@dascade/shared/games/showdown';
-import { Badge, Button, Kbd, PixelIcon, Spinner, cx } from '@dascade/ui';
+import { Badge, Button, Kbd, PixelIcon, Spinner, cx, type IconName } from '@dascade/ui';
 import { formatClock, useBoard, useCard, useClock, useFinale, useSweep, type ClockView } from '../state.ts';
 import { DEMO_CODE, DEMO_ROUNDS, DEMO_SETTINGS, sheetRound } from './script.ts';
-import type { LobbyTab, TourDialog, TourFrame } from './timeline.ts';
+import type { DrawerTabId, LobbyTab, TourDialog, TourFrame } from './timeline.ts';
 
 /** The console's size before the camera scales it (px). */
 export const MOCK_W = 1120;
@@ -39,7 +41,7 @@ export function MockConsole({ look, frame, landed, pressed, motion }: MockProps)
   let screen: ReactNode;
   if (frame.screen === 'lobby') screen = <LobbyScreen look={look} tab={frame.tab} preset={frame.preset} stage={frame.stage} />;
   else if (frame.screen === 'results') screen = <ResultsScreen />;
-  else screen = <ConsoleScreen look={look} stage={frame.stage} dialog={frame.dialog} toast={frame.toast} />;
+  else screen = <ConsoleScreen look={look} frame={frame} landed={landed} />;
   return (
     <Camera
       w={MOCK_W}
@@ -50,7 +52,7 @@ export function MockConsole({ look, frame, landed, pressed, motion }: MockProps)
       landed={landed}
       pressed={pressed}
       motion={motion}
-      screen={`${frame.screen}:${frame.tab}:${frame.dialog ?? ''}`}
+      screen={`${frame.screen}:${frame.tab}:${frame.dialog ?? ''}:${frame.drawer}:${frame.armed}:${frame.undo}`}
     >
       <div className="tour-mock sdc" data-look={look} data-screen={frame.screen}>
         {screen}
@@ -392,12 +394,19 @@ function CardsMock({ card, compact = false }: { card: ShowdownCard | null; compa
 }
 
 // ---------------------------------------------------------------------------
-// The showcase console
+// The showcase console (PRS-01 A: sheet | rail | pinned preview over the drawer)
 // ---------------------------------------------------------------------------
 
 const STAGE_LABEL: Record<string, string> = { intro: 'Opening', title: 'Title card', live: 'Live', steal: 'Live', done: 'Board complete' };
 
-function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; stage: boolean; dialog: TourDialog | null; toast: string }) {
+const DRAWER_TABS: ReadonlyArray<{ id: DrawerTabId; label: string; icon: IconName }> = [
+  { id: 'picker', label: 'Picker', icon: 'dice' },
+  { id: 'sound', label: 'Sound', icon: 'music' },
+  { id: 'cards', label: 'Cards', icon: 'eye' },
+  { id: 'fix', label: 'Fix', icon: 'refresh' },
+];
+
+function ConsoleScreen({ look, frame, landed }: { look: ShowdownLook; frame: TourFrame; landed: number }) {
   const board = useBoard();
   const clock = useClock();
   const sweeping = useSweep();
@@ -407,9 +416,18 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
   const found = board.slots.filter((s) => s.revealed && !s.late).length;
   const last = board.round >= board.totalRounds - 1;
   const timeUp = clock.on && clock.left <= 0 && board.stage === 'live';
+  const holdSweep = clock.running && !timeUp && board.stage === 'live' && hidden > 0;
   const where = board.round < 0 ? 'Before round 1' : `Round ${board.round + 1} of ${board.totalRounds}`;
+  const armed = frame.armed && board.stage === 'live' && !board.slots[board.special]?.revealed;
+  /** The control being held (its ring fills). */
+  const holding = (name: string) => (frame.held && frame.point === name ? 'true' : undefined);
   return (
-    <div className="tour-console">
+    <div className="tour-console" data-held={frame.held ? landed : undefined}>
+      <div className="sdc-private-band">
+        <span className="sdc-private-band__text">
+          <PixelIcon name="lock" /> <b>PRIVATE</b> — presenter console · share the <b>STAGE</b> window, never this one
+        </span>
+      </div>
       <header className="sdc-bar">
         <span className="sd-live">
           <i aria-hidden /> Live
@@ -423,8 +441,8 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
         </div>
         <span className="dc-spacer" />
         <SoundMock look={look} />
-        <StageWindowMock stage={stage} label="Stage window" size="sm" />
-        <Button size="sm" variant="danger" icon="flag">
+        <StageWindowMock stage={frame.stage} label="Stage window" size="sm" />
+        <Button size="sm" variant="danger" icon="flag" data-tour="end-show">
           End show
         </Button>
       </header>
@@ -436,9 +454,13 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
           </span>
         </div>
       ) : null}
-      <NextStepMock board={board} hidden={hidden} found={found} last={last} timeUp={timeUp} sweeping={sweeping} />
+      <NextStepMock board={board} hidden={hidden} found={found} last={last} timeUp={timeUp} sweeping={sweeping} armed={armed} look={look} />
       <div className="tour-console__main">
-        <SheetMock board={board} look={look} found={found} />
+        <div className="tour-console__sheetcol">
+          <div className="sdc-sheet">
+            <SheetMock board={board} look={look} found={found} armed={armed} />
+          </div>
+        </div>
         <div className="tour-console__rail">
           <div className="sdc-wrongbox">
             <span className="sdc-wrong" data-tour="wrong" data-off={board.stage !== 'live' || sweeping ? 'true' : undefined}>
@@ -450,7 +472,7 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
             </span>
           </div>
           <ClockMock clock={clock} timeUp={timeUp} />
-          <div className="sdc-sweep" data-on={sweeping ? 'true' : undefined}>
+          <div className="sdc-sweep" data-on={sweeping ? 'true' : undefined} data-hold={holdSweep ? 'true' : undefined}>
             {sweeping ? (
               <span className="sdc-sweep__status" data-tour="sweep">
                 <PixelIcon name="sparkle" /> Revealing… <span className="dc-num">{hidden}</span> to go
@@ -460,12 +482,13 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
                 variant={timeUp && hidden ? 'primary' : 'secondary'}
                 size="lg"
                 block
-                icon="sparkle"
-                className="sdc-sweep__btn"
+                icon={holdSweep ? undefined : 'sparkle'}
+                className={holdSweep ? 'sdc-sweep__btn sdc-hold' : 'sdc-sweep__btn'}
                 data-urgent={timeUp && hidden ? 'true' : undefined}
                 data-tour="sweep"
                 disabled={board.stage !== 'live' || !hidden}
               >
+                {holdSweep ? <HoldRing /> : null}
                 Reveal remaining {hidden && board.stage === 'live' ? <span className="sdc-sweep__count">({hidden})</span> : null}{' '}
                 <Kbd>R</Kbd>
               </Button>
@@ -483,43 +506,138 @@ function ConsoleScreen({ look, stage, dialog, toast }: { look: ShowdownLook; sta
               {board.stage === 'intro' ? 'Start round 1' : last ? 'Finish show' : 'Next round'} <Kbd>N</Kbd>
             </Button>
           </div>
+          <PickerMock />
         </div>
         <div className="tour-console__side">
-          <div className="sd-panel sdc-panel">
-            <h3 className="sd-panel__title">Stage cards</h3>
-            <CardsMock card={card} compact />
-          </div>
-          <div className="sd-panel sdc-panel">
-            <h3 className="sd-panel__title">Sound cues</h3>
-            <div className="sdc-cues">
-              <span className="sdc-cue sdc-cue--big" data-tour="celebrate">
-                <span aria-hidden>🎉</span> Celebrate! <Kbd>C</Kbd>
+          {frame.dialog ? <EndPanelMock kind={frame.dialog} board={board} look={look} holding={holding('end-hold')} /> : null}
+          <div className="sdc-side__preview">
+            <div className="tour-preview" aria-hidden>
+              <span className="tour-preview__board">
+                {board.slots.map((s, i) => (
+                  <i key={i} data-on={s.revealed ? 'true' : undefined} />
+                ))}
               </span>
             </div>
+            <p className="sd-preview__caption">
+              <PixelIcon name="eye" /> What the audience sees
+            </p>
           </div>
-          <div className="sd-panel sdc-panel sdc-fix">
-            <h3 className="sd-panel__title">Fix a mistake</h3>
-            <div className="sd-row sd-row--wrap">
-              <Button size="sm" variant="ghost" icon="refresh" data-tour="restart-round">
-                Restart this round
-              </Button>
-              <Button size="sm" variant="ghost" icon="refresh">
-                Restart the whole show
-              </Button>
+          <section className="sd-panel sdc-drawer">
+            <div className="sdc-drawer__tabs">
+              {DRAWER_TABS.map((t) => (
+                <span key={t.id} className={cx('sdc-drawer__tab', frame.drawer === t.id && 'is-on')} data-tour={`tab-${t.id}`}>
+                  <PixelIcon name={t.icon} />
+                  <span className="sdc-drawer__label">{t.label}</span>
+                </span>
+              ))}
             </div>
-          </div>
-          <div className="sd-panel sd-tools tour-tools">
-            <span className="sd-panel__title">
-              <PixelIcon name="crown" /> Presenter tools
+            <div className="sdc-drawer__body">
+              <DrawerBodyMock tab={frame.drawer} card={card} holding={holding('restart-round')} />
+            </div>
+          </section>
+          {frame.undo ? <UndoToastMock label={frame.undo} /> : null}
+        </div>
+      </div>
+      {frame.toast === 'reload' ? <ReloadMock /> : frame.toast ? <div className="tour-toast">{frame.toast}</div> : null}
+    </div>
+  );
+}
+
+/** The hold ring (filled by CSS while its button is held in the picture). */
+function HoldRing() {
+  return (
+    <span className="sdc-hold__ring tour-holdring" aria-hidden>
+      <svg viewBox="0 0 20 20" focusable="false">
+        <circle cx="10" cy="10" r="8" />
+        <circle cx="10" cy="10" r="8" className="sdc-hold__arc" />
+      </svg>
+    </span>
+  );
+}
+
+function PickerMock() {
+  return (
+    <section className="tour-picker" data-tour="pick">
+      <span className="tour-picker__head">
+        <span>
+          <PixelIcon name="users" /> Picker
+        </span>
+        <span>
+          <span className="dc-num">12</span> in the pool
+        </span>
+      </span>
+      <Button variant="primary" block>
+        Pick someone <Kbd>K</Kbd>
+      </Button>
+    </section>
+  );
+}
+
+function DrawerBodyMock({ tab, card, holding }: { tab: DrawerTabId; card: ShowdownCard | null; holding: string | undefined }) {
+  if (tab === 'sound')
+    return (
+      <div className="sdc-tab">
+        <div className="sdc-tabsection">
+          <h3 className="sd-panel__title">Sound cues</h3>
+          <div className="sdc-cues">
+            <span className="sdc-cue sdc-cue--big" data-tour="celebrate">
+              <span aria-hidden>🎉</span> Celebrate! <Kbd>C</Kbd>
             </span>
-            <Button size="sm" icon="copy" data-tour="presenter-link">
-              Copy presenter link
-            </Button>
+            {SHOWDOWN_CUES.filter((c) => c !== 'celebrate').map((c) => (
+              <span key={c} className="sdc-cue">
+                <span aria-hidden>{SHOWDOWN_CUE_INFO[c].icon}</span>
+                {SHOWDOWN_CUE_INFO[c].title}
+              </span>
+            ))}
           </div>
         </div>
       </div>
-      {dialog ? <DialogMock dialog={dialog} round={board.round} /> : null}
-      {toast === 'reload' ? <ReloadMock /> : toast ? <div className="tour-toast">{toast}</div> : null}
+    );
+  if (tab === 'cards')
+    return (
+      <div className="sdc-tab">
+        <div className="sdc-tabsection">
+          <h3 className="sd-panel__title">Stage cards</h3>
+          <CardsMock card={card} compact />
+        </div>
+      </div>
+    );
+  if (tab === 'fix')
+    return (
+      <div className="sdc-tab">
+        <div className="sdc-tabsection sdc-fix">
+          <h3 className="sd-panel__title">Fix a mistake</h3>
+          <div className="sdc-fix__btns">
+            <span className="dc-btn dc-btn--secondary sdc-hold" data-tour="restart-round" data-holding={holding}>
+              <HoldRing /> Restart this round
+            </span>
+            <span className="dc-btn dc-btn--secondary sdc-hold">
+              <HoldRing /> Restart the whole show
+            </span>
+          </div>
+          <p className="sd-muted">Press and hold to restart. Both can be undone.</p>
+        </div>
+        <div className="sd-panel sd-tools tour-tools">
+          <span className="sd-panel__title">
+            <PixelIcon name="crown" /> Presenter tools
+          </span>
+          <Button size="sm" icon="copy" data-tour="presenter-link">
+            Copy presenter link
+          </Button>
+        </div>
+      </div>
+    );
+  return (
+    <div className="sdc-tab tour-pickertab">
+      <h3 className="sd-panel__title">
+        <PixelIcon name="users" /> Picker
+      </h3>
+      <span className="tour-pickertab__row">
+        <span>Pool</span> <b>12 people · Round 1</b>
+      </span>
+      <span className="tour-pickertab__row">
+        <span>Hot seat</span> <b>Nobody</b>
+      </span>
     </div>
   );
 }
@@ -531,6 +649,8 @@ function NextStepMock({
   last,
   timeUp,
   sweeping,
+  armed,
+  look,
 }: {
   board: ShowdownBoardView;
   hidden: number;
@@ -538,12 +658,35 @@ function NextStepMock({
   last: boolean;
   timeUp: boolean;
   sweeping: boolean;
+  armed: boolean;
+  look: ShowdownLook;
 }) {
   let text: ReactNode;
   let action: ReactNode = null;
   let tone = 'go';
+  let label = 'Next step';
   const total = board.slots.length;
-  if (board.stage === 'intro') {
+  if (armed) {
+    tone = 'armed';
+    label = 'Special armed';
+    const round = sheetRound(board);
+    text = (
+      <>
+        <span aria-hidden>{look === 'halloween' ? '🎃' : '⭐'}</span> <b>#{board.special + 1}</b> {round.answers[board.special]?.text} is
+        armed — nobody sees it yet. Build the suspense, then take it.
+      </>
+    );
+    action = (
+      <>
+        <Button variant="secondary" icon="close">
+          Disarm <Kbd>Esc</Kbd>
+        </Button>
+        <Button variant="primary" size="lg" icon="play" className="sdc-take" data-tour="take-special">
+          Take special <Kbd>Space</Kbd>
+        </Button>
+      </>
+    );
+  } else if (board.stage === 'intro') {
     text = 'The opening is on the stage. Welcome everyone, then start round 1.';
     action = (
       <Button variant="primary" size="lg" icon="play" data-tour="next-step">
@@ -573,7 +716,7 @@ function NextStepMock({
     tone = 'alert';
     text = (
       <>
-        <b>Time’s up</b> — wrap up the last guesses, then Reveal remaining.
+        <b>Time’s up</b> — wrap up the last guesses, then Reveal remaining. Nothing flips until you say so.
       </>
     );
   } else if (board.stage === 'live') {
@@ -600,17 +743,22 @@ function NextStepMock({
   }
   return (
     <div className="sdc-next" data-tone={tone}>
-      <span className="sdc-next__label">Next step</span>
+      <span className="sdc-next__label">{label}</span>
       <p className="sdc-next__text">{text}</p>
       {action ? <span className="sdc-next__action">{action}</span> : null}
     </div>
   );
 }
 
-function SheetMock({ board, look, found }: { board: ShowdownBoardView; look: ShowdownLook; found: number }) {
+function SheetMock({ board, look, found, armed }: { board: ShowdownBoardView; look: ShowdownLook; found: number; armed: boolean }) {
   const intro = board.stage === 'intro';
   const round = intro ? DEMO_ROUNDS[0] : sheetRound(board);
   const mark = look === 'halloween' ? '🎃' : '⭐';
+  const meta = intro
+    ? 'A preview to get ready — the answers unlock when round 1 starts.'
+    : board.stage === 'title'
+      ? 'The question isn’t on the stage yet — clicking an answer shows it first.'
+      : `According to ${round.source}`;
   return (
     <section className="sd-panel sdc-sheetpanel tour-sheet" data-stage={board.stage} data-tour="sheet">
       <header className="sdc-sheet__head">
@@ -628,7 +776,9 @@ function SheetMock({ board, look, found }: { board: ShowdownBoardView; look: Sho
           R{intro ? 1 : board.round + 1} · {round.title}
         </span>
         <span className="sdc-sheet__qtext">{round.prompt}</span>
-        <span className="sdc-sheet__source">According to {round.source}</span>
+        <span className="sdc-sheet__source" data-hint={intro || board.stage === 'title' ? 'true' : undefined}>
+          {meta}
+        </span>
       </p>
       <ol className="sdc-answers" style={{ '--rows': 5 } as CSSProperties}>
         {round.answers.map((a, i) => {
@@ -636,6 +786,7 @@ function SheetMock({ board, look, found }: { board: ShowdownBoardView; look: Sho
           const revealed = !intro && Boolean(slot?.revealed);
           const late = revealed && Boolean(slot?.late);
           const special = i === round.special;
+          const isArmed = special && armed && !revealed;
           return (
             <li key={i}>
               <span
@@ -643,31 +794,33 @@ function SheetMock({ board, look, found }: { board: ShowdownBoardView; look: Sho
                 data-revealed={revealed ? 'true' : undefined}
                 data-late={late ? 'true' : undefined}
                 data-special={special ? 'true' : undefined}
+                data-armed={isArmed ? 'true' : undefined}
                 data-tour={`answer-${i + 1}`}
               >
                 <span className="sdc-answer__num">{i + 1}</span>
                 <span className="sdc-answer__body">
-                  {special ? (
-                    <span className="sdc-answer__special">
-                      Special <span aria-hidden>{mark}</span>
-                    </span>
-                  ) : null}
                   <span className="sdc-answer__text">{a.text}</span>
                   <span className="sdc-answer__meta">
                     <span className="sdc-answer__note">{a.note}</span>
                   </span>
                 </span>
-                <span className="sdc-answer__action" aria-hidden>
-                  {revealed ? (
-                    <>
-                      <PixelIcon name="check" /> {late ? 'Shown' : 'Found'}
-                    </>
-                  ) : intro ? (
-                    <PixelIcon name="lock" />
-                  ) : (
-                    'Reveal'
-                  )}
-                </span>
+                {revealed ? (
+                  <span className="sdc-answer__action" aria-hidden>
+                    <PixelIcon name="check" /> {late ? 'Shown' : 'Found'}
+                  </span>
+                ) : isArmed ? (
+                  <span className="sdc-answer__action sdc-answer__armed" aria-hidden>
+                    Armed · take <Kbd>Space</Kbd>
+                  </span>
+                ) : special ? (
+                  <span className="sdc-answer__action sdc-answer__special" aria-hidden>
+                    Special <span>{mark}</span>
+                  </span>
+                ) : (
+                  <span className="sdc-answer__action sdc-answer__reveal" aria-hidden>
+                    {intro ? <PixelIcon name="lock" /> : 'Reveal'}
+                  </span>
+                )}
               </span>
             </li>
           );
@@ -681,24 +834,28 @@ function ClockMock({ clock, timeUp }: { clock: ClockView; timeUp: boolean }) {
   const pct = clock.on && clock.max > 0 ? Math.max(0, Math.min(1, clock.left / clock.max)) : 0;
   return (
     <div className="sd-panel sdc-clock" data-state={!clock.on ? 'off' : timeUp ? 'up' : clock.running ? 'running' : 'paused'}>
-      <div className="sdc-clock__head">
-        <h3 className="sd-panel__title">
-          <PixelIcon name="clock" /> Round clock
-        </h3>
-        <span className="sdc-clock__state">{!clock.on ? 'Off' : timeUp ? 'Time’s up' : clock.running ? 'Running' : 'Paused'}</span>
+      <div className="sdc-clock__main">
+        <span className="sdc-clock__readout">
+          <span className="sdc-clock__head">
+            <span className="sdc-clock__title">
+              <PixelIcon name="clock" size={11} /> Round clock
+            </span>
+            <span className="sdc-clock__state">{!clock.on ? 'Off' : timeUp ? 'Time’s up' : clock.running ? 'Running' : 'Paused'}</span>
+          </span>
+          <span className="sdc-clock__time">{clock.on ? formatClock(clock.left) : '—'}</span>
+        </span>
+        <Button
+          className="sdc-clock__go"
+          variant={clock.on && !clock.running && clock.left > 0 ? 'primary' : 'secondary'}
+          icon={clock.running ? 'pause' : 'play'}
+          data-tour="clock-go"
+        >
+          {clock.running ? 'Pause' : 'Start'} <Kbd>P</Kbd>
+        </Button>
       </div>
-      <span className="sdc-clock__time">{clock.on ? formatClock(clock.left) : '—'}</span>
       <span className="sdc-clock__bar" aria-hidden>
         <i style={{ transform: `scaleX(${pct})` }} />
       </span>
-      <Button
-        className="sdc-clock__go"
-        variant={clock.on && !clock.running && clock.left > 0 ? 'primary' : 'secondary'}
-        icon={clock.running ? 'pause' : 'play'}
-        data-tour="clock-go"
-      >
-        {clock.running ? 'Pause clock' : 'Start clock'} <Kbd>P</Kbd>
-      </Button>
       <div className="sdc-clock__btns">
         <span className="sdc-mini" data-tour="clock-plus">
           +1 min
@@ -712,24 +869,78 @@ function ClockMock({ clock, timeUp }: { clock: ClockView; timeUp: boolean }) {
   );
 }
 
-function DialogMock({ dialog, round }: { dialog: TourDialog; round: number }) {
-  const finish = dialog === 'finish';
+/** End show / Finish show: the inline two-step panel (it names what's still hidden; a 1.2 s hold confirms). */
+function EndPanelMock({
+  kind,
+  board,
+  look,
+  holding,
+}: {
+  kind: TourDialog;
+  board: ShowdownBoardView;
+  look: ShowdownLook;
+  holding: string | undefined;
+}) {
+  const finish = kind === 'finish';
+  const round = sheetRound(board);
+  const hidden = board.stage === 'live' ? board.slots.map((s, i) => (s.revealed ? -1 : i)).filter((i) => i >= 0) : [];
+  const mark = look === 'halloween' ? '🎃' : '⭐';
   return (
-    <div className="tour-dialog">
-      <div className="tour-dialog__box">
-        <h3 className="tour-dialog__title">{finish ? 'Finish the show?' : `Restart round ${round + 1}?`}</h3>
-        <p>
-          {finish
-            ? 'That was the last board. Everyone sees the closing screen — this ends the show for good.'
-            : 'Every answer goes back under its tile, the round returns to its title card and the clock resets. You can Undo this.'}
-        </p>
-        <div className="tour-dialog__actions">
-          <Button variant="ghost">{finish ? 'Keep going' : 'Cancel'}</Button>
-          <Button variant={finish ? 'primary' : 'danger'} icon={finish ? 'flag' : 'refresh'} data-tour="dialog-ok">
-            {finish ? 'Finish show' : 'Restart round'}
-          </Button>
-        </div>
+    <div className="sdc-endpanel tour-endpanel" data-kind={kind}>
+      <h3 className="sdc-endpanel__title">
+        <PixelIcon name="flag" /> {finish ? 'Finish the show?' : 'End the show for everyone?'}
+      </h3>
+      <p className="sdc-endpanel__state">
+        {board.stage === 'title'
+          ? `Round ${board.round + 1} hasn’t been played yet — its answers stay hidden.`
+          : hidden.length
+            ? `${hidden.length} answer${hidden.length === 1 ? ' is' : 's are'} still hidden on this board:`
+            : finish
+              ? 'That was the last board, and every answer is up.'
+              : 'Every answer on this board is up.'}
+      </p>
+      {hidden.length ? (
+        <ol className="sdc-endpanel__hidden">
+          {hidden.map((i) => (
+            <li key={i}>
+              <span className="sdc-endpanel__n dc-num">{i + 1}</span>
+              <span className="sdc-endpanel__t">{round.answers[i]?.text}</span>
+              {i === round.special ? (
+                <span className="sdc-endpanel__sp">
+                  Special <span aria-hidden>{mark}</span>
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      <p className="sdc-endpanel__what">
+        Every screen goes to the closing screen. <b>This can’t be undone</b> — Undo won’t bring the show back.
+      </p>
+      <div className="sdc-endpanel__actions">
+        <Button variant="secondary" data-tour="end-keep">
+          Keep playing
+        </Button>
+        <span className="dc-btn dc-btn--danger sdc-hold tour-endhold" data-tour="end-hold" data-holding={holding}>
+          <HoldRing /> {finish ? 'Hold to finish the show' : 'Hold to end the show'}
+        </span>
       </div>
+    </div>
+  );
+}
+
+function UndoToastMock({ label }: { label: string }) {
+  return (
+    <div className="sdc-undotoast" data-tour="undo-toast">
+      <PixelIcon name="refresh" className="sdc-undotoast__icon" />
+      <span className="sdc-undotoast__text">
+        <b>{label}</b>
+        <span>Changed your mind? Undo.</span>
+      </span>
+      <span className="dc-btn dc-btn--primary dc-btn--sm sdc-undotoast__undo">
+        <PixelIcon name="refresh" /> Undo <span className="sdc-undotoast__left dc-num">12 s</span>
+      </span>
+      <i className="sdc-undotoast__bar tour-undobar" />
     </div>
   );
 }

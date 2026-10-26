@@ -21,6 +21,11 @@
  *     lock in private guesses (`guess`) that score "called it" points when a matching answer is
  *     revealed, and watch the board.
  *   - Big screens: any connection may mark itself as a stage display (`screen`); it joins no team.
+ *     A screen or a spectator can never take over the show.
+ *   - Event rooms (a DAS-O-Ween preset was loaded): crew roles on top — a producer (moves the
+ *     presenter role, hands out and revokes crew links), backup presenters and moderators — each
+ *     proven by a personal crew link and checked as permissions on the server (see "Crew" below).
+ *     The audience picker draws who answers next in every Presenter Showcase (see "Picker" below).
  *
  * Hidden information: answers that are not revealed yet never enter synchronized state or any
  * broadcast. Built-in question packs live only in the server engine package (never bundled into the
@@ -130,7 +135,8 @@ export const SHOWDOWN_MODE_INFO: Record<ShowdownMode, { title: string; blurb: st
   classic: { title: 'Team Showdown', blurb: 'Two teams, strikes, steals and a bank — the full family game show.' },
   showcase: {
     title: 'Presenter Showcase',
-    blurb: 'One big Top-10 board for a crowd that shouts its guesses (or types them in a meeting chat). You flip the answers they name — no teams, no scores.',
+    blurb:
+      'One big Top-10 board for a crowd that shouts its guesses (or types them in a meeting chat). You flip the answers they name — no teams, no scores.',
   },
 };
 
@@ -156,7 +162,12 @@ export const SHOWDOWN_PACK_IDS = ['spooky', 'office', 'tech', 'food', 'life'] as
 export type ShowdownPackId = (typeof SHOWDOWN_PACK_IDS)[number];
 
 export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, { title: string; blurb: string; rounds: number; seasonal?: boolean }> = {
-  spooky: { title: 'Halloween Spooktacular', blurb: 'Haunted houses, costumes, candy and things that go bump.', rounds: 10, seasonal: true },
+  spooky: {
+    title: 'Halloween Spooktacular',
+    blurb: 'Haunted houses, costumes, candy and things that go bump.',
+    rounds: 10,
+    seasonal: true,
+  },
   office: { title: 'Office Life', blurb: 'Meetings, desks, the kitchen fridge and Friday at 4:59.', rounds: 10 },
   tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 8 },
   food: { title: 'Snack Attack', blurb: 'Pizza, coffee, potlucks and leftovers.', rounds: 8 },
@@ -290,13 +301,15 @@ export function validateShowContent(input: readonly ShowdownRoundInput[]): Showd
       const aliases: string[] = [];
       for (const alias of a.aliases ?? []) {
         const clean = maskProfanity(cleanText(alias, SHOWDOWN_LIMITS.aliasMax));
-        if (clean && hasWordChar(clean) && aliases.length < SHOWDOWN_LIMITS.aliasesPerAnswer && !aliases.includes(clean)) aliases.push(clean);
+        if (clean && hasWordChar(clean) && aliases.length < SHOWDOWN_LIMITS.aliasesPerAnswer && !aliases.includes(clean))
+          aliases.push(clean);
       }
       const note = maskProfanity(cleanText(a.note ?? '', SHOWDOWN_LIMITS.noteMax));
       answers.push({ text, points: a.points, aliases, ...(note && hasWordChar(note) ? { note } : {}) });
     }
     if (answers.length < SHOWDOWN_LIMITS.answersMin) return problem('answers', `Add at least ${SHOWDOWN_LIMITS.answersMin} answers.`);
-    if (answers.length > SHOWDOWN_LIMITS.answersMax) return problem('answers', `A board holds at most ${SHOWDOWN_LIMITS.answersMax} answers.`);
+    if (answers.length > SHOWDOWN_LIMITS.answersMax)
+      return problem('answers', `A board holds at most ${SHOWDOWN_LIMITS.answersMax} answers.`);
     const ranked = answers.every((a) => a.points === 0);
     if (!ranked && answers.some((a) => a.points < SHOWDOWN_LIMITS.pointsMin || a.points > SHOWDOWN_LIMITS.pointsMax)) {
       return problem(
@@ -307,8 +320,14 @@ export function validateShowContent(input: readonly ShowdownRoundInput[]): Showd
     const keys = answers.map((a) => normalizeForCompare(a.text) || a.text);
     if (new Set(keys).size !== keys.length) return problem('answers', 'Each answer must be different.');
     const special = round.special ?? 0;
-    if (special > answers.length) return problem('special', `The special answer is #${special}, but this board has ${answers.length} answers.`);
-    const ordered = ranked ? answers : answers.map((a, i) => ({ a, i })).sort((x, y) => y.a.points - x.a.points || x.i - y.i).map((x) => x.a);
+    if (special > answers.length)
+      return problem('special', `The special answer is #${special}, but this board has ${answers.length} answers.`);
+    const ordered = ranked
+      ? answers
+      : answers
+          .map((a, i) => ({ a, i }))
+          .sort((x, y) => y.a.points - x.a.points || x.i - y.i)
+          .map((x) => x.a);
     const title = maskProfanity(cleanText(round.title ?? '', SHOWDOWN_LIMITS.roundTitleMax));
     const source = maskProfanity(cleanText(round.source ?? '', SHOWDOWN_LIMITS.sourceMax));
     rounds.push({
@@ -387,6 +406,12 @@ export const ShowdownSettingsSchema = z.object({
   minutes: z.number().int().min(0).max(SHOWDOWN_LIMITS.minutesMax),
   /** Presenter Showcase: the round clock shows on the stage too (the console always has it). */
   stageClock: z.boolean(),
+  /**
+   * How the stage tunes itself for the way it's watched (DSP-02): 'auto' = each screen decides (the
+   * stage window and the console preview are Stream-safe, a big-screen link is Projector, anything
+   * else by size); 'stream' / 'projector' force one profile on every screen (the escape hatch).
+   */
+  display: z.enum(['auto', 'stream', 'projector']).default('auto'),
 });
 export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
@@ -409,8 +434,19 @@ export function defaultShowdownSettings(now: Date = new Date()): ShowdownSetting
     teamNames: ['', ''],
     minutes: 10,
     stageClock: true,
+    display: 'auto',
   };
 }
+
+export const SHOWDOWN_DISPLAYS = ['auto', 'stream', 'projector'] as const;
+export type ShowdownDisplaySetting = (typeof SHOWDOWN_DISPLAYS)[number];
+/** The profile a screen actually uses. */
+export type ShowdownDisplay = Exclude<ShowdownDisplaySetting, 'auto'>;
+export const SHOWDOWN_DISPLAY_INFO: Record<ShowdownDisplaySetting, { title: string; blurb: string }> = {
+  auto: { title: 'Automatic', blurb: 'Each screen picks: the stage window is Stream-safe, a big-screen link is Projector.' },
+  stream: { title: 'Stream-safe', blurb: 'For a Teams share: bigger type, thicker edges, calmer decor.' },
+  projector: { title: 'Projector', blurb: 'For a room: lifted blacks and brighter edges that survive washout.' },
+};
 
 /** The holding screen's headline: the event name, else the show title. */
 export function eventTitle(settings: Pick<ShowdownSettings, 'eventName' | 'title'>): string {
@@ -459,8 +495,10 @@ export const SHOWDOWN_MSG = {
    */
   content: 'showdown:content',
   /**
-   * client → server (presenter, lobby/results) {id}: load an event preset — its settings and its rounds
-   * (which live on the server, never in the client bundle) become this room's custom rounds.
+   * client → server (presenter, lobby/results) {id}: load an event preset — its settings, and (unless
+   * it's settings-only, like DAS-O-Ween 2026, whose boards come from the presenter's show file) its
+   * rounds, which live on the server and never in the client bundle. An event preset makes the room
+   * an event room for good, and whoever loads it first becomes its producer.
    */
   preset: 'showdown:preset',
   /** client → server (presenter, any phase) {card}: put a holding card on every stage ('' = none). */
@@ -475,6 +513,45 @@ export const SHOWDOWN_MSG = {
   event: 'showdown:event',
   /** server → all: aggregated reactions of the last moment (ShowdownReactions). */
   reactions: 'showdown:reactions',
+
+  // ---- The audience picker (Presenter Showcase; see "Picker" below) ----
+  /** client → server (presenter, or `picker.run`) ShowdownPickPayload: pick, mark done, no answer, reroll. */
+  pick: 'showdown:pick',
+  /** client → server (a participant, for their own seat) {on}: "Skip me" — out of the pool. Private. */
+  skip: 'showdown:skip',
+
+  // ---- Event rooms: crew, moderation, audit (see "Crew" below) ----
+  /** client → server {link}: redeem a crew link (`#crew=<id>.<secret>`, read from the fragment). */
+  crewClaim: 'showdown:crew-claim',
+  /** client → server (`crew.issue`) {role, name}: mint a named crew link (the secret comes back once). */
+  crewIssue: 'showdown:crew-issue',
+  /** client → server (`crew.revoke`) {id}: revoke a crew link (its holder loses the role at once). */
+  crewRevoke: 'showdown:crew-revoke',
+  /** server → one player: their crew view (ShowdownCrewPrivate), null when they hold no crew role. */
+  crew: 'showdown:crew',
+  /** client → server (`presenter.assign`) {playerId, reason}: make someone the presenter (rotates the pass). */
+  assign: 'showdown:assign',
+  /** client → server (`people.rename`) {playerId, name}: rename anyone, in any phase. */
+  rename: 'showdown:rename',
+  /** client → server (`people.hide`) {playerId, on}: hide someone from the stage and the pool. */
+  hide: 'showdown:hide',
+  /** server → crew with `audit.read`: the latest audit entries (ShowdownAuditView). */
+  audit: 'showdown:audit',
+  /** client → server (`audit.export`) {}: server → that client: the whole log (ShowdownAuditFile). */
+  auditExport: 'showdown:audit-export',
+
+  // ---- Event rooms: sound station, preflight, black box ----
+  /** client → server {ready, muted, sounds}: this device's show audio, every 2 s (consoles and big screens). */
+  audio: 'showdown:audio',
+  /** client → server (`audio.station`) {playerId}: which device plays show sound ('' = the presenter's console). */
+  station: 'showdown:station',
+  /** client → server (`preflight.read`) {}: server → that client: ShowdownPreflightData. */
+  preflight: 'showdown:preflight',
+  /**
+   * server → presenter only: the room's encrypted snapshot (ShowdownBlackBox), after each change in
+   * an event room; null clears it. The console keeps it and hands it back after a server restart.
+   */
+  blackbox: 'showdown:blackbox',
 } as const;
 
 const rev = z.number().int().min(0).max(100_000_000);
@@ -493,7 +570,11 @@ export const ShowdownActSchema = z.discriminatedUnion('a', [
   z
     .object({
       a: z.literal('reveal'),
-      slot: z.number().int().min(0).max(SHOWDOWN_LIMITS.answersMax - 1),
+      slot: z
+        .number()
+        .int()
+        .min(0)
+        .max(SHOWDOWN_LIMITS.answersMax - 1),
       round: z.number().int().min(-1).max(1000).optional(),
     })
     .strict(),
@@ -539,7 +620,7 @@ export type ShowdownClockOp = Extract<ShowdownActPayload, { a: 'clock' }>['op'];
 /** A second wrong-answer press within this window is the same miss (a double click). */
 export const SHOWDOWN_MISS_GAP_MS = 450;
 
-export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense', 'celebrate'] as const;
+export const SHOWDOWN_CUES = ['intro', 'drumroll', 'applause', 'aww', 'ding', 'suspense', 'celebrate', 'pickAnswer'] as const;
 export type ShowdownCue = (typeof SHOWDOWN_CUES)[number];
 export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: string }> = {
   intro: { title: 'Intro sting', icon: '🎺' },
@@ -549,7 +630,13 @@ export const SHOWDOWN_CUE_INFO: Record<ShowdownCue, { title: string; icon: strin
   ding: { title: 'Ding', icon: '🔔' },
   suspense: { title: 'Suspense', icon: '😬' },
   celebrate: { title: 'Celebrate!', icon: '🎉' },
+  pickAnswer: { title: 'Pick the Answer', icon: '🎵' },
 };
+/**
+ * "Pick the Answer" is a ~10-second song: a second press while it plays is ignored (by the server, so
+ * a double press never stacks two songs on the stage).
+ */
+export const SHOWDOWN_SONG_MS = 10_500;
 export const ShowdownCueSchema = z.object({ cue: z.enum(SHOWDOWN_CUES) }).strict();
 
 export const ShowdownTeamSchema = z.object({ team }).strict();
@@ -558,11 +645,301 @@ export const ShowdownScreenSchema = z.object({ on: z.boolean() }).strict();
 export const ShowdownGuessSchema = z.object({ round: z.number().int().min(0).max(1000), text: z.string().max(200) }).strict();
 /** Reaction kinds: index into the look's reaction set (clap, fire, wow, laugh, love, party). */
 export const SHOWDOWN_REACTION_KINDS = 6;
-export const ShowdownReactSchema = z.object({ r: z.number().int().min(0).max(SHOWDOWN_REACTION_KINDS - 1) }).strict();
+export const ShowdownReactSchema = z
+  .object({
+    r: z
+      .number()
+      .int()
+      .min(0)
+      .max(SHOWDOWN_REACTION_KINDS - 1),
+  })
+  .strict();
 export const ShowdownClaimSchema = z.object({ pass: z.string().min(1).max(64) }).strict();
 export const ShowdownHandoverSchema = z.object({ playerId: z.string().min(1).max(64) }).strict();
 export const ShowdownTakeoverSchema = z.object({}).strict();
 export const ShowdownCardSchema = z.object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS)]) }).strict();
+
+// ---------------------------------------------------------------------------
+// Picker (PCK-01…05, VIS-02, DSP-03): the server draws who answers next; screens only replay it.
+//
+//   pool at draw time = participants (never the presenter, crew, screens or spectators) who are
+//   connected, not hidden, not skipping, not done this round and not in the hot seat.
+//   pick     → the server draws with its crypto RNG, the winner takes the hot seat, every screen
+//              gets the `pick` event (a pick is public the moment it lands; the stage lands at landAt).
+//   done     → the turn counts: out of the pool until the next round (key D).
+//   noAnswer → back in the pool, no penalty (key A).
+//   reroll   → back in the pool and an immediate redraw without them; logged with a reason.
+//   Every act carries the draw number it was made against: a stale or repeated one is ignored.
+//   The pool refills when the next round starts (PCK-05 A).
+// ---------------------------------------------------------------------------
+
+/** The presenter sees the name at once ("on stage in 2 s"); the stage lands after the sweep. */
+export const SHOWDOWN_PICK_LAND_MS = 3500;
+/** The presenter may reroll a no-show from here on (the console offers it; the server logs every reroll). */
+export const SHOWDOWN_NO_SHOW_MS = 30_000;
+export const SHOWDOWN_REROLL_REASONS = ['noAnswer', 'away', 'other'] as const;
+export type ShowdownRerollReason = (typeof SHOWDOWN_REROLL_REASONS)[number];
+export const SHOWDOWN_REROLL_INFO: Record<ShowdownRerollReason, string> = {
+  noAnswer: 'No answer',
+  away: 'Not there',
+  other: 'Other',
+};
+
+const drawNo = z.number().int().min(0).max(1_000_000);
+export const ShowdownPickSchema = z.discriminatedUnion('a', [
+  /** Draw the next person. `drawNo` = the last draw number the console saw (state.drawNo). */
+  z.object({ a: z.literal('pick'), round: z.number().int().min(0).max(1000), drawNo }).strict(),
+  /** The hot seat's turn counts (they're out until the next round). */
+  z.object({ a: z.literal('done'), drawNo }).strict(),
+  /** The hot seat didn't answer: back in the pool. */
+  z.object({ a: z.literal('noAnswer'), drawNo }).strict(),
+  /** Put the hot seat back and draw again without them, with a reason for the log. */
+  z.object({ a: z.literal('reroll'), drawNo, reason: z.enum(SHOWDOWN_REROLL_REASONS) }).strict(),
+]);
+export type ShowdownPickPayload = z.infer<typeof ShowdownPickSchema>;
+export const ShowdownSkipSchema = z.object({ on: z.boolean() }).strict();
+
+/** One seat on the stage's spotlight grid (built on clients from public state). */
+export type ShowdownSeatState = 'pool' | 'hot' | 'done' | 'away';
+
+// ---------------------------------------------------------------------------
+// Crew (ADM-04 B, JOI-02 C, AUD-02 C): roles as data, checked with one question — "may this person
+// <permission>?" — and denied by default. Only event rooms have crew. The presenter's set applies to
+// whoever presents right now; crew roles come from personal crew links:
+//   - `#crew=<id>.<secret>` in the URL fragment (never sent in a path, never logged), 128+ random bits,
+//     stored hashed in room memory, compared in constant time, expiring with the event (24 h),
+//     revocable, rate-limited. Claiming a link binds it to that seat (a second device moves it).
+//   - Whoever makes the room an event room (loads an event preset) becomes its producer and receives
+//     the producer link once, privately.
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_PERMISSIONS = [
+  'presenter.assign',
+  'crew.issue',
+  'crew.revoke',
+  'people.rename',
+  'people.hide',
+  'picker.run',
+  'picker.reroll',
+  'audio.station',
+  'audit.read',
+  'audit.export',
+  'preflight.read',
+] as const;
+export type ShowdownPermission = (typeof SHOWDOWN_PERMISSIONS)[number];
+
+export const SHOWDOWN_CREW_ROLES = ['producer', 'backup', 'moderator'] as const;
+export type ShowdownCrewRole = (typeof SHOWDOWN_CREW_ROLES)[number];
+/** Roles a producer can hand out (there is one producer link, minted with the event room). */
+export const SHOWDOWN_ISSUABLE_ROLES = ['backup', 'moderator'] as const;
+export type ShowdownIssuableRole = (typeof SHOWDOWN_ISSUABLE_ROLES)[number];
+
+export const SHOWDOWN_ROLE_INFO: Record<ShowdownCrewRole | 'presenter', { title: string; blurb: string }> = {
+  producer: { title: 'Producer', blurb: 'Moves the presenter role, hands out and revokes crew links, moderates names.' },
+  presenter: { title: 'Presenter', blurb: 'Runs the show: the answer sheet, the picker and the sound station.' },
+  backup: { title: 'Backup presenter', blurb: 'Can take over the show with this link while the presenter is offline.' },
+  moderator: { title: 'Moderator', blurb: 'Renames or hides guests from the stage and the picker.' },
+};
+
+/** Role presets: data, not code branches. A role missing here has no permissions (deny by default). */
+export const SHOWDOWN_ROLE_PERMISSIONS: Record<ShowdownCrewRole | 'presenter', readonly ShowdownPermission[]> = {
+  producer: [
+    'presenter.assign',
+    'crew.issue',
+    'crew.revoke',
+    'people.rename',
+    'people.hide',
+    'picker.run',
+    'picker.reroll',
+    'audio.station',
+    'audit.read',
+    'audit.export',
+    'preflight.read',
+  ],
+  presenter: ['people.rename', 'people.hide', 'picker.run', 'picker.reroll', 'audio.station', 'audit.read', 'preflight.read'],
+  backup: [],
+  moderator: ['people.rename', 'people.hide'],
+};
+
+/** Effective permissions of a set of roles (unknown roles grant nothing). */
+export function permissionsOf(roles: readonly string[]): ShowdownPermission[] {
+  const out = new Set<ShowdownPermission>();
+  for (const role of roles) {
+    const perms = (SHOWDOWN_ROLE_PERMISSIONS as Record<string, readonly ShowdownPermission[] | undefined>)[role];
+    if (perms) for (const p of perms) out.add(p);
+  }
+  return SHOWDOWN_PERMISSIONS.filter((p) => out.has(p));
+}
+
+/** A crew link in the address bar: `<id>.<secret>`. */
+export const SHOWDOWN_CREW_LINK = /^([A-Za-z0-9_-]{6,24})\.([A-Za-z0-9_-]{22,64})$/;
+export const ShowdownCrewClaimSchema = z.object({ link: z.string().min(8).max(100) }).strict();
+export const ShowdownCrewIssueSchema = z.object({ role: z.enum(SHOWDOWN_ISSUABLE_ROLES), name: z.string().max(64) }).strict();
+export const ShowdownCrewRevokeSchema = z.object({ id: z.string().min(1).max(32) }).strict();
+export const ShowdownAssignSchema = z.object({ playerId: z.string().min(1).max(64), reason: z.string().max(200).optional() }).strict();
+export const ShowdownRenameSchema = z.object({ playerId: z.string().min(1).max(64), name: z.string().max(64) }).strict();
+export const ShowdownHideSchema = z.object({ playerId: z.string().min(1).max(64), on: z.boolean() }).strict();
+export const ShowdownEmptySchema = z.object({}).strict();
+
+/** A crew link as the producer sees it (never the secret, except once in `fresh`). */
+export interface ShowdownCrewLinkView {
+  id: string;
+  role: ShowdownCrewRole;
+  /** Who it's for ("Dana"), as the producer typed it. */
+  name: string;
+  /** The seat holding it now ('' = not opened yet, or its holder left). */
+  holderId: string;
+  holderName: string;
+  online: boolean;
+  revoked: boolean;
+  expiresAt: number;
+}
+
+/** One player's crew view. */
+export interface ShowdownCrewPrivate {
+  /** This is an event room (crew exists here). */
+  event: boolean;
+  /** Your crew roles (not counting presenting). */
+  roles: ShowdownCrewRole[];
+  /** What you may do right now (your roles, plus the presenter's set while you present). */
+  perms: ShowdownPermission[];
+  /** Every crew link (only with `crew.issue`). */
+  links: ShowdownCrewLinkView[];
+  /** Moderation (only with `people.hide` / `people.rename`): who is hidden from the stage, and who is crew right now. */
+  hidden?: string[];
+  crewIds?: string[];
+  /**
+   * A link just minted for you — the producer link when you made the event room, or one you issued.
+   * Sent once: keep it on this device (the server keeps only its hash).
+   */
+  fresh?: { id: string; role: ShowdownCrewRole; name: string; link: string };
+}
+
+/** Crew link in the address bar → `/room/<code>#crew=<id>.<secret>`. */
+export function crewLinkPath(code: string, link: string): string {
+  return `/room/${code}#crew=${link}`;
+}
+
+// ---------------------------------------------------------------------------
+// Audit (NN-06): per room, append-only, in memory, never synced; crew read it in the console and the
+// producer can download it. It leaves with the room.
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_AUDIT_ACTIONS = [
+  'event.start',
+  'preset.load',
+  'crew.issue',
+  'crew.revoke',
+  'crew.claim',
+  'crew.refused',
+  'presenter.claim',
+  'presenter.refused',
+  'presenter.assign',
+  'presenter.handover',
+  'presenter.takeover',
+  'people.rename',
+  'people.hide',
+  'people.unhide',
+  'picker.draw',
+  'picker.done',
+  'picker.noAnswer',
+  'picker.reroll',
+  'audio.station',
+  'audio.failover',
+  'show.end',
+  'show.restored',
+] as const;
+export type ShowdownAuditAction = (typeof SHOWDOWN_AUDIT_ACTIONS)[number];
+
+export interface ShowdownAuditEntry {
+  seq: number;
+  at: number;
+  /** '' = the server itself (a failover, an automatic end). */
+  actorId: string;
+  actorName: string;
+  /** The actor's role when they acted: 'presenter' | crew role | 'guest' | 'server'. */
+  role: string;
+  action: ShowdownAuditAction;
+  target?: string;
+  targetName?: string;
+  before?: string;
+  after?: string;
+  reason?: string;
+}
+
+/** Pushed to crew with `audit.read` (the latest entries, newest last). */
+export interface ShowdownAuditView {
+  entries: ShowdownAuditEntry[];
+  total: number;
+}
+
+export interface ShowdownAuditFile {
+  room: string;
+  exportedAt: number;
+  entries: ShowdownAuditEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Sound station (AUD-02 C): exactly one device plays the show's sound in an event room. Consoles and
+// big screens report `audio` every SHOWDOWN_AUDIO_BEAT_MS; the station falls back to the presenter's
+// console after SHOWDOWN_STATION_TIMEOUT_MS without a heartbeat, or at once when it disconnects.
+// ---------------------------------------------------------------------------
+
+export const SHOWDOWN_AUDIO_BEAT_MS = 2000;
+export const SHOWDOWN_STATION_TIMEOUT_MS = 5000;
+export const ShowdownAudioSchema = z.object({ ready: z.boolean(), muted: z.boolean(), sounds: z.boolean() }).strict();
+export const ShowdownStationSchema = z.object({ playerId: z.string().max(64) }).strict();
+/** Public per-device audio status (`audio` map): 1 = can play now, 2 = locked, muted or sounds off. */
+export const SHOWDOWN_AUDIO_READY = 1;
+export const SHOWDOWN_AUDIO_SILENT = 2;
+
+/** Which device plays show sound on this connection ('' station = the presenter's console). */
+export function isSoundStation(
+  state: Pick<ShowdownPublicState, 'event' | 'soundStation' | 'presenterId'>,
+  playerId: string | null,
+): boolean {
+  if (!playerId) return false;
+  return state.soundStation ? state.soundStation === playerId : state.presenterId === playerId;
+}
+
+// ---------------------------------------------------------------------------
+// Preflight (OPS-03 B): crew-only server facts for the go/no-go list. `/api/health` stays as it is.
+// ---------------------------------------------------------------------------
+
+export interface ShowdownPreflightData {
+  at: number;
+  uptimeSeconds: number;
+  /** When this server process started (server epoch ms). */
+  startedAt: number;
+  /** The running commit (Render sets RENDER_GIT_COMMIT), '' when unknown. */
+  commit: string;
+  /** The room is an event room ('' = no). */
+  event: string;
+  rehearsal: boolean;
+  /** Custom rounds loaded, and how many of them have a special answer. */
+  rounds: number;
+  specials: number;
+  /** Crew links issued for backup presenters, and how many of their holders are here right now. */
+  backups: { issued: number; online: number };
+  station: { playerId: string; name: string; ready: boolean; seenAgoMs: number | null };
+  /** Snapshots can be taken (the server has its key). */
+  blackbox: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Black box (OPS-01 C): an encrypted, authenticated snapshot of an event room. Only the server can
+// read it; the presenter's console only carries it and hands it back (CreateOptions.restore) after a
+// restart, which recreates the room under the same code. Expires after 24 hours.
+// ---------------------------------------------------------------------------
+
+export interface ShowdownBlackBox {
+  code: string;
+  takenAt: number;
+  blob: string;
+}
+
+/** Seconds an event room holds the presenter's and crew's seats after a drop. */
+export const SHOWDOWN_EVENT_GRACE_SECONDS = 30 * 60;
 
 // ---------------------------------------------------------------------------
 // Event presets (metadata only — their rounds live in the server engine package)
@@ -579,6 +956,16 @@ export interface ShowdownEventInfo {
   rounds: number;
   /** Demo answers for practising: the console and stage say "Rehearsal" while it's loaded. */
   rehearsal: boolean;
+  /**
+   * Loading it makes the room an event room for the rest of its life: crew links, the event join
+   * screen, the sound station, keep-alive and the black box, the Room DJ lock and the preflight.
+   */
+  event: boolean;
+  /**
+   * Its rounds stay out of the public repo: the preset carries settings only, and the presenter loads
+   * the boards from a show file (rounds already loaded in the room are kept).
+   */
+  settingsOnly: boolean;
   /** Settings it applies (the rest stay as they are). */
   settings: Partial<ShowdownSettings>;
 }
@@ -592,21 +979,28 @@ const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
   minutes: 10,
   stageClock: true,
   audience: false,
+  display: 'auto',
 };
 
 export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
   'dasoween-2026': {
     title: 'DAS-O-Ween 2026',
-    blurb: 'Two Top-10 boards — Halloween songs, then Halloween movies — with a celebration on #5, a 10-minute clock per round and the Halloween Night look.',
+    blurb:
+      'The show’s settings — Presenter Showcase, the Halloween Night look, a celebration on #5 and a 10-minute clock per round. The boards come from your show file.',
     rounds: 2,
     rehearsal: false,
+    event: true,
+    settingsOnly: true,
     settings: DASOWEEN_SETTINGS,
   },
   'dasoween-rehearsal': {
     title: 'DAS-O-Ween rehearsal',
-    blurb: 'The same show with two practice boards (candy and costumes), so you can try every control without giving the real answers away.',
+    blurb:
+      'The same show with two practice boards (candy and costumes), so you can try every control without giving the real answers away.',
     rounds: 2,
     rehearsal: true,
+    event: true,
+    settingsOnly: false,
     settings: { ...DASOWEEN_SETTINGS, title: 'DAS-O-Ween Rehearsal' },
   },
 };
@@ -645,6 +1039,8 @@ export interface ShowdownSlotView {
   late: boolean;
   /** The answer's small line (artist, year…), only once revealed. */
   note?: string;
+  /** Presenter Showcase: who was in the hot seat when it flipped ("called by Priya S."), only once revealed. */
+  calledBy?: string;
 }
 
 export interface ShowdownRoundResult {
@@ -721,6 +1117,33 @@ export interface ShowdownPublicState extends BaseRoomView {
   sweep: boolean;
   /** The loaded rounds are an event preset's practice boards. */
   rehearsal: boolean;
+
+  // ---- Event rooms ----
+  /** The event preset that made this an event room ('' = an ordinary room). */
+  event: string;
+
+  // ---- The picker (public: a pick is public the moment it lands; who skipped never is) ----
+  /** Draws so far this show (the console sends the last one it saw with every picker act). */
+  drawNo: number;
+  /** The player in the hot seat ('' = nobody). */
+  hotSeat: string;
+  /** When the current draw was made / when the stage lands on it (server epoch ms; 0 = no draw). */
+  pickAt: number;
+  landAt: number;
+  /** People who could be drawn right now (not counting the hot seat). */
+  poolSize: number;
+  /** playerIds whose turn counted this round. */
+  done: Record<string, boolean>;
+  /** playerIds with a seat on the stage's spotlight grid (participants who aren't hidden). */
+  seats: Record<string, boolean>;
+
+  // ---- Sound station (event rooms) ----
+  /** The device that plays show sound ('' = the presenter's console). */
+  soundStation: string;
+  /** Server epoch ms of the station's last heartbeat (0 = none yet). */
+  soundSeenAt: number;
+  /** playerId → SHOWDOWN_AUDIO_READY | SHOWDOWN_AUDIO_SILENT, for consoles and big screens that report. */
+  audio: Record<string, number>;
 }
 
 /** Milliseconds left on the round clock (negative = overtime). `now` = serverNow() on clients. */
@@ -808,6 +1231,13 @@ export interface ShowdownMe {
   /** Called-it points this show / correct calls this show. */
   points: number;
   calls: number;
+  /**
+   * Presenter Showcase picker, private to you (DSP-03 B): `in` = you could be drawn next, `skip` =
+   * your Skip me switch, `done` = your turn counted this round. Absent for crew, screens, spectators.
+   */
+  pool?: { in: boolean; skip: boolean; done: boolean };
+  /** You're in the hot seat right now ("You're up!"). */
+  picked?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -857,7 +1287,20 @@ export type ShowdownEvent =
   /** The round went back to its title card. */
   | { type: 'restart'; rev: number; round: number }
   /** The show went back to the opening. */
-  | { type: 'reset'; rev: number };
+  | { type: 'reset'; rev: number }
+  /** One minute left on the round clock (once per round; AUD-01's tower bell). */
+  | { type: 'clockWarn'; rev: number; round: number }
+  /** The last ten seconds: n = 10 … 1, one per second (AUD-01's clock "tock"). */
+  | { type: 'tick'; rev: number; round: number; n: number }
+  /**
+   * The picker drew someone (the server already decided; screens replay it). The presenter's console
+   * names them at once; the stage sweeps and lands at `landAt` (server epoch ms).
+   */
+  | { type: 'pick'; rev: number; drawNo: number; winnerId: string; name: string; poolSize: number; landAt: number; reroll: boolean }
+  /** The hot seat emptied: their turn counted (done), they're back in the pool (noAnswer/reroll), or a moderator hid them. */
+  | { type: 'pickEnd'; rev: number; drawNo: number; playerId: string; how: 'done' | 'noAnswer' | 'reroll' | 'cleared' }
+  /** The sound station moved ('' = back to the presenter's console); `lost` = the old station stopped answering. */
+  | { type: 'station'; rev: number; playerId: string; lost: boolean };
 
 export interface ShowdownReactions {
   /** Count per reaction kind in the last moment. */

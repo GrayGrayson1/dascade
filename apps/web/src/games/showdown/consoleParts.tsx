@@ -6,7 +6,7 @@
  * Everything here is presenter chrome on the presenter's own screen: none of it is ever mirrored to
  * the stage window (the stage window only renders <Stage>).
  */
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   SHOWDOWN_CARDS,
   SHOWDOWN_CARD_INFO,
@@ -131,13 +131,15 @@ export function StageWindowButton({
       className={className}
       data-part="showdown-stage-window"
       onClick={() => openStage(code, title)}
+      aria-label={stageWin.open ? 'Stage window open' : openLabel}
       title={
         stageWin.open
           ? 'The stage window is open — click to bring it to the front'
           : 'Open the stage (no answers) in its own window, to share in the meeting'
       }
     >
-      {stageWin.open ? 'Stage window open' : openLabel}
+      {/* (A narrow console bar keeps the icon only; the name stays the button's accessible name.) */}
+      <span className="sdc-lbl-wide">{stageWin.open ? 'Stage window open' : openLabel}</span>
     </Button>
   );
 }
@@ -296,6 +298,69 @@ export function AudioStatus({ look, compact = false }: { look: ShowdownLook; com
         <span className="sdc-lbl">Test sound</span>
       </Button>
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Share-safe styling (PRS-05 C): the console can't be mistaken for the stage in a window picker
+// ---------------------------------------------------------------------------
+
+/** The console tab's title while the console is open (the stage window says "… — STAGE (share this)"). */
+export const CONSOLE_WINDOW_TITLE = "🔒 PRESENTER — don't share";
+
+/** A red lock: the console tab's icon while the console is open (inline, so it works offline). */
+export const CONSOLE_FAVICON = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='#c8102e'/>" +
+    "<path d='M21 29v-7a11 11 0 0 1 22 0v7' fill='none' stroke='#fff' stroke-width='7'/>" +
+    "<rect x='14' y='28' width='36' height='27' rx='5' fill='#fff'/><rect x='29' y='35' width='6' height='12' rx='3' fill='#c8102e'/></svg>",
+)}`;
+
+/**
+ * While the presenter console is mounted: the tab is titled "🔒 PRESENTER — don't share" and its icon
+ * is a red lock, so the console stands out in a meeting app's window picker and in the browser's tab
+ * strip. Both go back to what they were when the console closes.
+ */
+export function usePresenterWindowChrome(): void {
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = CONSOLE_WINDOW_TITLE;
+    const icons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+    const saved = icons.map((l) => ({ l, href: l.getAttribute('href'), type: l.getAttribute('type') }));
+    let added: HTMLLinkElement | null = null;
+    if (icons.length) {
+      for (const l of icons) {
+        l.setAttribute('href', CONSOLE_FAVICON);
+        l.setAttribute('type', 'image/svg+xml');
+      }
+    } else {
+      added = document.createElement('link');
+      added.rel = 'icon';
+      added.type = 'image/svg+xml';
+      added.href = CONSOLE_FAVICON;
+      document.head.appendChild(added);
+    }
+    return () => {
+      // Someone else renamed the tab meanwhile (a route of its own): leave theirs.
+      if (document.title === CONSOLE_WINDOW_TITLE) document.title = prevTitle;
+      for (const { l, href, type } of saved) {
+        if (href === null) l.removeAttribute('href');
+        else l.setAttribute('href', href);
+        if (type === null) l.removeAttribute('type');
+        else l.setAttribute('type', type);
+      }
+      added?.remove();
+    };
+  }, []);
+}
+
+/** The striped PRIVATE band across the top of the console (real text, high contrast). */
+export function PrivateBand() {
+  return (
+    <div className="sdc-private-band" data-part="showdown-private-band">
+      <span className="sdc-private-band__text">
+        <PixelIcon name="lock" /> <b>PRIVATE</b> — presenter console · share the <b>STAGE</b> window, never this one
+      </span>
+    </div>
   );
 }
 

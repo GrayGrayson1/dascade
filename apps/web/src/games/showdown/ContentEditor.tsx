@@ -8,8 +8,12 @@
  * Saved privately to the room (only the presenter gets the rounds back) and, if you like, on this
  * device: the whole show (rounds + its settings) to restore in a new room, or as a file to share.
  * Validation is the same pure function the server runs (validateShowContent), shown live.
+ *
+ * ADM-01: for the event, the show file IS where the boards live (never the app or the repo), so
+ * "Load show file" / "Save show file" lead the editor, and a load is confirmed in words. Round content
+ * is never logged or put into a message.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import {
   SHOWDOWN_LIMITS,
   SHOWDOWN_MSG,
@@ -26,12 +30,17 @@ import { useApp } from '../../app/store.ts';
 import { persistence } from '../../persistence/index.ts';
 import type { Preset } from '../../persistence/types.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
-import { useCustomContent, useRehearsal } from './state.ts';
+import { useCustomContent, useEvent, useRehearsal } from './state.ts';
 import { forgetLoadedPreset } from './consoleParts.tsx';
+import { downloadJson } from './panels/download.ts';
 import {
+  SHOW_FILE_MAX_BYTES,
   blankAnswer,
   blankRound,
+  describeShowFile,
   describeShowSettings,
+  showFileData,
+  showFileName,
   fromInput,
   move,
   nextKey,
@@ -44,6 +53,7 @@ import {
   type ShowFileSettings,
 } from './consoleDraft.ts';
 import './chrome-showcase.css';
+import './panels/panels.css';
 
 /** Rounds-only presets (older): a bare array of rounds. */
 const ROUNDS_KIND = 'showdown-show';
@@ -78,14 +88,22 @@ export function ContentEditor({
   onClose,
   settings,
   update,
+  intent,
 }: {
   onClose: () => void;
   /** The lobby's settings, to save the whole show (and apply a saved one) — optional. */
   settings?: ShowdownSettings | null;
   update?: (patch: Partial<ShowdownSettings>) => void;
+  /** Opened to load the show file: the Load show file button gets the focus. */
+  intent?: 'showfile';
 }) {
   const stored = useCustomContent();
   const rehearsal = useRehearsal();
+  const event = useEvent();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const loadButton = useRef<HTMLButtonElement>(null);
+  /** What the last load did, in words (a live region: confirmed in text, not colour alone). */
+  const [loadNote, setLoadNote] = useState<{ ok: boolean; text: string } | null>(null);
   const showcase = settings?.mode === 'showcase';
   const look = resolveShowdownLook(settings?.look ?? 'auto', seasonClock());
   const [rounds, setRounds] = useState<DraftRound[]>(() =>
@@ -127,14 +145,54 @@ export function ContentEditor({
     if (pendingSettings && update) update({ ...pendingSettings, source: 'custom' });
     session.send(SHOWDOWN_MSG.content, { rounds: input });
     forgetLoadedPreset();
-    toast('success', `Saved ${report.rounds.length} round${report.rounds.length === 1 ? '' : 's'} to the show${pendingSettings && update ? ', with its settings' : ''}`);
+    toast(
+      'success',
+      `Saved ${report.rounds.length} round${report.rounds.length === 1 ? '' : 's'} to the show${pendingSettings && update ? ', with its settings' : ''}`,
+    );
     onClose();
   };
+
+  useEffect(() => {
+    if (intent !== 'showfile') return;
+    const t = setTimeout(() => loadButton.current?.focus({ preventScroll: false }), 60);
+    return () => clearTimeout(t);
+  }, [intent]);
 
   const loadFile = (file: ShowFile, from: string) => {
     setRounds(fromInput(file.rounds));
     setPendingSettings(file.settings && update ? file.settings : null);
+    setLoadNote({ ok: true, text: `Loaded “${from}”: ${describeShowFile(file)}. Check the boards below, then press Save to the show.` });
     toast('success', `Loaded “${from}” — check it, then Save to the show.`);
+  };
+
+  const readShowFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const picked = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!picked) return;
+    const fail = (text: string) => {
+      setLoadNote({ ok: false, text });
+      toast('error', text);
+    };
+    if (picked.size > SHOW_FILE_MAX_BYTES) return fail(`“${picked.name}” is too big to be a show file.`);
+    try {
+      const file = parseShowFile(JSON.parse(await picked.text()));
+      if (!file || file.rounds.length === 0) return fail(`“${picked.name}” isn’t a show file (no rounds in it).`);
+      loadFile(file, picked.name);
+    } catch {
+      fail(`“${picked.name}” isn’t a show file (it couldn’t be read as one).`);
+    }
+  };
+
+  const saveShowFile = () => {
+    const file: ShowFile = { rounds: input, ...(settings ? { settings: pickShowSettings(settings) } : {}) };
+    const name = showFileName(settings?.title);
+    if (downloadJson(name, showFileData(file, new Date()))) {
+      setLoadNote({
+        ok: true,
+        text: `Saved “${name}” to this computer’s downloads: ${describeShowFile(file)}. Keep it out of shared drives and chats.`,
+      });
+      toast('success', `Show file saved as “${name}”`);
+    } else toast('error', 'This browser couldn’t save the file — use Copy as file instead.');
   };
 
   const saveOnDevice = async () => {
@@ -154,8 +212,9 @@ export function ContentEditor({
     try {
       const file = parseShowFile(JSON.parse(json));
       if (!file) throw new Error('shape');
-      loadFile(file, 'the show file');
+      loadFile(file, 'the pasted show file');
     } catch {
+      setLoadNote({ ok: false, text: 'The pasted text isn’t a show file.' });
       toast('error', 'That isn’t a show file (expected {"rounds":[{"prompt":…,"answers":[{"text":…,"points":…}]}]}).');
     }
   };
@@ -184,7 +243,9 @@ export function ContentEditor({
                 </span>
               </>
             ) : null}
-            {pendingSettings && update ? <span className="sdc-editor__pending"> · also applies: {describeShowSettings(pendingSettings)}</span> : null}
+            {pendingSettings && update ? (
+              <span className="sdc-editor__pending"> · also applies: {describeShowSettings(pendingSettings)}</span>
+            ) : null}
           </span>
           <span className="dc-spacer" />
           <Button variant="ghost" onClick={onClose}>
@@ -198,10 +259,90 @@ export function ContentEditor({
     >
       <div className="sd-editor sdc-editor">
         <p className="sd-muted">
-          One round = one board with {SHOWDOWN_LIMITS.answersMin}–{SHOWDOWN_LIMITS.answersMax} answers. Give each answer its survey points (the board sorts them), or switch on{' '}
-          <b>Ranked list</b> to keep your own order with no points. “Also accept” lists other spellings people might type. Answers stay on your device and the server —
-          nobody else sees them until they flip.
+          One round = one board with {SHOWDOWN_LIMITS.answersMin}–{SHOWDOWN_LIMITS.answersMax} answers. Give each answer its survey points
+          (the board sorts them), or switch on <b>Ranked list</b> to keep your own order with no points. “Also accept” lists other spellings
+          people might type. Answers stay on your device and the server — nobody else sees them until they flip.
         </p>
+        <section className="sdp-showfile" aria-labelledby="sdp-showfile-title" data-part="showdown-showfile">
+          <h3 className="sdp-showfile__title" id="sdp-showfile-title">
+            Show file
+          </h3>
+          <p className="sd-muted">
+            {event
+              ? 'Your boards live in your show file on this computer — never in the app. Load it before doors open, then press Save to the show; give your backup presenter a copy.'
+              : 'Keep your boards in a show file on this computer: load it into any room, or save the rounds below as one.'}
+          </p>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json,application/json"
+            className="visually-hidden"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => void readShowFile(e)}
+          />
+          <div className="sd-row sd-row--wrap">
+            <Button
+              ref={loadButton}
+              variant="primary"
+              icon="share"
+              onClick={() => fileInput.current?.click()}
+              data-part="showdown-load-showfile"
+            >
+              Load show file…
+            </Button>
+            {saved.length ? (
+              <Select
+                aria-label="Load from this device"
+                value=""
+                onChange={(e) => {
+                  const show = saved.find((p) => p.id === e.currentTarget.value);
+                  if (show) loadFile(show.file, show.name);
+                }}
+              >
+                <option value="">Load from this device…</option>
+                {saved.some((s) => s.kind === SHOW_KIND) ? (
+                  <optgroup label="Whole shows (rounds + settings)">
+                    {saved
+                      .filter((s) => s.kind === SHOW_KIND)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.file.rounds.length} round{p.file.rounds.length === 1 ? '' : 's'})
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : null}
+                {saved.some((s) => s.kind === ROUNDS_KIND) ? (
+                  <optgroup label="Rounds only">
+                    {saved
+                      .filter((s) => s.kind === ROUNDS_KIND)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.file.rounds.length} round{p.file.rounds.length === 1 ? '' : 's'})
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : null}
+              </Select>
+            ) : null}
+            <Button
+              variant="secondary"
+              icon="check"
+              disabled={report.rounds.length === 0}
+              onClick={saveShowFile}
+              data-part="showdown-save-showfile"
+            >
+              Save show file
+            </Button>
+          </div>
+          <p className="sdp-showfile__status" role="status" data-ok={loadNote ? String(loadNote.ok) : undefined}>
+            {loadNote ? (
+              <>
+                <b>{loadNote.ok ? '✓ Done:' : '✕ Not loaded:'}</b> {loadNote.text}
+              </>
+            ) : null}
+          </p>
+        </section>
         {rehearsal ? (
           <p className="sdc-editor__note" role="note">
             These are the rehearsal’s <b>demo boards</b>. Saving makes them your own rounds (the Rehearsal badge goes away).
@@ -231,7 +372,11 @@ export function ContentEditor({
           />
         ))}
         <div className="sd-row sd-row--wrap">
-          <Button icon="plus" disabled={rounds.length >= SHOWDOWN_LIMITS.customRounds} onClick={() => setRounds((all) => [...all, blankRound(showcase)])}>
+          <Button
+            icon="plus"
+            disabled={rounds.length >= SHOWDOWN_LIMITS.customRounds}
+            onClick={() => setRounds((all) => [...all, blankRound(showcase)])}
+          >
             Add round
           </Button>
           <Button
@@ -244,9 +389,10 @@ export function ContentEditor({
         </div>
 
         <details className="sd-editor__more sdc-editor__more">
-          <summary>Save, load and share</summary>
+          <summary>More ways to save and share</summary>
           <p className="sd-muted">
-            Save the whole show — rounds{settings ? ' and settings (format, title, look, clock…)' : ''} — on this device, to restore it in a new room.
+            Save the whole show — rounds{settings ? ' and settings (format, title, look, clock…)' : ''} — in this browser, to load it later
+            with Load from this device.
           </p>
           <div className="sd-row sd-row--wrap">
             <TextInput
@@ -259,40 +405,6 @@ export function ContentEditor({
             <Button size="sm" icon="check" disabled={report.rounds.length === 0} onClick={() => void saveOnDevice()}>
               Save on this device
             </Button>
-            {saved.length ? (
-              <Select
-                aria-label="Load a saved show"
-                value=""
-                onChange={(e) => {
-                  const show = saved.find((p) => p.id === e.currentTarget.value);
-                  if (show) loadFile(show.file, show.name);
-                }}
-              >
-                <option value="">Load a saved show…</option>
-                {saved.some((s) => s.kind === SHOW_KIND) ? (
-                  <optgroup label="Whole shows (rounds + settings)">
-                    {saved
-                      .filter((s) => s.kind === SHOW_KIND)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.file.rounds.length} round{p.file.rounds.length === 1 ? '' : 's'})
-                        </option>
-                      ))}
-                  </optgroup>
-                ) : null}
-                {saved.some((s) => s.kind === ROUNDS_KIND) ? (
-                  <optgroup label="Rounds only">
-                    {saved
-                      .filter((s) => s.kind === ROUNDS_KIND)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.file.rounds.length} round{p.file.rounds.length === 1 ? '' : 's'})
-                        </option>
-                      ))}
-                  </optgroup>
-                ) : null}
-              </Select>
-            ) : null}
           </div>
           <TextArea
             rows={4}
@@ -438,7 +550,9 @@ function RoundCard({
           </Select>
         </label>
         <span className="sdc-f__hint" id={`sdc-ranked-${round.key}`}>
-          {round.ranked ? 'The board keeps the order below (#1 first). Use ▲/▼ to reorder.' : 'The board sorts answers by points, highest first.'}
+          {round.ranked
+            ? 'The board keeps the order below (#1 first). Use ▲/▼ to reorder.'
+            : 'The board sorts answers by points, highest first.'}
           {round.special > 0 ? ` Finding #${round.special} sets off the big celebration.` : ''}
         </span>
       </div>
@@ -535,7 +649,9 @@ function RoundCard({
             {issue}
           </span>
         ) : allZero ? (
-          <span className="dc-field__hint">Every answer has 0 points, so this board will be ranked in the order listed. Fill in the points, or switch on Ranked list.</span>
+          <span className="dc-field__hint">
+            Every answer has 0 points, so this board will be ranked in the order listed. Fill in the points, or switch on Ranked list.
+          </span>
         ) : null}
       </div>
 

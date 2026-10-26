@@ -96,10 +96,13 @@ Showdown. What differs:
   Thanks for playing. The presenter can put one up on every stage in any phase (the lobby, the show,
   the results); starting a show takes it down.
 - **Event presets** (`showdown:preset {id}`, lobby or results). Each preset's settings are public
-  metadata (`SHOWDOWN_EVENT_INFO`); its rounds are server-only
-  (`packages/game-core/src/showdown/events.ts`) and become the room's custom rounds, which only the
-  presenter receives. `dasoween-rehearsal` loads practice boards, and every screen says "Rehearsal"
-  (`state.rehearsal`) until the presenter saves rounds of their own.
+  metadata (`SHOWDOWN_EVENT_INFO`). **`dasoween-2026` is settings only** (`settingsOnly`, ADM-01): the
+  real boards are never in the repo — the presenter loads them from a show file (the content editor's
+  *Load show file* / *Load from this device*) before doors, in either order (a settings-only preset
+  keeps the rounds already loaded; `validateStart` refuses a custom show with no rounds).
+  `dasoween-rehearsal` loads practice boards (server-only, `packages/game-core/src/showdown/events.ts`),
+  and every screen says "Rehearsal" (`state.rehearsal`) until the presenter saves rounds of their own.
+  Both presets make the room an **event room** (below).
 - **Outcome:** no winner is ever invented. The finale has `mode: 'showcase'` and per-round
   `found`/`total`, and the reported outcome places the whole audience together.
 - **Theme music:** a looping procedural bed under the opening, the category cards and the holding
@@ -133,6 +136,102 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
   `?voice=1` plays a voice-over clip per line through the one audio pipeline; the clips (and the video
   files) are made outside the repo.
 
+## Event rooms (the DAS-O-Ween decisions)
+
+Loading either DAS-O-Ween preset makes the room an event room for the rest of its life
+(`state.event` = the preset id; also in the room metadata, so `/api/rooms/:code` returns `event` and
+`/r/<code>` can show the event join screen). Ordinary Showdown rooms keep today's behaviour, except
+the hardening that only makes the server safer (screens and spectators can never take over) and the
+picker, which works in every Presenter Showcase room.
+
+**Crew and permissions** (ADM-04 B, JOI-02 C; the smallest slice of ADM-02/03). Roles are data
+(`SHOWDOWN_ROLE_PERMISSIONS`): `producer`, `presenter` (whoever presents now), `backup`, `moderator`,
+each a set of permission names (`presenter.assign`, `crew.issue`, `crew.revoke`, `people.rename`,
+`people.hide`, `picker.run`, `picker.reroll`, `audio.station`, `audit.read`, `audit.export`,
+`preflight.read`). The room checks `can(player, permission)` and denies by default.
+
+- **Crew links**: `/room/<code>#crew=<id>.<secret>` — 190 random bits, the secret in the fragment (read
+  once and stripped from the address bar, `access.ts`), only its SHA-256 kept in room memory, compared
+  in constant time, expiring after 24 h, revocable, rate-limited, never logged or synced
+  (`apps/game-server/src/rooms/showdown/crew.ts`). Claiming binds the role to that seat; a second
+  device moves it. The server sends a secret once (`ShowdownCrewPrivate.fresh`); the minting device
+  keeps it to copy again.
+- **The producer** is whoever made the room an event room; they get the producer link privately. They
+  make someone presenter (`showdown:assign`), issue named backup-presenter and moderator links, revoke
+  links, and moderate.
+- **Succession**: in an event room every change of presenter **rotates the presenter pass** (the new
+  presenter receives it privately; nobody reloads; the old pass stops working). `showdown:claim` with
+  the pass is refused while the presenter is online ("ask the producer") and allowed while they're
+  offline (audited). A backup presenter can make themselves presenter only while the presenter is
+  offline — the fallback when the producer is offline too. Takeover needs `presenter.assign`.
+- **Moderation**: `rename` (any phase, the same cleaning as a lobby rename; the guest is told) and
+  `hide` (off the stage grid and out of the pool; they stay in the room). Moderators see who is hidden
+  and who is crew in their private crew view.
+- **Audit** (`apps/game-server/src/rooms/showdown/audit.ts`): append-only, in memory, capped at 1,000,
+  never synced; each entry `{at, actor, role, action, target, before, after, reason}`. Crew with
+  `audit.read` get the latest 60; the producer downloads the whole log as JSON. Server logs get one
+  line per entry with ids only. It leaves with the room.
+
+**The picker** (PCK-01…05, VIS-02, DSP-03). The server draws with its crypto RNG
+(`drawPick`/`pickPool`, `packages/game-core/src/showdown/picker.ts`) from connected participants —
+never the presenter, crew, big screens or spectators — who aren't hidden, on Skip me, done this round
+or in the hot seat. `showdown:pick` acts (`pick`, `done`, `noAnswer`, `reroll` with a reason) carry the
+draw number, so a stale or repeated one is ignored; Pick while someone is in the hot seat is refused
+with a nudge. Every screen gets the `pick` event (`winnerId`, `name`, `poolSize`, `landAt`): the console
+names the person at once, the stage's spotlight lands at `landAt` (3.5 s), and the picked phone shows
+"You're up!". Done counts the turn until the next round; No answer and reroll put them back. The pool
+refills when the next round starts. Public: `drawNo`, `hotSeat`, `pickAt`, `landAt`, `poolSize`,
+`done`, and `seats` (the stage grid: participants who aren't hidden — skippers stay on it, so nobody
+can tell who skipped). Private: `ShowdownMe.pool {in, skip, done}` and `picked`. A tile revealed while
+someone is in the hot seat is credited to them (`calledBy` on the slot, only once revealed; undo takes
+it back). Draws, rerolls, done and no answer are audited.
+
+**Sound station** (AUD-02 C): consoles and big screens report `showdown:audio {ready, muted, sounds}`
+every 2 s; exactly one device plays show sound — `soundStation` ('' = the presenter's console), which
+crew (`audio.station`) can move to a connected big screen. A screen station that disconnects hands it
+back at once; one that misses heartbeats for 5 s, too (a `station` event with `lost: true`). Phones
+never play show sound in an event room. Outside event rooms every device behaves as before.
+
+**Clock cues** (AUD-01): `clockWarn` at 1:00 left (once per round, for clocks longer than a minute) and
+`tick` n = 10 … 1. **Room DJ** (AUD-04): refused and switched off while an event room is PLAYING
+(`djLockReason`, an additive `BaseGameRoom` hook).
+
+**Join** (JOI-01 B, JOI-03 B): `/r/<code>` for an event room shows the one-field join screen; a join
+with `strictName` is refused with `JoinErrorCode.NAME_TAKEN` (message = the name the room would give
+instead) so the screen can ask for an initial first, with "Keep Sam 2" as the fallback.
+
+**Continuity** (OPS-01 C):
+- *Keep-alive*: the presenter's and the crew's seats are held for 30 minutes (`reconnectGraceFor`, an
+  additive `BaseGameRoom` hook), a presenter away mid-show ends it only after 30 minutes, and a live
+  event room doesn't auto-dispose (back on at the results; a safety timer closes it after 30 minutes
+  with nobody connected). The console pings `/api/health` every 4 minutes (keep-warm).
+- *The black box*: after each change (at most once a second, and every 15 s while the clock runs) the
+  server seals a snapshot of the room — engine state, rounds, settings, seats with hashed seat tokens,
+  crew link hashes, the picker, the audit tail, the clock — with AES-256-GCM under a key derived from
+  `DASCADE_SAVE_SECRET` (HKDF, its own label; `apps/game-server/src/rooms/showdown/blackbox.ts`) and
+  sends it to the presenter's console only (`showdown:blackbox`). On a graceful stop (a deploy) a last
+  one goes out first (`onServerShutdown`). The console keeps it (`apps/web/src/net/recovery.ts`); after
+  a restart it hands it back (`CreateOptions.restore` → `prepareRestore`/`applyRestore`) and the room
+  comes back **under the same code**, silently: no events are broadcast, the clock comes back paused,
+  the pass rotates, and every seat waits for its owner's old seat token (phones in an event room keep
+  looking for the room and rejoin by themselves — `apps/web/src/shell/ShowRecovery.tsx`). Snapshots
+  expire after 24 h; a forged one, or one whose code is live again, is refused (`RESTORE_FAILED`). In
+  production without `DASCADE_SAVE_SECRET` black boxes are off and keep-alive still works. The limit:
+  if the presenter's laptop is lost at the same moment as the server, there's nothing to restore.
+
+**Preflight** (OPS-03 B): crew with `preflight.read` ask `showdown:preflight` for the server's facts
+(uptime, start time, `RENDER_GIT_COMMIT`, the loaded show, backups online, the station's heartbeat,
+whether black boxes are on). `/api/health` stays as it is (it's Render's health check).
+
+**Freeze** (OPS-04 B): `scripts/freeze.sh on|off|status` adds or removes a GitHub ruleset that blocks
+merges and pushes to `main` (no bypass), and switches Render's auto-deploy (through the Render API
+when `RENDER_API_KEY`/`RENDER_SERVICE_ID` are set, otherwise it prints the dashboard steps).
+
+**Display profiles** (DSP-02 C): the `display` setting (`auto` default, `stream`, `projector`). `auto`
+lets each screen pick: the stage window and the console preview are Stream-safe, a big-screen link is
+Projector (unless `&display=stream`), anything else by size. The stage's fonts are pinned to the show,
+not the presenter's theme.
+
 ## Roles and secrecy
 
 - **Presenter = host, and never migrates.** `ShowdownRoom.canBecomeHost` only allows the presenter.
@@ -143,7 +242,10 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
     itself.
   - an explicit **hand-over**.
   - **Become the presenter**, between shows only, if the presenter left for good. The previous
-    presenter's custom rounds are discarded and the pass changes.
+    presenter's custom rounds are discarded and the pass changes. Never from a big screen or a
+    spectator.
+  - In an event room: the producer's **Make … presenter** (`showdown:assign`), and the rules in "Event
+    rooms" above (the pass rotates on every change; a link can't take the show from an online presenter).
 - **Hidden answers never leave the server** except in the presenter's sheet (`showdown:sheet`,
   `sendTo` the presenter). The public board (`boardJson`, built by the pure `boardView()`) carries
   hidden slots as bare positions: no text and no points. The built-in packs are only in
@@ -161,8 +263,8 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
 - **Room size:** up to 100 seats, and the default is the limit, so everyone who joins plays. The
   presenter and each big screen take a seat too; anyone past the limit watches as a spectator. The
   load scenario passes with 61 and 100 clients.
-- **Disconnects:** the seat is held for 180 s (`reconnectGraceSeconds`). If the presenter is gone for
-  10 minutes mid-show, the show ends with the scores as they stand and the role is freed, so the room
+- **Disconnects:** the seat is held for 180 s (`reconnectGraceSeconds`; 30 minutes for the presenter
+  and the crew in an event room). If the presenter is gone for 10 minutes mid-show (30 in an event room), the show ends with the scores as they stand and the role is freed, so the room
   never stalls: anyone can *Become the presenter* from the results screen or the lobby (the old pass
   still works until then).
 - **Big screens never present:** a hand-over to a stage display is refused. A big-screen link opened in
@@ -172,8 +274,9 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
   group for a tie, and always one group in a Presenter Showcase). The presenter and big screens aren't
   placed. A show ended before round 1 reports nothing. Stats extras: `calls` (answers called) and
   `bestCallPoints`.
-- A guard test (`apps/web/src/games/showdown/secrecy.test.ts`) fails if a web module imports the
-  engine package or contains a DAS-O-Ween answer.
+- Guard tests (`apps/web/src/games/showdown/secrecy.test.ts`, `packages/game-core/src/showdown/content.test.ts`)
+  fail if a web module imports the engine package, or if any event preset other than the practice
+  boards carries rounds (ADM-01: no real show content in the repo).
 
 ## Architecture (where it lives)
 

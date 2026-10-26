@@ -5,7 +5,9 @@
  *
  * Presenter Showcase has no teams: a mini board with the round, the question and the clock, how many
  * answers the crowd has found, the cheer pad (reactions float up on the stage), and — only when the
- * presenter allows it — private guesses that say "you called it" when they flip.
+ * presenter allows it — private guesses that say "you called it" when they flip. It is also the phone
+ * companion of the picker (DSP-03 B): the pool card with Skip me, "<name> is answering", and the
+ * full-screen "You're up!" on the phone that was picked.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import {
@@ -29,15 +31,28 @@ import { LOOK_COPY } from './look.ts';
 import { showFeed, useShowFeed } from './fx.ts';
 import { setScreenMode } from './access.ts';
 import { playShowSound } from './sounds.ts';
+import { PoolCard } from './PoolCard.tsx';
+import { PickMoment } from './YoureUp.tsx';
 import { formatClock, useBoard, useCard, useClock, useHype, useMe, useMotion, useShowSounds, useSweep, type RoleInfo } from './state.ts';
 import './chrome-showcase.css';
 
-export function AudienceView({ look, settings, code, role }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string; role: RoleInfo }) {
+export function AudienceView({
+  look,
+  settings,
+  code,
+  role,
+}: {
+  look: ShowdownLook;
+  settings: ShowdownSettings | null;
+  code: string;
+  role: RoleInfo;
+}) {
   const board = useBoard();
   const wide = useMedia('(min-width: 960px) and (min-height: 560px)');
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   if (!board) return null;
-  if (board.mode === 'showcase') return <ShowcaseAudience board={board} look={look} settings={settings} code={code} role={role} wide={wide} />;
+  if (board.mode === 'showcase')
+    return <ShowcaseAudience board={board} look={look} settings={settings} code={code} role={role} wide={wide} />;
   const canPickTeam = board.stage === 'intro' || role.team === null;
   return (
     <div className="sd-aud" data-look={look} data-wide={wide ? 'true' : undefined}>
@@ -107,13 +122,24 @@ function MiniBoard({ board, names, look }: { board: ShowdownBoardView; names: [s
         ))}
       </div>
       <div className="sd-mini__meta">
-        <span>{board.round < 0 ? copy.tagline : `Round ${board.round + 1}/${board.totalRounds}${board.multiplier > 1 ? ` · ×${board.multiplier}` : ''}`}</span>
+        <span>
+          {board.round < 0
+            ? copy.tagline
+            : `Round ${board.round + 1}/${board.totalRounds}${board.multiplier > 1 ? ` · ×${board.multiplier}` : ''}`}
+        </span>
         <StrikeLamps strikes={board.strikes} stealFailed={board.stealFailed} />
         <span className="sd-mini__bank">
           {copy.bank} <Rolling value={board.bank} motion={motion.motion} />
         </span>
       </div>
-      <p className="sd-mini__prompt">{board.prompt || (board.stage === 'intro' ? 'The show is about to begin…' : board.stage === 'title' ? `Round ${board.round + 1} — get ready!` : copy.waiting)}</p>
+      <p className="sd-mini__prompt">
+        {board.prompt ||
+          (board.stage === 'intro'
+            ? 'The show is about to begin…'
+            : board.stage === 'title'
+              ? `Round ${board.round + 1} — get ready!`
+              : copy.waiting)}
+      </p>
       {stealer !== -1 ? <p className="sd-mini__steal">Steal! {names[stealer]} get one guess.</p> : null}
       {board.slots.length ? <Board board={board} compact /> : null}
       {/* Phones have no stage (and so no host): screen readers hear the host's line for each event. */}
@@ -129,7 +155,17 @@ function MiniBoard({ board, names, look }: { board: ShowdownBoardView; names: [s
   );
 }
 
-function TeamCard({ team, names, canPick, spectator }: { team: TeamIndex | null; names: [string, string]; canPick: boolean; spectator: boolean }) {
+function TeamCard({
+  team,
+  names,
+  canPick,
+  spectator,
+}: {
+  team: TeamIndex | null;
+  names: [string, string];
+  canPick: boolean;
+  spectator: boolean;
+}) {
   if (spectator) {
     return (
       <div className="sd-panel sd-teamcard">
@@ -138,8 +174,16 @@ function TeamCard({ team, names, canPick, spectator }: { team: TeamIndex | null;
     );
   }
   return (
-    <div className="sd-panel sd-teamcard" data-team={team === null ? 'none' : SHOWDOWN_TEAMS[team].id} style={team === null ? undefined : ({ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties)}>
-      {team === null ? <span className="sd-teamcard__label">Pick a team to cheer for</span> : <span className="sd-teamcard__label">You’re on</span>}
+    <div
+      className="sd-panel sd-teamcard"
+      data-team={team === null ? 'none' : SHOWDOWN_TEAMS[team].id}
+      style={team === null ? undefined : ({ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties)}
+    >
+      {team === null ? (
+        <span className="sd-teamcard__label">Pick a team to cheer for</span>
+      ) : (
+        <span className="sd-teamcard__label">You’re on</span>
+      )}
       {team !== null ? <span className="sd-teamcard__name">{names[team]}</span> : null}
       {canPick ? (
         <div className="sd-row sd-row--stretch">
@@ -281,7 +325,13 @@ function CheerPad({ look, team, names }: { look: ShowdownLook; team: TeamIndex |
         ))}
       </div>
       {team !== null ? (
-        <button type="button" className="sd-hypebtn" data-team={SHOWDOWN_TEAMS[team].id} style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties} onClick={() => react(1)}>
+        <button
+          type="button"
+          className="sd-hypebtn"
+          data-team={SHOWDOWN_TEAMS[team].id}
+          style={{ '--team': SHOWDOWN_TEAMS[team].color } as CSSProperties}
+          onClick={() => react(1)}
+        >
           {copy.hype} for {names[team]}!
         </button>
       ) : null}
@@ -326,6 +376,13 @@ function ShowcaseAudience({
   role: RoleInfo;
   wide: boolean;
 }) {
+  // The picker on this phone: who's answering, and (participants only) the pool card with Skip me.
+  const picker = (
+    <div className="sdg-bar">
+      <PickMoment look={look} />
+      <PoolCard />
+    </div>
+  );
   return (
     <div className="sd-aud sdc-aud" data-look={look} data-wide={wide ? 'true' : undefined} data-mode="showcase">
       <div className="sd-aud__main">
@@ -334,10 +391,14 @@ function ShowcaseAudience({
             <Stage look={look} settings={settings} variant="preview" />
           </div>
         ) : (
-          <ShowcaseMini board={board} look={look} show={settings ? showTitle(settings) : ''} />
+          <>
+            {picker}
+            <ShowcaseMini board={board} look={look} show={settings ? showTitle(settings) : ''} />
+          </>
         )}
       </div>
       <aside className="sd-aud__side">
+        {wide ? picker : null}
         <div className="sd-panel sdc-crowdcard">
           <span className="sdc-crowdcard__icon" aria-hidden>
             {look === 'halloween' ? '🎃' : '🎉'}
@@ -381,10 +442,13 @@ function ShowcaseMini({ board, look, show }: { board: ShowdownBoardView; look: S
   return (
     <section className="sd-mini sdc-mini" data-look={look} data-stage={stage} aria-label="Live board">
       <header className="sdc-mini__head">
-        <span className="sdc-mini__round">{board.round < 0 ? copy.showcase.tagline : `Round ${board.round + 1} of ${board.totalRounds}`}</span>
+        <span className="sdc-mini__round">
+          {board.round < 0 ? copy.showcase.tagline : `Round ${board.round + 1} of ${board.totalRounds}`}
+        </span>
         {showClock ? (
           <span className="sdc-mini__clock" role="timer" data-over={clock.left <= 0 ? 'true' : undefined}>
-            <PixelIcon name="clock" size={14} /> {clock.left <= 0 ? copy.showcase.finalGuesses : <span className="sd-num">{formatClock(clock.left)}</span>}
+            <PixelIcon name="clock" size={14} />{' '}
+            {clock.left <= 0 ? copy.showcase.finalGuesses : <span className="sd-num">{formatClock(clock.left)}</span>}
           </span>
         ) : null}
       </header>
@@ -579,4 +643,3 @@ function ShowcaseCheerPad({ look }: { look: ShowdownLook }) {
     </div>
   );
 }
-

@@ -3,12 +3,16 @@
  * card — team pick for the audience, presenter tools for the presenter, big-screen mode for a TV.
  *
  * The format comes first: Team Showdown (teams, strikes, scores) or Presenter Showcase (one board
- * for a crowd in a meeting). Event presets load a ready-made showcase (its settings and rounds) in
- * one click.
+ * for a crowd in a meeting). Event presets set up a ready-made showcase in one click: DAS-O-Ween 2026
+ * carries settings only (the boards come from the presenter's show file, never the app — ADM-01), the
+ * rehearsal adds two practice boards. Loading either makes the room an event room: the presenter's
+ * setup then gets "Crew & checks" (preflight, crew links and the log, names).
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { cleanText } from '@dascade/shared';
 import {
+  SHOWDOWN_DISPLAYS,
+  SHOWDOWN_DISPLAY_INFO,
   SHOWDOWN_EVENT_IDS,
   SHOWDOWN_EVENT_INFO,
   SHOWDOWN_LIMITS,
@@ -41,9 +45,11 @@ import { sfx } from '../../audio/audio.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
 import type { SettingsPanelProps } from '../types.ts';
 import { ContentEditor } from './ContentEditor.tsx';
-import { AudioStatus, BigScreenLinkButton, PresenterTools, StageCards, StageWindowButton, loadEventPreset, useLoadedPreset } from './consoleParts.tsx';
+import { AudioStatus, BigScreenLinkButton, PresenterTools, StageCards, StageWindowButton, loadEventPreset } from './consoleParts.tsx';
 import { copyText, screenLink, setScreenMode, useScreenMode } from './access.ts';
-import { useLook, usePass, useRehearsal, useRole, useRosters, useShowdownSettings } from './state.ts';
+import { useEvent, useLook, usePass, useRehearsal, useRole, useRosters, useShowdownSettings } from './state.ts';
+import { CrewPanel, NamesPanel, PreflightPanel } from './panels/index.ts';
+import { PoolCard } from './PoolCard.tsx';
 import { TourButton } from './tour/TourButton.tsx';
 import './chrome-showcase.css';
 
@@ -75,11 +81,15 @@ function useDebouncedText(value: string, commit: (v: string) => void): [string, 
 export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPanelProps<ShowdownSettings>) {
   const customRounds = useRoomSelector<ShowdownPublicState, number>((s) => s.customRounds) ?? 0;
   const rehearsal = useRehearsal();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<false | 'edit' | 'showfile'>(false);
   const [title, setTitle] = useDebouncedText(settings.title ?? '', (t) => update({ title: t }));
   const [eventName, setEventName] = useDebouncedText(settings.eventName ?? '', (t) => update({ eventName: t }));
-  const [name0, setName0] = useDebouncedText(settings.teamNames?.[0] ?? '', (t) => update({ teamNames: [t, settings.teamNames?.[1] ?? ''] }));
-  const [name1, setName1] = useDebouncedText(settings.teamNames?.[1] ?? '', (t) => update({ teamNames: [settings.teamNames?.[0] ?? '', t] }));
+  const [name0, setName0] = useDebouncedText(settings.teamNames?.[0] ?? '', (t) =>
+    update({ teamNames: [t, settings.teamNames?.[1] ?? ''] }),
+  );
+  const [name1, setName1] = useDebouncedText(settings.teamNames?.[1] ?? '', (t) =>
+    update({ teamNames: [settings.teamNames?.[0] ?? '', t] }),
+  );
   const available = SHOWDOWN_PACK_IDS.filter((id) => settings.packs?.includes(id)).reduce((n, id) => n + SHOWDOWN_PACK_INFO[id].rounds, 0);
   const auto = resolveShowdownLook('auto', seasonClock());
   if (!settings.packs) return null;
@@ -88,16 +98,21 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
   const togglePack = (id: ShowdownPackId) => {
     const on = settings.packs.includes(id);
     if (on && settings.packs.length === 1) return;
-    update({ packs: on ? settings.packs.filter((p) => p !== id) : SHOWDOWN_PACK_IDS.filter((p) => p === id || settings.packs.includes(p)) });
+    update({
+      packs: on ? settings.packs.filter((p) => p !== id) : SHOWDOWN_PACK_IDS.filter((p) => p === id || settings.packs.includes(p)),
+    });
   };
 
   return (
     <div className="sd-settings" data-mode={settings.mode}>
       <FormatPicker value={settings.mode ?? 'classic'} canEdit={canEdit} onChange={(mode) => update({ mode })} />
 
-      {canEdit ? <EventPresets customRounds={customRounds} rehearsal={rehearsal} /> : null}
+      {canEdit ? <EventPresets customRounds={customRounds} rehearsal={rehearsal} onLoadShowFile={() => setEditing('showfile')} /> : null}
 
-      <Field label="Show title" hint={showcase ? 'On the opening marquee, the title cards and the stage window.' : 'On the marquee and the big screen.'}>
+      <Field
+        label="Show title"
+        hint={showcase ? 'On the opening marquee, the title cards and the stage window.' : 'On the marquee and the big screen.'}
+      >
         {({ id, describedBy }) => (
           <TextInput
             id={id}
@@ -112,7 +127,10 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
       </Field>
 
       {showcase ? (
-        <Field label="Holding-screen headline" hint="The big line on the Welcome card (the event’s name). Leave blank to use the show title.">
+        <Field
+          label="Holding-screen headline"
+          hint="The big line on the Welcome card (the event’s name). Leave blank to use the show title."
+        >
           {({ id, describedBy }) => (
             <TextInput
               id={id}
@@ -192,7 +210,14 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
               );
             })}
           </div>
-          <Field label="Rounds" hint={settings.rounds > available ? `Only ${available} questions in these packs.` : 'Questions in this show (unplayed ones come first).'}>
+          <Field
+            label="Rounds"
+            hint={
+              settings.rounds > available
+                ? `Only ${available} questions in these packs.`
+                : 'Questions in this show (unplayed ones come first).'
+            }
+          >
             {({ id, describedBy }) => (
               <NumberInput
                 id={id}
@@ -211,12 +236,19 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
           <p>
             <span className="dc-num">{customRounds}</span> custom round{customRounds === 1 ? '' : 's'} ready.
             {rehearsal ? ' (The rehearsal’s demo boards.)' : ''}
-            {canEdit ? ' The answers stay on your device and the server — nobody else sees them until they flip.' : ' The presenter writes these; nobody else sees the answers.'}
+            {canEdit
+              ? ' The answers stay on your device and the server — nobody else sees them until they flip.'
+              : ' The presenter writes these; nobody else sees the answers.'}
           </p>
           {canEdit ? (
-            <Button icon="pencil" variant="primary" onClick={() => setEditing(true)}>
-              {customRounds ? 'Edit your rounds' : 'Write your rounds'}
-            </Button>
+            <div className="sd-row sd-row--wrap">
+              <Button icon="pencil" variant="primary" onClick={() => setEditing('edit')}>
+                {customRounds ? 'Edit your rounds' : 'Write your rounds'}
+              </Button>
+              <Button icon="share" variant="ghost" onClick={() => setEditing('showfile')}>
+                Load show file
+              </Button>
+            </div>
           ) : null}
         </div>
       )}
@@ -238,8 +270,18 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
           </div>
 
           <div className="sd-toggles">
-            <Toggle label="Three strikes open a steal" checked={settings.steal} disabled={!canEdit} onChange={(steal) => update({ steal })} />
-            <Toggle label="Audience locks in guesses for points" checked={settings.audience} disabled={!canEdit} onChange={(audience) => update({ audience })} />
+            <Toggle
+              label="Three strikes open a steal"
+              checked={settings.steal}
+              disabled={!canEdit}
+              onChange={(steal) => update({ steal })}
+            />
+            <Toggle
+              label="Audience locks in guesses for points"
+              checked={settings.audience}
+              disabled={!canEdit}
+              onChange={(audience) => update({ audience })}
+            />
           </div>
 
           <div className="sd-teamnames">
@@ -263,7 +305,14 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
         </>
       )}
 
-      {editing ? <ContentEditor onClose={() => setEditing(false)} settings={settings} update={update} /> : null}
+      {editing ? (
+        <ContentEditor
+          onClose={() => setEditing(false)}
+          settings={settings}
+          update={update}
+          intent={editing === 'showfile' ? 'showfile' : undefined}
+        />
+      ) : null}
     </div>
   );
 }
@@ -303,25 +352,50 @@ const PRESET_LABEL: Record<ShowdownEventId, { title: string; icon: string }> = {
   'dasoween-rehearsal': { title: 'DAS-O-Ween rehearsal (demo answers)', icon: '🧪' },
 };
 
-/** One-click ready-made shows: they replace this room's rounds and set the format, look and clock. */
-function EventPresets({ customRounds, rehearsal }: { customRounds: number; rehearsal: boolean }) {
+/**
+ * One-click ready-made shows. DAS-O-Ween 2026 sets the format, look and clock and keeps the rounds
+ * already loaded (its boards live in the presenter's show file, never in the app); the rehearsal also
+ * loads two practice boards, replacing the room's rounds (so it asks first).
+ */
+function EventPresets({
+  customRounds,
+  rehearsal,
+  onLoadShowFile,
+}: {
+  customRounds: number;
+  rehearsal: boolean;
+  onLoadShowFile: () => void;
+}) {
   const code = useSessionStore((s) => s.code) ?? '';
-  const loaded = useLoadedPreset(code);
+  const event = useEvent();
   const [pending, setPending] = useState<ShowdownEventId | null>(null);
-  /** The preset in the room now (the server knows "rehearsal"; this browser knows which one it loaded). */
-  const current: ShowdownEventId | null = rehearsal ? 'dasoween-rehearsal' : loaded === 'dasoween-2026' && customRounds > 0 ? 'dasoween-2026' : null;
+  /** The preset in the room now (the server says "rehearsal" and which preset made it an event room). */
+  const current: ShowdownEventId | null = rehearsal ? 'dasoween-rehearsal' : event === 'dasoween-2026' ? 'dasoween-2026' : null;
   const load = (id: ShowdownEventId) => {
-    // Hand-written rounds would be replaced: ask first. A preset's own rounds can be loaded again any time.
-    if (customRounds > 0 && current === null) return setPending(id);
+    // Only a preset with boards replaces rounds: ask first when they're the presenter's own.
+    const replaces = !SHOWDOWN_EVENT_INFO[id].settingsOnly;
+    if (replaces && customRounds > 0 && !rehearsal) return setPending(id);
     loadEventPreset(code, id);
   };
+  const needShowFile = current === 'dasoween-2026' && customRounds === 0;
   return (
     <section className="sdc-presets" aria-labelledby="sdc-presets-label">
       <div className="sdc-presets__head">
         <span className="dc-field__label" id="sdc-presets-label">
           Event presets
+          {event ? (
+            <>
+              {' '}
+              <Badge color="var(--accent)" icon="crown" data-part="showdown-event-badge">
+                Event room
+              </Badge>
+            </>
+          ) : null}
         </span>
-        <span className="dc-field__hint">One click loads a ready-made show — its format, look, clock and rounds. It replaces this room’s rounds.</span>
+        <span className="dc-field__hint">
+          One click sets up the show’s format, look and clock and makes this an event room (crew links, the preflight, the sound station).
+          DAS-O-Ween 2026 keeps your boards out of the app: you load them from your show file. The rehearsal brings two practice boards.
+        </span>
       </div>
       <div className="sdc-presets__list">
         {SHOWDOWN_EVENT_IDS.map((id) => {
@@ -343,31 +417,49 @@ function EventPresets({ customRounds, rehearsal }: { customRounds: number; rehea
                 </span>
                 <span className="sdc-preset__blurb">{info.blurb}</span>
               </span>
-              <Button size="sm" variant={on ? 'ghost' : info.rehearsal ? 'secondary' : 'primary'} onClick={() => load(id)} aria-label={`${on ? 'Reload' : 'Load'} ${PRESET_LABEL[id].title}`}>
+              <Button
+                size="sm"
+                variant={on ? 'ghost' : info.rehearsal ? 'secondary' : 'primary'}
+                onClick={() => load(id)}
+                aria-label={`${on ? 'Reload' : 'Load'} ${PRESET_LABEL[id].title}`}
+              >
                 {on ? 'Reload' : 'Load'}
               </Button>
             </div>
           );
         })}
       </div>
-      <p className="sdc-presets__status" role="status">
+      <div className="sdc-presets__status" role="status" data-part="showdown-preset-status">
         {rehearsal ? (
-          <>
+          <p>
             <Badge color="var(--warning)" solid>
               Rehearsal
             </Badge>{' '}
-            Demo boards loaded — practise every control without giving the real answers away. Load DAS-O-Ween 2026 for the real show.
-          </>
+            Practice boards loaded — try every control without giving the real answers away. For the real show, load DAS-O-Ween 2026, then
+            your show file.
+          </p>
+        ) : needShowFile ? (
+          <div className="sdp-showfile-prompt" data-part="showdown-showfile-prompt">
+            <p>
+              <PixelIcon name="warning" /> <b>Now load your show file.</b> DAS-O-Ween 2026’s settings are on, but its boards aren’t in the
+              app: open <b>Load show file</b> and pick the file on this computer (or <b>Load from this device</b> if you saved it here),
+              then press Save to the show.
+            </p>
+            <Button size="sm" variant="primary" icon="share" onClick={onLoadShowFile}>
+              Load your show file
+            </Button>
+          </div>
         ) : current === 'dasoween-2026' ? (
-          <>
-            <PixelIcon name="check" /> DAS-O-Ween 2026 is loaded: <span className="dc-num">{customRounds}</span> rounds. Check them with Edit your rounds.
-          </>
+          <p>
+            <PixelIcon name="check" /> DAS-O-Ween 2026’s settings with <span className="dc-num">{customRounds}</span> round
+            {customRounds === 1 ? '' : 's'} from your show file. Check them with Edit your rounds.
+          </p>
         ) : customRounds > 0 ? (
-          <>
+          <p>
             <span className="dc-num">{customRounds}</span> round{customRounds === 1 ? '' : 's'} of your own loaded.
-          </>
+          </p>
         ) : null}
-      </p>
+      </div>
       <Modal
         open={pending !== null}
         onClose={() => setPending(null)}
@@ -390,8 +482,9 @@ function EventPresets({ customRounds, rehearsal }: { customRounds: number; rehea
         }
       >
         <p>
-          This room has <span className="dc-num">{customRounds}</span> round{customRounds === 1 ? '' : 's'} of your own. Loading the preset replaces them (and sets the format, look and
-          clock). Save them on this device first if you want to keep them (Edit your rounds → Save, load and share).
+          This room has <span className="dc-num">{customRounds}</span> round{customRounds === 1 ? '' : 's'} of your own. Loading the
+          rehearsal replaces them with its practice boards (and sets the format, look and clock). Save them as a show file first if you want
+          to keep them (Edit your rounds → Save show file).
         </p>
       </Modal>
     </section>
@@ -401,7 +494,10 @@ function EventPresets({ customRounds, rehearsal }: { customRounds: number; rehea
 function ShowcaseOptions({ settings, canEdit, update }: SettingsPanelProps<ShowdownSettings>) {
   return (
     <div className="sdc-showopts">
-      <Field label="Round clock (minutes)" hint="0 = no clock. It starts when the question goes up and never reveals anything by itself — you press Reveal remaining.">
+      <Field
+        label="Round clock (minutes)"
+        hint="0 = no clock. It starts when the question goes up and never reveals anything by itself — you press Reveal remaining."
+      >
         {({ id, describedBy }) => (
           <NumberInput
             id={id}
@@ -421,8 +517,26 @@ function ShowcaseOptions({ settings, canEdit, update }: SettingsPanelProps<Showd
           disabled={!canEdit || settings.minutes === 0}
           onChange={(stageClock) => update({ stageClock })}
         />
-        <Toggle label="Phones can lock in private guesses" checked={settings.audience} disabled={!canEdit} onChange={(audience) => update({ audience })} />
-        <span className="dc-field__hint">For a meeting, leave phone guesses off: people guess in the chat and you flip what they name.</span>
+        <Toggle
+          label="Phones can lock in private guesses"
+          checked={settings.audience}
+          disabled={!canEdit}
+          onChange={(audience) => update({ audience })}
+        />
+        <span className="dc-field__hint">
+          For a meeting, leave phone guesses off: people guess in the chat and you flip what they name.
+        </span>
+      </div>
+      <div className="dc-field">
+        <span className="dc-field__label">Display</span>
+        <Segmented
+          label="Display"
+          value={settings.display ?? 'auto'}
+          disabled={!canEdit}
+          onChange={(display) => display !== settings.display && update({ display })}
+          options={SHOWDOWN_DISPLAYS.map((d) => ({ value: d, label: SHOWDOWN_DISPLAY_INFO[d].title }))}
+        />
+        <span className="dc-field__hint">{SHOWDOWN_DISPLAY_INFO[settings.display ?? 'auto'].blurb}</span>
       </div>
     </div>
   );
@@ -441,6 +555,26 @@ export function ShowdownPlayerSetup() {
   const names: [string, string] = [teamName(settings, 0), teamName(settings, 1)];
   const showcase = settings?.mode === 'showcase';
   const title = settings ? showTitle(settings) : SHOWDOWN_DEFAULT_TITLE;
+  const event = useEvent();
+
+  // Event rooms: the preflight belongs in the lobby too (OPS-03), with the producer's crew links and names.
+  const crewChecks =
+    role.role === 'presenter' && event ? (
+      <section className="sdp-crewchecks" aria-labelledby="sdp-crewchecks-label" data-part="showdown-crew-checks">
+        <span className="dc-field__label" id="sdp-crewchecks-label">
+          Crew & checks{' '}
+          <Badge color="var(--accent)" icon="crown">
+            Event room
+          </Badge>
+        </span>
+        <span className="dc-field__hint">Run the preflight before doors open, hand out crew links, and fix names as people join.</span>
+        <div className="sdp-lobbycrew">
+          <PreflightPanel look={look} code={code} title={title} />
+          <CrewPanel code={code} />
+          <NamesPanel />
+        </div>
+      </section>
+    ) : null;
 
   if (role.role === 'presenter' && showcase) {
     return (
@@ -483,6 +617,7 @@ export function ShowdownPlayerSetup() {
           <span className="dc-field__hint">Put up Welcome while people arrive; it comes down when the show starts.</span>
         </div>
         <PresenterTools code={code} pass={pass} />
+        {crewChecks}
       </div>
     );
   }
@@ -513,6 +648,7 @@ export function ShowdownPlayerSetup() {
           </Button>
         </div>
         <PresenterTools code={code} pass={pass} />
+        {crewChecks}
       </div>
     );
   }
@@ -562,9 +698,12 @@ export function ShowdownPlayerSetup() {
             <b>You’re in the audience</b> — cheer on the show!
           </p>
           <p className="sd-muted">
-            No teams tonight. Watch the board, shout your guesses (or type them in the meeting chat) and tap the reactions to cheer — they float up on the stage.
+            No teams tonight. Watch the board, shout your guesses (or type them in the meeting chat) and tap the reactions to cheer — they
+            float up on the stage.
           </p>
         </div>
+        {/* Event rooms: whether you might be picked, and your private Skip me switch. */}
+        {event ? <PoolCard compact /> : null}
         {role.role === 'spectator' ? <p className="sd-muted">You’re spectating — you’ll see the show too.</p> : null}
         {bigScreen}
         <ClaimForm />
@@ -638,7 +777,13 @@ function ClaimForm() {
           setPass('');
         }}
       >
-        <TextInput value={pass} placeholder="Paste your presenter link or pass" aria-label="Presenter pass" onChange={(e) => setPass(e.currentTarget.value)} autoComplete="off" />
+        <TextInput
+          value={pass}
+          placeholder="Paste your presenter link or pass"
+          aria-label="Presenter pass"
+          onChange={(e) => setPass(e.currentTarget.value)}
+          autoComplete="off"
+        />
         <Button type="submit" size="sm" disabled={!pass.trim()}>
           Claim
         </Button>

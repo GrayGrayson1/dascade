@@ -274,8 +274,7 @@
   right: -30%;
   height: 30cqh;
   background:
-    radial-gradient(40% 50% at 25% 60%, #e7dcff2e, transparent 70%),
-    radial-gradient(35% 45% at 60% 55%, #e7dcff26, transparent 70%),
+    radial-gradient(40% 50% at 25% 60%, #e7dcff2e, transparent 70%), radial-gradient(35% 45% at 60% 55%, #e7dcff26, transparent 70%),
     radial-gradient(30% 40% at 85% 65%, #e7dcff22, transparent 70%);
   filter: blur(1.4cqh);
 }
@@ -374,7 +373,9 @@
   background-image:
     radial-gradient(circle at center, var(--sd-bulb-on) 0 22%, color-mix(in srgb, var(--sd-bulb-on) 40%, transparent) 28%, transparent 46%),
     radial-gradient(circle at center, var(--sd-bulb-off) 0 22%, transparent 26%);
-  background-size: calc(var(--b) * 2) var(--b), var(--b) var(--b);
+  background-size:
+    calc(var(--b) * 2) var(--b),
+    var(--b) var(--b);
   filter: drop-shadow(0 0 0.8cqh color-mix(in srgb, var(--sd-bulb-on) 70%, transparent));
 }
 .sd-bulbs__edge--top,
@@ -395,7 +396,9 @@
   top: 0;
   bottom: 0;
   width: var(--b);
-  background-size: var(--b) calc(var(--b) * 2), var(--b) var(--b);
+  background-size:
+    var(--b) calc(var(--b) * 2),
+    var(--b) var(--b);
   background-repeat: repeat-y;
 }
 .sd-bulbs__edge--left {
@@ -414,12 +417,16 @@
 }
 @keyframes sd-chase-x {
   to {
-    background-position: calc(var(--b) * 2) 0, 0 0;
+    background-position:
+      calc(var(--b) * 2) 0,
+      0 0;
   }
 }
 @keyframes sd-chase-y {
   to {
-    background-position: 0 calc(var(--b) * 2), 0 0;
+    background-position:
+      0 calc(var(--b) * 2),
+      0 0;
   }
 }
 
@@ -586,7 +593,14 @@
   min-height: 0;
   padding: 1.5cqh;
   border-radius: 2.4cqh;
-  background: linear-gradient(135deg, var(--sd-frame-a), var(--sd-frame-b) 32%, var(--sd-frame-a) 52%, var(--sd-frame-b) 78%, var(--sd-frame-a));
+  background: linear-gradient(
+    135deg,
+    var(--sd-frame-a),
+    var(--sd-frame-b) 32%,
+    var(--sd-frame-a) 52%,
+    var(--sd-frame-b) 78%,
+    var(--sd-frame-a)
+  );
   box-shadow:
     0 0 5cqh color-mix(in srgb, var(--sd-gold) 30%, transparent),
     0 2cqh 4cqh #000a,
@@ -618,9 +632,7 @@
   gap: 1.1cqh 1.3cqh;
   min-height: 0;
   border-radius: 1.4cqh;
-  background:
-    radial-gradient(80% 120% at 50% 0, #ffffff12, transparent 60%),
-    #07041a;
+  background: radial-gradient(80% 120% at 50% 0, #ffffff12, transparent 60%), #07041a;
   box-shadow: inset 0 0 2cqh #000c;
 }
 .sd-tile {
@@ -651,9 +663,7 @@
 }
 .sd-tile__face--front {
   justify-content: center;
-  background:
-    linear-gradient(180deg, #ffffff22, transparent 42%),
-    linear-gradient(180deg, var(--sd-tile-a), var(--sd-tile-b));
+  background: linear-gradient(180deg, #ffffff22, transparent 42%), linear-gradient(180deg, var(--sd-tile-a), var(--sd-tile-b));
   border: 0.3cqh solid var(--sd-tile-edge);
   box-shadow:
     inset 0 -0.9cqh 1.4cqh #0007,
@@ -684,9 +694,7 @@
   justify-content: space-between;
   padding-left: 1.6cqw;
   color: var(--sd-face-ink);
-  background:
-    linear-gradient(180deg, #ffffff55, transparent 45%),
-    linear-gradient(180deg, var(--sd-face-a), var(--sd-face-b));
+  background: linear-gradient(180deg, #ffffff55, transparent 45%), linear-gradient(180deg, var(--sd-face-a), var(--sd-face-b));
   border: 0.3cqh solid var(--sd-frame-a);
   box-shadow: inset 0 -0.8cqh 1.2cqh #0004;
 }
@@ -1010,9 +1018,7 @@
   padding: 1.8cqh 1.2cqw;
   border-radius: 2cqh;
   text-align: center;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--team) 20%, transparent), transparent 40%),
-    var(--sd-panel);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--team) 20%, transparent), transparent 40%), var(--sd-panel);
   border: 0.3cqh solid color-mix(in srgb, var(--team) 55%, transparent);
   box-shadow: 0 0 3cqh color-mix(in srgb, var(--team) 25%, transparent);
   transition:
@@ -1547,7 +1553,11 @@
   gap: 2.4cqh;
   padding: 2cqh 4cqw;
   border-radius: 2cqh;
-  background: radial-gradient(80% 80% at 50% 45%, color-mix(in srgb, var(--sd-sky-top) 70%, transparent), color-mix(in srgb, var(--sd-sky-bottom) 92%, transparent));
+  background: radial-gradient(
+    80% 80% at 50% 45%,
+    color-mix(in srgb, var(--sd-sky-top) 70%, transparent),
+    color-mix(in srgb, var(--sd-sky-bottom) 92%, transparent)
+  );
   text-align: center;
   overflow: hidden;
 }
@@ -1732,7 +1742,11 @@
   justify-items: center;
   gap: 1.6cqh;
   pointer-events: none;
-  background: radial-gradient(75% 75% at 50% 50%, color-mix(in srgb, var(--sd-sky-bottom) 94%, transparent), color-mix(in srgb, var(--sd-sky-top) 70%, transparent));
+  background: radial-gradient(
+    75% 75% at 50% 50%,
+    color-mix(in srgb, var(--sd-sky-bottom) 94%, transparent),
+    color-mix(in srgb, var(--sd-sky-top) 70%, transparent)
+  );
   border-radius: 2cqh;
   animation: sd-splash 2.7s ease both;
 }
@@ -1802,7 +1816,12 @@
   padding: 1.4cqh 5cqw;
   transform: translateX(-50%) rotate(-3deg);
   border-radius: 1.4cqh;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--team) 30%, #000), color-mix(in srgb, var(--team) 70%, #000), color-mix(in srgb, var(--team) 30%, #000));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--team) 30%, #000),
+    color-mix(in srgb, var(--team) 70%, #000),
+    color-mix(in srgb, var(--team) 30%, #000)
+  );
   border: 0.4cqh solid var(--team);
   box-shadow: 0 0 6cqh color-mix(in srgb, var(--team) 70%, transparent);
   pointer-events: none;
@@ -2086,10 +2105,17 @@
   height: 140cqh;
   margin-left: -13cqw;
   transform-origin: 50% 0;
-  background: conic-gradient(from 166deg at 50% 0, transparent 0deg, color-mix(in srgb, var(--c) 42%, transparent) 14deg, transparent 28deg);
+  background: conic-gradient(
+    from 166deg at 50% 0,
+    transparent 0deg,
+    color-mix(in srgb, var(--c) 42%, transparent) 14deg,
+    transparent 28deg
+  );
   mix-blend-mode: screen;
   filter: blur(0.5cqh);
-  animation: sd-beam 1.6s calc(var(--i) * -0.4s) ease-in-out infinite alternate, sd-beam-in 4.4s ease both;
+  animation:
+    sd-beam 1.6s calc(var(--i) * -0.4s) ease-in-out infinite alternate,
+    sd-beam-in 4.4s ease both;
 }
 @keyframes sd-beam {
   from {
@@ -2274,7 +2300,21 @@
 /* ---------- Reduced motion: overlays stand still instead of vanishing ----------
    base.css shortens every animation to 1 ms under reduced motion, which would leave these at their
    last keyframe (opacity 0) — never seen. Their components remove them on a timer, so just show them. */
-:root[data-reduced-motion='true'] :is(.sd-ribbon, .sd-bubble, .sd-splash, .sd-steal, .sd-strike, .sd-mini__x, .sd-miss, .sd-miss__x, .sd-celebrate, .sd-celebrate__banner, .sd-complete, .sd-tile__burst) {
+:root[data-reduced-motion='true']
+  :is(
+    .sd-ribbon,
+    .sd-bubble,
+    .sd-splash,
+    .sd-steal,
+    .sd-strike,
+    .sd-mini__x,
+    .sd-miss,
+    .sd-miss__x,
+    .sd-celebrate,
+    .sd-celebrate__banner,
+    .sd-complete,
+    .sd-tile__burst
+  ) {
   animation: none !important;
 }
 :root[data-reduced-motion='true'] .sd-tile__burst {
@@ -2337,6 +2377,52 @@ body.sd-window {
   font: 600 20px/1.4 var(--font-ui, system-ui);
   color: #fff8ec;
   background: #0b0620;
+}
+/* The stage window's "We'll be right back" card (stageWindow.ts, OPS-01): held over the empty portal
+   while the console finds its room again; the next stage drawn into the window takes it down. Still —
+   no animation — and in the show's look (it is a .sd-stage with data-look). */
+.sd-window__hold.sd-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: auto;
+  height: auto;
+}
+.sd-window__hold-plate {
+  display: grid;
+  justify-items: center;
+  gap: 3cqh;
+  max-width: 80cqw;
+  padding: 6cqh 6cqw 7cqh;
+  border-radius: 3cqh;
+  text-align: center;
+  background: color-mix(in srgb, var(--sd-sky-bottom) 88%, transparent);
+  border: 0.6cqh solid var(--sd-gold);
+  box-shadow: 0 3cqh 6cqh #000c;
+}
+.sd-window__hold-plate .sd-logo-badge {
+  font-size: 3.6cqh;
+}
+.sd-window__hold-title {
+  margin: 0;
+  font-family: var(--sd-title-font);
+  font-size: calc(10cqh * var(--sd-title-k, 1) + 1cqh);
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sd-gold);
+  -webkit-text-stroke: 0.3cqh color-mix(in srgb, var(--sd-frame-b) 70%, black);
+  paint-order: stroke fill;
+}
+.sd-window__hold-line {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: 3.6cqh;
+  line-height: 1.3;
+  color: var(--sd-ink);
 }
 .sd-screen {
   position: fixed;

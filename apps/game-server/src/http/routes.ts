@@ -6,8 +6,7 @@ import { CLIENT_IP_HEADER, ipRateKey } from '../lib/clientIp.ts';
 import { registerStatsRoutes } from '../platform/statsRoutes.ts';
 import { registerClassicsRoutes } from '../rooms/classics/scoresRoute.ts';
 import { registerTournamentRoutes } from './tournamentRoutes.ts';
-
-const startedAt = Date.now();
+import { processStartedAt as startedAt } from '../lib/process.ts';
 
 // Room lookups reveal whether a code is live: throttle per IP so codes can't be enumerated,
 // while staying generous for offices where everyone shares one public address.
@@ -54,6 +53,7 @@ export function registerApiRoutes(app: express.Application): void {
       locked: Boolean(meta.locked),
       full: players >= maxPlayers,
       allowSpectators: meta.allowSpectators ?? true,
+      ...(meta.event ? { event: meta.event } : {}),
     } satisfies RoomLookup);
   });
 }

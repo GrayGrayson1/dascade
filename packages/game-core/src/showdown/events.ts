@@ -26,32 +26,9 @@ function top10(prompt: string, title: string, answers: A[], special = 5): Showdo
 }
 
 export const SHOWDOWN_EVENT_ROUNDS: Record<ShowdownEventId, ShowdownRoundInput[]> = {
-  'dasoween-2026': [
-    top10('Name the Top 10 Halloween Songs.', 'Halloween Songs', [
-      ['Thriller', 'Michael Jackson', ['thriler', 'michael jackson']],
-      ['Monster Mash', 'Bobby “Boris” Pickett', ['the monster mash', 'monster mash song']],
-      ['Ghostbusters', 'Ray Parker Jr.', ['ghost busters', 'who you gonna call']],
-      ['This Is Halloween', 'The Nightmare Before Christmas', ['this is halloween song', 'nightmare before christmas']],
-      ['The Time Warp', 'The Rocky Horror Picture Show', ['time warp', 'lets do the time warp again', 'rocky horror']],
-      ['Somebody’s Watching Me', 'Rockwell', ['somebodys watching me', 'somebody watching me']],
-      ['Werewolves of London', 'Warren Zevon', ['werewolves', 'werewolf of london']],
-      ['Purple People Eater', 'Sheb Wooley', ['the purple people eater', 'people eater']],
-      ['I Put a Spell on You', 'Screamin’ Jay Hawkins', ['put a spell on you', 'i put a spell on u']],
-      ['(Don’t Fear) The Reaper', 'Blue Öyster Cult', ['dont fear the reaper', 'the reaper', 'more cowbell']],
-    ]),
-    top10('Name the Top 10 Halloween Movies.', 'Halloween Movies', [
-      ['Halloween', '1978', ['halloween 1978', 'michael myers']],
-      ['Hocus Pocus', '1993', ['hocus-pocus', 'sanderson sisters']],
-      ['The Nightmare Before Christmas', '1993', ['nightmare before christmas', 'jack skellington']],
-      ['Beetlejuice', '1988', ['beetle juice', 'betelgeuse']],
-      ['Ghostbusters', '1984', ['ghost busters']],
-      ['The Addams Family', '1991', ['addams family', 'adams family']],
-      ['Scream', '1996', ['ghostface']],
-      ['Casper', '1995', ['casper the friendly ghost']],
-      ['The Exorcist', '1973', ['exorcist']],
-      ['A Nightmare on Elm Street', '1984', ['nightmare on elm street', 'freddy krueger', 'freddy']],
-    ]),
-  ],
+  // DAS-O-Ween 2026: SETTINGS ONLY. The real boards live in a show file outside git (ADM-01) and are loaded
+  // in the console before doors; the old answers are public in git history, so the show uses new ones.
+  'dasoween-2026': [],
   // Practice boards: the same show, with answers that don't spoil the real ones.
   'dasoween-rehearsal': [
     top10('Name the Top 10 Halloween Candies.', 'Practice: Candy', [

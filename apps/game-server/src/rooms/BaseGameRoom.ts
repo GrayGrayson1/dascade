@@ -13,6 +13,7 @@
  * Concurrency rule: message handlers must be synchronous with respect to game
  * state. Never mutate state after an `await` without re-validating the phase.
  */
+import { createHash } from 'node:crypto';
 import { Room, ServerError, CloseCode, type Client, type AuthContext, type Delayed, type Deferred } from '@colyseus/core';
 import type { z } from 'zod';
 import {
@@ -69,7 +70,7 @@ import {
 import { isProvisional, type Rating } from '@dascade/game-core/rating';
 import { PlayerState, type BaseRoomState } from '../schema/base.ts';
 import { primeRoomStateContext } from '../schema/typeContext.ts';
-import { allocateRoomCode, releaseRoomCode } from '../lib/roomCodes.ts';
+import { allocateRoomCode, claimRoomCode, releaseRoomCode } from '../lib/roomCodes.ts';
 import { clientIpFromAuth, ipRateKey } from '../lib/clientIp.ts';
 import { log } from '../lib/log.ts';
 import { config } from '../config.ts';
@@ -279,6 +280,36 @@ export abstract class BaseGameRoom<
   }
   protected onRoomDisposed(): void {}
   /**
+   * The server process is shutting down gracefully (a deploy, an instance stop): the last moment the
+   * room can still message its clients before they are disconnected (e.g. hand over a final snapshot).
+   */
+  protected onServerShutdown(): void {}
+  /**
+   * Seconds this player's seat is held after their connection drops (default: the room's
+   * `reconnectGraceSeconds`). E.g. a live event holds its presenter's seat much longer.
+   */
+  protected reconnectGraceFor(_player: PlayerRecord): number {
+    return this.reconnectGraceSeconds;
+  }
+  /** Extra matchmaking metadata (e.g. the event a room runs), merged into the room listing. */
+  protected metadataExtra(): Partial<RoomMetadata> {
+    return {};
+  }
+  /** A reason the Room DJ is locked right now (refused, and switched off by djLockChanged()), or null. */
+  protected djLockReason(): string | null {
+    return null;
+  }
+  /**
+   * Restoring from a sealed snapshot (CreateOptions.restore): verify and parse it, keep what you need,
+   * and return the room code to recreate — or null to refuse (the create fails with RESTORE_FAILED).
+   * Called before the room code is allocated. Default: rooms can't be restored.
+   */
+  protected prepareRestore(_blob: string, _options: CreateOptions): { code: string } | null {
+    return null;
+  }
+  /** After onRoomCreated, for a room created from prepareRestore(): rebuild its state (see restoreSeat()). */
+  protected applyRestore(): void {}
+  /**
    * Whether a player may be *given* the host role (transfer or migration). Default: anyone in the
    * lobby/results; mid-match only seated players, so a spectator can't gain host-only powers
    * (spins, deals, "next round") in the middle of a game. A host keeps the role once held.
@@ -336,7 +367,17 @@ export abstract class BaseGameRoom<
     const options: CreateOptions = parsed.success ? parsed.data : { name: 'Player' };
     this.catalog = GAME_CATALOG[this.gameId];
 
-    const code = await allocateRoomCode(this.presence, this.rng);
+    let code: string;
+    let restoring = false;
+    if (options.restore) {
+      // A sealed snapshot recreates its room under the old code (only if that code is free again).
+      const wanted = this.prepareRestore(options.restore, options);
+      if (!wanted || !(await claimRoomCode(this.presence, wanted.code))) {
+        throw new ServerError(JoinErrorCode.RESTORE_FAILED, 'That show can’t be restored (it may be too old, or its room code is in use).');
+      }
+      code = wanted.code;
+      restoring = true;
+    } else code = await allocateRoomCode(this.presence, this.rng);
     this.codeAllocated = true;
     this.roomId = code;
 
@@ -366,7 +407,9 @@ export abstract class BaseGameRoom<
       : clamp(options.maxPlayers ?? cap.defaultMaxPlayers, Math.max(1, cap.minPlayers), cap.maxPlayersLimit);
     const fallbackName = `${cleanNickname(options.name, LIMITS.nickname)}'s ${this.catalog.title}`;
     // Same profanity masking as a lobby rename (the name is public, e.g. via /api/rooms/:code).
-    state.roomName = maskProfanity(cleanText(options.roomName ?? '', LIMITS.roomName) || (this.isSolo ? `Solo ${this.catalog.title}` : fallbackName));
+    state.roomName = maskProfanity(
+      cleanText(options.roomName ?? '', LIMITS.roomName) || (this.isSolo ? `Solo ${this.catalog.title}` : fallbackName),
+    );
     // Describe only this room's schema types to joining clients (not every cabinet's; see typeContext.ts).
     primeRoomStateContext(state);
     this.state = state;
@@ -393,6 +436,18 @@ export abstract class BaseGameRoom<
     this.onRoomCreated(options);
     // Create-time settings go through the same hook as lobby edits (after handlers are registered).
     if (this.settings !== defaults) this.safeHook(() => this.onSettingsChanged(defaults, this.settings), 'onSettingsChanged');
+    // A restore that fails half-way never leaves a half-built room: the create is refused instead.
+    if (restoring) {
+      try {
+        this.applyRestore();
+      } catch (err) {
+        log.error('room restore failed', { room: this.roomId, game: this.gameId, err: err as Error });
+        this.clock.clear();
+        await releaseRoomCode(this.presence, code).catch(() => undefined);
+        this.codeAllocated = false;
+        throw new ServerError(JoinErrorCode.RESTORE_FAILED, 'That show can’t be restored.');
+      }
+    }
     this.markMetadataDirty();
     this.flushMetadata();
     this.clock.setInterval(() => this.flushMetadata(), 1000);
@@ -408,7 +463,7 @@ export abstract class BaseGameRoom<
 
     // --- Rejoin an existing seat with its secret token -----------------------
     if (options.seatToken) {
-      const existing = [...this.players.values()].find((p) => p.seatToken === options.seatToken);
+      const existing = [...this.players.values()].find((p) => p.seatToken === options.seatToken) ?? this.restoredSeatFor(options.seatToken);
       if (existing) {
         this.rebind(existing, client);
         return;
@@ -445,6 +500,12 @@ export abstract class BaseGameRoom<
       }
     }
 
+    // A join screen that asks for an initial first: refuse a taken name instead of renaming silently.
+    if (options.strictName) {
+      const base = this.cleanJoinName(options.name);
+      if (this.nameTaken(base)) throw new ServerError(JoinErrorCode.NAME_TAKEN, this.uniqueName(base));
+    }
+
     const record = this.createRecord(client, options, spectator, queued);
     this.claimHostIfOrphaned(record);
 
@@ -470,7 +531,7 @@ export abstract class BaseGameRoom<
     this.markMetadataDirty();
     this.tournamentPresenceChanged();
 
-    const deferred = this.allowReconnection(client, this.reconnectGraceSeconds);
+    const deferred = this.allowReconnection(client, this.reconnectGraceFor(record));
     this.pendingReconnects.set(client.sessionId, deferred);
     // The deferred rejects on timeout; onLeave handles the outcome.
     void Promise.resolve(deferred).catch(() => undefined);
@@ -541,6 +602,12 @@ export abstract class BaseGameRoom<
     this.djTimer = null;
     this.safeHook(() => this.onRoomDisposed(), 'onRoomDisposed');
     if (this.codeAllocated) await releaseRoomCode(this.presence, this.roomId).catch(() => undefined);
+  }
+
+  /** Graceful process shutdown: let the game speak last (onServerShutdown), then disconnect as Colyseus does. */
+  override onBeforeShutdown(): void {
+    this.safeHook(() => this.onServerShutdown(), 'onServerShutdown');
+    super.onBeforeShutdown();
   }
 
   override onUncaughtException(error: unknown, methodName: string): void {
@@ -714,7 +781,8 @@ export abstract class BaseGameRoom<
     // Everyone who was seated at the start plus anyone seated mid-match (late joiners, promoted queue).
     const roster = new Map(this.matchRoster);
     for (const p of this.seatedPlayers()) {
-      if (!roster.has(p.id)) roster.set(p.id, { playerId: p.id, name: p.state.name, guestId: p.guestId, userId: p.userId, spectator: false });
+      if (!roster.has(p.id))
+        roster.set(p.id, { playerId: p.id, name: p.state.name, guestId: p.guestId, userId: p.userId, spectator: false });
     }
     // Declared non-player placeholders (CPU tanks…) keep their place but are never credited.
     const bots = new Set((outcome.nonPlayerIds ?? []).filter((id) => !roster.has(id)));
@@ -805,6 +873,62 @@ export abstract class BaseGameRoom<
     return promoted;
   }
 
+  /**
+   * Recreate a seat from a sealed snapshot (applyRestore): disconnected and away until its owner
+   * rejoins with their old seat token (matched by hash; the welcome then hands them a new token).
+   */
+  protected restoreSeat(seat: RestoredSeat): PlayerRecord {
+    const ps = new PlayerState();
+    ps.id = seat.id;
+    ps.name = seat.name;
+    ps.avatar = seat.avatar;
+    ps.color = seat.color;
+    ps.spectator = seat.spectator;
+    ps.connected = false;
+    ps.joinOrder = seat.joinOrder;
+    this.joinCounter = Math.max(this.joinCounter, seat.joinOrder);
+    const record: PlayerRecord = {
+      id: seat.id,
+      seatToken: randomId(24, this.rng),
+      guestId: seat.guestId,
+      sessionId: null,
+      client: null,
+      state: ps,
+      away: true,
+      joinedAt: Date.now(),
+      buckets: new Map(),
+      data: { restoreSeatHash: seat.seatTokenHash },
+    };
+    this.players.set(seat.id, record);
+    this.state.players.set(seat.id, ps);
+    this.markMetadataDirty();
+    return record;
+  }
+
+  /** The hash a sealed snapshot keeps instead of a seat token (see restoreSeat()). */
+  protected seatTokenHash(record: PlayerRecord): string {
+    return typeof record.data.restoreSeatHash === 'string' ? record.data.restoreSeatHash : hashSeatToken(record.seatToken);
+  }
+
+  /**
+   * Rename a player from game code (e.g. a moderator, in any phase), with the same cleaning and
+   * uniqueness as a lobby rename. Returns the new name, or null when nothing changed.
+   */
+  protected renamePlayer(target: PlayerRecord, raw: string, announce = true): string | null {
+    const clean = this.uniqueName(this.cleanJoinName(raw), target.id);
+    if (clean === target.state.name) return null;
+    if (announce) this.systemChat(`${target.state.name} is now ${clean}.`);
+    target.state.name = clean;
+    return clean;
+  }
+
+  /** Call when djLockReason() may have changed: a lock switches a running Room DJ off. */
+  protected djLockChanged(): void {
+    this.djSafe('lock', () => {
+      if (this.djLockReason() && this.dj.disable()) this.djPublish(true);
+    });
+  }
+
   // ===========================================================================
   // Player queries
   // ===========================================================================
@@ -859,14 +983,17 @@ export abstract class BaseGameRoom<
   /** Schedule a named timeout; re-scheduling the same key replaces it. */
   protected schedule(key: string, ms: number, fn: () => void): void {
     this.cancel(key);
-    const delayed = this.clock.setTimeout(() => {
-      this.timers.delete(key);
-      try {
-        fn();
-      } catch (err) {
-        log.error('timer failed', { room: this.roomId, key, err: err as Error });
-      }
-    }, Math.max(0, ms));
+    const delayed = this.clock.setTimeout(
+      () => {
+        this.timers.delete(key);
+        try {
+          fn();
+        } catch (err) {
+          log.error('timer failed', { room: this.roomId, key, err: err as Error });
+        }
+      },
+      Math.max(0, ms),
+    );
     this.timers.set(key, delayed);
   }
 
@@ -902,19 +1029,23 @@ export abstract class BaseGameRoom<
   // ===========================================================================
 
   private registerBaseMessages(): void {
-    this.handle(
-      SYS.time,
-      TimeSyncRequestSchema,
-      (_p, { t0 }, client) => client.send(SYS.time, { t0, server: Date.now() }),
-      { rate: { burst: 10, perSecond: 2 }, silent: true, maxNodes: 4 },
-    );
+    this.handle(SYS.time, TimeSyncRequestSchema, (_p, { t0 }, client) => client.send(SYS.time, { t0, server: Date.now() }), {
+      rate: { burst: 10, perSecond: 2 },
+      silent: true,
+      maxNodes: 4,
+    });
 
     this.handle(
       LOBBY.ready,
       ReadySchema,
       (p, { ready }) => {
         if (!this.lobbyReadyEnabled || this.tournamentBinding) {
-          return this.reject(p, LOBBY.ready, 'not_allowed', this.tournamentBinding ? 'Tournament games start automatically.' : 'There is nothing to get ready for here.');
+          return this.reject(
+            p,
+            LOBBY.ready,
+            'not_allowed',
+            this.tournamentBinding ? 'Tournament games start automatically.' : 'There is nothing to get ready for here.',
+          );
         }
         p.state.ready = ready && !p.state.spectator;
       },
@@ -932,7 +1063,8 @@ export abstract class BaseGameRoom<
           p.state.ready = false;
         } else {
           if (!p.state.spectator) return;
-          if (this.seatedCount() >= this.state.maxPlayers) return this.reject(p, LOBBY.spectate, 'not_allowed', 'All player seats are taken.');
+          if (this.seatedCount() >= this.state.maxPlayers)
+            return this.reject(p, LOBBY.spectate, 'not_allowed', 'All player seats are taken.');
           p.state.spectator = false;
         }
         if (p.id === this.state.hostId || !this.hostRecord) this.ensureHost();
@@ -945,7 +1077,8 @@ export abstract class BaseGameRoom<
       LOBBY.profile,
       ProfileSchema,
       (p, { name, avatar }) => {
-        if (name !== undefined && this.tournamentBinding) return this.reject(p, LOBBY.profile, 'not_allowed', 'Tournament players keep their registered names.');
+        if (name !== undefined && this.tournamentBinding)
+          return this.reject(p, LOBBY.profile, 'not_allowed', 'Tournament players keep their registered names.');
         if (name !== undefined) {
           const clean = this.uniqueName(maskProfanity(cleanNickname(name, LIMITS.nickname)), p.id);
           if (clean !== p.state.name) {
@@ -962,7 +1095,8 @@ export abstract class BaseGameRoom<
       LOBBY.settings,
       SettingsUpdateSchema,
       (p, { settings }) => {
-        if (this.tournamentBinding) return this.reject(p, LOBBY.settings, 'not_allowed', 'Tournament match settings are set by the organizer.');
+        if (this.tournamentBinding)
+          return this.reject(p, LOBBY.settings, 'not_allowed', 'Tournament match settings are set by the organizer.');
         if (!this.settingsEditablePhases.includes(this.phase)) {
           return this.reject(p, LOBBY.settings, 'wrong_phase', 'Settings are locked right now.');
         }
@@ -996,7 +1130,8 @@ export abstract class BaseGameRoom<
       LOBBY.room,
       RoomUpdateSchema,
       (p, update) => {
-        if (this.tournamentBinding) return this.reject(p, LOBBY.room, 'not_allowed', 'Tournament match rooms are managed by the Tournament Center.');
+        if (this.tournamentBinding)
+          return this.reject(p, LOBBY.room, 'not_allowed', 'Tournament match rooms are managed by the Tournament Center.');
         // Mid-match renames are refused: the name is visible to everyone and could leak hidden
         // information (e.g. a host broadcasting the DASketch word).
         if (update.roomName !== undefined && IN_MATCH_PHASES.has(this.phase)) {
@@ -1061,7 +1196,8 @@ export abstract class BaseGameRoom<
       LOBBY.start,
       StartSchema,
       (p) => {
-        if (this.tournamentBinding) return this.reject(p, LOBBY.start, 'not_allowed', 'Tournament games start automatically when both players are here.');
+        if (this.tournamentBinding)
+          return this.reject(p, LOBBY.start, 'not_allowed', 'Tournament games start automatically when both players are here.');
         const reason = this.startBlocker();
         if (reason) return this.reject(p, LOBBY.start, 'not_allowed', reason);
         this.beginCountdown();
@@ -1073,7 +1209,8 @@ export abstract class BaseGameRoom<
       LOBBY.toLobby,
       EmptySchema,
       (p) => {
-        if (this.tournamentBinding) return this.reject(p, LOBBY.toLobby, 'not_allowed', 'The tournament runs this match — the next game starts automatically.');
+        if (this.tournamentBinding)
+          return this.reject(p, LOBBY.toLobby, 'not_allowed', 'The tournament runs this match — the next game starts automatically.');
         if (this.phase === 'LOBBY' || this.phase === 'ENDED') return;
         if (IN_MATCH_PHASES.has(this.phase)) {
           const blocked = this.hostEndsMatch(p);
@@ -1088,7 +1225,8 @@ export abstract class BaseGameRoom<
       LOBBY.close,
       EmptySchema,
       (p) => {
-        if (this.tournamentBinding) return this.reject(p, LOBBY.close, 'not_allowed', 'Tournament match rooms close by themselves when the match is over.');
+        if (this.tournamentBinding)
+          return this.reject(p, LOBBY.close, 'not_allowed', 'Tournament match rooms close by themselves when the match is over.');
         if (IN_MATCH_PHASES.has(this.phase)) {
           const blocked = this.hostEndsMatch(p);
           if (blocked) return this.reject(p, LOBBY.close, 'not_allowed', blocked);
@@ -1164,7 +1302,7 @@ export abstract class BaseGameRoom<
     const ps = new PlayerState();
     const id = randomId(12, this.rng);
     ps.id = id;
-    ps.name = this.uniqueName(maskProfanity(cleanNickname(options.name, LIMITS.nickname)));
+    ps.name = this.uniqueName(this.cleanJoinName(options.name));
     ps.avatar = options.avatar ?? (AVATARS[this.joinCounter % AVATARS.length] as Avatar);
     ps.color = this.nextColor();
     ps.spectator = spectator;
@@ -1314,10 +1452,13 @@ export abstract class BaseGameRoom<
 
   private scheduleHostMigration(): void {
     this.cancelHostMigration();
-    this.hostMigrationTimer = this.clock.setTimeout(() => {
-      this.hostMigrationTimer = null;
-      this.migrateHost();
-    }, Math.max(0, this.hostMigrationDelayMs));
+    this.hostMigrationTimer = this.clock.setTimeout(
+      () => {
+        this.hostMigrationTimer = null;
+        this.migrateHost();
+      },
+      Math.max(0, this.hostMigrationDelayMs),
+    );
   }
 
   private cancelHostMigration(): void {
@@ -1331,6 +1472,30 @@ export abstract class BaseGameRoom<
     return n;
   }
 
+  private cleanJoinName(raw: string): string {
+    return maskProfanity(cleanNickname(raw, LIMITS.nickname));
+  }
+
+  /** Someone in the room already goes by this (cleaned) name (reserved names become "Player", not a clash). */
+  private nameTaken(base: string): boolean {
+    if (RESERVED_NAMES.has(base.toLowerCase().replace(/[^a-z]/g, ''))) return false;
+    const lower = base.toLowerCase();
+    for (const p of this.players.values()) if (p.state.name.toLowerCase() === lower) return true;
+    return false;
+  }
+
+  /** A restored seat (restoreSeat()) whose owner is back with their old token. */
+  private restoredSeatFor(token: string): PlayerRecord | undefined {
+    const hash = hashSeatToken(token);
+    for (const p of this.players.values()) {
+      if (p.data.restoreSeatHash === hash) {
+        delete p.data.restoreSeatHash;
+        return p;
+      }
+    }
+    return undefined;
+  }
+
   private uniqueName(base: string, selfId?: string): string {
     // Reserve the system sender's name so nobody can impersonate platform messages.
     if (RESERVED_NAMES.has(base.toLowerCase().replace(/[^a-z]/g, ''))) base = 'Player';
@@ -1339,7 +1504,10 @@ export abstract class BaseGameRoom<
     // Slice by code point so emoji / astral characters are never split into lone surrogates.
     const chars = Array.from(base);
     for (let i = 2; i < 100; i++) {
-      const candidate = `${chars.slice(0, LIMITS.nickname - 3).join('').trimEnd()} ${i}`;
+      const candidate = `${chars
+        .slice(0, LIMITS.nickname - 3)
+        .join('')
+        .trimEnd()} ${i}`;
       if (!taken.has(candidate.toLowerCase())) return candidate;
     }
     return `${chars.slice(0, 12).join('').trimEnd()} ${randomId(4, this.rng)}`;
@@ -1358,7 +1526,7 @@ export abstract class BaseGameRoom<
       gameId: this.gameId,
       serverNow: Date.now(),
       rejoined,
-      reconnectGraceSeconds: this.reconnectGraceSeconds,
+      reconnectGraceSeconds: this.reconnectGraceFor(record),
     };
     record.client?.send(SYS.welcome, payload);
     this.djSendTo(record);
@@ -1456,7 +1624,8 @@ export abstract class BaseGameRoom<
       entry.playerId = record.id;
       this.publishTournamentInfo();
     } else {
-      if (!this.state.allowSpectators) throw new ServerError(JoinErrorCode.ROOM_LOCKED, 'Only the two tournament players can join this match.');
+      if (!this.state.allowSpectators)
+        throw new ServerError(JoinErrorCode.ROOM_LOCKED, 'Only the two tournament players can join this match.');
       record = this.createRecord(client, options, true, false);
       if (options.ticket) notice = 'That match ticket is not valid here — you joined as a spectator.';
     }
@@ -1637,19 +1806,23 @@ export abstract class BaseGameRoom<
     if (!binding) return;
     unregisterBoundRoom(binding.code, binding.matchId, binding.handle);
     // Died before the series was decided: the kiosk re-launches the match (the series score is kept).
-    if (binding.status !== 'decided' && binding.status !== 'closed') getTournament(binding.code)?.matchRoomClosed(binding.matchId, this.roomId);
+    if (binding.status !== 'decided' && binding.status !== 'closed')
+      getTournament(binding.code)?.matchRoomClosed(binding.matchId, this.roomId);
   }
 
   private platformSchedule(key: string, ms: number, fn: () => void): void {
     this.cancelPlatformTimer(key);
-    const delayed = this.clock.setTimeout(() => {
-      this.platformTimers.delete(key);
-      try {
-        fn();
-      } catch (err) {
-        log.error('platform timer failed', { room: this.roomId, key, err: err as Error });
-      }
-    }, Math.max(0, ms));
+    const delayed = this.clock.setTimeout(
+      () => {
+        this.platformTimers.delete(key);
+        try {
+          fn();
+        } catch (err) {
+          log.error('platform timer failed', { room: this.roomId, key, err: err as Error });
+        }
+      },
+      Math.max(0, ms),
+    );
     this.platformTimers.set(key, delayed);
   }
 
@@ -1682,18 +1855,32 @@ export abstract class BaseGameRoom<
         if (this.tournamentBinding || this.tournamentInfo) {
           return this.reject(p, DJ.config, 'not_allowed', 'The Room DJ is off in tournament matches.');
         }
+        const locked = this.djLockReason();
+        if (locked && config.enabled !== false) return this.reject(p, DJ.config, 'not_allowed', locked);
         this.djApply(p, DJ.config, () => this.dj.configure(p.id, config), true);
       },
       { ...opts, rate: { burst: 6, perSecond: 2 } },
     );
-    this.handle(DJ.command, DjCommandSchema, (p, command) => this.djApply(p, DJ.command, () => this.dj.command(p.id, command)), {
-      ...opts,
-      rate: { burst: 12, perSecond: 4 },
-    });
-    this.handle(DJ.skipVote, EmptySchema, (p) => this.djApply(p, DJ.skipVote, () => this.dj.voteSkip(p.id)), {
-      ...opts,
-      rate: { burst: 4, perSecond: 1 },
-    });
+    this.handle(
+      DJ.command,
+      DjCommandSchema,
+      (p, command) => {
+        const locked = this.djLockReason();
+        if (locked) return this.reject(p, DJ.command, 'not_allowed', locked);
+        this.djApply(p, DJ.command, () => this.dj.command(p.id, command));
+      },
+      { ...opts, rate: { burst: 12, perSecond: 4 } },
+    );
+    this.handle(
+      DJ.skipVote,
+      EmptySchema,
+      (p) => {
+        const locked = this.djLockReason();
+        if (locked) return this.reject(p, DJ.skipVote, 'not_allowed', locked);
+        this.djApply(p, DJ.skipVote, () => this.dj.voteSkip(p.id));
+      },
+      { ...opts, rate: { burst: 4, perSecond: 1 } },
+    );
   }
 
   /** Run a DJ operation for a player: reply with the refusal, or publish the change. */
@@ -1768,6 +1955,7 @@ export abstract class BaseGameRoom<
       locked: this.state.locked,
       allowSpectators: this.state.allowSpectators,
       solo: this.isSolo,
+      ...this.metadataExtra(),
     };
     void this.setMetadata(meta).catch(() => undefined);
   }
@@ -1809,4 +1997,21 @@ const RESERVED_NAMES = new Set(['dascade', 'system', 'server', 'admin', 'moderat
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/** A seat as a sealed snapshot keeps it (see BaseGameRoom.restoreSeat()). */
+export interface RestoredSeat {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+  joinOrder: number;
+  spectator: boolean;
+  guestId?: string;
+  /** sha256 of the seat token (snapshots never hold the token itself). */
+  seatTokenHash: string;
+}
+
+export function hashSeatToken(token: string): string {
+  return createHash('sha256').update(`dascade-seat:${token}`).digest('base64url');
 }

@@ -21,8 +21,11 @@ export type TourScreen = 'diagram' | 'lobby' | 'share' | 'console' | 'results';
 
 export type LobbyTab = 'setup' | 'settings';
 
-/** A confirmation the mock console shows (as the real one asks). */
-export type TourDialog = 'finish' | 'restart';
+/** The console's inline two-step panel for the show's one irreversible action (End show / Finish show). */
+export type TourDialog = 'finish' | 'end';
+
+/** The console drawer's tab under the stage preview. */
+export type DrawerTabId = 'picker' | 'sound' | 'cards' | 'fix';
 
 /** Boo's bits in the film: each is a little animation of the narrator (tour.css). */
 export type BooAct = 'float' | 'point' | 'cover' | 'faint' | 'jump' | 'spin' | 'watch' | 'drums' | 'wave' | 'shrug' | 'listen';
@@ -39,8 +42,14 @@ export interface ConsoleBeat {
   key?: string;
   /** Zoom the console towards the control (1 = the whole console). */
   zoom?: number;
-  /** A confirmation dialog on the console (null closes it). */
+  /** The End show / Finish show panel on the console (null closes it). */
   dialog?: TourDialog | null;
+  /** The console drawer's open tab (it stays until a beat changes it). */
+  drawer?: DrawerTabId;
+  /** The special answer is armed, waiting for Take special (stays until a beat changes it). */
+  armed?: boolean;
+  /** The click is a press-and-hold: the control's ring fills (Restart, End show). */
+  held?: boolean;
 }
 
 export interface ChatLine {
@@ -77,6 +86,8 @@ export interface TourBeat {
   step?: number;
   /** A toast on the mock console ('' clears it). */
   toast?: string;
+  /** The console's undo toast after a reversible action ('' clears it). */
+  undo?: string;
   /** Boo, the narrator: his line, his bit and his mood. */
   boo?: { say?: string; act?: BooAct; mood?: HostMood };
 }
@@ -146,11 +157,16 @@ export interface TourFrame {
   key: string;
   zoom: number;
   dialog: TourDialog | null;
+  drawer: DrawerTabId;
+  armed: boolean;
+  /** This beat's click is a press-and-hold. */
+  held: boolean;
   chat: ChatLine[];
   stage: boolean;
   preset: boolean;
   step: number;
   toast: string;
+  undo: string;
   boo: { say: string; act: BooAct; mood: HostMood };
 }
 
@@ -164,11 +180,15 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     key: '',
     zoom: 1,
     dialog: null,
+    drawer: 'picker',
+    armed: false,
+    held: false,
     chat: [],
     stage: chapter.stage,
     preset: chapter.preset,
     step: 0,
     toast: '',
+    undo: '',
     boo: { say: '', act: 'float', mood: 'idle' },
   };
   const beats = beatsOf(chapter, film).slice(0, index + 1);
@@ -181,6 +201,8 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     if (c?.point !== undefined) frame.point = c.point;
     if (c?.zoom !== undefined) frame.zoom = c.zoom;
     if (c?.dialog !== undefined) frame.dialog = c.dialog;
+    if (c?.drawer !== undefined) frame.drawer = c.drawer;
+    if (c?.armed !== undefined) frame.armed = c.armed;
     // A new screen starts with the cursor resting and the camera back out, unless the beat says.
     if (c?.screen && c.point === undefined) frame.point = '';
     if (c?.screen && c.zoom === undefined) frame.zoom = 1;
@@ -189,6 +211,7 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     if (b.preset !== undefined) frame.preset = b.preset;
     if (b.step !== undefined) frame.step = b.step;
     if (b.toast !== undefined) frame.toast = b.toast;
+    if (b.undo !== undefined) frame.undo = b.undo;
     // Boo's line lasts for its beat; his mood and bit carry on until the next one changes them.
     frame.boo = {
       say: current ? (b.boo?.say ?? '') : '',
@@ -197,6 +220,7 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     };
     if (current) {
       frame.click = Boolean(c?.click);
+      frame.held = Boolean(c?.click && c.held);
       frame.key = c?.key ?? '';
     }
   });
@@ -220,6 +244,7 @@ export function preFrameAt(chapter: TourChapter, index: number, film: boolean): 
     point: c?.point !== undefined ? now.point : before.point,
     zoom: c?.point !== undefined && c.zoom !== undefined ? now.zoom : before.zoom,
     click: false,
+    held: false,
     key: now.key,
   };
 }

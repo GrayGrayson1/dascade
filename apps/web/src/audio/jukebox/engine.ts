@@ -10,11 +10,20 @@ import { mixer } from '../mixer.ts';
 import { activeSfxVoices } from '../voices.ts';
 import { createJukeboxEngine, type JukeboxEngine, type MediaSessionLike } from './core.ts';
 import { installRoomDj } from './roomDj.ts';
+import { createShowPause, type ShowPause } from './showPause.ts';
 import { useJukebox } from './store.ts';
 
 function localStorageOrNull(): Storage | null {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function sessionStorageOrNull(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
   } catch {
     return null;
   }
@@ -27,7 +36,8 @@ async function fetchManifest(): Promise<unknown> {
   return (await res.json()) as unknown;
 }
 
-const mediaSession: MediaSessionLike | null = typeof navigator !== 'undefined' && 'mediaSession' in navigator ? navigator.mediaSession : null;
+const mediaSession: MediaSessionLike | null =
+  typeof navigator !== 'undefined' && 'mediaSession' in navigator ? navigator.mediaSession : null;
 
 export const jukebox: JukeboxEngine = createJukeboxEngine({
   store: useJukebox,
@@ -57,6 +67,12 @@ export const jukebox: JukeboxEngine = createJukeboxEngine({
   // Records paired with a theme are the default in it (the theme as applied, e.g. the seasonal invite's).
   theme: { get: activeThemeId, subscribe: (cb) => onThemeChange(() => cb()) },
 });
+
+/**
+ * A show's hold on the jukebox (AUD-04: pause while a question is live, give back in the breaks,
+ * resuming only what the show paused). Additive: plain play()/pause() on the engine above.
+ */
+export const jukeboxShowPause: ShowPause = createShowPause({ jukebox, store: useJukebox, storage: sessionStorageOrNull() });
 
 /**
  * Gesture events that grant user activation (pointerdown alone doesn't on touch Safari: pointerup/

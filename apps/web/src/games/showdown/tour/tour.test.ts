@@ -130,12 +130,14 @@ describe('the tour script', () => {
     for (const m of mock.matchAll(/data-tour=\{([^}]*)\}/g)) for (const q of m[1]!.matchAll(/'([^']+)'/g)) targets.add(q[1]!);
     for (let n = 1; n <= 10; n++) targets.add(`answer-${n}`);
     for (const card of Object.keys(SHOWDOWN_CARD_INFO)) targets.add(`card-${card}`);
+    for (const tab of ['picker', 'sound', 'cards', 'fix']) targets.add(`tab-${tab}`);
     for (const { chapter, beat } of all) {
       const point = beat.console?.point;
       if (point) expect(targets.has(point), `${chapter.id}: ${point}`).toBe(true);
     }
     expect(mock).toContain('data-tour={`answer-${i + 1}`}');
     expect(mock).toContain('data-tour={`card-${c}`}');
+    expect(mock).toContain('data-tour={`tab-${t.id}`}');
   });
 
   it('names controls exactly as the console does', () => {
@@ -170,8 +172,11 @@ describe('the tour script', () => {
         .filter(Boolean),
     );
     for (const key of keys)
-      expect(['Q', 'X', 'R', 'C', 'P', 'N', 'U', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], String(key)).toContain(key);
-    for (const key of ['X', 'R', 'C', 'P', 'N', 'U', 'Q']) expect(keys.has(key), key).toBe(true);
+      expect(
+        ['Q', 'X', 'R', 'C', 'P', 'N', 'U', 'K', 'D', 'A', 'Space', 'Esc', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+        String(key),
+      ).toContain(key);
+    for (const key of ['X', 'R', 'C', 'P', 'N', 'U', 'Q', 'Space', 'Esc']) expect(keys.has(key), key).toBe(true);
   });
 
   it('flips only tiles the board shows, with the right flags', () => {
