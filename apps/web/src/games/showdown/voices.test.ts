@@ -289,6 +289,8 @@ describe('show voices', () => {
     }
     expect(CUE_SOUND.celebrate).toBe('special');
     expect(CUE_SOUND.pickAnswer).toBe('pickAnswer');
+    // The end of the show plays Brian's applause (the organ fanfare read as sad).
+    expect(SHOWDOWN_SOUND_FILES.finale).toBe(SHOWDOWN_SOUND_FILES.applause);
   });
 
   it('every recorded file maps a real sound (or look:sound), exists in public/audio/showdown, and has a licence entry', () => {

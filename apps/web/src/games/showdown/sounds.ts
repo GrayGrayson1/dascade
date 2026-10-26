@@ -94,6 +94,8 @@ export type ShowdownSound =
 export const SHOWDOWN_SOUND_FILES: Partial<Record<ShowdownSound | `${ShowdownLook}:${ShowdownSound}`, string>> = {
   // Brian's soundboard picks (2026-10-26); sources and licences: apps/web/public/audio/showdown/README.md.
   applause: '/audio/showdown/applause.mp3',
+  // The end of the show (the results): Brian's applause, not the organ-and-thunder fanfare, which read as sad.
+  finale: '/audio/showdown/applause.mp3',
   aww: '/audio/showdown/aww.mp3',
   ding: '/audio/showdown/ding.mp3',
   drumroll: '/audio/showdown/drumroll.mp3',
