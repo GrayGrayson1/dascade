@@ -67,7 +67,9 @@ export function AudienceView({
       </div>
       <aside className="sd-aud__side">
         <TeamCard team={role.team} names={names} canPick={canPickTeam && role.role === 'audience'} spectator={role.role === 'spectator'} />
-        {settings?.audience !== false && role.role === 'audience' ? <GuessBox board={board} look={look} /> : null}
+        {settings?.audience !== false && role.role === 'audience' ? (
+          <GuessBox board={board} look={look} limit={settings?.guesses ?? SHOWDOWN_LIMITS.guessesDefault} />
+        ) : null}
         <CheerPad look={look} team={role.team} names={names} />
         <DeviceOptions code={code} role={role} />
       </aside>
@@ -206,13 +208,13 @@ function TeamCard({
   );
 }
 
-function GuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLook }) {
+function GuessBox({ board, look, limit }: { board: ShowdownBoardView; look: ShowdownLook; limit: number }) {
   const me = useMe();
   const feed = useShowFeed();
   const [text, setText] = useState('');
   const open = board.stage === 'live' || board.stage === 'steal';
   const mine = me && me.round === board.round ? me.guesses : [];
-  const left = SHOWDOWN_LIMITS.guessesPerRound - mine.length;
+  const left = limit - mine.length;
   const flash = useRecent(feed.calledAt || undefined, 2600);
   /** The guess on its way to the server: a refused one (rate limit, the round just moved on) comes back to the box. */
   const sent = useRef<string | null>(null);
@@ -250,7 +252,7 @@ function GuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLoo
       <p className="sd-muted">
         {open
           ? left > 0
-            ? `Lock in up to ${SHOWDOWN_LIMITS.guessesPerRound} secret guesses. Called answers score their survey points when they flip.`
+            ? `Lock in up to ${limit} secret guesses. Called answers score their survey points when they flip.`
             : 'All guesses locked in — watch the board!'
           : 'Guesses open when the question is on the board.'}
       </p>
@@ -288,7 +290,7 @@ function GuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLoo
         </ul>
       ) : null}
       <p className="sd-guess__left" aria-live="polite">
-        {open ? `${Math.max(0, left)} of ${SHOWDOWN_LIMITS.guessesPerRound} guesses left` : ' '}
+        {open ? `${Math.max(0, left)} of ${limit} guesses left` : ' '}
       </p>
     </div>
   );
@@ -414,7 +416,9 @@ function ShowcaseAudience({
             )}
           </span>
         </div>
-        {settings?.audience && role.role === 'audience' ? <ShowcaseGuessBox board={board} look={look} /> : null}
+        {settings?.audience && role.role === 'audience' ? (
+          <ShowcaseGuessBox board={board} look={look} limit={settings?.guesses ?? SHOWDOWN_LIMITS.guessesDefault} />
+        ) : null}
         {wide ? <ShowcaseCheerPad look={look} /> : null}
         <DeviceOptions code={code} role={role} />
       </aside>
@@ -498,12 +502,12 @@ function ShowcaseMini({ board, look, show }: { board: ShowdownBoardView; look: S
 }
 
 /** Private guesses in a showcase: no points — "you called it" when one of yours flips. */
-function ShowcaseGuessBox({ board, look }: { board: ShowdownBoardView; look: ShowdownLook }) {
+function ShowcaseGuessBox({ board, look, limit }: { board: ShowdownBoardView; look: ShowdownLook; limit: number }) {
   const me = useMe();
   const [text, setText] = useState('');
   const open = board.stage === 'live';
   const mine = me && me.round === board.round ? me.guesses : [];
-  const left = SHOWDOWN_LIMITS.guessesPerRound - mine.length;
+  const left = limit - mine.length;
   // Ranked boards have no points, so "called it" follows the calls count (not the points).
   const [calledAt, setCalledAt] = useState(0);
   const prevCalls = useRef<number | null>(null);
@@ -551,7 +555,7 @@ function ShowcaseGuessBox({ board, look }: { board: ShowdownBoardView; look: Sho
       <p className="sd-muted">
         {open
           ? left > 0
-            ? `Lock in up to ${SHOWDOWN_LIMITS.guessesPerRound} guesses. Nobody sees them — you find out when your answer flips.`
+            ? `Lock in up to ${limit} guesses. Nobody sees them — you find out when your answer flips.`
             : 'All guesses locked in — watch the board!'
           : 'Guesses open when the question is on the board.'}
       </p>
@@ -587,7 +591,7 @@ function ShowcaseGuessBox({ board, look }: { board: ShowdownBoardView; look: Sho
         </ul>
       ) : null}
       <p className="sd-guess__left" aria-live="polite">
-        {open ? `${Math.max(0, left)} of ${SHOWDOWN_LIMITS.guessesPerRound} guesses left` : ' '}
+        {open ? `${Math.max(0, left)} of ${limit} guesses left` : ' '}
       </p>
     </div>
   );
