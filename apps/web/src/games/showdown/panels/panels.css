@@ -979,3 +979,78 @@
     font-size: var(--fs-md);
   }
 }
+
+/* ---------- Spotlight a name (strip dialog and Picker tab) ---------- */
+.sdp-strip__row--pick {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+}
+.sdp-strip__row--pick > .dc-btn:first-child {
+  justify-content: flex-start;
+}
+/* A narrow rail (1024 px windows): one above the other. */
+@container sdp-strip (max-width: 250px) {
+  .sdp-strip__row--pick {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sdp-choosedialog .sdp-choose {
+  min-width: min(420px, 80vw);
+}
+.sdp-choose {
+  display: grid;
+  gap: 6px;
+}
+.sdp-choose__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sdp-strip .sdp-choose__pick,
+.sdp-choose__pick {
+  min-height: 40px;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+}
+.sdp-choose__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-0);
+  font-weight: 700;
+}
+.sdp-choose__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.sdp-choose__turns .dc-num,
+.sdp-person__tags .dc-num {
+  font-family: var(--font-num);
+}
+.sdp-strip__empty {
+  display: grid;
+  gap: 6px;
+}
+
+/* ---------- Setup: option groups (Scoring, Picker) ---------- */
+.sdc-optgroup {
+  margin: 0;
+  padding: 10px 12px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.sdc-optgroup > legend {
+  padding: 0 4px;
+}

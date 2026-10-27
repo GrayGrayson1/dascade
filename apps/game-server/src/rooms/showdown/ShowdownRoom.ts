@@ -80,6 +80,7 @@ import {
   type ShowdownMe,
   type ShowdownPermission,
   type ShowdownPickPayload,
+  type ShowdownPickerPrivate,
   type ShowdownPreflightData,
   type ShowdownRerollReason,
   type ShowdownClockOp,
@@ -103,7 +104,6 @@ import {
   currentRound,
   drawPick,
   finalizeShow,
-  inPool,
   nextSweepSlot,
   pickPool,
   pickRounds,
@@ -112,6 +112,7 @@ import {
   showWinner,
   specialSlot,
   step,
+  type PickRules,
   type PickSeat,
   type ShowCommand,
   type ShowState,
@@ -228,6 +229,12 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private readonly skips = new Set<string>();
   /** Participants a moderator hid from the stage and the pool. */
   private readonly hidden = new Set<string>();
+  /** Turns this show (Mark done counts one): Fair mode draws the fewest first. */
+  private readonly turns = new Map<string, number>();
+  /** Out of random draws until included again (the presenter and crew decide; by name still works). */
+  private readonly excluded = new Set<string>();
+  /** Whom the last draw picked: True random never draws them twice in a row. */
+  private lastPicked = '';
   /** "Called by": `${round}:${slot}` → who was in the hot seat when it flipped. */
   private readonly credits = new Map<string, { id: string; name: string }>();
 
@@ -299,8 +306,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       rate: { burst: 8, perSecond: 2 },
     });
     // ---- The picker ----
+    // Include / exclude work in any phase (people are set up before doors); draws need a live show.
     this.handle(SHOWDOWN_MSG.pick, ShowdownPickSchema, (p, payload) => this.pickAct(p, payload), {
-      phases: ['PLAYING'],
+      phases: PRESENTER_PHASES,
       rate: { burst: 12, perSecond: 4 },
     });
     this.handle(SHOWDOWN_MSG.skip, ShowdownSkipSchema, (p, { on }) => this.setSkip(p, on), {
@@ -416,6 +424,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       const team = this.teamOf(p);
       if (team !== null) this.recordPlayer(p, team);
     }
+    // Turns count per show: a new show starts everyone level.
+    this.turns.clear();
+    this.lastPicked = '';
     this.resetPicker();
     this.credits.clear();
     this.publish([{ type: 'intro', rev: this.show.rev }]);
@@ -430,6 +441,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   protected override onReturnToLobby(): void {
     this.autoDispose = true;
+    this.turns.clear();
+    this.lastPicked = '';
     this.resetPicker();
     this.credits.clear();
     this.markSnapshot();
@@ -491,6 +504,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.beats.delete(player.id);
     this.skips.delete(player.id);
     this.hidden.delete(player.id);
+    this.turns.delete(player.id);
+    this.excluded.delete(player.id);
     if (this.state.soundStation === player.id) this.stationFailover();
     if (this.state.hotSeat === player.id) this.endTurn(null, 'cleared');
     // A crew link's holder left for good: the link can be opened again (on any device).
@@ -1223,8 +1238,15 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     }
     const def = currentRound(show);
     if (!def) return;
-    const result = this.guesses.submit(player.id, show.round, def, text, revealedIn(show, show.round));
-    if (!result.ok) return this.reject(player, type, 'not_allowed', GUESS_REJECTION_TEXT[result.reason]);
+    const limit = this.getSettings().guesses;
+    const result = this.guesses.submit(player.id, show.round, def, text, revealedIn(show, show.round), limit);
+    if (!result.ok) {
+      const message =
+        result.reason === 'limit'
+          ? `You’ve locked in all ${limit} guess${limit === 1 ? '' : 'es'} for this question.`
+          : GUESS_REJECTION_TEXT[result.reason];
+      return this.reject(player, type, 'not_allowed', message);
+    }
     this.state.guessesIn = this.guesses.count(show.round);
     this.refreshMe(player);
     // A crowd locks in hundreds of guesses in seconds: the sheet (with the whole rundown) follows at
@@ -1296,15 +1318,24 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.sendTo(presenter, SHOWDOWN_MSG.sheet, sheet);
   }
 
-  private refreshMe(player: PlayerRecord): void {
+  private refreshMe(player: PlayerRecord, pool?: ReadonlySet<string>): void {
     if (!player.client || !this.isAudience(player)) return;
     const show = this.show;
     const me: ShowdownMe = show
       ? this.guesses.me(player.id, show.round, show.rounds, (r) => revealedIn(show, r))
       : { round: -1, guesses: [], points: 0, calls: 0 };
-    // DSP-03 B / PCK-03 C: your place in the picker's pool, private to you.
-    if (this.getSettings().mode === 'showcase' && this.isParticipant(player)) {
-      me.pool = { in: inPool(this.seatOf(player)), skip: this.skips.has(player.id), done: this.state.done.get(player.id) === true };
+    // DSP-03 B / PCK-03 C: your place in the picker's pool, private to you (guests and crew alike).
+    const settings = this.getSettings();
+    if (settings.mode === 'showcase' && this.isPickable(player)) {
+      me.pool = {
+        in: (pool ?? new Set(this.pool())).has(player.id),
+        skip: this.skips.has(player.id),
+        done: this.state.done.get(player.id) === true,
+        turns: this.turns.get(player.id) ?? 0,
+        excluded: this.excluded.has(player.id),
+        crewOut: this.isCrew(player) && !settings.crewDraw,
+        mode: settings.pickMode,
+      };
       me.picked = this.state.hotSeat === player.id;
     }
     const json = JSON.stringify(me);
@@ -1314,7 +1345,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   }
 
   private refreshMeAll(): void {
-    for (const p of this.players.values()) if (!p.state.spectator) this.refreshMe(p);
+    const pool = new Set(this.pool());
+    for (const p of this.players.values()) if (!p.state.spectator) this.refreshMe(p, pool);
   }
 
   // ===========================================================================
@@ -1332,7 +1364,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (this.isPresenter(player)) roles.push('presenter');
     const perms = permissionsOf(roles);
     // Outside event rooms only the picker exists (it works in every Presenter Showcase room).
-    return this.event ? perms : perms.filter((p) => p === 'picker.run' || p === 'picker.reroll');
+    return this.event ? perms : perms.filter((p) => p.startsWith('picker.'));
   }
 
   private can(player: PlayerRecord, perm: ShowdownPermission): boolean {
@@ -1420,8 +1452,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const record = result.link;
     const prev = record.holderId && record.holderId !== player.id ? this.getPlayer(record.holderId) : undefined;
     record.holderId = player.id;
-    // Crew aren't guests: out of the pool (and the hot seat) from now on.
-    this.skips.delete(player.id);
+    // Crew aren't guests: out of the hot seat, and in the random draw only with crewDraw from now on.
     if (this.state.hotSeat === player.id) this.endTurn(null, 'cleared');
     this.log({ ...this.actor(player, record.role), action: 'crew.claim', target: record.id, targetName: record.name, after: record.role });
     if (prev) {
@@ -1559,6 +1590,19 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       ...(perms.includes('people.hide') || perms.includes('people.rename')
         ? { hidden: [...this.hidden], crewIds: [...this.players.values()].filter((p) => this.isCrew(p)).map((p) => p.id) }
         : {}),
+      ...(perms.includes('picker.manage') ? { picker: this.pickerPrivate() } : {}),
+    };
+  }
+
+  /** The picker's people for the presenter and crew: turns, exclusions, crew, hidden — never Skip me. */
+  private pickerPrivate(): ShowdownPickerPrivate {
+    const turns: Record<string, number> = {};
+    for (const [id, n] of this.turns) if (n > 0 && this.getPlayer(id)) turns[id] = n;
+    return {
+      turns,
+      excluded: [...this.excluded],
+      crew: [...this.players.values()].filter((p) => this.isCrew(p) && this.isPickable(p)).map((p) => p.id),
+      hidden: [...this.hidden],
     };
   }
 
@@ -1582,41 +1626,66 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   // The picker (PCK-01…05): the server draws, screens replay
   // ===========================================================================
 
-  /** A participant: could ever be drawn (never the presenter, crew, a big screen or a spectator). */
+  /** A participant: a guest who could ever be drawn (never the presenter, crew, a big screen or a spectator). */
   private isParticipant(player: PlayerRecord): boolean {
-    return !player.state.spectator && player.id !== this.presenterId && !this.state.screens.get(player.id) && !this.isCrew(player);
+    return this.isPickable(player) && !this.isCrew(player);
   }
 
-  private seatOf(player: PlayerRecord, exclude = ''): PickSeat {
+  /** Could take the hot seat at all — by name, or at random — guests and crew alike (never the presenter, a screen or a spectator). */
+  private isPickable(player: PlayerRecord): boolean {
+    return !player.state.spectator && player.id !== this.presenterId && !this.state.screens.get(player.id);
+  }
+
+  private pickRules(): PickRules {
+    const settings = this.getSettings();
+    return { mode: settings.pickMode, crewDraw: settings.crewDraw, lastPicked: this.lastPicked };
+  }
+
+  private seatOf(player: PlayerRecord, rerolled = ''): PickSeat {
     return {
       id: player.id,
       participant: this.isParticipant(player),
+      crew: this.isPickable(player) && this.isCrew(player),
       // Presence is the server's own connection state, never a client claim.
       connected: Boolean(player.client) && !player.away,
       hidden: this.hidden.has(player.id),
       skip: this.skips.has(player.id),
-      done: this.state.done.get(player.id) === true,
+      excluded: this.excluded.has(player.id),
+      turns: this.turns.get(player.id) ?? 0,
       hot: this.state.hotSeat === player.id,
-      excluded: player.id === exclude,
+      rerolled: player.id === rerolled,
     };
   }
 
-  private pool(exclude = ''): string[] {
-    return pickPool(this.seatedPlayers().map((p) => this.seatOf(p, exclude)));
+  private pool(rerolled = ''): string[] {
+    return pickPool(
+      this.seatedPlayers().map((p) => this.seatOf(p, rerolled)),
+      this.pickRules(),
+    );
   }
 
-  /** The stage grid (participants who aren't hidden) and the public pool size, kept in step. */
+  /**
+   * The stage grid and the public pool size, kept in step. The grid holds the guests who aren't
+   * hidden, crew too while they're in the random draw, and whoever is in the hot seat (a crew member
+   * chosen by name gets a seat for the spotlight to land on).
+   */
   private refreshPicker(): void {
-    const showcase = this.getSettings().mode === 'showcase';
+    const settings = this.getSettings();
+    const showcase = settings.mode === 'showcase';
     const want = new Set<string>();
-    if (showcase) for (const p of this.seatedPlayers()) if (this.isParticipant(p) && !this.hidden.has(p.id)) want.add(p.id);
+    if (showcase) {
+      for (const p of this.seatedPlayers()) {
+        if (this.hidden.has(p.id) || !this.isPickable(p)) continue;
+        if (this.isParticipant(p) || settings.crewDraw || p.id === this.state.hotSeat) want.add(p.id);
+      }
+    }
     for (const id of [...this.state.seats.keys()]) if (!want.has(id)) this.state.seats.delete(id);
     for (const id of want) if (!this.state.seats.get(id)) this.state.seats.set(id, true);
     const size = showcase ? this.pool().length : 0;
     if (this.state.poolSize !== size) this.state.poolSize = size;
   }
 
-  /** A fresh pool: nobody done, nobody in the hot seat (a new round, a new show). */
+  /** A fresh round: nobody done this round, nobody in the hot seat (turns last the whole show). */
   private resetPicker(): void {
     this.state.done.clear();
     this.state.hotSeat = '';
@@ -1624,26 +1693,50 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.state.landAt = 0;
     this.refreshPicker();
     this.refreshMeAll();
+    this.refreshCrewAll();
   }
 
   private pickAct(player: PlayerRecord, payload: ShowdownPickPayload): void {
     const type = SHOWDOWN_MSG.pick;
+    switch (payload.a) {
+      case 'exclude':
+      case 'include':
+      case 'includeAll':
+        return this.manageDraw(player, payload);
+    }
     const show = this.show;
-    if (!show) return;
+    if (!show || this.phase !== 'PLAYING') return;
     if (show.mode !== 'showcase') return this.reject(player, type, 'not_allowed', 'The picker is part of Presenter Showcase.');
-    if (!this.can(player, payload.a === 'reroll' ? 'picker.reroll' : 'picker.run')) {
+    if (payload.a === 'choose') {
+      if (!this.can(player, 'picker.choose'))
+        return this.reject(player, type, 'not_allowed', 'Only the presenter or the producer can spotlight a name.');
+    } else if (!this.can(player, payload.a === 'reroll' ? 'picker.reroll' : 'picker.run')) {
       return this.reject(player, type, 'not_allowed', 'Only the presenter runs the picker.');
     }
     // Made against another draw (a double press, a console that hadn't caught up): ignore quietly.
     if (payload.drawNo !== this.state.drawNo) return;
     switch (payload.a) {
-      case 'pick': {
+      case 'pick':
+      case 'choose': {
         if (payload.round !== show.round) return;
         if (show.stage === 'intro' || show.round < 0) return this.reject(player, type, 'wrong_phase', 'Start round 1 first.');
         if (this.state.hotSeat) {
           return this.reject(player, type, 'not_allowed', `Mark ${this.nameOf(this.state.hotSeat)} done (or No answer) first.`);
         }
-        return this.draw(player, '', null);
+        if (payload.a === 'pick') return this.draw(player, '', null);
+        const target = this.getPlayer(payload.playerId);
+        if (!target || !this.isPickable(target))
+          return this.reject(
+            player,
+            type,
+            'not_allowed',
+            'Choose someone in the audience or the crew — not the presenter or a big screen.',
+          );
+        if (this.hidden.has(target.id))
+          return this.reject(player, type, 'not_allowed', `${target.state.name} is hidden — show them again first (Names).`);
+        if (!target.client || target.away)
+          return this.reject(player, type, 'not_allowed', `${target.state.name} isn’t connected right now.`);
+        return this.draw(player, '', null, target);
       }
       case 'done':
       case 'noAnswer':
@@ -1658,29 +1751,82 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     }
   }
 
-  /** One draw with the crypto RNG from the pool as it is right now; every screen replays the result. */
-  private draw(player: PlayerRecord, exclude: string, reroll: ShowdownRerollReason | null): void {
+  /** Include / exclude people from random draws (any phase; by name they can still be chosen). Audited. */
+  private manageDraw(player: PlayerRecord, payload: Extract<ShowdownPickPayload, { a: 'exclude' | 'include' | 'includeAll' }>): void {
+    const type = SHOWDOWN_MSG.pick;
+    if (!this.can(player, 'picker.manage'))
+      return this.reject(player, type, 'not_allowed', 'Only the presenter and the crew can include or exclude people.');
+    if (payload.a === 'includeAll') {
+      if (this.excluded.size === 0) return;
+      const before = `${this.excluded.size} excluded`;
+      const back = [...this.excluded];
+      this.excluded.clear();
+      this.log({ ...this.actor(player), action: 'picker.include', targetName: 'Everyone', before, after: 'everyone in the draw' });
+      return this.afterManage(back);
+    }
+    const target = this.getPlayer(payload.playerId);
+    if (!target || !this.isPickable(target))
+      return this.reject(player, type, 'not_allowed', 'Only people in the audience or the crew are in the draw.');
+    const out = payload.a === 'exclude';
+    if (this.excluded.has(target.id) === out) return;
+    if (out) this.excluded.add(target.id);
+    else this.excluded.delete(target.id);
+    this.log({
+      ...this.actor(player),
+      action: out ? 'picker.exclude' : 'picker.include',
+      target: target.id,
+      targetName: target.state.name,
+      after: out ? 'out of the random draw' : 'back in the random draw',
+    });
+    this.afterManage([target.id]);
+  }
+
+  private afterManage(ids: readonly string[]): void {
+    this.refreshPicker();
+    const pool = new Set(this.pool());
+    for (const id of ids) {
+      const p = this.getPlayer(id);
+      if (p) this.refreshMe(p, pool);
+    }
+    // Who else is in the pool can change too (Fair mode's lowest turn count moves).
+    this.refreshMeAll();
+    this.refreshCrewAll();
+    this.markSnapshot();
+  }
+
+  /**
+   * One draw with the crypto RNG from the pool as it is right now — or, with `chosen`, Spotlight a
+   * name (no draw: the presenter or the producer picked them). Every screen replays the result.
+   */
+  private draw(player: PlayerRecord, rerolled: string, reroll: ShowdownRerollReason | null, chosen?: PlayerRecord): void {
     const show = this.show;
     if (!show) return;
-    const pool = this.pool(exclude);
-    const winnerId = drawPick(pool, this.rng);
+    const pool = this.pool(rerolled);
+    const winnerId = chosen ? chosen.id : drawPick(pool, this.rng);
     const winner = winnerId ? this.getPlayer(winnerId) : undefined;
     if (!winner) {
       this.refreshPicker();
-      return this.reject(player, SHOWDOWN_MSG.pick, 'not_allowed', 'Nobody is left in the pool this round.');
+      return this.reject(
+        player,
+        SHOWDOWN_MSG.pick,
+        'not_allowed',
+        'Nobody is in the draw right now — include people, or spotlight a name.',
+      );
     }
     const now = Date.now();
     this.state.drawNo++;
     this.state.hotSeat = winner.id;
     this.state.pickAt = now;
     this.state.landAt = now + SHOWDOWN_PICK_LAND_MS;
-    this.state.poolSize = Math.max(0, pool.length - 1);
+    this.lastPicked = winner.id;
+    // The chosen person gets a seat on the stage grid (crew), then the pool is what's left.
+    this.refreshPicker();
     this.log({
       ...this.actor(player),
-      action: reroll ? 'picker.reroll' : 'picker.draw',
+      action: chosen ? 'picker.choose' : reroll ? 'picker.reroll' : 'picker.draw',
       target: winner.id,
       targetName: winner.state.name,
-      before: `${pool.length} in the pool`,
+      before: chosen ? turnWords(this.turns.get(winner.id) ?? 0) : `${pool.length} in the pool`,
       after: `draw ${this.state.drawNo}`,
       ...(reroll ? { reason: SHOWDOWN_REROLL_INFO[reroll] } : {}),
     });
@@ -1693,19 +1839,24 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       poolSize: this.state.poolSize,
       landAt: this.state.landAt,
       reroll: reroll !== null,
+      ...(chosen ? { chosen: true } : {}),
     };
     this.broadcast(SHOWDOWN_MSG.event, event);
     this.refreshMeAll();
+    this.markSnapshot();
   }
 
-  /** The hot seat empties: their turn counted (done), or they're back in the pool. */
+  /** The hot seat empties: their turn counted (done), or it didn't (no answer, reroll, cleared). */
   private endTurn(player: PlayerRecord | null, how: 'done' | 'noAnswer' | 'reroll' | 'cleared', reason?: ShowdownRerollReason): void {
     const id = this.state.hotSeat;
     if (!id) return;
     this.state.hotSeat = '';
     this.state.pickAt = 0;
     this.state.landAt = 0;
-    if (how === 'done') this.state.done.set(id, true);
+    if (how === 'done') {
+      this.state.done.set(id, true);
+      this.turns.set(id, (this.turns.get(id) ?? 0) + 1);
+    }
     if (player && (how === 'done' || how === 'noAnswer')) {
       this.log({
         ...this.actor(player),
@@ -1727,13 +1878,14 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     }
     this.refreshPicker();
     this.refreshMeAll();
+    this.refreshCrewAll();
     this.markSnapshot();
   }
 
-  /** PCK-03 C: your own Skip me switch (private: only you and the server know). */
+  /** PCK-03 C: your own Skip me switch (private: only you and the server know). Random draws only. */
   private setSkip(player: PlayerRecord, on: boolean): void {
-    if (!this.isParticipant(player))
-      return this.reject(player, SHOWDOWN_MSG.skip, 'not_allowed', 'Only guests in the audience can be picked.');
+    if (!this.isPickable(player))
+      return this.reject(player, SHOWDOWN_MSG.skip, 'not_allowed', 'Only people in the audience or the crew can be picked.');
     if (on) this.skips.add(player.id);
     else this.skips.delete(player.id);
     this.refreshPicker();
@@ -1966,6 +2118,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
         skips: [...this.skips],
         hidden: [...this.hidden],
         credits: [...this.credits],
+        turns: [...this.turns],
+        excluded: [...this.excluded],
+        lastPicked: this.lastPicked,
       },
       station: this.state.soundStation,
       clock: {
@@ -2031,6 +2186,10 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     for (const id of snap.picker.skips) this.skips.add(id);
     for (const id of snap.picker.hidden) this.hidden.add(id);
     for (const [key, credit] of snap.picker.credits) this.credits.set(key, credit);
+    // Older black boxes (before turns and exclusions) restore with everyone level and included.
+    for (const [id, n] of snap.picker.turns ?? []) if (this.getPlayer(id) && n > 0) this.turns.set(id, n);
+    for (const id of snap.picker.excluded ?? []) if (this.getPlayer(id)) this.excluded.add(id);
+    this.lastPicked = snap.picker.lastPicked ?? '';
     this.state.drawNo = snap.picker.drawNo;
     this.state.card = snap.card;
     this.misses = snap.misses;
@@ -2085,6 +2244,10 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   }
 }
 
+function turnWords(n: number): string {
+  return `${n} turn${n === 1 ? '' : 's'} so far`;
+}
+
 function emptyReactions(): ShowdownReactions {
   return { k: Array.from({ length: SHOWDOWN_REACTION_KINDS }, () => 0), t: [0, 0] };
 }
@@ -2130,6 +2293,10 @@ interface ShowdownSnapshot {
     skips: string[];
     hidden: string[];
     credits: Array<[string, { id: string; name: string }]>;
+    /** Absent in black boxes sealed before the picker kept turns and exclusions. */
+    turns?: Array<[string, number]>;
+    excluded?: string[];
+    lastPicked?: string;
   };
   station: string;
   clock: { left: number; max: number; show: boolean; timeUp: boolean; warned: boolean; armed: boolean };
@@ -2187,6 +2354,10 @@ function isSnapshot(s: ShowdownSnapshot): boolean {
   const picker = raw.picker;
   if (!isObj(picker) || !isNum(picker.drawNo) || !isStr(picker.hotSeat) || !isNum(picker.pickAt) || !isNum(picker.landAt)) return false;
   if (![picker.done, picker.skips, picker.hidden].every((l) => isArr(l) && l.every(isStr)) || !isArr(picker.credits)) return false;
+  if (picker.turns !== undefined && !(isArr(picker.turns) && picker.turns.every((t) => isArr(t) && isStr(t[0]) && isNum(t[1]))))
+    return false;
+  if (picker.excluded !== undefined && !(isArr(picker.excluded) && picker.excluded.every(isStr))) return false;
+  if (picker.lastPicked !== undefined && !isStr(picker.lastPicked)) return false;
   const clock = raw.clock;
   if (!isObj(clock) || !isNum(clock.left) || !isNum(clock.max) || typeof clock.show !== 'boolean') return false;
   return isStr(raw.card) && isNum(raw.misses) && isNum(raw.cueSeq);

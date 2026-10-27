@@ -49,7 +49,7 @@ function onEvent(payload: unknown): void {
   const base = draws.code === code ? draws.list : [];
   const list =
     ev.type === 'pick'
-      ? foldDraw(base, { type: 'pick', drawNo: ev.drawNo, name: ev.name, reroll: ev.reroll }, serverNow())
+      ? foldDraw(base, { type: 'pick', drawNo: ev.drawNo, name: ev.name, reroll: ev.reroll, chosen: ev.chosen }, serverNow())
       : foldDraw(base, { type: 'pickEnd', drawNo: ev.drawNo, how: ev.how }, serverNow());
   draws = { code, list };
   bump();

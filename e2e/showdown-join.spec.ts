@@ -150,7 +150,7 @@ test('event join link: one field, the initial prompt, Skip me, and the pick on t
   await inRoom(riley, code);
   const card = (p: Page) => p.locator('[data-part="showdown-pool-card"]');
   // It arrives in the pool card (the lobby's compact one first).
-  await expect(card(riley)).toContainText('Skip me is on — you won’t be picked');
+  await expect(card(riley)).toContainText('Skip me is on — you’re out of the random draw');
   await expect(card(riley).getByRole('switch', { name: 'Skip me' })).toBeChecked();
   await card(riley).evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await card(riley).screenshot({ path: `${SHOTS}/${testInfo.project.name}-lobby-pool-compact.png` });
@@ -173,7 +173,8 @@ test('event join link: one field, the initial prompt, Skip me, and the pick on t
   await send(host, 'showdown:act', { a: 'begin', rev: (await board(host)).rev });
   await expect.poll(async () => (await board(host))?.stage).toBe('title');
 
-  await expect(card(riley)).toContainText('Skip me is on — you won’t be picked');
+  await expect(card(riley)).toContainText('Skip me is on — you’re out of the random draw');
+  await expect(card(riley)).toContainText('The presenter can still call you up by name.');
   await expect(card(riley).getByRole('switch', { name: 'Skip me' })).toBeChecked();
   await expect(card(ada)).toContainText('You’re in the pool — you might be picked');
   await expect(card(ada)).toContainText('On stage as Sam');
@@ -220,7 +221,8 @@ test('event join link: one field, the initial prompt, Skip me, and the pick on t
   await expect(card(winner)).toContainText('You’re answering now');
   await send(host, 'showdown:pick', { a: 'done', drawNo: (await roomState(host)).drawNo });
   await expect.poll(async () => (await roomState(host)).hotSeat).toBe('');
-  await expect(card(winner)).toContainText('Your turn’s done this round — you’re back in next round');
+  // Fair mode: a turn counts, and you're back once everyone has had one.
+  await expect(card(winner)).toContainText('You’ve had a turn — you’re back in once everyone has had one');
   for (const p of [...others, winner]) await expect(p.locator('[data-part="showdown-answering"]')).toHaveCount(0);
 
   // JOI-02 C, the guest's side: a moderator's rename shows on their phone at once.

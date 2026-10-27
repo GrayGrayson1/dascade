@@ -418,20 +418,29 @@ describe('the picker (PCK-01…05)', () => {
     expect(t.server.state.poolSize).toBe(1);
   });
 
-  it('the pool refills when the next round starts, late joiners included', async () => {
+  it('Fair mode: a lap gives everyone a turn, then the next lap opens by itself; a late joiner goes first; turns last the show', async () => {
     const t = await eventRoom(['Ada', 'Ben']);
     await live(t);
+    const drawn: string[] = [];
     for (let i = 0; i < 2; i++) {
       const e = await pick(t);
+      drawn.push(e.winnerId);
       t.host.room.send(SHOWDOWN_MSG.pick, { a: 'done', drawNo: e.drawNo });
       await waitFor(() => t.server.state.hotSeat === '', 2000, 'done');
     }
-    await waitFor(() => t.server.state.poolSize === 0, 2000, 'empty pool');
+    expect(new Set(drawn).size).toBe(2);
+    // Everyone is level: lap two is open at once (the rail never dead-ends).
+    await waitFor(() => t.server.state.poolSize === 2, 2000, 'next lap open');
+    expect(lastCrew(t.host)!.picker!.turns).toEqual({ [drawn[0]!]: 1, [drawn[1]!]: 1 });
     const late = await t.join('Late');
-    await waitFor(() => t.server.state.poolSize === 1, 2000, 'late joiner in');
+    await waitFor(() => t.server.state.poolSize === 1, 2000, 'the late joiner (no turns) goes first');
     await act(t, { a: 'next' });
-    await waitFor(() => t.server.state.poolSize === 3 && t.server.state.done.size === 0, 2000, 'round 2 pool = everyone present');
+    // A new round clears this round's done list; turns carry on through the show.
+    await waitFor(() => t.server.state.done.size === 0, 2000, 'round 2 done list empty');
+    expect(t.server.state.poolSize).toBe(1);
     expect(t.server.state.seats.get(late.id())).toBe(true);
+    const next = await pick(t);
+    expect(next.winnerId).toBe(late.id());
   });
 
   it('Skip me is private: only the owner learns it; screens, crew and the presenter can’t skip', async () => {
@@ -439,11 +448,14 @@ describe('the picker (PCK-01…05)', () => {
     const [ada, ben] = t.guests as [Client, Client];
     ada.room.send(SHOWDOWN_MSG.skip, { on: true });
     await waitFor(() => ada.me.at(-1)?.pool?.skip === true, 2000, 'my skip');
-    expect(ada.me.at(-1)!.pool).toEqual({ in: false, skip: true, done: false });
-    expect(ben.me.at(-1)?.pool).toEqual({ in: true, skip: false, done: false });
-    // Nothing anyone else receives says Ada skipped (only the pool count moves).
+    expect(ada.me.at(-1)!.pool).toEqual({ in: false, skip: true, done: false, turns: 0, excluded: false, crewOut: false, mode: 'fair' });
+    expect(ben.me.at(-1)?.pool).toMatchObject({ in: true, skip: false, done: false });
+    // Nothing anyone else receives says Ada skipped (only the pool count moves) — the presenter's
+    // picker view included.
     expect(JSON.stringify(ben.all)).not.toMatch(/"skip":true/);
     expect(JSON.stringify(json(ben))).not.toMatch(/skip/i);
+    await sleep(100);
+    expect(JSON.stringify(t.host.crew.at(-1))).not.toContain('skip');
     t.host.room.send(SHOWDOWN_MSG.skip, { on: true });
     await waitFor(() => t.host.errors.some((e) => e.type === SHOWDOWN_MSG.skip), 2000, 'presenter refused');
   });
@@ -476,6 +488,171 @@ describe('the picker (PCK-01…05)', () => {
     const e = await pick(t);
     expect(e.winnerId).toBe(ada.id());
     await waitFor(() => ada.me.at(-1)?.picked === true, 2000, 'you’re up (private)');
+  });
+});
+
+async function settings(t: Show, patch: Json): Promise<void> {
+  t.host.room.send('lobby:settings', { settings: patch });
+  await waitFor(
+    () => Object.entries(patch).every(([k, v]) => JSON.parse(t.server.state.settingsJson)[k] === v),
+    2000,
+    `settings ${Object.keys(patch).join(', ')}`,
+  );
+}
+
+async function done(t: Show, drawNo: number): Promise<void> {
+  t.host.room.send(SHOWDOWN_MSG.pick, { a: 'done', drawNo });
+  await waitFor(() => t.server.state.hotSeat === '', 2000, 'turn done');
+}
+
+async function choose(t: Show, playerId: string, by: Client = t.host): Promise<Extract<ShowdownEvent, { type: 'pick' }>> {
+  const drawNo = t.server.state.drawNo as number;
+  const round = JSON.parse(t.server.state.boardJson).round as number;
+  by.room.send(SHOWDOWN_MSG.pick, { a: 'choose', round, drawNo, playerId });
+  await waitFor(() => by.events.some((e) => e.type === 'pick' && e.drawNo === drawNo + 1), 2000, 'chosen');
+  return by.events.find((e) => e.type === 'pick' && e.drawNo === drawNo + 1) as Extract<ShowdownEvent, { type: 'pick' }>;
+}
+
+describe('the picker’s modes and controls (scoring brief, PR A)', () => {
+  it('True random: a finished turn doesn’t take you out, and nobody is drawn twice in a row', async () => {
+    const t = await eventRoom(['Ada', 'Ben', 'Cy']);
+    await settings(t, { pickMode: 'random' });
+    await live(t);
+    let last = '';
+    const turns = new Map<string, number>();
+    // Five draws among three people: someone is drawn a second time (the picker's rate limit allows 12 acts in a burst).
+    for (let i = 0; i < 5; i++) {
+      const e = await pick(t);
+      expect(e.winnerId).not.toBe(last);
+      last = e.winnerId;
+      turns.set(e.winnerId, (turns.get(e.winnerId) ?? 0) + 1);
+      await done(t, e.drawNo);
+      // Everyone but the last pick: done people stay in.
+      expect(t.server.state.poolSize).toBe(2);
+    }
+    expect([...turns.values()].some((n) => n > 1)).toBe(true);
+    await waitFor(() => t.guests[0]!.me.at(-1)?.pool?.mode === 'random', 2000, 'phones know the mode');
+  });
+
+  it('Spotlight a name: anyone seated — done already, on Skip me, excluded or crew — never the presenter, a screen, a spectator or a hidden guest', async () => {
+    const t = await eventRoom(['Ada', 'Ben', 'Cy']);
+    const [ada, ben, cy] = t.guests as [Client, Client, Client];
+    const mo = await moderator(t);
+    const screen = await t.join('TV');
+    screen.room.send(SHOWDOWN_MSG.screen, { on: true });
+    const spec = await t.join('Spec', { spectator: true });
+    await waitFor(() => t.server.state.screens.get(screen.id()) === true, 2000, 'screen');
+    ben.room.send(SHOWDOWN_MSG.skip, { on: true });
+    await live(t);
+    // Ada has had her turn; choosing her again by name works.
+    const first = await choose(t, ada.id());
+    expect(first).toMatchObject({ winnerId: ada.id(), name: 'Ada', chosen: true, reroll: false });
+    await done(t, first.drawNo);
+    const again = await choose(t, ada.id());
+    expect(again.winnerId).toBe(ada.id());
+    // Busy hot seat: refused with the nudge.
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'choose', round: 0, drawNo: again.drawNo, playerId: cy.id() });
+    await waitFor(() => t.host.errors.some((e) => e.type === SHOWDOWN_MSG.pick && /Mark Ada done/.test(e.message)), 2000, 'nudge');
+    await done(t, again.drawNo);
+    // Skip me only stops random draws (Brian, question 3): Ben can be chosen by name, privately.
+    const skipper = await choose(t, ben.id());
+    expect(skipper.winnerId).toBe(ben.id());
+    await waitFor(() => ben.me.at(-1)?.picked === true, 2000, 'Ben is up');
+    await done(t, skipper.drawNo);
+    // Crew can be chosen by name; they get a seat on the stage for the spotlight to land on.
+    const crew = await choose(t, mo.id());
+    expect(crew.winnerId).toBe(mo.id());
+    expect(t.server.state.seats.get(mo.id())).toBe(true);
+    await waitFor(() => mo.me.at(-1)?.picked === true, 2000, 'the moderator is up');
+    await done(t, crew.drawNo);
+    await waitFor(() => !t.server.state.seats.get(mo.id()), 2000, 'crew seat gone after the turn');
+    // Never the presenter, a big screen, a spectator, a hidden guest, or a stale draw number.
+    t.host.room.send(SHOWDOWN_MSG.hide, { playerId: cy.id(), on: true });
+    await waitFor(() => !t.server.state.seats.get(cy.id()), 2000, 'Cy hidden');
+    const drawNo = t.server.state.drawNo as number;
+    for (const id of [t.host.id(), screen.id(), spec.id(), cy.id()]) {
+      t.host.room.send(SHOWDOWN_MSG.pick, { a: 'choose', round: 0, drawNo, playerId: id });
+    }
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'choose', round: 0, drawNo: drawNo - 1, playerId: ada.id() });
+    await waitFor(() => t.host.errors.filter((e) => e.type === SHOWDOWN_MSG.pick).length >= 5, 2000, 'four refusals');
+    expect(t.server.state.drawNo).toBe(drawNo);
+    expect(t.server.state.hotSeat).toBe('');
+    // Every choice is audited as a choice.
+    const chosen = (t.server.audit.all() as Array<Json>).filter((e) => e.action === 'picker.choose').map((e) => e.target);
+    expect(chosen).toEqual([ada.id(), ada.id(), ben.id(), mo.id()]);
+  });
+
+  it('Include / Exclude: excluded people are never drawn; presenter and crew manage it any time; guests can’t; moderators can’t choose', async () => {
+    const t = await eventRoom(['Ada', 'Ben', 'Cy']);
+    const [ada, ben, cy] = t.guests as [Client, Client, Client];
+    const mo = await moderator(t);
+    // Before doors (the lobby) the presenter excludes Ada; a moderator excludes Ben.
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'exclude', playerId: ada.id() });
+    mo.room.send(SHOWDOWN_MSG.pick, { a: 'exclude', playerId: ben.id() });
+    await waitFor(() => (lastCrew(mo)?.picker?.excluded ?? []).length === 2, 2000, 'two excluded');
+    await waitFor(() => ada.me.at(-1)?.pool?.excluded === true, 2000, 'Ada told privately');
+    // A guest can do neither; a moderator can't spotlight a name.
+    cy.room.send(SHOWDOWN_MSG.pick, { a: 'include', playerId: ada.id() });
+    await waitFor(() => cy.errors.some((e) => e.type === SHOWDOWN_MSG.pick && e.code === 'not_allowed'), 2000, 'guest refused');
+    await live(t);
+    await waitFor(() => t.server.state.poolSize === 1, 2000, 'only Cy in the draw');
+    mo.room.send(SHOWDOWN_MSG.pick, { a: 'choose', round: 0, drawNo: t.server.state.drawNo, playerId: ada.id() });
+    await waitFor(
+      () => mo.errors.some((e) => e.type === SHOWDOWN_MSG.pick && /spotlight/i.test(e.message)),
+      2000,
+      'moderator can’t choose',
+    );
+    for (let i = 0; i < 3; i++) {
+      const e = await pick(t);
+      expect(e.winnerId).toBe(cy.id());
+      t.host.room.send(SHOWDOWN_MSG.pick, { a: 'noAnswer', drawNo: e.drawNo });
+      await waitFor(() => t.server.state.hotSeat === '', 2000, 'back');
+    }
+    // Include one, then everyone.
+    mo.room.send(SHOWDOWN_MSG.pick, { a: 'include', playerId: ben.id() });
+    await waitFor(() => t.server.state.poolSize === 2, 2000, 'Ben back in');
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'includeAll' });
+    await waitFor(() => t.server.state.poolSize === 3, 2000, 'everyone back');
+    expect(ada.me.at(-1)!.pool!.excluded).toBe(false);
+    // The exclusions never reach guests' state or messages.
+    expect(JSON.stringify(json(cy))).not.toMatch(/exclu/i);
+    expect(cy.crew.filter(Boolean)).toEqual([]);
+    const log = (t.server.audit.all() as Array<Json>).filter((e) => /^picker\.(exclude|include)$/.test(e.action));
+    expect(log.map((e) => [e.action, e.actorId])).toEqual([
+      ['picker.exclude', t.host.id()],
+      ['picker.exclude', mo.id()],
+      ['picker.include', mo.id()],
+      ['picker.include', t.host.id()],
+    ]);
+    expect(log.at(-1)).toMatchObject({ targetName: 'Everyone' });
+  });
+
+  it('crew are in the random draw only with "Crew in the random draw" on, and then get a seat on the stage', async () => {
+    const t = await eventRoom(['Ada']);
+    const mo = await moderator(t);
+    await live(t);
+    await waitFor(() => t.server.state.poolSize === 1, 2000, 'guests only');
+    expect(t.server.state.seats.get(mo.id())).toBeUndefined();
+    await waitFor(() => mo.me.at(-1)?.pool?.crewOut === true, 2000, 'crew get a pool card');
+    expect(mo.me.at(-1)!.pool!.in).toBe(false);
+    // Another show with the switch on (a lobby setting).
+    const u = await eventRoom(['Ada']);
+    const mo2 = await moderator(u);
+    await settings(u, { crewDraw: true });
+    await live(u);
+    await waitFor(() => u.server.state.poolSize === 2 && u.server.state.seats.get(mo2.id()) === true, 2000, 'crew in the draw');
+    await waitFor(() => mo2.me.at(-1)?.pool?.in === true, 2000, 'the moderator is in');
+  });
+
+  it('the guess limit comes from the setting', async () => {
+    const t = await eventRoom(['Ada']);
+    const ada = t.guests[0]!;
+    await settings(t, { audience: true, guesses: 1 });
+    await live(t);
+    ada.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'Lamp' });
+    await waitFor(() => (ada.me.at(-1)?.guesses.length ?? 0) === 1, 2000, 'one guess');
+    ada.room.send(SHOWDOWN_MSG.guess, { round: 0, text: 'Stapler' });
+    await waitFor(() => ada.errors.some((e) => e.type === SHOWDOWN_MSG.guess && /all 1 guess for/.test(e.message)), 2000, 'limit');
   });
 });
 
@@ -649,6 +826,12 @@ describe('the black box (OPS-01 C)', () => {
     const [ada, ben] = t.guests as [Client, Client];
     ben.room.send(SHOWDOWN_MSG.skip, { on: true });
     await live(t);
+    // Ada's first turn counts; Ben is excluded (and on Skip me): both survive the restore.
+    const first = await pick(t);
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'done', drawNo: first.drawNo });
+    await waitFor(() => t.server.state.hotSeat === '', 2000, 'first turn done');
+    t.host.room.send(SHOWDOWN_MSG.pick, { a: 'exclude', playerId: ben.id() });
+    await waitFor(() => (lastCrew(t.host)?.picker?.excluded ?? []).includes(ben.id()), 2000, 'Ben excluded');
     const drawn = await pick(t);
     await act(t, { a: 'reveal', slot: 3 });
     act(t, { a: 'clock', op: 'start' }).catch(() => undefined);
@@ -685,6 +868,9 @@ describe('the black box (OPS-01 C)', () => {
     expect(ada2.id()).toBe(ada.id());
     expect(ben2.id()).toBe(ben.id());
     await waitFor(() => ben2.me.at(-1)?.pool?.skip === true, 2000, 'skip kept');
+    expect(ben2.me.at(-1)!.pool!.excluded).toBe(true);
+    await waitFor(() => lastCrew(host2)?.picker?.turns[ada.id()] === 1, 2000, 'turns kept');
+    expect(lastCrew(host2)!.picker!.excluded).toEqual([ben.id()]);
     expect(ada2.events).toEqual([]);
     expect((server2.audit.all() as Array<Json>).some((e) => e.action === 'show.restored')).toBe(true);
     // The show carries on.

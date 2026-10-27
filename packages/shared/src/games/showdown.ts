@@ -73,8 +73,9 @@ export const SHOWDOWN_LIMITS = {
   minutesMax: 30,
   /** Strikes before the other team may steal. */
   strikes: 3,
-  /** Private audience guesses per player per round. */
-  guessesPerRound: 3,
+  /** Private audience guesses per player per board: the `guesses` setting's default and its most. */
+  guessesDefault: 3,
+  guessesMax: 10,
   guessText: 40,
   /** Presenter undo depth. */
   undo: 40,
@@ -379,6 +380,19 @@ const cleanTitle = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.sho
 const cleanTeamName = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.teamName));
 const cleanEventName = (t: string) => maskProfanity(cleanText(t, SHOWDOWN_LIMITS.eventName));
 
+export const SHOWDOWN_PICK_MODES = ['fair', 'random'] as const;
+export type ShowdownPickMode = (typeof SHOWDOWN_PICK_MODES)[number];
+export const SHOWDOWN_PICK_MODE_INFO: Record<ShowdownPickMode, { title: string; blurb: string }> = {
+  fair: {
+    title: 'Fair mode',
+    blurb: 'Fewest turns first: everyone gets a turn before anyone gets a second one.',
+  },
+  random: {
+    title: 'True random',
+    blurb: 'Anyone in the draw, every time — a finished turn doesn’t take you out. Never the same person twice in a row.',
+  },
+};
+
 export const ShowdownSettingsSchema = z.object({
   /** Team Showdown (teams, strikes, steals, scores) or Presenter Showcase (one board, no teams). */
   mode: z.enum(SHOWDOWN_MODES),
@@ -412,6 +426,12 @@ export const ShowdownSettingsSchema = z.object({
    * else by size); 'stream' / 'projector' force one profile on every screen (the escape hatch).
    */
   display: z.enum(['auto', 'stream', 'projector']).default('auto'),
+  /** Private guesses each audience member may lock in per board (1–10). */
+  guesses: z.number().int().min(1).max(SHOWDOWN_LIMITS.guessesMax).default(SHOWDOWN_LIMITS.guessesDefault),
+  /** The picker (Presenter Showcase): Fair mode (fewest turns this show first) or True random. */
+  pickMode: z.enum(SHOWDOWN_PICK_MODES).default('fair'),
+  /** Crew (producer, backup presenters, moderators) are in the random draw too; by name they always can be. */
+  crewDraw: z.boolean().default(false),
 });
 export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
@@ -435,6 +455,9 @@ export function defaultShowdownSettings(now: Date = new Date()): ShowdownSetting
     minutes: 10,
     stageClock: true,
     display: 'auto',
+    guesses: SHOWDOWN_LIMITS.guessesDefault,
+    pickMode: 'fair',
+    crewDraw: false,
   };
 }
 
@@ -515,9 +538,12 @@ export const SHOWDOWN_MSG = {
   reactions: 'showdown:reactions',
 
   // ---- The audience picker (Presenter Showcase; see "Picker" below) ----
-  /** client → server (presenter, or `picker.run`) ShowdownPickPayload: pick, mark done, no answer, reroll. */
+  /**
+   * client → server ShowdownPickPayload: pick, mark done, no answer, reroll (`picker.run` / `picker.reroll`),
+   * spotlight a name (`picker.choose`), exclude / include people (`picker.manage`).
+   */
   pick: 'showdown:pick',
-  /** client → server (a participant, for their own seat) {on}: "Skip me" — out of the pool. Private. */
+  /** client → server (a participant or crew, for their own seat) {on}: "Skip me" — out of random draws. Private. */
   skip: 'showdown:skip',
 
   // ---- Event rooms: crew, moderation, audit (see "Crew" below) ----
@@ -662,15 +688,22 @@ export const ShowdownCardSchema = z.object({ card: z.union([z.literal(''), z.enu
 // ---------------------------------------------------------------------------
 // Picker (PCK-01…05, VIS-02, DSP-03): the server draws who answers next; screens only replay it.
 //
-//   pool at draw time = participants (never the presenter, crew, screens or spectators) who are
-//   connected, not hidden, not skipping, not done this round and not in the hot seat.
+//   in the draw = participants (never the presenter, big screens or spectators; crew only with the
+//   `crewDraw` setting) who are connected, not hidden, not on Skip me, not excluded and not in the
+//   hot seat. The `pickMode` setting decides the pool from there:
+//     fair   → only those with the fewest turns this show (Mark done counts a turn). When everyone
+//              is level, the next lap opens by itself, so the pool never runs dry.
+//     random → everyone in the draw, but never the person the last draw picked (unless nobody else is).
 //   pick     → the server draws with its crypto RNG, the winner takes the hot seat, every screen
 //              gets the `pick` event (a pick is public the moment it lands; the stage lands at landAt).
-//   done     → the turn counts: out of the pool until the next round (key D).
-//   noAnswer → back in the pool, no penalty (key A).
-//   reroll   → back in the pool and an immediate redraw without them; logged with a reason.
-//   Every act carries the draw number it was made against: a stale or repeated one is ignored.
-//   The pool refills when the next round starts (PCK-05 A).
+//   choose   → Spotlight a name: that person takes the hot seat whatever the pool says (done already,
+//              excluded, on Skip me, crew) — never the presenter, a big screen, a spectator, a hidden or
+//              an offline seat. Skip me only keeps you out of RANDOM draws (and stays private).
+//   done     → the turn counts (key D). noAnswer → no turn counted (key A).
+//   reroll   → back in the draw and an immediate redraw without them; logged with a reason.
+//   exclude / include → out of / back in random draws until changed (presenter and crew, any time).
+//   Every draw act carries the draw number it was made against: a stale or repeated one is ignored.
+//   `done` (this round's finished turns) clears when the next round starts; turns last the show.
 // ---------------------------------------------------------------------------
 
 /** The presenter sees the name at once ("on stage in 2 s"); the stage lands after the sweep. */
@@ -695,6 +728,13 @@ export const ShowdownPickSchema = z.discriminatedUnion('a', [
   z.object({ a: z.literal('noAnswer'), drawNo }).strict(),
   /** Put the hot seat back and draw again without them, with a reason for the log. */
   z.object({ a: z.literal('reroll'), drawNo, reason: z.enum(SHOWDOWN_REROLL_REASONS) }).strict(),
+  /** Spotlight a name: this person takes the hot seat, whether or not they've had a turn. */
+  z.object({ a: z.literal('choose'), round: z.number().int().min(0).max(1000), drawNo, playerId: z.string().min(1).max(64) }).strict(),
+  /** Out of random draws until included again (they can still be chosen by name). */
+  z.object({ a: z.literal('exclude'), playerId: z.string().min(1).max(64) }).strict(),
+  z.object({ a: z.literal('include'), playerId: z.string().min(1).max(64) }).strict(),
+  /** Everyone excluded is back in the draw. */
+  z.object({ a: z.literal('includeAll') }).strict(),
 ]);
 export type ShowdownPickPayload = z.infer<typeof ShowdownPickSchema>;
 export const ShowdownSkipSchema = z.object({ on: z.boolean() }).strict();
@@ -721,6 +761,10 @@ export const SHOWDOWN_PERMISSIONS = [
   'people.hide',
   'picker.run',
   'picker.reroll',
+  /** Spotlight a name (put anyone seated in the hot seat). */
+  'picker.choose',
+  /** Exclude people from random draws and include them again. */
+  'picker.manage',
   'audio.station',
   'audit.read',
   'audit.export',
@@ -737,8 +781,11 @@ export type ShowdownIssuableRole = (typeof SHOWDOWN_ISSUABLE_ROLES)[number];
 export const SHOWDOWN_ROLE_INFO: Record<ShowdownCrewRole | 'presenter', { title: string; blurb: string }> = {
   producer: { title: 'Producer', blurb: 'Moves the presenter role, hands out and revokes crew links, moderates names.' },
   presenter: { title: 'Presenter', blurb: 'Runs the show: the answer sheet, the picker and the sound station.' },
-  backup: { title: 'Backup presenter', blurb: 'Can take over the show with this link while the presenter is offline.' },
-  moderator: { title: 'Moderator', blurb: 'Renames or hides guests from the stage and the picker.' },
+  backup: {
+    title: 'Backup presenter',
+    blurb: 'Can take over the show with this link while the presenter is offline, and includes or excludes people from the draw.',
+  },
+  moderator: { title: 'Moderator', blurb: 'Renames or hides guests, and includes or excludes people from the draw.' },
 };
 
 /** Role presets: data, not code branches. A role missing here has no permissions (deny by default). */
@@ -751,14 +798,26 @@ export const SHOWDOWN_ROLE_PERMISSIONS: Record<ShowdownCrewRole | 'presenter', r
     'people.hide',
     'picker.run',
     'picker.reroll',
+    'picker.choose',
+    'picker.manage',
     'audio.station',
     'audit.read',
     'audit.export',
     'preflight.read',
   ],
-  presenter: ['people.rename', 'people.hide', 'picker.run', 'picker.reroll', 'audio.station', 'audit.read', 'preflight.read'],
-  backup: [],
-  moderator: ['people.rename', 'people.hide'],
+  presenter: [
+    'people.rename',
+    'people.hide',
+    'picker.run',
+    'picker.reroll',
+    'picker.choose',
+    'picker.manage',
+    'audio.station',
+    'audit.read',
+    'preflight.read',
+  ],
+  backup: ['picker.manage'],
+  moderator: ['people.rename', 'people.hide', 'picker.manage'],
 };
 
 /** Effective permissions of a set of roles (unknown roles grant nothing). */
@@ -808,11 +867,28 @@ export interface ShowdownCrewPrivate {
   /** Moderation (only with `people.hide` / `people.rename`): who is hidden from the stage, and who is crew right now. */
   hidden?: string[];
   crewIds?: string[];
+  /** The picker's people (only with `picker.manage`): turns this show, who's excluded, who's crew. */
+  picker?: ShowdownPickerPrivate;
   /**
    * A link just minted for you — the producer link when you made the event room, or one you issued.
    * Sent once: keep it on this device (the server keeps only its hash).
    */
   fresh?: { id: string; role: ShowdownCrewRole; name: string; link: string };
+}
+
+/**
+ * The picker as the presenter and crew see it (`picker.manage`). Never who chose Skip me: that stays
+ * between the guest and the server, so a presenter can't tell a skipper from anyone else.
+ */
+export interface ShowdownPickerPrivate {
+  /** Turns this show by playerId (Mark done counts one; absent = none yet). */
+  turns: Record<string, number>;
+  /** Out of random draws until included again. */
+  excluded: string[];
+  /** Crew who aren't presenting (in the random draw only with `crewDraw`; by name always). */
+  crew: string[];
+  /** Hidden by a moderator: off the stage, out of the draw, and can't be chosen until shown again. */
+  hidden: string[];
 }
 
 /** Crew link in the address bar → `/room/<code>#crew=<id>.<secret>`. */
@@ -844,6 +920,9 @@ export const SHOWDOWN_AUDIT_ACTIONS = [
   'picker.done',
   'picker.noAnswer',
   'picker.reroll',
+  'picker.choose',
+  'picker.exclude',
+  'picker.include',
   'audio.station',
   'audio.failover',
   'show.end',
@@ -980,6 +1059,9 @@ const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
   stageClock: true,
   audience: false,
   display: 'auto',
+  guesses: 10,
+  pickMode: 'fair',
+  crewDraw: false,
 };
 
 export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
@@ -1233,9 +1315,20 @@ export interface ShowdownMe {
   calls: number;
   /**
    * Presenter Showcase picker, private to you (DSP-03 B): `in` = you could be drawn next, `skip` =
-   * your Skip me switch, `done` = your turn counted this round. Absent for crew, screens, spectators.
+   * your Skip me switch, `done` = your turn counted this round, `turns` = your turns this show,
+   * `excluded` = the presenter or crew took you out of random draws, `crewOut` = you're crew and crew
+   * aren't in the random draw (`crewDraw` off: by name only), `mode` = the picker's mode. Absent for
+   * screens, spectators and the presenter.
    */
-  pool?: { in: boolean; skip: boolean; done: boolean };
+  pool?: {
+    in: boolean;
+    skip: boolean;
+    done: boolean;
+    turns: number;
+    excluded: boolean;
+    crewOut: boolean;
+    mode: ShowdownPickMode;
+  };
   /** You're in the hot seat right now ("You're up!"). */
   picked?: boolean;
 }
@@ -1296,7 +1389,18 @@ export type ShowdownEvent =
    * The picker drew someone (the server already decided; screens replay it). The presenter's console
    * names them at once; the stage sweeps and lands at `landAt` (server epoch ms).
    */
-  | { type: 'pick'; rev: number; drawNo: number; winnerId: string; name: string; poolSize: number; landAt: number; reroll: boolean }
+  | {
+      type: 'pick';
+      rev: number;
+      drawNo: number;
+      winnerId: string;
+      name: string;
+      poolSize: number;
+      landAt: number;
+      reroll: boolean;
+      /** Spotlight a name: chosen by the presenter or crew, not drawn. */
+      chosen?: boolean;
+    }
   /** The hot seat emptied: their turn counted (done), they're back in the pool (noAnswer/reroll), or a moderator hid them. */
   | { type: 'pickEnd'; rev: number; drawNo: number; playerId: string; how: 'done' | 'noAnswer' | 'reroll' | 'cleared' }
   /** The sound station moved ('' = back to the presenter's console); `lost` = the old station stopped answering. */

@@ -27,6 +27,7 @@ import {
   type ShowdownAuditView,
   type ShowdownCrewPrivate,
   type ShowdownPermission,
+  type ShowdownPickerPrivate,
   type ShowdownPreflightData,
   type ShowdownSeatState,
   isSoundStation,
@@ -370,6 +371,11 @@ export function useSeatGrid(): GridSeat[] {
 /** Your crew view (null: no crew role and not presenting, or not sent yet). */
 export function useCrew(): ShowdownCrewPrivate | null {
   return useLatestMessage<ShowdownCrewPrivate | null>(SHOWDOWN_MSG.crew) ?? null;
+}
+
+/** The picker's people for the presenter and crew (`picker.manage`; null for everyone else). */
+export function usePickerPrivate(): ShowdownPickerPrivate | null {
+  return useCrew()?.picker ?? null;
 }
 
 /** Whether you may do this right now (the server checks again; this only shapes the screen). */

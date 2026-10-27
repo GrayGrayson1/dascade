@@ -22,6 +22,12 @@ export const showdownApi = {
   noAnswer: (drawNo: number) => pick({ a: 'noAnswer', drawNo }),
   /** Put the hot seat back and draw again without them. */
   reroll: (drawNo: number, reason: ShowdownRerollReason) => pick({ a: 'reroll', drawNo, reason }),
+  /** Spotlight a name: put this person in the hot seat (`picker.choose`). */
+  choose: (round: number, drawNo: number, playerId: string) => pick({ a: 'choose', round, drawNo, playerId }),
+  /** Out of / back in the random draw (`picker.manage`). */
+  exclude: (playerId: string) => pick({ a: 'exclude', playerId }),
+  include: (playerId: string) => pick({ a: 'include', playerId }),
+  includeAll: () => pick({ a: 'includeAll' }),
   /** Your own Skip me switch. */
   skip: (on: boolean) => session.send(SHOWDOWN_MSG.skip, { on }),
 

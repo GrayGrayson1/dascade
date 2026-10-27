@@ -11,7 +11,18 @@ import {
 } from '@dascade/shared/games/showdown';
 import { auditActor, auditFileName, auditReason, auditRole, auditSentence, auditWords, newestFirst, untilWords } from './audit.ts';
 import { buildPeople, filterPeople, peopleSummary, type PeopleInput } from './people.ts';
-import { foldDraw, formatElapsed, pickerPhase, type DrawLine } from './picker.ts';
+import {
+  choosable,
+  drawWords,
+  emptyWhy,
+  foldDraw,
+  formatElapsed,
+  modeWords,
+  pickPeople,
+  pickerPhase,
+  searchPeople,
+  type DrawLine,
+} from './picker.ts';
 import { evaluatePreflight, formatUptime, preflightSummary, type PreflightInput } from './preflight.ts';
 import { shortcutBlockedBy, type GuardEvent } from './shortcuts.ts';
 import { crewTabs, roleWords } from './tabs.ts';
@@ -82,6 +93,61 @@ describe('picker strip phases', () => {
       [2, 'done', true],
       [1, 'reroll', false],
     ]);
+    list = foldDraw(list, { type: 'pick', drawNo: 3, name: 'Dana', reroll: false, chosen: true }, 15);
+    expect(drawWords(list[0]!)).toBe('Spotlight 3: Dana, in the hot seat');
+    expect(drawWords(list[1]!)).toBe('Redraw 2: Sam, turn done');
+  });
+});
+
+describe('the picker’s people (Spotlight a name, Include / Exclude)', () => {
+  const players = {
+    host: { id: 'host', name: 'Host', connected: true, spectator: false },
+    tv: { id: 'tv', name: 'TV', connected: true, spectator: false },
+    spec: { id: 'spec', name: 'Watcher', connected: true, spectator: true },
+    ada: { id: 'ada', name: 'Ada', connected: true, spectator: false },
+    zoe: { id: 'zoe', name: 'Zoë', connected: false, spectator: false },
+    mo: { id: 'mo', name: 'mo', connected: true, spectator: false },
+    cy: { id: 'cy', name: 'Cy', connected: true, spectator: false },
+  };
+  const input = {
+    players,
+    presenterId: 'host',
+    screens: { tv: true },
+    done: { ada: true },
+    hotSeat: '',
+    myId: 'host',
+    picker: { turns: { ada: 2 }, excluded: ['cy'], crew: ['mo'], hidden: [] as string[] },
+  };
+
+  it('lists everyone who could take the hot seat, A–Z — never the presenter, a big screen or a spectator', () => {
+    const rows = pickPeople(input);
+    expect(rows.map((r) => r.id)).toEqual(['ada', 'cy', 'mo', 'zoe']);
+    expect(rows.find((r) => r.id === 'ada')).toMatchObject({ turns: 2, done: true, excluded: false });
+    expect(rows.find((r) => r.id === 'cy')).toMatchObject({ excluded: true, turns: 0 });
+    expect(rows.find((r) => r.id === 'mo')).toMatchObject({ crew: true });
+    expect(rows.find((r) => r.id === 'zoe')).toMatchObject({ away: true });
+  });
+
+  it('can choose anyone connected who isn’t hidden or already up (done and excluded people included)', () => {
+    const rows = pickPeople({ ...input, hotSeat: 'mo', picker: { ...input.picker, hidden: ['cy'] } });
+    expect(rows.filter(choosable).map((r) => r.id)).toEqual(['ada']);
+    expect(searchPeople(pickPeople(input), 'zoe').map((r) => r.id)).toEqual(['zoe']);
+    expect(searchPeople(pickPeople(input), '').map((r) => r.id)).toEqual(['ada', 'cy', 'mo', 'zoe']);
+  });
+
+  it('says why the draw is empty without naming who chose Skip me', () => {
+    const rows = pickPeople(input);
+    const allOut = rows.map((r) => ({ ...r, excluded: true }));
+    expect(emptyWhy(allOut, false)).toBe('Everyone here is excluded from the random draw.');
+    expect(emptyWhy(rows, false)).toMatch(/excluded, hidden or has switched on Skip me/);
+    expect(
+      emptyWhy(
+        rows.map((r) => ({ ...r, away: true })),
+        false,
+      ),
+    ).toBe('Nobody in the audience is connected right now.');
+    expect(modeWords('fair', false)).toMatch(/^Fair mode: .* Crew are only picked by name\.$/);
+    expect(modeWords('random', true)).toMatch(/^True random: .* Crew are in the random draw too\.$/);
   });
 });
 
@@ -91,10 +157,10 @@ describe('picker strip phases', () => {
 
 describe('crew tabs follow permissions (deny by default)', () => {
   it('gives each role preset exactly its tabs', () => {
-    expect(crewTabs(permissionsOf(['moderator']))).toEqual(['names']);
-    expect(crewTabs(permissionsOf(['producer']))).toEqual(['names', 'crew', 'preflight']);
-    expect(crewTabs(permissionsOf(['presenter']))).toEqual(['names', 'crew', 'preflight']);
-    expect(crewTabs(permissionsOf(['backup']))).toEqual([]);
+    expect(crewTabs(permissionsOf(['moderator']))).toEqual(['names', 'picker']);
+    expect(crewTabs(permissionsOf(['producer']))).toEqual(['names', 'picker', 'crew', 'preflight']);
+    expect(crewTabs(permissionsOf(['presenter']))).toEqual(['names', 'picker', 'crew', 'preflight']);
+    expect(crewTabs(permissionsOf(['backup']))).toEqual(['picker']);
   });
 
   it('grants nothing for unknown roles or no permissions', () => {
@@ -108,6 +174,7 @@ describe('crew tabs follow permissions (deny by default)', () => {
     expect(crewTabs(['people.hide'])).toEqual(['names']);
     expect(crewTabs(['audit.read'])).toEqual(['crew']);
     expect(crewTabs(['preflight.read'])).toEqual(['preflight']);
+    expect(crewTabs(['picker.manage'])).toEqual(['picker']);
     expect(SHOWDOWN_ROLE_PERMISSIONS.moderator).not.toContain('audit.read');
   });
 

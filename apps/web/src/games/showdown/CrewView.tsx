@@ -2,9 +2,10 @@
  * The crew screen (ADM-04, JOI-02, OPS-03): for crew who aren't presenting — a moderator, a backup
  * presenter, or a producer on a second device — in every phase. A header with their role(s) in words,
  * the stage preview (what the audience sees, never an answer), and the tabs their permissions allow:
- * Names, Crew & log, Preflight. A backup presenter can take the show here while the presenter is
- * offline (the server refuses it while they're online). Crew are never in the picker pool. Single
- * column on phones.
+ * Picker, Names, Crew & log, Preflight. A backup presenter can take the show here while the presenter
+ * is offline (the server refuses it while they're online). Crew get the pool card too: they can be
+ * spotlighted by name, and they're in the random draw when the show's "Crew in the random draw" is
+ * on. Single column on phones (the same screen in a browser and on a phone).
  */
 import { useEffect, useState } from 'react';
 import {
@@ -22,9 +23,10 @@ import { GameStage, LeaveButton } from '../../shell/common.tsx';
 import { hidesArcadeExit } from '../../shell/arcadeExit.ts';
 import { Stage } from './Stage.tsx';
 import { showdownApi } from './api.ts';
-import { CrewPanel, NamesPanel, PreflightPanel } from './panels/index.ts';
+import { CrewPanel, NamesPanel, PickerPanel, PreflightPanel } from './panels/index.ts';
+import { PoolCard } from './PoolCard.tsx';
 import { CREW_TAB_LABEL, crewTabs, roleWords, type CrewTab } from './panels/tabs.ts';
-import { useCrew, useRehearsal } from './state.ts';
+import { useBoard, useCrew, useRehearsal } from './state.ts';
 import './panels/panels.css';
 
 interface PresenterInfo {
@@ -35,6 +37,7 @@ interface PresenterInfo {
 export function CrewView({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
   const crew = useCrew();
   const rehearsal = useRehearsal();
+  const board = useBoard();
   const presenter = useRoomSelector<ShowdownPublicState, PresenterInfo | null>((s) => {
     const p = s.presenterId ? s.players[s.presenterId] : undefined;
     return p ? { name: p.name, connected: p.connected } : null;
@@ -74,10 +77,12 @@ export function CrewView({ look, settings, code }: { look: ShowdownLook; setting
         <p className="sdp-crewnote">
           <PixelIcon name="info" />
           <span>
-            You’re crew, so you’re not in the picker pool. Presenter: <b>{presenter ? presenter.name : 'nobody'}</b>
+            You’re crew. Presenter: <b>{presenter ? presenter.name : 'nobody'}</b>
             {presenter ? (presenter.connected ? ' (online)' : ' (offline)') : ''}.
           </span>
         </p>
+
+        {settings?.mode === 'showcase' ? <PoolCard /> : null}
 
         <div className="sdp-crewview__stage sd-preview" role="img" aria-label="Stage preview: what the audience sees">
           <Stage look={look} settings={settings} variant="preview" />
@@ -95,7 +100,9 @@ export function CrewView({ look, settings, code }: { look: ShowdownLook; setting
           ) : null}
           {tab ? (
             <div role={tabs.length > 1 ? 'tabpanel' : undefined} aria-label={CREW_TAB_LABEL[tab]} className="sdp-crewview__panel">
-              {tab === 'names' ? (
+              {tab === 'picker' ? (
+                <PickerPanel look={look} board={board} />
+              ) : tab === 'names' ? (
                 <NamesPanel />
               ) : tab === 'crew' ? (
                 <CrewPanel code={code} />

@@ -7,11 +7,14 @@
  *   → after 30 s without an answer: Reroll, with a reason the server logs
  *
  * Pressing Pick with someone still in the hot seat nudges ("Mark Priya S. done?") instead of drawing.
+ * **Spotlight a name… (F)** puts anyone seated in the hot seat by name, whether or not they've had a
+ * turn (the presenter and the producer). When nobody is in the random draw the strip says why and
+ * offers Include everyone and Spotlight a name — it never dead-ends.
  * Every act carries the draw number this console saw, so a double press or a stale click is ignored
- * by the server. Keys K / D / A work like the console's other shortcuts (not while typing or with a
- * dialog open).
+ * by the server. Keys K / D / A / F work like the console's other shortcuts (not while typing or with
+ * a dialog open).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SHOWDOWN_REROLL_INFO,
   SHOWDOWN_REROLL_REASONS,
@@ -20,15 +23,18 @@ import {
   type ShowdownPublicState,
   type ShowdownRerollReason,
 } from '@dascade/shared/games/showdown';
-import { Button, Kbd, PixelIcon } from '@dascade/ui';
-import { useRoomSelector } from '../../../net/hooks.ts';
+import { Button, Kbd, Modal, PixelIcon } from '@dascade/ui';
+import { playersEqual, useRoomSelector } from '../../../net/hooks.ts';
 import { useSessionStore } from '../../../net/session.ts';
 import { sfx } from '../../../audio/audio.ts';
 import { showdownApi } from '../api.ts';
-import { useCan, usePicker } from '../state.ts';
-import { formatElapsed, pickerPhase, poolWords } from './picker.ts';
+import { useCan, usePicker, usePickerPrivate, useShowdownSettings } from '../state.ts';
+import { emptyWhy, formatElapsed, pickPeople, pickerPhase, poolWords } from './picker.ts';
+import { SpotlightChooser } from './SpotlightChooser.tsx';
 import { shortcutBlocked, useServerNow } from './useTicker.ts';
 import './panels.css';
+
+const NO_FLAGS: Record<string, boolean> = {};
 
 /** How long a sent act keeps its button busy if the room doesn't answer (it re-enables after). */
 const PENDING_MS = 2500;
@@ -38,7 +44,17 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
   const presenterId = useRoomSelector<ShowdownPublicState, string>((s) => s.presenterId) ?? '';
   const presenter = Boolean(playerId && playerId === presenterId);
   const allowed = useCan('picker.run') || presenter;
+  const canChoose = useCan('picker.choose') || presenter;
+  const canManage = useCan('picker.manage') || presenter;
   const picker = usePicker();
+  const privatePicker = usePickerPrivate();
+  const crewDraw = useShowdownSettings()?.crewDraw ?? false;
+  const players = useRoomSelector<ShowdownPublicState, ShowdownPublicState['players']>((s) => s.players, playersEqual);
+  const screens = useRoomSelector<ShowdownPublicState, Record<string, boolean>>((s) => s.screens ?? NO_FLAGS) ?? NO_FLAGS;
+  const people = useMemo(
+    () => pickPeople({ players, presenterId, screens, done: picker.done, hotSeat: picker.hotSeat, myId: playerId, picker: privatePicker }),
+    [players, presenterId, screens, picker.done, picker.hotSeat, playerId, privatePicker],
+  );
   const hot = picker.hotSeat !== '';
   const now = useServerNow(hot, 250);
   const phase = pickerPhase(
@@ -56,14 +72,17 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
   const [pending, setPending] = useState<{ kind: string; drawNo: number } | null>(null);
   const [nudge, setNudge] = useState('');
   const [rerolling, setRerolling] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [said, setSaid] = useState('');
   const doneRef = useRef<HTMLButtonElement>(null);
+  const spotlightRef = useRef<HTMLButtonElement>(null);
 
   // A new draw (or the hot seat emptying) settles whatever was pending and closes the reroll form.
   useEffect(() => {
     setPending(null);
     setNudge('');
     setRerolling(false);
+    setChoosing(false);
   }, [picker.drawNo, picker.hotSeat]);
   // The nudge says its piece, then the hot seat's own line comes back.
   useEffect(() => {
@@ -95,8 +114,8 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
       setSaid(hotAway ? `${headsName} dropped out: Reroll is open.` : `No answer from ${headsName} for 30 seconds: Reroll is open.`);
   }, [rerollOpen, headsName, hotAway]);
 
-  const live = useRef({ phase, picker, board, pending, allowed });
-  live.current = { phase, picker, board, pending, allowed };
+  const live = useRef({ phase, picker, board, pending, allowed, canChoose });
+  live.current = { phase, picker, board, pending, allowed, canChoose };
 
   const requestPick = () => {
     const cur = live.current;
@@ -110,7 +129,7 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
       return;
     }
     if (p.kind === 'empty') {
-      setSaid('Everyone’s had a turn this round. The pool refills next round.');
+      setSaid('Nobody is in the random draw right now. Include people, or spotlight a name with F.');
       return;
     }
     if (p.kind !== 'ready') return;
@@ -148,8 +167,17 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
     if (rerolling) firstReason.current?.focus({ preventScroll: true });
   }, [rerolling]);
 
-  const keys = useRef({ requestPick, markDone, noAnswer });
-  keys.current = { requestPick, markDone, noAnswer };
+  /** F: open Spotlight a name (a dialog, so it never runs off a 720 px screen) — not while someone is in the hot seat. */
+  const openChoose = () => {
+    const cur = live.current;
+    if (!cur.canChoose || cur.phase.kind === 'off' || cur.picker.hotSeat) return;
+    setChoosing(true);
+  };
+  // The dialog gives focus back to whatever opened it (the button, or the page for F).
+  const closeChoose = () => setChoosing(false);
+
+  const keys = useRef({ requestPick, markDone, noAnswer, openChoose });
+  keys.current = { requestPick, markDone, noAnswer, openChoose };
   useEffect(() => {
     if (!allowed) return;
     const onKey = (e: KeyboardEvent) => {
@@ -162,6 +190,7 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
         return;
       }
       if (k === 'k') keys.current.requestPick();
+      else if (k === 'f' && !hotNow) keys.current.openChoose();
       else if (k === 'd' && hotNow) keys.current.markDone();
       else if (k === 'a' && hotNow) keys.current.noAnswer();
       else return;
@@ -176,6 +205,7 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
   const off = phase.kind === 'off';
   const busy = pending !== null;
   const onSeat = phase.kind === 'heads' || phase.kind === 'answering';
+  const anyExcluded = people.some((p) => p.excluded);
 
   return (
     <section
@@ -237,22 +267,58 @@ export function PickerStrip({ look, board }: { look: ShowdownLook; board: Showdo
           )}
         </p>
       ) : (
-        <Button
-          variant="primary"
-          block
-          className="sdp-strip__pick"
-          disabled={off || phase.kind === 'empty' || busy}
-          loading={pending?.kind === 'pick'}
-          onClick={requestPick}
-          aria-keyshortcuts="K"
-          aria-label={phase.kind === 'ready' ? `Pick someone · ${poolWords(phase.pool)}` : undefined}
-          data-part="showdown-pick"
-        >
-          {phase.kind === 'empty' ? 'Pool is empty' : 'Pick someone'} <Kbd>K</Kbd>
-        </Button>
+        // Pick and Spotlight side by side: the rail keeps its height at 1280×720.
+        <div className={canChoose && !off ? 'sdp-strip__row sdp-strip__row--pick' : undefined}>
+          <Button
+            variant="primary"
+            block
+            className="sdp-strip__pick"
+            disabled={off || phase.kind === 'empty' || busy}
+            loading={pending?.kind === 'pick'}
+            onClick={requestPick}
+            aria-keyshortcuts="K"
+            aria-label={phase.kind === 'ready' ? `Pick someone · ${poolWords(phase.pool)}` : undefined}
+            data-part="showdown-pick"
+          >
+            {phase.kind === 'empty' ? 'Nobody in the draw' : 'Pick someone'} <Kbd>K</Kbd>
+          </Button>
+          {canChoose && !off ? (
+            <Button
+              ref={spotlightRef}
+              variant="secondary"
+              block
+              icon="star"
+              disabled={busy}
+              onClick={() => setChoosing(true)}
+              aria-keyshortcuts="F"
+              aria-haspopup="dialog"
+              aria-label="Spotlight a name…"
+              title="Put anyone in the hot seat by name (F)"
+              data-part="showdown-spotlight-open"
+            >
+              Spotlight… <Kbd>F</Kbd>
+            </Button>
+          ) : null}
+        </div>
       )}
 
-      {phase.kind === 'empty' ? <p className="sdp-strip__note">Everyone’s had a turn this round. The pool refills next round.</p> : null}
+      {phase.kind === 'empty' ? (
+        <div className="sdp-strip__empty" data-part="showdown-pick-empty">
+          <p className="sdp-strip__note">{emptyWhy(people, crewDraw)}</p>
+          {canManage && anyExcluded ? (
+            <Button size="sm" variant="secondary" icon="users" onClick={() => showdownApi.includeAll()} data-part="showdown-include-all">
+              Include everyone
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      <Modal open={choosing && canChoose && !onSeat && !off} onClose={closeChoose} title="Spotlight a name" className="sdp-choosedialog">
+        <p className="sdp-lead">
+          Put anyone in the hot seat by name — whether or not they’ve had a turn, crew included. Skip me and Exclude only keep people out of
+          random draws.
+        </p>
+        <SpotlightChooser people={people} round={board.round} drawNo={picker.drawNo} onClose={closeChoose} />
+      </Modal>
       {phase.kind === 'off' ? (
         <p className="sdp-strip__note">
           {phase.why === 'intro' ? 'Pick works once round 1 is up.' : 'The picker runs in Presenter Showcase.'}

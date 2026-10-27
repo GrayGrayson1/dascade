@@ -104,10 +104,11 @@ test('event crew: producer link, moderator screen, rename and hide follow on sta
   const crewScreen = mod.locator('[data-part="showdown-crew-screen"]');
   await expect(crewScreen).toBeVisible();
   await expect(crewScreen).toContainText('Moderator');
-  await expect(mod.getByText('You’re crew, so you’re not in the picker pool.')).toBeVisible();
+  // Crew get a pool card too: not in the random draw (the show's setting), but choosable by name.
+  await expect(mod.locator('[data-part="showdown-pool-card"]')).toContainText('You’re crew — not in the random draw');
   // The secret left the address bar.
   expect(mod.url()).not.toContain('#crew=');
-  // A moderator gets Names only (no log, no preflight).
+  // A moderator gets Names and Picker (no log, no preflight).
   await expect(mod.getByRole('tab', { name: 'Crew & log' })).toHaveCount(0);
   await expect(mod.getByRole('tab', { name: 'Preflight' })).toHaveCount(0);
   const names = mod.locator('[data-part="showdown-names-panel"]');
