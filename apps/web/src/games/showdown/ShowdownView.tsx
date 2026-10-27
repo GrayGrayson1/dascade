@@ -33,6 +33,7 @@ import { useApp } from '../../app/store.ts';
 import { audioReady, onAudioReadyChange } from '../../audio/audio.ts';
 import { GameStage, LeaveButton, ResultsActions } from '../../shell/common.tsx';
 import { Lobby } from '../../shell/Lobby.tsx';
+import { hidesArcadeExit } from '../../shell/arcadeExit.ts';
 import type { GameClientModule, SettingsPanelProps } from '../types.ts';
 import { AudienceView, switchToScreen } from './Audience.tsx';
 import { PresenterConsole } from './Console.tsx';
@@ -275,7 +276,7 @@ function BigScreen({ look, settings, code }: { look: ShowdownLook; settings: Sho
             <Button size="sm" variant="ghost" onClick={() => switchToScreen(code, false)}>
               Exit big screen
             </Button>
-            <LeaveButton size="sm" collapseLabel />
+            {hidesArcadeExit('showdown') ? null : <LeaveButton size="sm" collapseLabel />}
           </>
         }
       />

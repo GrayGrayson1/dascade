@@ -6,7 +6,7 @@
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GAME_CATALOG, isGameId, isValidRoomCode, normalizeRoomCode, type GameId } from '@dascade/shared';
-import { Button, GameTheme, Panel, Spinner, type IconName } from '@dascade/ui';
+import { Button, GameTheme, Panel, Spinner, cx, type IconName } from '@dascade/ui';
 import { session, useSessionStore } from '../net/session.ts';
 import { useCountdown, useRoomSelector } from '../net/hooks.ts';
 import { selectCanPlay, useApp } from '../app/store.ts';
@@ -21,6 +21,7 @@ import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './R
 import { ShowRecovery, canRecover } from './ShowRecovery.tsx';
 import { recoveringCode, subscribeRecovery } from '../net/recovery.ts';
 import { crumbCabinet } from './crumbs.ts';
+import { hidesArcadeExit } from './arcadeExit.ts';
 import { shouldLeaveBeforeResolving, shouldLeaveOnExit } from './roomPath.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
 import { leaveRoomTo, useTournamentExit } from '../tournament/exit.ts';
@@ -286,6 +287,8 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
   const gameId = lookup?.gameId && isGameId(lookup.gameId) ? lookup.gameId : null;
   const game = gameId ? GAME_CATALOG[gameId] : null;
   const cabinet = gameId ? crumbCabinet(gameId) : null;
+  // A dead code keeps its way back (shell/arcadeExit.ts: error screens never strand anyone).
+  const exit = !hidesArcadeExit(gameId) || lookup?.exists === false;
   const join = async () => {
     if (busy || lookup?.exists === false || !commitProfileName()) return;
     setBusy(true);
@@ -326,11 +329,15 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
             {lookup && !lookup.exists ? <p className="dc-field__error">No room is using this code right now.</p> : null}
           </div>
           <ProfileEditor compact onSubmit={() => void join()} />
-          <div className="dc-row dc-row--wrap">
-            <Button variant="ghost" onClick={onCancel} icon="arrow-left">
-              Arcade
-            </Button>
-            <span className="dc-spacer" />
+          <div className={cx('dc-row dc-row--wrap', !exit && 'join-prompt__actions--solo')}>
+            {exit ? (
+              <>
+                <Button variant="ghost" onClick={onCancel} icon="arrow-left">
+                  Arcade
+                </Button>
+                <span className="dc-spacer" />
+              </>
+            ) : null}
             <Button variant="primary" size="lg" icon="play" loading={busy} disabled={!canPlay || lookup?.exists === false} onClick={join}>
               Join game
             </Button>

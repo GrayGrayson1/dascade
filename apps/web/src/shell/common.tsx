@@ -36,6 +36,7 @@ import { useGame, useRoomSelector } from '../net/hooks.ts';
 import { sfx } from '../audio/audio.ts';
 import { leaveRoomTo, useTournamentExit } from '../tournament/exit.ts';
 import { useThemeFlavour } from '../themes/copy.ts';
+import { hidesArcadeExit } from './arcadeExit.ts';
 
 export { Toasts } from './Toasts.tsx';
 
@@ -235,13 +236,15 @@ export function ChatPanel({
 // ---------------------------------------------------------------------------
 /**
  * Host: "Play again" (back to lobby) · Everyone: "Back to cabinet" (leave → the cabinet's picker or
- * title screen) and "Leave" (→ arcade floor). Use on results screens. In a Tournament Center match
- * room: no "Play again" (the series runs itself) and the way out is "Back to tournament".
+ * title screen) and "Leave" (→ arcade floor), unless the game hides its arcade exits (arcadeExit.ts).
+ * Use on results screens. In a Tournament Center match room: no "Play again" (the series runs itself)
+ * and the way out is "Back to tournament".
  */
 export function ResultsActions({ extra }: { extra?: ReactNode }) {
   // Selectors, not useGame(): results screens can keep receiving game patches.
   const hostId = useRoomSelector((s) => s.hostId);
   const playerId = useSessionStore((s) => s.playerId);
+  const gameId = useSessionStore((s) => s.gameId);
   const tournament = useTournamentExit();
   if (hostId === null) return null;
   if (tournament) {
@@ -261,6 +264,7 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
     );
   }
   const isHost = Boolean(playerId && hostId === playerId);
+  const exits = !hidesArcadeExit(gameId);
   return (
     <div className="results-actions" data-part="results-buttons">
       {isHost ? (
@@ -273,8 +277,8 @@ export function ResultsActions({ extra }: { extra?: ReactNode }) {
         </span>
       )}
       {extra}
-      <BackToCabinetButton />
-      <LeaveButton />
+      {exits ? <BackToCabinetButton /> : null}
+      {exits ? <LeaveButton /> : null}
     </div>
   );
 }

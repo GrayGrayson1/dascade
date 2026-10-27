@@ -974,6 +974,16 @@
       'cap cap cap'
       'leave spec main';
   }
+  /* No Leave (shell/arcadeExit.ts): no empty column and gap before Spectate / Ready / Start. */
+  .lobby__actions-inner[data-leave='off'] {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'spec main';
+  }
+  .lobby__actions-inner[data-leave='off']:has(.lobby__waiting) {
+    grid-template-areas:
+      'cap cap'
+      'spec main';
+  }
   .lobby__actions-inner .dc-spacer {
     display: none;
   }
@@ -1367,6 +1377,10 @@
 .join-prompt__room {
   color: var(--text-1);
   font-weight: 600;
+}
+/* No Arcade button (shell/arcadeExit.ts): Join stands alone, centred. */
+.join-prompt__actions--solo {
+  justify-content: center;
 }
 
 /* ---------- Settings: theme line ---------- */
