@@ -95,6 +95,9 @@ export const DEMO_SETTINGS: ShowdownSettings = {
   minutes: 10,
   stageClock: true,
   display: 'auto',
+  guesses: 10,
+  pickMode: 'fair',
+  crewDraw: false,
 };
 
 /** Before the preset: a new room's defaults. */
