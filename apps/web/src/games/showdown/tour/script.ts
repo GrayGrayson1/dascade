@@ -688,7 +688,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         filmHold: 6200,
         console: { dialog: null, screen: 'results' },
         show: { phase: 'RESULTS', finale: FINALE, sweep: false },
-        caption: '“That’s a wrap!” Boo says goodbye, with a fanfare and applause.',
+        caption: '“That’s a wrap!” Boo says goodbye to a round of applause.',
         boo: { say: 'That’s a wrap, boils and ghouls!', act: 'wave', mood: 'bye' },
       },
       {
