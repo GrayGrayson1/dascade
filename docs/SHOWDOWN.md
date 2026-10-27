@@ -29,7 +29,9 @@ It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/
 
 1. **Lobby.** The presenter picks the look, the questions (built-in packs or their own rounds), the
    scoring and the team names. Everyone else is balanced into Team Delta or Team Sierra and can switch.
-   The presenter opens the stage window, or puts the big-screen link on the TV.
+   The presenter opens the stage window, or puts the big-screen link on the TV. Nobody readies up: the
+   presenter presses *Start game* when they like (ready-up starts off in Showdown rooms; the Room
+   panel's *Players ready up before the start* switch turns it on).
 2. **Start.** The stage opens on the marquee (intro sting, host welcome, both teams, join code).
 3. **Each round:** a title card, then *Show the question*. The face-off reveals don't count for anyone
    yet. *Team X play* hands over control. Reveals bank `points × multiplier`. A miss is ✕, and three
