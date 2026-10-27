@@ -334,27 +334,30 @@ Notes:
 
 ## Sound
 
-All sounds are procedural voices on the shared synth (`sounds.ts`). They use the one AudioContext and
-the SFX bus, so mute, volume and the jukebox dip all apply. Sounds include the clang (a struck plate;
+Every sound is a procedural voice on the shared synth (`sounds.ts`); a few play Brian's recordings
+instead (see *Recorded sounds* below). They use the one AudioContext and the SFX bus, so mute, volume and
+the jukebox dip all apply. Sounds include the clang (a struck plate;
 a haunted bell in Halloween), the top-answer sparkle, the strike buzzer (ghostly in Halloween), steal
 stings, the award, applause, the intro fanfare (an organ toccata with thunder in Halloween), drumroll,
 aww, ding, suspense and the finale. The presenter can fire cues from the console.
 
 Presenter Showcase adds a crescendo, all original:
 
-- **A found answer:** a bright `correct` ding at 0 ms, then the `clang`, which lands at 320 ms
+- **A found answer:** the `correct` ding (Brian's `ding.mp3`) at 0 ms, then the `clang`, which lands at 320 ms
   (`FLIP_LAND_MS`) as the tile's 3D flip turns face up.
 - **A sweep tile:** a lighter `clangLate`.
 - **Board complete:** a `complete` flourish, then applause.
-- **The special answer:** the `special` sting (about 3 s: a hit, a fanfare, a bell cascade and a
-  crowd roar).
+- **The special answer:** the `special` sting (about 3 s: a hit, a fanfare and a bell cascade), with
+  Brian's applause coming in 250 ms later (`SPECIAL_CROWD_MS`). The presenter's **Celebrate!** cue plays
+  the same pair (`cueSounds`). A special answer that also completes the board adds the flourish but no
+  second applause.
 - **Wrong:** a single 0.5 s `miss` buzzer. It stays clean when pressed several times.
 - **Other cues:**
   - `opening`, about 6 s, for the start of the show;
   - `category`, the round's transition sting;
   - `sweepStart`, when Reveal remaining begins;
-  - `rollIn`, the sweep's 2.95 s drumroll, which ends exactly as the server flips the special tile
-    2.6 s after `suspense`;
+  - `rollIn`, the sweep's drumroll into the special tile: Brian's `drumroll.mp3`, whose cymbal lands
+    as the server flips the tile 2.6 s after `suspense` (the 2.95 s procedural roll is the fallback);
   - `timeup`, when the round clock runs out;
   - `cardIn`, when a stage card goes up.
 - **Theme music** (`themeMusic.ts`): two original 16-bar beds, written to sit under a presenter
@@ -376,7 +379,10 @@ a toggle.
 **Recorded sounds:** put files in `apps/web/public/audio/showdown/` and map them in
 `SHOWDOWN_SOUND_FILES` (`sounds.ts`), e.g. `clang: '/audio/showdown/clang.mp3'` or, for one look only,
 `'halloween:strike': …`. They're decoded into the shared context, and a missing or broken file falls
-back to the procedural voice. Only use audio you have the rights to (this repo is public).
+back to the procedural voice. Only use audio you have the rights to (this repo is public). Mapped now
+(sources and licences in that folder's README): `applause.mp3` (also the special answer's crowd and the
+finale), `aww.mp3` (also Team Showdown's missed steal), `ding.mp3` (also `correct`), `drumroll.mp3`
+(also `rollIn`), `suspense.mp3` and `pick-the-answer.mp3`.
 
 ## Testing
 
@@ -405,8 +411,8 @@ Manual walkthrough:
 
 ## Known limitations / next steps
 
-- Placeholder-quality audio. The procedural voices are good, but recorded stingers would be better;
-  the hook is ready (above).
+- Most stingers are still procedural (the clang, the buzzers, the fanfares); the crowd, the ding, the
+  drumroll, suspense and Pick the Answer are recordings, and the hook takes more (above).
 - No Fast Money / bonus round, and no buzzer race for the face-off (the presenter judges it).
 - The join hint shows the short URL and code. A QR code would need an encoder (not added: no new
   dependency).
