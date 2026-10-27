@@ -273,7 +273,7 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
   }, [musicOn, look, stage, card]);
   useEffect(() => () => themeMusic.stop(), []);
 
-  // The finale: fanfare + applause once per show on this device, as the show ends. A device that
+  // The finale: Brian's applause once per show on this device, as the show ends. A device that
   // joins (or reloads, or reconnects) on the results screen hears nothing: that finale is already over.
   const finaleKey = useRef<string | null>(null);
   useEffect(() => {
