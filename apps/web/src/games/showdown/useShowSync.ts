@@ -41,7 +41,7 @@ import { jukeboxShowPause } from '../../audio/jukebox/engine.ts';
 import { useJukebox } from '../../audio/jukebox/store.ts';
 import { lineForCue, lineForEvent } from './look.ts';
 import { showFeed } from './fx.ts';
-import { CUE_SOUND, playShowSound, preloadShowSounds, type ShowdownSound } from './sounds.ts';
+import { cueSounds, playShowSound, preloadShowSounds, type ShowdownSound } from './sounds.ts';
 import { themeMusic } from './themeMusic.ts';
 import { rememberPass, storedPass, takeHashPass } from './access.ts';
 import { showdownApi } from './api.ts';
@@ -160,7 +160,7 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
   useRoomMessage<{ cue: ShowdownCue; id: number }>(SHOWDOWN_MSG.cue, ({ cue, id }) => {
     showFeed.cue(cue, id);
     showFeed.say(lineForCue(cue, id, ctx.current.look));
-    play([[CUE_SOUND[cue], 0]]);
+    play(cueSounds(cue));
   });
 
   useRoomMessage<ShowdownReactions>(SHOWDOWN_MSG.reactions, (batch) =>

@@ -16,7 +16,7 @@
  * laptop speaker and a voice codec keep (a 200 Hz knock under each kick, a mid crack on the thunder),
  * no single noise burst is longer than the shared 1-second noise buffer, and the impact grows from a
  * found answer (ding + clang) to the board complete (+ flourish + applause) to the special answer
- * (a hit, a fanfare and a crowd). Peaks stay well under full scale (see voices.test.ts).
+ * (a hit, a fanfare and Brian's applause). Peaks stay well under full scale (see voices.test.ts).
  *
  * RECORDED SOUNDS (optional): drop a file into apps/web/public/audio/showdown/ and map it below in
  * SHOWDOWN_SOUND_FILES, e.g. `clang: '/audio/showdown/clang.mp3'` (or per look:
@@ -101,6 +101,12 @@ export const SHOWDOWN_SOUND_FILES: Partial<Record<ShowdownSound | `${ShowdownLoo
   drumroll: '/audio/showdown/drumroll.mp3',
   suspense: '/audio/showdown/suspense.mp3',
   pickAnswer: '/audio/showdown/pick-the-answer.mp3',
+  // Brian's recordings in place of the built-in claps, dings and rolls (2026-10-26): the "correct!" ding
+  // before a found answer's clang, the sweep's roll into the special answer (its cymbal lands ~2.88 s in,
+  // as the tile flips at 2.92 s) and Team Showdown's failed steal.
+  correct: '/audio/showdown/ding.mp3',
+  rollIn: '/audio/showdown/drumroll.mp3',
+  stealMiss: '/audio/showdown/aww.mp3',
 };
 
 export type Voice = (k: SfxKit, rand: () => number) => number;
@@ -338,53 +344,6 @@ function heartbeat(k: SfxKit, start: number, gain = 0.12): void {
   }
 }
 
-/**
- * The crowd going wild: an "aah" roar (two vowel formants, in overlapping one-second layers), a few
- * whoops and whistles, and the claps.
- */
-function crowd(k: SfxKit, rand: () => number, start: number, seconds: number, level = 1): void {
-  for (let t = 0; t < seconds - 0.5; t += 0.26) {
-    const fade = Math.max(0.25, 1 - Math.pow(t / seconds, 2));
-    k.noise({
-      start: start + t,
-      dur: 0.95,
-      gain: Math.min(0.4, 0.3 * level * fade),
-      freq: 700 + rand() * 80,
-      to: 820,
-      q: 0.9,
-      attack: 0.28,
-    });
-    k.noise({
-      start: start + t + 0.12,
-      dur: 0.9,
-      gain: Math.min(0.4, 0.18 * level * fade),
-      freq: 1180 + rand() * 120,
-      to: 1300,
-      q: 1.2,
-      attack: 0.26,
-    });
-    k.noise({
-      start: start + t + 0.06,
-      dur: 0.9,
-      gain: Math.min(0.4, 0.16 * level * fade),
-      freq: 460 + rand() * 40,
-      to: 520,
-      q: 1,
-      attack: 0.3,
-    });
-  }
-  const whoops: Array<[number, number, number]> = [
-    [0.12, 1500, 2500],
-    [0.55, 1900, 2800],
-    [0.95, 2200, 1500],
-    [1.45, 1650, 2450],
-  ];
-  for (const [at, f0, f1] of whoops) {
-    if (at < seconds - 0.5) k.tone({ type: 'sine', freq: f0, to: f1, start: start + at, dur: 0.42, gain: 0.03 * level, attack: 0.06 });
-  }
-  claps(k, rand, start, seconds, Math.round(seconds * 40), level);
-}
-
 // ---------------------------------------------------------------------------
 // DAS Showtime
 // ---------------------------------------------------------------------------
@@ -559,9 +518,9 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
     return 1.1;
   },
   // THE moment (lands on the flip): clang + kick + crash under a C-major blast, a sparkle run, a
-  // ta-ta-ta-TAAA brass fanfare (I–IV–V–I) whose last chord rings a second, higher plate, a bell
-  // cascade down and the crowd going wild.
-  special: (k, rand) => {
+  // ta-ta-ta-TAAA brass fanfare (I–IV–V–I) whose last chord rings a second, higher plate and a bell
+  // cascade down (Brian's applause comes in under it: cueSounds, eventSounds).
+  special: (k) => {
     // The hit's layers are flammed by a few ms (heard as one hit, but their peaks don't stack).
     thump(k, 0, 0.26);
     plate(k, 392, 0.75, 0.008);
@@ -576,7 +535,6 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
     plate(k, 523, 0.45, 1.01);
     crash(k, 1.016, 0.12);
     [96, 91, 88, 84, 79].forEach((n, i) => chime(k, k.note(n), 1.08 + i * 0.09, 0.9, 0.085));
-    crowd(k, rand, 0.25, 2.9, 2);
     return 3.2;
   },
   // One dramatic buzz (an A–B♭ cluster, rattling), on a thump that lands with the big ✕.
@@ -662,16 +620,15 @@ const SHOWTIME: Record<ShowdownSound, Voice> = {
     k.tone({ type: 'sine', freq: 196, start: 0, dur: 0.9, gain: 0.09, attack: 0.004 });
     return 1.8;
   },
-  // The board's last tile: "ta-DAAA!" — a G pickup into C major, a glockenspiel run up, a crash and
-  // a cheer (the applause follows).
-  complete: (k, rand) => {
+  // The board's last tile: "ta-DAAA!" — a G pickup into C major, a glockenspiel run up and a crash
+  // (Brian's applause follows).
+  complete: (k) => {
     horn(k, [55, 67, 71, 74], 0, 0.11, 0.06);
     thump(k, 0.13, 0.24);
     horn(k, [48, 60, 64, 67, 72], 0.134, 1.6, 0.06);
     crash(k, 0.142, 0.12);
     [84, 88, 91, 96, 100].forEach((n, i) => chime(k, k.note(n), 0.16 + i * 0.05, 0.5, 0.06));
     chime(k, k.note(96), 0.45, 1.2, 0.06);
-    crowd(k, rand, 0.2, 1.6, 1.1);
     return 1.8;
   },
   // A holding card slides up: a soft whoosh and a faint chime.
@@ -847,8 +804,8 @@ const HALLOWEEN: Partial<Record<ShowdownSound, Voice>> = {
     return 1.4;
   },
   // THE moment: thunder and the big bell on the flip, a D-major organ fanfare (the spooky turned
-  // happy), a bell cascade, bats, a ghostly "woo-OOO" and the crowd.
-  special: (k, rand) => {
+  // happy), a bell cascade, bats and a ghostly "woo-OOO" (Brian's applause comes in under it).
+  special: (k) => {
     thump(k, 0, 0.24);
     storm(k, 0.006, 0.2);
     bell(k, 294, 0.8, 0.012);
@@ -863,7 +820,6 @@ const HALLOWEEN: Partial<Record<ShowdownSound, Voice>> = {
     crash(k, 1.012, 0.11);
     [98, 93, 90, 86, 81].forEach((n, i) => churchBell(k, k.note(n), 1.06 + i * 0.1, 1.1, 0.08));
     theremin(k, 523, 1046, 1.15, 1.4, 0.07, 0.35);
-    crowd(k, rand, 0.25, 2.9, 2);
     return 3.2;
   },
   // A lower, rounder buzz, then a ghost wails away (quiet enough to run into the next press).
@@ -951,15 +907,14 @@ const HALLOWEEN: Partial<Record<ShowdownSound, Voice>> = {
     k.noise({ start: 0.7, dur: 0.95, gain: 0.03, freq: 1100, q: 3, attack: 0.3 });
     return 2.9;
   },
-  // The board's last tile: an organ "ta-DAAA" in D major, a bell cascade up, the bats and a cheer.
-  complete: (k, rand) => {
+  // The board's last tile: an organ "ta-DAAA" in D major, a bell cascade up and the bats (Brian's applause follows).
+  complete: (k) => {
     pipe(k, [57, 69, 73, 76], 0, 0.11, 0.06);
     thump(k, 0.13, 0.24);
     pipe(k, [50, 62, 66, 69, 74], 0.134, 1.6, 0.06);
     crash(k, 0.142, 0.11);
     [74, 78, 81, 86, 90].forEach((n, i) => churchBell(k, k.note(n), 0.16 + i * 0.07, 0.9, 0.065));
     bats(k, 0.5, 7, 0.05);
-    crowd(k, rand, 0.2, 1.6, 1.1);
     return 1.8;
   },
   // A holding card drifts up: a gust of wind and a faint flutter.
@@ -1032,6 +987,20 @@ export const CUE_SOUND: Record<ShowdownCue, ShowdownSound> = {
   pickAnswer: 'pickAnswer',
 };
 
+/** Brian's applause comes in this long after the celebration starts (where the built-in crowd used to). */
+export const SPECIAL_CROWD_MS = 250;
+
+/** The sounds of a presenter's cue: Celebrate! is the special answer's celebration, applause and all. */
+export function cueSounds(cue: ShowdownCue): Array<[ShowdownSound, number]> {
+  const sound = CUE_SOUND[cue];
+  return sound === 'special'
+    ? [
+        [sound, 0],
+        ['applause', SPECIAL_CROWD_MS],
+      ]
+    : [[sound, 0]];
+}
+
 // ---------------------------------------------------------------------------
 // Which sounds each board event plays
 // ---------------------------------------------------------------------------
@@ -1064,11 +1033,12 @@ export function eventSounds(e: ShowdownEvent, mode: ShowdownMode = 'classic'): A
         // ding … into the celebration; the sweep's tiles (and other late ones) only clang, lighter;
         // the board's last tile adds the flourish and the applause.
         const list: Array<[ShowdownSound, number]> = e.late ? [] : [['correct', 0]];
-        if (e.special) list.push(['special', FLIP_LAND_MS]);
+        if (e.special) list.push(['special', FLIP_LAND_MS], ['applause', FLIP_LAND_MS + SPECIAL_CROWD_MS]);
         else list.push([e.late ? 'clangLate' : 'clang', FLIP_LAND_MS - STRIKE_MS]);
         if (e.cleared) {
-          const at = e.special ? FLIP_LAND_MS + SPECIAL_RING_MS : FLIP_LAND_MS + 380;
-          list.push(['complete', at], ['applause', at + 250]);
+          // A special answer that completes the board: its applause is still going, so only the flourish.
+          if (e.special) list.push(['complete', FLIP_LAND_MS + SPECIAL_RING_MS]);
+          else list.push(['complete', FLIP_LAND_MS + 380], ['applause', FLIP_LAND_MS + 630]);
         }
         return list;
       }

@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { showTitle, type ShowdownLook } from '@dascade/shared/games/showdown';
 import { lineForCue, lineForEvent } from '../look.ts';
-import { CUE_SOUND, eventSounds, playShowSound, type ShowdownSound } from '../sounds.ts';
+import { cueSounds, eventSounds, playShowSound, type ShowdownSound } from '../sounds.ts';
 import { themeMusic } from '../themeMusic.ts';
 import { createDemoSource, type DemoShow, type DemoSource } from './demoSource.ts';
 import { DEMO_CODE, DEMO_SETTINGS } from './script.ts';
@@ -233,7 +233,7 @@ function createController(opts: { current: TourOptions }, setView: (fn: (v: Tour
       cueId++;
       feed.cue(beat.cue, cueId);
       feed.say(lineForCue(beat.cue, cueId, look));
-      sound(CUE_SOUND[beat.cue]);
+      for (const [name, delay] of cueSounds(beat.cue)) sound(name, delay);
     }
     if (beat.sound) sound(beat.sound);
     if (after.card && after.card !== before.card) sound('cardIn');

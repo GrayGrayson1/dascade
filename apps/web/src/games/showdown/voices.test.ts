@@ -16,8 +16,18 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock('../../audio/audio.ts', () => ({ synth: mock.synth }));
 
-const { SHOWDOWN_VOICES, SHOWDOWN_SOUND_FILES, CUE_SOUND, FLIP_LAND_MS, SPIN_MIN_MS, eventSounds, pickSounds, playShowSound } =
-  await import('./sounds.ts');
+const {
+  SHOWDOWN_VOICES,
+  SHOWDOWN_SOUND_FILES,
+  CUE_SOUND,
+  FLIP_LAND_MS,
+  SPECIAL_CROWD_MS,
+  SPIN_MIN_MS,
+  cueSounds,
+  eventSounds,
+  pickSounds,
+  playShowSound,
+} = await import('./sounds.ts');
 const { SHOWDOWN_CUES, SHOWDOWN_PICK_LAND_MS } = await import('@dascade/shared/games/showdown');
 type ShowdownEvent = import('@dascade/shared/games/showdown').ShowdownEvent;
 type ShowdownSound = import('./sounds.ts').ShowdownSound;
@@ -163,7 +173,7 @@ describe('show voices', () => {
       for (const name of SHOWCASE) {
         const { tones, noises } = record(look, name);
         for (const o of noises) expect(o.dur, `${look}:${name}`).toBeLessThanOrEqual(NOISE_BUFFER_S);
-        // A few hundred short-lived nodes at most (the crowd in the celebration is the biggest).
+        // A few hundred short-lived nodes at most.
         expect(tones.length + noises.length, `${look}:${name}`).toBeLessThanOrEqual(300);
       }
     }
@@ -291,6 +301,26 @@ describe('show voices', () => {
     expect(CUE_SOUND.pickAnswer).toBe('pickAnswer');
     // The end of the show plays Brian's applause (the organ fanfare read as sad).
     expect(SHOWDOWN_SOUND_FILES.finale).toBe(SHOWDOWN_SOUND_FILES.applause);
+  });
+
+  it('Celebrate! brings in Brian’s applause under the celebration; every other cue is its one sound', () => {
+    expect(cueSounds('celebrate')).toEqual([
+      ['special', 0],
+      ['applause', SPECIAL_CROWD_MS],
+    ]);
+    for (const cue of SHOWDOWN_CUES) if (cue !== 'celebrate') expect(cueSounds(cue), cue).toEqual([[CUE_SOUND[cue], 0]]);
+  });
+
+  it('Brian’s recordings stand in for the built-in ding, the roll into the special and the failed steal', () => {
+    expect(SHOWDOWN_SOUND_FILES.correct).toBe('/audio/showdown/ding.mp3');
+    // The cymbal in the drumroll file lands ~2.88 s in, as the special tile flips (2.6 s + FLIP_LAND_MS).
+    expect(SHOWDOWN_SOUND_FILES.rollIn).toBe('/audio/showdown/drumroll.mp3');
+    expect(SHOWDOWN_SOUND_FILES.stealMiss).toBe('/audio/showdown/aww.mp3');
+    // The same file in both looks (no per-look file shadows it).
+    for (const look of LOOKS) {
+      for (const name of ['correct', 'rollIn', 'stealMiss'] as const)
+        expect(SHOWDOWN_SOUND_FILES[`${look}:${name}`], `${look}:${name}`).toBeUndefined();
+    }
   });
 
   it('every recorded file maps a real sound (or look:sound), exists in public/audio/showdown, and has a licence entry', () => {
@@ -438,6 +468,8 @@ describe('eventSounds', () => {
     for (const e of [reveal({ special: true }), reveal({ special: true, late: true, sweep: true })]) {
       const list = eventSounds(e, 'showcase');
       expect(list).toContainEqual(['special', FLIP_LAND_MS]);
+      // Brian's applause comes in under the fanfare (the celebration has no built-in crowd).
+      expect(list).toContainEqual(['applause', FLIP_LAND_MS + SPECIAL_CROWD_MS]);
       expect(list.some(([s]) => s === 'clang' || s === 'clangLate' || s === 'clangTop')).toBe(false);
     }
     // Found by hand: the ding comes first; in the sweep (the drumroll led in) it doesn't.
@@ -456,6 +488,8 @@ describe('eventSounds', () => {
     // A special answer that completes the board: the flourish waits for the celebration's fanfare.
     const both = eventSounds(reveal({ special: true, cleared: true }), 'showcase');
     expect(both.find(([s]) => s === 'complete')![1]).toBeGreaterThanOrEqual(FLIP_LAND_MS + 2000);
+    // …and the special's applause is still going, so one applause, not two on top of each other.
+    expect(both.filter(([s]) => s === 'applause')).toEqual([['applause', FLIP_LAND_MS + SPECIAL_CROWD_MS]]);
   });
 
   it('showcase cues: the opening, the category sting, the sweep, the drumroll into the special, the clock', () => {
