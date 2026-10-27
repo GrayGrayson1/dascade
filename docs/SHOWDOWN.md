@@ -48,7 +48,8 @@ undone, including scores and audience points.
 
 ### Audience game
 
-While a question is up, every audience member can lock in up to 3 **private** guesses. A guess is
+While a question is up, every audience member can lock in up to 3 **private** guesses (the `guesses`
+setting, 1–10; the DAS-O-Ween presets set 10). A guess is
 matched on the server (typo-tolerant, plus hidden alternative spellings), but the match stays secret.
 The guesser only learns they "called it" when that answer flips for everyone, and then scores its
 survey points. Another spelling of an answer you already guessed is locked in like any guess (refusing
@@ -174,19 +175,43 @@ each a set of permission names (`presenter.assign`, `crew.issue`, `crew.revoke`,
   `audit.read` get the latest 60; the producer downloads the whole log as JSON. Server logs get one
   line per entry with ids only. It leaves with the room.
 
-**The picker** (PCK-01…05, VIS-02, DSP-03). The server draws with its crypto RNG
-(`drawPick`/`pickPool`, `packages/game-core/src/showdown/picker.ts`) from connected participants —
-never the presenter, crew, big screens or spectators — who aren't hidden, on Skip me, done this round
-or in the hot seat. `showdown:pick` acts (`pick`, `done`, `noAnswer`, `reroll` with a reason) carry the
-draw number, so a stale or repeated one is ignored; Pick while someone is in the hot seat is refused
-with a nudge. Every screen gets the `pick` event (`winnerId`, `name`, `poolSize`, `landAt`): the console
-names the person at once, the stage's spotlight lands at `landAt` (3.5 s), and the picked phone shows
-"You're up!". Done counts the turn until the next round; No answer and reroll put them back. The pool
-refills when the next round starts. Public: `drawNo`, `hotSeat`, `pickAt`, `landAt`, `poolSize`,
-`done`, and `seats` (the stage grid: participants who aren't hidden — skippers stay on it, so nobody
-can tell who skipped). Private: `ShowdownMe.pool {in, skip, done}` and `picked`. A tile revealed while
-someone is in the hot seat is credited to them (`calledBy` on the slot, only once revealed; undo takes
-it back). Draws, rerolls, done and no answer are audited.
+**The picker** (PCK-01…05, VIS-02, DSP-03; modes and controls from the Scoring Studio, PR A). The
+server draws with its crypto RNG (`drawPick`/`pickPool`, `packages/game-core/src/showdown/picker.ts`)
+from the people **in the draw**: connected guests — never the presenter, big screens or spectators;
+crew only with the `crewDraw` setting — who aren't hidden, on Skip me, **excluded** or in the hot seat.
+The `pickMode` setting narrows that down:
+
+- `fair` (default; DAS-O-Ween's): only those with the fewest **turns this show** (Mark done counts one;
+  No answer, reroll and a cleared seat don't). When everyone is level the next lap opens by itself, so
+  the pool never runs dry; a late joiner (no turns) goes first.
+- `random`: everyone in the draw every time (a finished turn doesn't take you out), except whoever the
+  last draw picked (`lastPicked`) — unless they're the only one left.
+
+`showdown:pick` acts: `pick`, `done`, `noAnswer`, `reroll` (with a reason), **`choose`** (Spotlight a
+name, `picker.choose`: presenter and producer), **`exclude` / `include` / `includeAll`**
+(`picker.manage`: presenter, producer, backup, moderator; any phase). The draw acts carry the draw
+number, so a stale or repeated one is ignored; Pick or choose while someone is in the hot seat is
+refused with a nudge. `choose` puts anyone seated in the hot seat whatever the draw says — done, on
+Skip me, excluded, crew — and refuses the presenter, big screens, spectators, hidden and offline seats
+(**Skip me only stops random draws**, Brian 2026-10-27, so choosing a skipper never reveals who
+skipped). Every screen gets the `pick` event (`winnerId`, `name`, `poolSize`, `landAt`, `chosen`): the
+console names the person at once, the stage's spotlight lands at `landAt` (3.5 s), and the picked phone
+shows "You're up!". `done` lists this round's finished turns and clears when the next round starts;
+turns last the show. Public: `drawNo`, `hotSeat`, `pickAt`, `landAt`, `poolSize`, `done`, and `seats`
+(the stage grid: guests who aren't hidden, crew too while `crewDraw` is on, and whoever is in the hot
+seat — skippers and excluded people stay on it, so nobody can tell). Private: `ShowdownMe.pool {in,
+skip, done, turns, excluded, crewOut, mode}` and `picked` (guests and crew), and for `picker.manage`
+holders `ShowdownCrewPrivate.picker {turns, excluded, crew, hidden}` — never who chose Skip me. A tile
+revealed while someone is in the hot seat is credited to them (`calledBy` on the slot, only once
+revealed; undo takes it back). Draws, spotlights, rerolls, done, no answer, exclusions and inclusions
+are audited, and turns, exclusions and `lastPicked` are in the black box (older boxes restore with
+everyone level and included).
+
+The console: the rail's **Pick someone (K)** and **Spotlight… (F)** side by side (Spotlight opens a
+searchable dialog: type, Enter); an empty draw says why and offers **Include everyone**. The **Picker**
+tab (console drawer, crew screen, and the lobby's Crew & checks) lists everyone with their turns,
+Include/Exclude and Spotlight, the mode in words and this round's done list. Phones and crew screens
+show the pool card (`poolStatus.ts`).
 
 **Sound station** (AUD-02 C): consoles and big screens report `showdown:audio {ready, muted, sounds}`
 every 2 s; exactly one device plays show sound — `soundStation` ('' = the presenter's console), which
@@ -410,6 +435,42 @@ Manual walkthrough:
    screen and it comes back to the same board.
 6. To force a look, set it in the lobby settings, or use `?season=2026-10-15` / `?season=2026-11-15`
    with *Seasonal*.
+
+## Scoring decisions (Brian, 2026-10-27)
+
+From the Showdown Scoring Studio (<https://claude.ai/artifact/QtmwM4qoUUKqvQNDAT3eih>), for the
+DAS-O-Ween show on 2026-10-29. Brian's picks, verbatim:
+
+> 1. We like the Medal Ceremony idea, but it should be a toggle between Never, after each round, and at the end of the whole game
+> 2 - called it - if they get position right (guess number 2 answer in the number 2 spot, etc) they get a bonus point as well. Anyone that guesses all of them in a row gets 20 bonus points
+>
+> 3 - how many in the list - first option is best, but it should be easy to make this a selection rather than just all or nothing. Make it a part of the setup process
+> not on here - add the ability to choose a name to spotlight, whether they have gone already or not. Also, crew/producers should be able to be selected for spotlight as well, and it should be a choice if they are also in the running for random spotlight
+>
+> 4 - scorekeeper credits is the best answer presented here, however I don't really care if it's implemented right now. Make note that as far as formats go, phone and browser should always have function parity
+> 5 - fair lap is the best choice, we would still like to have a toggle for it, something like "fair mode" vs "true random". Also want to be able to have presenter and crew to be able to manually re-include or exclude at will
+>
+> 6 - standings and a paced finale is the best option, however we would like "just the finale" to be a toggle as well
+> 7 - hidden gems is a good idea, call-it pops is a good idea
+
+His answers to the four open questions (one question round, 2026-10-27), each the recommended option:
+
+1. **Perfect list (+20):** "Every answer, exact spot" — every answer on the board guessed, each in its
+   exact numbered spot (possible only with 10 guesses per board).
+2. **True random:** "Anyone, never twice in a row" — uniform over everyone in the draw; a finished turn
+   doesn't take you out; never the same person twice in a row.
+3. **Spotlight a name vs Skip me:** "Yes, Skip me = random only" — choosing by name works on anyone
+   seated; Skip me only keeps you out of random draws (and stays private).
+4. **DAS-O-Ween defaults:** "Recommended set" — Score the crowd on, 10 guesses, medals After each round,
+   Standings + paced finale, Fair mode, crew not in the random draw, Hidden gems on, Called-it pops on.
+
+**Standing rule — phone and browser parity (Brian):** every audience and crew feature works the same
+on a phone and in a desktop browser tab: one component with a responsive layout, never a phone-only
+path, and e2e covers both (chromium and mobile).
+
+**Later (noted, not built):** *Scorekeeper credits* — a crew member credits answers given in the
+meeting chat or out loud to the person who gave them (studio decision 4, Brian's preferred approach,
+deferred). Also not chosen: Pumpkin patch, Double final round, First-caller star, the Awards show.
 
 ## Known limitations / next steps
 

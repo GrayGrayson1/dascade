@@ -98,7 +98,7 @@ Keep the stage window open: don't minimise it, or Teams freezes on its last pict
 | 15–20 | Opening, then the old cartoon | **Welcome** card; for the cartoon, share the video, then the stage again. |
 | 20 | The game starts | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks. |
 | 20–32 | Round 1 | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs). |
-| 32–33 | Intermission | **Next round** — the pool refills for round 2. |
+| 32–33 | Intermission | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first. |
 | 33–45 | Round 2 | The same. Then **Finish show** (two steps + hold). |
 | 45–50 | Second clip | **Be right back**, or share the clip |
 | 50–60 | Prizes | **Prize time**, then **Thanks for playing** |
@@ -133,16 +133,25 @@ irreversible thing (ending the show) takes two steps and a hold.
 
 ## Picking who answers
 
-Everyone who joined on a phone is **in the pool** — except you, the crew, big screens, spectators,
-anyone a moderator hid, and anyone who switched on **Skip me** (that's private: nobody can tell who
-skipped; only the pool count shows).
+Everyone who joined on a phone is **in the random draw** — except you, big screens, spectators, anyone
+a moderator hid, anyone you or the crew **excluded**, and anyone who switched on **Skip me** (that's
+private: nobody can tell who skipped, not even you; only the pool count shows). Crew are in the random
+draw only if **Crew in the random draw** is on in the setup (off for DAS-O-Ween).
+
+**Two modes** (setup → **Picker**):
+- **Fair mode** (DAS-O-Ween's): fewest turns first. Everyone gets a turn before anyone gets a second
+  one; once everyone has had one, the next lap opens by itself. Turns count for the whole show.
+- **True random**: anyone in the draw, every time — a finished turn doesn't take you out — but never
+  the same person twice in a row.
 
 | What | Button | Key |
 |---|---|---|
 | Pick someone | **Pick someone · 37 in the pool** | `K` |
-| They answered | **Mark done** — out of the pool until the next round | `D` |
-| They didn't | **No answer** — back in the pool, no penalty | `A` |
+| Pick a particular person | **Spotlight…** next to Pick: type a name, Enter. Works on anyone seated — even if they've had a turn, are excluded, have Skip me on, or are crew. Never you, a big screen or a spectator. (You and the producer.) | `F` |
+| They answered | **Mark done** — counts their turn | `D` |
+| They didn't | **No answer** — no turn counted, no penalty | `A` |
 | No-show after 30 s | **Reroll** with a reason (No answer / Not there / Other) — draws again without them; it's logged | — |
+| Take someone out of the draw / put them back | **Picker** tab → **Exclude** / **Include** next to their name, or **Include everyone**. You and every crew member, any time (lobby too). | — |
 
 - The server draws (fairly, with its own random generator); every screen only replays it.
 - **You see the name first** ("Priya S. — on stage in 2 s"), so you can read it before the stage lands.
@@ -151,7 +160,12 @@ skipped; only the pool count shows).
   everyone else's says "Priya S. is answering".
 - An answer you flip while someone is in the hot seat is credited on the tile: **called by Priya S.**
 - Pressing Pick while someone is still up asks "Mark Priya done?" instead of drawing again.
-- The pool refills when the next round starts.
+- The **Picker** tab lists everyone with their turns this show, who's excluded, who's crew and who's
+  done this round. If nobody is in the draw, the rail says why and offers **Include everyone** — and
+  **Spotlight…** always works.
+- Phones say where people stand: in the pool, "You've had a turn — you're back in once everyone has
+  had one", "out of the random draw" (excluded or Skip me), always with "The presenter can still call
+  you up by name". Crew see the same card on their crew screen.
 
 ---
 
@@ -162,6 +176,9 @@ skipped; only the pool count shows).
 - A second "Sam" is asked to add an initial ("Sam P."), or can keep "Sam 2".
 - **Moderators** (and you) open **Names**: **Rename** anyone, any time (they're told), or **Hide from
   stage** (off the spotlight grid and out of the pool; they stay in the room). Both are in the log.
+- Moderators and backup presenters also get the **Picker** tab on their crew screen (phone or laptop:
+  the same screen): **Exclude** / **Include** anyone, any time. Spotlight a name is yours and the
+  producer's.
 
 ---
 
