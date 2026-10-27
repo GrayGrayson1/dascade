@@ -34,7 +34,7 @@ export type GuessRejection = 'empty' | 'limit' | 'duplicate' | 'revealed';
 
 export const GUESS_REJECTION_TEXT: Record<GuessRejection, string> = {
   empty: 'Type a guess first.',
-  limit: `You've locked in all ${SHOWDOWN_LIMITS.guessesPerRound} guesses for this question.`,
+  limit: `You've locked in all your guesses for this question.`,
   duplicate: 'You already guessed that.',
   revealed: 'That answer is already on the board!',
 };
@@ -57,9 +57,17 @@ export class GuessBook {
 
   /**
    * Locks in a guess for `round`. `revealed` = the round's revealed flags right now (a guess that
-   * matches an answer already showing is refused — that answer is public anyway).
+   * matches an answer already showing is refused — that answer is public anyway). `limit` = guesses
+   * per player per board (the show's `guesses` setting).
    */
-  submit(playerId: string, round: number, def: Pick<ShowdownRoundDef, 'answers'>, rawText: string, revealed: readonly boolean[]): SubmitResult {
+  submit(
+    playerId: string,
+    round: number,
+    def: Pick<ShowdownRoundDef, 'answers'>,
+    rawText: string,
+    revealed: readonly boolean[],
+    limit: number = SHOWDOWN_LIMITS.guessesDefault,
+  ): SubmitResult {
     const text = maskProfanity(cleanText(rawText, SHOWDOWN_LIMITS.guessText));
     const key = answerKey(text);
     if (!text || !key) return { ok: false, reason: 'empty' };
@@ -72,7 +80,7 @@ export class GuessBook {
     if (mine.some((g) => g.key === key)) return { ok: false, reason: 'duplicate' };
     const slot = matchSlot(def, text);
     if (slot >= 0 && revealed[slot]) return { ok: false, reason: 'revealed' };
-    if (mine.length >= SHOWDOWN_LIMITS.guessesPerRound) return { ok: false, reason: 'limit' };
+    if (mine.length >= limit) return { ok: false, reason: 'limit' };
     // A second spelling of the same hidden answer is locked in like any guess (refusing it would tell
     // the player their earlier guess is on the board), but it never scores or counts twice.
     const repeat = slot >= 0 && mine.some((g) => g.slot === slot);

@@ -48,6 +48,16 @@ describe('GuessBook', () => {
     expect(book.submit('a', 1, OTHER, 'Pepperoni', none)).toEqual({ ok: true, slot: 0 });
   });
 
+  it('takes the limit from the show’s setting (1–10 guesses per board)', () => {
+    const book = new GuessBook();
+    expect(book.submit('a', 0, ROUND, 'Lamp', none, 1)).toEqual({ ok: true, slot: -1 });
+    expect(book.submit('a', 0, ROUND, 'mug', none, 1)).toEqual({ ok: false, reason: 'limit' });
+    const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    for (const w of words) expect(book.submit('b', 0, ROUND, w, none, 10)).toMatchObject({ ok: true });
+    expect(book.submit('b', 0, ROUND, 'eleven', none, 10)).toEqual({ ok: false, reason: 'limit' });
+    expect(book.count(0)).toBe(11);
+  });
+
   it('locks in a second spelling of the same hidden answer (no leak) but never scores or counts it twice', () => {
     const book = new GuessBook();
     expect(book.submit('a', 0, ROUND, 'mug', none)).toEqual({ ok: true, slot: 0 });
