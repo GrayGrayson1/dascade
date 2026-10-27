@@ -401,6 +401,7 @@ export abstract class BaseGameRoom<
     state.code = code;
     state.phase = 'LOBBY';
     state.allowSpectators = cap.supportsSpectators && !this.isSolo;
+    state.readyUp = this.lobbyReadyEnabled && !this.isSolo && (this.catalog.readyUp ?? true);
     state.locked = this.isSolo;
     state.maxPlayers = this.isSolo
       ? 1
@@ -1039,12 +1040,16 @@ export abstract class BaseGameRoom<
       LOBBY.ready,
       ReadySchema,
       (p, { ready }) => {
-        if (!this.lobbyReadyEnabled || this.tournamentBinding) {
+        if (!this.lobbyReadyEnabled || !this.state.readyUp || this.tournamentBinding) {
           return this.reject(
             p,
             LOBBY.ready,
             'not_allowed',
-            this.tournamentBinding ? 'Tournament games start automatically.' : 'There is nothing to get ready for here.',
+            this.tournamentBinding
+              ? 'Tournament games start automatically.'
+              : this.lobbyReadyEnabled
+                ? 'No need to ready up here: the host starts when they like.'
+                : 'There is nothing to get ready for here.',
           );
         }
         p.state.ready = ready && !p.state.spectator;
@@ -1144,6 +1149,11 @@ export abstract class BaseGameRoom<
         if (update.locked !== undefined && !this.isSolo) this.state.locked = update.locked;
         if (update.allowSpectators !== undefined && this.catalog.capacity.supportsSpectators && !this.isSolo) {
           this.state.allowSpectators = update.allowSpectators;
+        }
+        // Ready-up off: nobody is asked to ready up, so nobody stays marked ready either.
+        if (update.readyUp !== undefined && this.lobbyReadyEnabled && !this.isSolo) {
+          this.state.readyUp = update.readyUp;
+          if (!update.readyUp) for (const rec of this.players.values()) rec.state.ready = false;
         }
         if (update.maxPlayers !== undefined) {
           if (this.phase !== 'LOBBY') return this.reject(p, LOBBY.room, 'wrong_phase', 'Player limit can only change in the lobby.');
@@ -1596,6 +1606,7 @@ export abstract class BaseGameRoom<
     this.state.locked = true;
     this.state.maxPlayers = 2;
     this.state.allowSpectators = this.catalog.capacity.supportsSpectators;
+    this.state.readyUp = false;
     this.reconnectGraceSeconds = Math.max(this.reconnectGraceSeconds, binding.reconnectGraceSeconds);
     this.autoDispose = false;
     this.publishTournamentInfo();

@@ -70,6 +70,7 @@ const BASE_KEYS = [
   'locked',
   'maxPlayers',
   'allowSpectators',
+  'readyUp',
   'settingsJson',
   'settingsRev',
   'round',

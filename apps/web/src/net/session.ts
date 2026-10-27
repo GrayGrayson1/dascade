@@ -690,7 +690,7 @@ export const session = {
     spectate: (spectator: boolean) => session.send(LOBBY.spectate, { spectator }),
     profile: (patch: { name?: string; avatar?: string }) => session.send(LOBBY.profile, patch),
     settings: (settings: Record<string, unknown>) => session.send(LOBBY.settings, { settings }),
-    room: (patch: { roomName?: string; locked?: boolean; maxPlayers?: number; allowSpectators?: boolean }) =>
+    room: (patch: { roomName?: string; locked?: boolean; maxPlayers?: number; allowSpectators?: boolean; readyUp?: boolean }) =>
       session.send(LOBBY.room, patch),
     kick: (playerId: string) => session.send(LOBBY.kick, { playerId }),
     transferHost: (playerId: string) => session.send(LOBBY.transferHost, { playerId }),

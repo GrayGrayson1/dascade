@@ -299,6 +299,38 @@ describe('BaseGameRoom lifecycle', () => {
     await waitFor(() => st(host.room).players.get(guest.me().playerId)?.ready === false);
   });
 
+  it('the host can switch ready-up off: readies clear, ready-up is refused, and the start is unchanged', async () => {
+    const host = await createRoom();
+    const guest = await join(host.room.roomId, 'Bob');
+    const ready = () => st(host.room).players.get(guest.me().playerId)?.ready;
+    expect(st(host.room).readyUp).toBe(true);
+    guest.room.send('lobby:ready', { ready: true });
+    await waitFor(() => ready() === true);
+
+    // Only the host has the switch.
+    guest.room.send('lobby:room', { readyUp: false });
+    await waitFor(() => guest.errors.length === 1);
+    expect(guest.errors[0]!.code).toBe('not_host');
+    expect(host.server.state.readyUp).toBe(true);
+
+    host.room.send('lobby:room', { readyUp: false });
+    await waitFor(() => st(host.room).readyUp === false && ready() === false);
+    guest.room.send('lobby:ready', { ready: true });
+    await waitFor(() => guest.errors.length === 2);
+    expect(guest.errors[1]!.code).toBe('not_allowed');
+    expect(host.server.state.players.get(guest.me().playerId)?.ready).toBe(false);
+
+    // Back on, readying works again; either way the host starts when they like.
+    host.room.send('lobby:room', { readyUp: true });
+    await waitFor(() => st(guest.room).readyUp === true);
+    guest.room.send('lobby:ready', { ready: true });
+    await waitFor(() => ready() === true);
+    host.room.send('lobby:room', { readyUp: false });
+    await waitFor(() => st(host.room).readyUp === false);
+    host.room.send('lobby:start', {});
+    await waitFor(() => st(host.room).phase === 'PLAYING');
+  });
+
   it('a solo host who drops and comes back is still the host (no candidate ≠ no host)', async () => {
     const host = await createRoom('Solo');
     const me = host.me().playerId;

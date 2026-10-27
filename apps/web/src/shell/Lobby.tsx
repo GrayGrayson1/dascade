@@ -88,7 +88,9 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
   /** Host controls the server honours in this room. */
   const canManage = isHost && !tournamentMatch;
   const activeConnected = seated.filter((p) => p.connected);
-  const notReady = seated.filter((p) => !p.ready && !p.isHost && p.connected);
+  /** The host's room switch: off means no Ready up anywhere, and Start game starts at once. */
+  const readyUp = state.readyUp && !tournamentMatch;
+  const notReady = readyUp ? seated.filter((p) => !p.ready && !p.isHost && p.connected) : [];
   const minPlayers = catalog.capacity.minPlayers;
   const canStart = activeConnected.length >= minPlayers;
   const SettingsPanel = module?.SettingsPanel as ComponentType<SettingsPanelProps<Record<string, unknown>>> | undefined;
@@ -151,7 +153,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
               players={players}
               meId={game.playerId}
               hostView={canManage}
-              showReady={!tournamentMatch}
+              showReady={readyUp}
               maxPlayers={state.maxPlayers}
               locked={state.locked && !tournamentMatch}
             />
@@ -205,7 +207,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
         <div className="lobby__actions-inner">
           <LeaveButton size="md" className="lobby__leave" collapseLabel popover="above" />
           <span className="dc-spacer" />
-          {me && !me.spectator && !isHost && !tournamentMatch ? (
+          {me && !me.spectator && !isHost && readyUp ? (
             <Button
               className="lobby__ready"
               data-part="ready-button"
@@ -561,6 +563,12 @@ function RoomSettings({ gameId }: { gameId: GameId }) {
             onChange={(allowSpectators) => session.lobby.room({ allowSpectators })}
           />
         ) : null}
+        <Toggle
+          label="Players ready up before the start"
+          checked={state.readyUp}
+          disabled={!isHost}
+          onChange={(readyUp) => session.lobby.room({ readyUp })}
+        />
         <Field label="Max players" hint={`Up to ${cap.maxPlayersLimit} for ${GAME_CATALOG[gameId].title}.`}>
           {({ id, describedBy }) => (
             <NumberInput
