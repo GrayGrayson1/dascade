@@ -455,6 +455,7 @@ function RoundCard({
   count: number;
   issue: string | undefined;
   mark: string;
+  /** `fn` runs later, inside React's state update: read an input's value before calling (the event is cleared by then). */
   onEdit: (fn: (r: DraftRound) => DraftRound) => void;
   onAnswer: (ai: number, patch: Partial<DraftAnswer>) => void;
   onRemove: () => void;
@@ -498,7 +499,10 @@ function RoundCard({
             maxLength={SHOWDOWN_LIMITS.roundTitleMax}
             placeholder="Halloween Songs"
             aria-label={`Round ${n} category`}
-            onChange={(e) => onEdit((r) => ({ ...r, title: e.currentTarget.value }))}
+            onChange={(e) => {
+              const title = e.currentTarget.value;
+              onEdit((r) => ({ ...r, title }));
+            }}
           />
           <span className="sdc-f__hint">On the round’s title card.</span>
         </label>
@@ -509,7 +513,10 @@ function RoundCard({
             maxLength={SHOWDOWN_LIMITS.sourceMax}
             placeholder="DAS-O-Ween Host Picks"
             aria-label={`Round ${n} attribution`}
-            onChange={(e) => onEdit((r) => ({ ...r, source: e.currentTarget.value }))}
+            onChange={(e) => {
+              const source = e.currentTarget.value;
+              onEdit((r) => ({ ...r, source }));
+            }}
           />
           <span className="sdc-f__hint">“According to …” — leave blank for none. Don’t name a poll you didn’t run.</span>
         </label>
@@ -521,7 +528,10 @@ function RoundCard({
             maxLength={SHOWDOWN_LIMITS.promptMax}
             placeholder="Name the Top 10 Halloween Songs."
             aria-label={`Round ${n} question`}
-            onChange={(e) => onEdit((r) => ({ ...r, prompt: e.currentTarget.value }))}
+            onChange={(e) => {
+              const prompt = e.currentTarget.value;
+              onEdit((r) => ({ ...r, prompt }));
+            }}
           />
         </label>
       </div>
@@ -538,7 +548,10 @@ function RoundCard({
           <Select
             aria-label={`Round ${n} special answer`}
             value={String(round.special)}
-            onChange={(e) => onEdit((r) => ({ ...r, special: Number(e.currentTarget.value) }))}
+            onChange={(e) => {
+              const special = Number(e.currentTarget.value);
+              onEdit((r) => ({ ...r, special }));
+            }}
           >
             <option value="0">None</option>
             {Array.from({ length: Math.min(SHOWDOWN_LIMITS.answersMax, Math.max(places, 1)) }, (_, i) => (
