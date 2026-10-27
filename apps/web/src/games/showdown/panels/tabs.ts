@@ -4,10 +4,11 @@
  */
 import type { ShowdownPermission } from '@dascade/shared/games/showdown';
 
-export type CrewTab = 'names' | 'crew' | 'preflight';
+export type CrewTab = 'names' | 'picker' | 'crew' | 'preflight';
 
 export const CREW_TAB_LABEL: Record<CrewTab, string> = {
   names: 'Names',
+  picker: 'Picker',
   crew: 'Crew & log',
   preflight: 'Preflight',
 };
@@ -16,6 +17,7 @@ export function crewTabs(perms: readonly ShowdownPermission[] | readonly string[
   const has = (p: ShowdownPermission) => (perms as readonly string[]).includes(p);
   const out: CrewTab[] = [];
   if (has('people.rename') || has('people.hide')) out.push('names');
+  if (has('picker.manage') || has('picker.choose')) out.push('picker');
   if (has('audit.read') || has('crew.issue') || has('presenter.assign')) out.push('crew');
   if (has('preflight.read')) out.push('preflight');
   return out;

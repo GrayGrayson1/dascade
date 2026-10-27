@@ -6,7 +6,15 @@
  * 1.5 s converge (landAt − 1500) — then "Priya S. is answering · 0:12" from the landing on. After
  * SHOWDOWN_NO_SHOW_MS without an answer the presenter may reroll (with a reason the server logs).
  */
-import { SHOWDOWN_NO_SHOW_MS, type ShowdownMode, type ShowdownStage } from '@dascade/shared/games/showdown';
+import type { PlayerView } from '@dascade/shared';
+import {
+  SHOWDOWN_NO_SHOW_MS,
+  SHOWDOWN_PICK_MODE_INFO,
+  type ShowdownMode,
+  type ShowdownPickMode,
+  type ShowdownPickerPrivate,
+  type ShowdownStage,
+} from '@dascade/shared/games/showdown';
 
 /** The stage spends the last 1.5 s before landAt converging on the winner. */
 export const PICK_CONVERGE_MS = 1500;
@@ -14,7 +22,7 @@ export const PICK_CONVERGE_MS = 1500;
 export type PickerPhase =
   /** The picker can't run now: before round 1, or not a Presenter Showcase. */
   | { kind: 'off'; why: 'intro' | 'mode' }
-  /** Nobody left to draw this round. */
+  /** Nobody is in the random draw right now (Spotlight a name still works). */
   | { kind: 'empty' }
   /** Ready to draw from `pool` people. */
   | { kind: 'ready'; pool: number }
@@ -66,6 +74,8 @@ export interface DrawLine {
   how: 'drawn' | 'done' | 'noAnswer' | 'reroll' | 'cleared';
   /** This draw was a reroll's redraw. */
   reroll: boolean;
+  /** Spotlight a name: chosen, not drawn. */
+  chosen?: boolean;
   at: number;
 }
 
@@ -78,7 +88,7 @@ const HOW_WORDS: Record<DrawLine['how'], string> = {
 };
 
 export function drawWords(line: DrawLine): string {
-  return `${line.reroll ? 'Redraw' : 'Draw'} ${line.drawNo}: ${line.name}, ${HOW_WORDS[line.how]}`;
+  return `${line.chosen ? 'Spotlight' : line.reroll ? 'Redraw' : 'Draw'} ${line.drawNo}: ${line.name}, ${HOW_WORDS[line.how]}`;
 }
 
 /**
@@ -88,14 +98,107 @@ export function drawWords(line: DrawLine): string {
 export function foldDraw(
   list: readonly DrawLine[],
   ev:
-    | { type: 'pick'; drawNo: number; name: string; reroll: boolean }
+    | { type: 'pick'; drawNo: number; name: string; reroll: boolean; chosen?: boolean }
     | { type: 'pickEnd'; drawNo: number; how: 'done' | 'noAnswer' | 'reroll' | 'cleared' },
   at: number,
   cap = 30,
 ): DrawLine[] {
   if (ev.type === 'pick') {
     if (list.some((l) => l.drawNo === ev.drawNo)) return [...list];
-    return [{ drawNo: ev.drawNo, name: ev.name, how: 'drawn' as const, reroll: ev.reroll, at }, ...list].slice(0, cap);
+    const line: DrawLine = {
+      drawNo: ev.drawNo,
+      name: ev.name,
+      how: 'drawn',
+      reroll: ev.reroll,
+      ...(ev.chosen ? { chosen: true } : {}),
+      at,
+    };
+    return [line, ...list].slice(0, cap);
   }
   return list.map((l) => (l.drawNo === ev.drawNo && l.how === 'drawn' ? { ...l, how: ev.how } : l));
+}
+
+/** One person the picker can put in the hot seat (the presenter, big screens and spectators never). */
+export interface PickPerson {
+  id: string;
+  name: string;
+  crew: boolean;
+  /** Turns this show. */
+  turns: number;
+  /** Out of the random draw (Include puts them back). */
+  excluded: boolean;
+  /** Hidden by a moderator: can't be chosen until shown again. */
+  hidden: boolean;
+  away: boolean;
+  /** Their turn counted this round. */
+  done: boolean;
+  hot: boolean;
+  me: boolean;
+}
+
+export interface PickPeopleInput {
+  players: Record<string, Pick<PlayerView, 'id' | 'name' | 'connected' | 'spectator'>> | null | undefined;
+  presenterId: string;
+  screens: Record<string, boolean> | null | undefined;
+  done: Record<string, boolean> | null | undefined;
+  hotSeat: string;
+  myId: string | null;
+  /** The server's picker view (presenter and crew); null = not sent yet. */
+  picker: ShowdownPickerPrivate | null | undefined;
+}
+
+/** Everyone who could take the hot seat, A–Z (the presenter, big screens and spectators never). */
+export function pickPeople(input: PickPeopleInput): PickPerson[] {
+  const crew = new Set(input.picker?.crew ?? []);
+  const excluded = new Set(input.picker?.excluded ?? []);
+  const hidden = new Set(input.picker?.hidden ?? []);
+  const rows: PickPerson[] = [];
+  for (const p of Object.values(input.players ?? {})) {
+    if (!p || p.spectator || p.id === input.presenterId || input.screens?.[p.id]) continue;
+    rows.push({
+      id: p.id,
+      name: p.name,
+      crew: crew.has(p.id),
+      turns: input.picker?.turns[p.id] ?? 0,
+      excluded: excluded.has(p.id),
+      hidden: hidden.has(p.id),
+      away: !p.connected,
+      done: input.done?.[p.id] === true,
+      hot: p.id === input.hotSeat,
+      me: p.id === input.myId,
+    });
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id));
+}
+
+/** Can be chosen by name right now (the server checks again). */
+export function choosable(p: PickPerson): boolean {
+  return !p.hidden && !p.away && !p.hot;
+}
+
+/** Why nobody is in the random draw — never naming who chose Skip me. */
+export function emptyWhy(people: readonly PickPerson[], crewDraw: boolean): string {
+  const here = people.filter((p) => !p.away && !p.hidden && !p.hot && (crewDraw || !p.crew));
+  if (here.length === 0) return 'Nobody in the audience is connected right now.';
+  if (here.every((p) => p.excluded)) return 'Everyone here is excluded from the random draw.';
+  return 'Everyone here is excluded, hidden or has switched on Skip me.';
+}
+
+/** "Fair mode: fewest turns first…", plus where the crew stand. */
+export function modeWords(mode: ShowdownPickMode, crewDraw: boolean): string {
+  return `${SHOWDOWN_PICK_MODE_INFO[mode].title}: ${SHOWDOWN_PICK_MODE_INFO[mode].blurb} ${
+    crewDraw ? 'Crew are in the random draw too.' : 'Crew are only picked by name.'
+  }`;
+}
+
+/** Names matching a search (accents and case ignored), choosable first. */
+export function searchPeople(people: readonly PickPerson[], query: string): PickPerson[] {
+  const fold = (t: string) =>
+    t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase();
+  const q = fold(query.trim());
+  const hits = q ? people.filter((p) => fold(p.name).includes(q)) : [...people];
+  return hits.sort((a, b) => Number(choosable(b)) - Number(choosable(a)));
 }

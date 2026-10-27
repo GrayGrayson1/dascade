@@ -99,6 +99,12 @@ export function auditWords(e: ShowdownAuditEntry): string {
     case 'picker.reroll':
       // The entry names the redraw's winner (the person rerolled went back in the pool).
       return `rerolled and drew ${them}${drawDetail(e)}`;
+    case 'picker.choose':
+      return `spotlighted ${them} by name${e.before ? ` (${e.before})` : ''}`;
+    case 'picker.exclude':
+      return `took ${them} out of the random draw`;
+    case 'picker.include':
+      return who === 'Everyone' ? 'put everyone back in the random draw' : `put ${them} back in the random draw`;
     case 'audio.station':
       return `moved the sound station to ${e.after || who || 'the presenter’s console'}`;
     case 'audio.failover':

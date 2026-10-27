@@ -23,6 +23,8 @@ import {
   SHOWDOWN_MSG,
   SHOWDOWN_PACK_IDS,
   SHOWDOWN_PACK_INFO,
+  SHOWDOWN_PICK_MODES,
+  SHOWDOWN_PICK_MODE_INFO,
   SHOWDOWN_SCORING,
   SHOWDOWN_SCORING_INFO,
   SHOWDOWN_TEAMS,
@@ -48,7 +50,7 @@ import { ContentEditor } from './ContentEditor.tsx';
 import { AudioStatus, BigScreenLinkButton, PresenterTools, StageCards, StageWindowButton, loadEventPreset } from './consoleParts.tsx';
 import { copyText, screenLink, setScreenMode, useScreenMode } from './access.ts';
 import { useEvent, useLook, usePass, useRehearsal, useRole, useRosters, useShowdownSettings } from './state.ts';
-import { CrewPanel, NamesPanel, PreflightPanel } from './panels/index.ts';
+import { CrewPanel, NamesPanel, PickerPanel, PreflightPanel } from './panels/index.ts';
 import { PoolCard } from './PoolCard.tsx';
 import { TourButton } from './tour/TourButton.tsx';
 import './chrome-showcase.css';
@@ -283,6 +285,7 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
               onChange={(audience) => update({ audience })}
             />
           </div>
+          <GuessesField settings={settings} canEdit={canEdit} update={update} />
 
           <div className="sd-teamnames">
             {([0, 1] as const).map((t) => (
@@ -527,6 +530,28 @@ function ShowcaseOptions({ settings, canEdit, update }: SettingsPanelProps<Showd
           For a meeting, leave phone guesses off: people guess in the chat and you flip what they name.
         </span>
       </div>
+      <GuessesField settings={settings} canEdit={canEdit} update={update} />
+      <fieldset className="sdc-optgroup" data-part="showdown-picker-options">
+        <legend className="dc-field__label">Picker</legend>
+        <Segmented
+          label="Picker mode"
+          value={settings.pickMode ?? 'fair'}
+          disabled={!canEdit}
+          onChange={(pickMode) => pickMode !== settings.pickMode && update({ pickMode })}
+          options={SHOWDOWN_PICK_MODES.map((m) => ({ value: m, label: SHOWDOWN_PICK_MODE_INFO[m].title }))}
+        />
+        <span className="dc-field__hint">{SHOWDOWN_PICK_MODE_INFO[settings.pickMode ?? 'fair'].blurb}</span>
+        <Toggle
+          label="Crew in the random draw"
+          checked={settings.crewDraw ?? false}
+          disabled={!canEdit}
+          onChange={(crewDraw) => update({ crewDraw })}
+        />
+        <span className="dc-field__hint">
+          Off: the producer, backups and moderators are only picked by name (Spotlight a name). Anyone can be spotlighted by name, whether
+          or not they’ve had a turn.
+        </span>
+      </fieldset>
       <div className="dc-field">
         <span className="dc-field__label">Display</span>
         <Segmented
@@ -539,6 +564,30 @@ function ShowcaseOptions({ settings, canEdit, update }: SettingsPanelProps<Showd
         <span className="dc-field__hint">{SHOWDOWN_DISPLAY_INFO[settings.display ?? 'auto'].blurb}</span>
       </div>
     </div>
+  );
+}
+
+/** Guesses each phone may lock in per board (the audience game), 1–10. */
+function GuessesField({ settings, canEdit, update }: SettingsPanelProps<ShowdownSettings>) {
+  const guesses = settings.guesses ?? SHOWDOWN_LIMITS.guessesDefault;
+  return (
+    <Field
+      label="Guesses per board"
+      hint={settings.audience ? 'How many private guesses each phone can lock in per question.' : 'Used when phone guesses are on.'}
+    >
+      {({ id, describedBy }) => (
+        <NumberInput
+          id={id}
+          aria-describedby={describedBy}
+          value={guesses}
+          min={1}
+          max={SHOWDOWN_LIMITS.guessesMax}
+          disabled={!canEdit || !settings.audience}
+          onChange={(n) => n !== guesses && update({ guesses: n })}
+          data-part="showdown-guesses-setting"
+        />
+      )}
+    </Field>
   );
 }
 
@@ -567,11 +616,14 @@ export function ShowdownPlayerSetup() {
             Event room
           </Badge>
         </span>
-        <span className="dc-field__hint">Run the preflight before doors open, hand out crew links, and fix names as people join.</span>
+        <span className="dc-field__hint">
+          Run the preflight before doors open, hand out crew links, fix names as people join, and take anyone out of the random draw.
+        </span>
         <div className="sdp-lobbycrew">
           <PreflightPanel look={look} code={code} title={title} />
           <CrewPanel code={code} />
           <NamesPanel />
+          {showcase ? <PickerPanel look={look} board={null} /> : null}
         </div>
       </section>
     ) : null;
