@@ -201,6 +201,18 @@ describe('DAS Survey Showdown — presenter role and secrecy', () => {
     expect(sizes).toEqual([30, 30]);
   });
 
+  it('asks nobody to ready up by default: the presenter starts when they like (the host can switch it on)', async () => {
+    const t = await setup({ custom: false });
+    expect(t.server.state.readyUp).toBe(false);
+    t.a.room.send('lobby:ready', { ready: true });
+    await waitFor(() => t.a.errors.length > 0, 2000, 'ready refused');
+    expect(t.server.state.players.get(t.a.id()).ready).toBe(false);
+    t.host.room.send('lobby:room', { readyUp: true });
+    await waitFor(() => t.server.state.readyUp === true, 2000, 'switched on');
+    t.a.room.send('lobby:ready', { ready: true });
+    await waitFor(() => t.server.state.players.get(t.a.id()).ready === true, 2000, 'ready');
+  });
+
   it('never sends hidden answers to the audience — only revealed ones reach their board', async () => {
     const t = await setup();
     const spec = await t.join('Spec', { spectator: true });

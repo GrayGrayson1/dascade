@@ -8,7 +8,7 @@ For a game with id `<id>`:
 
 | What | Path | Notes |
 |---|---|---|
-| Catalog entry | `packages/shared/src/catalog.ts` | `GAME_IDS` + `GAME_CATALOG[<id>]`: title, taglines, `category`, `cabinet`, capacity, controls, how-to-play, accent. Optional `tournament`, `rated`, `reconnectGraceSeconds`. |
+| Catalog entry | `packages/shared/src/catalog.ts` | `GAME_IDS` + `GAME_CATALOG[<id>]`: title, taglines, `category`, `cabinet`, capacity, controls, how-to-play, accent. Optional `tournament`, `rated`, `reconnectGraceSeconds`, `readyUp` (whether a new room asks players to ready up; default true). |
 | Cabinet listing | `packages/shared/src/cabinets.ts` | Add the game to its cabinet's `games[]` (see the README for adding a cabinet). |
 | Shared contract | `packages/shared/src/games/<id>.ts` | Settings Zod schema + defaults, message names, payload schemas and public types. Imported by both server and client. |
 | Pure engine | `packages/game-core/src/<id>/` (`index.ts` + `*.test.ts`) | Pure TypeScript: no Colyseus, no DOM. Deterministic with an injected `Rng`. **Heavily unit tested.** |

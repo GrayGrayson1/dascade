@@ -37,6 +37,7 @@ export const BaseRoomState = schema(
     locked: t.boolean().default(false),
     maxPlayers: t.uint16().default(8),
     allowSpectators: t.boolean().default(true),
+    readyUp: t.boolean().default(true),
     settingsJson: t.string().default('{}'),
     settingsRev: t.uint32().default(0),
     players: t.map(PlayerState),

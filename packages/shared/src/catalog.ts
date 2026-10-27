@@ -88,6 +88,8 @@ export interface GameCatalogEntry {
   rated?: boolean;
   /** Seconds a dropped player keeps their live session (long, thoughtful games get more). Default RECONNECT_GRACE_SECONDS. */
   reconnectGraceSeconds?: number;
+  /** Whether a new room asks players to ready up before the start (the host can switch it in the lobby). Default true. */
+  readyUp?: boolean;
   accent: GameAccent;
   capacity: GameCapacity;
   /** One-line control hints for the cabinet plaque. */
@@ -620,6 +622,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     category: 'party',
     cabinet: 'stravaganza',
     reconnectGraceSeconds: 180,
+    // An audience show: the presenter starts when they like, not when a crowd of phones has readied up.
+    readyUp: false,
     accent: { primary: '#ffb020', secondary: '#ff4fd8', deep: '#1a0b2e' },
     capacity: {
       minPlayers: 1,

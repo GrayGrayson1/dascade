@@ -150,6 +150,7 @@ export const RoomUpdateSchema = /* @__PURE__ */ lazy(() =>
     locked: z.boolean().optional(),
     maxPlayers: z.number().int().min(1).max(100).optional(),
     allowSpectators: z.boolean().optional(),
+    readyUp: z.boolean().optional(),
   }),
 );
 export const TargetPlayerSchema = /* @__PURE__ */ lazy(() => z.object({ playerId: z.string().min(1).max(64) }));
@@ -274,6 +275,8 @@ export interface BaseRoomView {
   locked: boolean;
   maxPlayers: number;
   allowSpectators: boolean;
+  /** Players ready up in the lobby (the host's switch). Off: no Ready up, and Start game starts at once. */
+  readyUp: boolean;
   /** JSON of the validated game settings. */
   settingsJson: string;
   settingsRev: number;
