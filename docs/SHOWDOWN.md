@@ -423,6 +423,23 @@ Manual walkthrough:
 - The stage window needs pop-ups allowed. Without them, use the big-screen link.
 - Not tournament-capable (team format) and not rated.
 
+### To revisit: leaving a show
+
+For the DAS-O-Ween show (Brian, 2026-10-27), Survey Showdown's main screens hide every way back to
+the arcade: the top bar's Leave, the lobby bar's Leave (bottom left), the results' *Back to cabinet*
+and *Leave*, and the Leave in the big screen's and the crew screen's corners. The invite's join card
+(`/room/<code>` without a saved name) drops its *Arcade* button and centres *Join game*. One list
+switches all of it: `NO_ARCADE_EXIT` in `apps/web/src/shell/arcadeExit.ts`.
+
+Still there on purpose, so nobody is stuck on a room that's gone: the reconnecting card's Leave, the
+connection-lost and error screens' *Back to arcade*, the join card for a dead code, the event join
+link's "This show isn't open right now" card, and the browser's Back. The cabinet page
+(`/play/showdown`), where the presenter creates the room, isn't inside a show and keeps its way back.
+
+To decide later: how guests, crew and big screens should leave a show (an end-of-show "You can close
+this tab" card, a Leave only after the finale, a presenter-only exit, or Leave back for everyone), and
+whether the error screens should send guests to the event's join link instead of the arcade.
+
 ## Removing the feature
 
 1. Delete `apps/web/src/games/showdown/`, `apps/game-server/src/rooms/showdown/`,

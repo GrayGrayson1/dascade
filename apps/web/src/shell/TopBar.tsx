@@ -6,6 +6,7 @@ import { useRoomSelector } from '../net/hooks.ts';
 import { sfx } from '../audio/audio.ts';
 import { ConnectionDot, LeaveButton } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
+import { hidesArcadeExit } from './arcadeExit.ts';
 import { ThemeButton } from '../themes/ThemeButton.tsx';
 
 const PHASE_LABEL: Record<string, string> = {
@@ -64,7 +65,7 @@ export function TopBar({ gameId, code }: { gameId: GameId; code: string }) {
   return (
     <header className="topbar" data-part="top-bar" style={{ '--accent': game.accent.primary } as React.CSSProperties}>
       <div className="topbar__left" data-part="top-bar-left">
-        <LeaveButton size="sm" compact popover="below" />
+        {hidesArcadeExit(gameId) ? null : <LeaveButton size="sm" compact popover="below" />}
         <span
           className="topbar__title dc-pixel"
           data-part="top-bar-title"
@@ -179,7 +180,7 @@ export function ShellMenu({ gameId, code }: { gameId: GameId; code: string }) {
             >
               {muted ? 'Unmute' : 'Mute'}
             </Button>
-            <LeaveButton size="sm" className="shell-menu__leave" />
+            {hidesArcadeExit(gameId) ? null : <LeaveButton size="sm" className="shell-menu__leave" />}
           </div>
         </div>
       ) : null}

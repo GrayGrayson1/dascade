@@ -26,6 +26,7 @@ import { sfx } from '../audio/audio.ts';
 import type { GameClientModule, SettingsPanelProps } from '../games/types.ts';
 import { ChatPanel, GameStage, LeaveButton } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
+import { hidesArcadeExit } from './arcadeExit.ts';
 import { ThemedText } from '../themes/ThemedText.tsx';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
 
@@ -204,8 +205,8 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           phones it is one row — Leave and Spectate collapse to icons, Ready/Start fills the rest
           and the waiting note becomes a caption (see app.css). */}
       <footer className="lobby__actions" data-part="lobby-actions">
-        <div className="lobby__actions-inner">
-          <LeaveButton size="md" className="lobby__leave" collapseLabel popover="above" />
+        <div className="lobby__actions-inner" data-leave={hidesArcadeExit(gameId) ? 'off' : undefined}>
+          {hidesArcadeExit(gameId) ? null : <LeaveButton size="md" className="lobby__leave" collapseLabel popover="above" />}
           <span className="dc-spacer" />
           {me && !me.spectator && !isHost && readyUp ? (
             <Button

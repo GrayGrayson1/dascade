@@ -19,6 +19,7 @@ import { useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { sfx } from '../../audio/audio.ts';
 import { GameStage, LeaveButton } from '../../shell/common.tsx';
+import { hidesArcadeExit } from '../../shell/arcadeExit.ts';
 import { Stage } from './Stage.tsx';
 import { showdownApi } from './api.ts';
 import { CrewPanel, NamesPanel, PreflightPanel } from './panels/index.ts';
@@ -67,7 +68,7 @@ export function CrewView({ look, settings, code }: { look: ShowdownLook; setting
               {rehearsal ? ' · Rehearsal' : ''} · Room <span className="dc-num">{code}</span>
             </span>
           </div>
-          <LeaveButton size="sm" collapseLabel />
+          {hidesArcadeExit('showdown') ? null : <LeaveButton size="sm" collapseLabel />}
         </header>
 
         <p className="sdp-crewnote">
