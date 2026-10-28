@@ -729,7 +729,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
           <Kbd>X</Kbd> wrong
         </span>
         <span>
-          <Kbd>R</Kbd> reveal remaining (hold while the clock runs)
+          <Kbd>R</Kbd> reveal remaining (hold if the clock runs)
         </span>
         <span>
           <Kbd>C</Kbd> celebrate

@@ -140,6 +140,12 @@ test.describe('the join QR on the stage', () => {
     await expect(pop(tv)).toBeVisible();
     await expect(stageWin.locator('.sd-board, [data-part="showdown-board"]').first()).toBeVisible();
     await stageWin.waitForTimeout(800);
+    // Beside the board's frame (over the status column), never over the answers; the clock stays in view.
+    const box = async (sel: string) => (await stageWin.locator(sel).first().boundingBox())!;
+    const [frame, popped, clock] = await Promise.all(['.sd-sc__frame', '[data-part="showdown-join-pop"] .sd-ticket', '.sd-clock'].map(box));
+    expect(popped.x).toBeGreaterThan(frame.x + frame.width);
+    expect(popped.x + popped.width).toBeLessThanOrEqual(1280);
+    expect(popped.y).toBeGreaterThan(clock.y + clock.height);
     await shot(stageWin, 'qr-join-popup');
     expect(await phone.locator('canvas.sd-qr, [data-part="showdown-join-ticket"]').count()).toBe(0);
     // Phones never even fetch the encoder (its own chunk); the stage window did.
