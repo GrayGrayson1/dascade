@@ -15,6 +15,7 @@ import {
   SHOWDOWN_AUDIO_SILENT,
   SHOWDOWN_STATION_TIMEOUT_MS,
   type ShowdownCard,
+  type ShowdownSceneCard,
   type ShowdownEvent,
   type ShowdownMode,
   type ShowdownStage,
@@ -164,10 +165,19 @@ export function stationLostMessage(screenName: string): string {
 // The jukebox and the theme bed (AUD-04)
 // ---------------------------------------------------------------------------
 
-/** Live = a question is up (until the next round's card); break = a title card, a holding card or the results. */
-export type MusicSegment = 'live' | 'break' | 'neutral';
+/**
+ * Live = a question is up (until the next round's card); break = a title card, a holding card or the
+ * results; cinema = the presenter's video is on (its sound is the only one: the jukebox waits).
+ */
+export type MusicSegment = 'live' | 'break' | 'cinema' | 'neutral';
 
-export function musicSegment(o: { phase: string; stage: ShowdownStage | null; card: ShowdownCard | null }): MusicSegment {
+export function musicSegment(o: {
+  phase: string;
+  stage: ShowdownStage | null;
+  card: ShowdownCard | null;
+  scene?: ShowdownSceneCard | null;
+}): MusicSegment {
+  if (o.scene === 'cinema') return 'cinema';
   if (o.phase === 'RESULTS') return 'break';
   if (o.card !== null && (o.phase === 'PLAYING' || o.phase === 'LOBBY')) return 'break';
   if (o.phase !== 'PLAYING') return 'neutral';
@@ -179,8 +189,10 @@ export function musicSegment(o: { phase: string; stage: ShowdownStage | null; ca
 /** What the show does to the jukebox as the segment changes: hold it as a question goes live, give it back in a break. */
 export function jukeboxStep(prev: MusicSegment | null, next: MusicSegment): 'hold' | 'release' | null {
   if (prev === next) return null;
-  if (next === 'live') return 'hold';
+  if (next === 'live' || next === 'cinema') return 'hold';
   if (next === 'break') return 'release';
+  // Out of Cinema before the show (or anywhere that's neither live nor a break): the music it held comes back.
+  if (prev === 'cinema') return 'release';
   return null;
 }
 
@@ -201,6 +213,8 @@ export interface BedInput {
   phase: string;
   stage: ShowdownStage | null;
   card: ShowdownCard | null;
+  /** A stage scene instead of the Show (Cinema plays its own sound: no bed under it). */
+  scene?: ShowdownSceneCard | null;
   /** (Event rooms) the jukebox is playing or the show holds it paused: one music source per segment. */
   jukeboxBusy: boolean;
 }
@@ -211,7 +225,7 @@ export interface BedInput {
  * jukebox paused (the break that follows gives the jukebox back).
  */
 export function bedWanted(o: BedInput): boolean {
-  if (o.mode !== 'showcase' || !o.musicPref || !o.audible || o.jukeboxBusy) return false;
+  if (o.mode !== 'showcase' || !o.musicPref || !o.audible || o.jukeboxBusy || o.scene) return false;
   if (o.phase === 'PLAYING') return o.card !== null || o.stage === 'intro' || o.stage === 'title';
   return (o.phase === 'LOBBY' || o.phase === 'RESULTS') && o.card !== null;
 }
