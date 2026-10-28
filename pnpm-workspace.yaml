@@ -4,3 +4,9 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+# Security sweep F-02 to F-04 (Oct 2026): Colyseus' peer dependencies still resolved zod 4.6.5, and
+# Express 5.2.1 body-parser 2.3.0 and qs 6.16.0.
+overrides:
+  body-parser: ^2.4.0
+  qs: ^6.16.1
+  zod: ^4.6.7
