@@ -109,31 +109,41 @@ Keep the stage window open: don't minimise it, or Teams freezes on its last pict
   nothing**, so Windows doesn't turn the shared sound down.
 - If the video stutters for viewers, press **Optimize** in Teams' presenter toolbar.
 
+### The Awards desk (fill it in during the quiz)
+
+Console drawer → **Awards** (or the results screen's **Awards**). Each award (Best Costume, Best
+Background; Trivia Champions fills itself from the finale's podium) has a 1st, 2nd and 3rd: type the
+name, and add a photo if you like: **paste** a Teams screenshot into the row (Ctrl/Cmd+V), **drop** a
+picture on it, or press its photo button. Photos are shrunk in your browser and never uploaded; names
+and photos stay in this browser (a console reload keeps them). **Nothing shows on the share until
+Start.** Places with no name are skipped.
+
 ### Scenes: what the stage window shows
 
 The scene strip above the console's preview switches the stage window; you never re-share in Teams.
 
-| Scene      | Key | What the share shows                                                       | Phones and big-screen links            |
-| ---------- | --- | -------------------------------------------------------------------------- | -------------------------------------- |
-| **Show**   | `B` | The board, exactly where you left it                                       | The board                              |
-| **Cinema** | `V` | Your video in its frame (press **Play** in the Cinema tab)                 | "Cartoon break: watch the Teams share" |
-| **Cards**  |     | Opens the Cards tab: Welcome, Be right back, Standings, Prize time, Thanks | The card                               |
+| Scene      | Key | What the share shows                                                       | Phones and big-screen links              |
+| ---------- | --- | -------------------------------------------------------------------------- | ---------------------------------------- |
+| **Show**   | `B` | The board, exactly where you left it                                       | The board                                |
+| **Cinema** | `V` | Your video in its frame (press **Play** in the Cinema tab)                 | "Cartoon break: watch the Teams share"   |
+| **Awards** |     | The awards ceremony (start it in the Awards tab)                           | "Awards on stage: watch the Teams share" |
+| **Cards**  |     | Opens the Cards tab: Welcome, Be right back, Standings, Prize time, Thanks | The card                                 |
 
 Leaving the Show while the round clock runs **pauses the clock**; press `P` to start it again. The
 jukebox pauses during Cinema and comes back in the next break.
 
 ### Event cue sheet (60 minutes)
 
-| Time  | What's happening                     | What you do                                                                                                                                                                                                                                                           |
-| ----- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0–15  | Introductions, Halloween backgrounds | **Welcome** card (it carries the big QR ticket). At 0:00 post the link and its QR in the chat. The DAS-O-Ween record can play from the jukebox.                                                                                                                       |
-| 15–20 | Opening, then the old cartoon        | **Welcome** card. For the cartoon: Cinema tab → choose the cartoon → `V` → **Play**. When it ends, `Cards` → Welcome (or `B`).                                                                                                                                        |
-| 20    | The game starts                      | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks.                                                                                                                                                     |
-| 20–32 | Round 1                              | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs). |
-| 32–33 | Intermission                         | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first. Latecomers: press `J` for the Join pop-up (the QR over the board for 20 s).                                                                                                           |
-| 33–45 | Round 2                              | The same. Then **Finish show** (two steps + hold).                                                                                                                                                                                                                    |
-| 45–50 | Second clip                          | Cinema tab → choose the second clip → `V` → **Play**. Then `B`.                                                                                                                                                                                                       |
-| 50–60 | Prizes                               | **Prize time**, then **Thanks for playing**                                                                                                                                                                                                                           |
+| Time  | What's happening                     | What you do                                                                                                                                                                                                                                                                         |
+| ----- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0–15  | Introductions, Halloween backgrounds | **Welcome** card (it carries the big QR ticket). At 0:00 post the link and its QR in the chat. The DAS-O-Ween record can play from the jukebox.                                                                                                                                     |
+| 15–20 | Opening, then the old cartoon        | **Welcome** card. For the cartoon: Cinema tab → choose the cartoon → `V` → **Play**. When it ends, `Cards` → Welcome (or `B`).                                                                                                                                                      |
+| 20    | The game starts                      | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks.                                                                                                                                                                   |
+| 20–32 | Round 1                              | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs).               |
+| 32–33 | Intermission                         | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first. Latecomers: press `J` for the Join pop-up (the QR over the board for 20 s).                                                                                                                         |
+| 33–45 | Round 2                              | The same. Then **Finish show** (two steps + hold).                                                                                                                                                                                                                                  |
+| 45–50 | Second clip                          | Cinema tab → choose the second clip → `V` → **Play**. Then `B`.                                                                                                                                                                                                                     |
+| 50–60 | Awards and prizes                    | On the results screen, **Awards** → **Start the ceremony**, then **Next** for each step: the title, each award, 3rd → 2nd → 1st (each after its drumroll), fireworks on the last winner, then **Thanks for playing**. No awards ready? **Prize time**, then **Thanks for playing**. |
 
 ---
 
