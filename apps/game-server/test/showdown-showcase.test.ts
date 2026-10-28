@@ -153,7 +153,10 @@ describe('Presenter Showcase — presets, roles and secrecy', () => {
       title: 'DAS-O-Ween Trivia',
       source: 'custom',
       minutes: 10,
-      audience: false,
+      audience: true,
+      points: true,
+      guesses: 10,
+      medals: 'round',
     });
     expect(json(t.a).rehearsal).toBe(false);
     const content = t.host.contents.at(-1)!;
