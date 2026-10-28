@@ -115,9 +115,16 @@ function createHttpServer(): http.Server {
   return httpServer;
 }
 
-/** CSP for the HTML shell. Inline style attributes are used by React; no inline/eval scripts. */
-function contentSecurityPolicy(): string {
-  const supabase = config.supabasePublicUrl ? ` ${config.supabasePublicUrl} ${config.supabasePublicUrl.replace(/^http/, 'ws')}` : '';
+const HOST_RE = /^(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?$/i;
+
+/**
+ * CSP for the HTML shell. Inline style attributes are used by React; no inline/eval scripts.
+ * connect-src is the site itself and its own WebSocket origin (F-05: it was `ws: wss:`, any host),
+ * plus Supabase when configured. `host` comes from the request, so it is checked before use.
+ */
+export function contentSecurityPolicy(host: string | undefined, secure: boolean, supabaseUrl = config.supabasePublicUrl): string {
+  const supabase = supabaseUrl ? ` ${supabaseUrl} ${supabaseUrl.replace(/^http/, 'ws')}` : '';
+  const socket = host && HOST_RE.test(host) ? ` ${secure ? 'wss' : 'ws'}://${host.toLowerCase()}` : '';
   return [
     "default-src 'self'",
     "script-src 'self'",
@@ -125,13 +132,17 @@ function contentSecurityPolicy(): string {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' data: blob:",
-    `connect-src 'self' ws: wss:${supabase}`,
+    `connect-src 'self'${socket}${supabase}`,
     "worker-src 'self' blob:",
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
   ].join('; ');
+}
+
+function cspFor(req: express.Request): string {
+  return contentSecurityPolicy(req.headers.host, req.secure || req.headers['x-forwarded-proto'] === 'https');
 }
 
 function serveWebClient(app: express.Application): void {
@@ -141,7 +152,6 @@ function serveWebClient(app: express.Application): void {
     log.warn(`Web client not found at ${dist} — run "pnpm build" to serve it from this process.`);
     return;
   }
-  const csp = contentSecurityPolicy();
   // Source maps are built ('hidden') for error tooling but not published (set SERVE_SOURCEMAPS=1 to allow).
   if (process.env.SERVE_SOURCEMAPS !== '1') {
     app.use((req, res, next) => (req.path.endsWith('.map') ? void res.status(404).end() : next()));
@@ -157,7 +167,7 @@ function serveWebClient(app: express.Application): void {
       // /index.html (or any other static HTML) gets the same CSP as the SPA fallback.
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
-          res.setHeader('Content-Security-Policy', csp);
+          res.setHeader('Content-Security-Policy', cspFor(res.req));
           res.setHeader('Cache-Control', 'no-cache');
         }
         // The jukebox manifest changes whenever songs are added; MP3s/art keep the 1h default (ETag revalidates).
@@ -166,9 +176,9 @@ function serveWebClient(app: express.Application): void {
     }),
   );
   // SPA fallback for client routes (never for API / matchmaking / static media: a missing song is a 404, not HTML).
-  app.get(/^\/(?!api\/|matchmake\/|assets\/|audio\/).*/, (_req, res) => {
+  app.get(/^\/(?!api\/|matchmake\/|assets\/|audio\/).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Content-Security-Policy', csp);
+    res.setHeader('Content-Security-Policy', cspFor(req));
     res.sendFile(index);
   });
 }
