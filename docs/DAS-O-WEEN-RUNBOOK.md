@@ -150,9 +150,17 @@ jukebox pauses during Cinema and comes back in the next break.
 ## Running a round
 
 The console never scrolls at 1280×720: the **answer sheet** on the left; the **rail** (WRONG, the clock,
-Reveal remaining, Undo / Next, the **picker**); the **stage preview** over a drawer with tabs
-**Picker · Sound · Cards · Fix** (plus **Names · Crew & log · Preflight** for crew). A **Next step**
-line always says what to do now.
+Reveal remaining, Undo / Next, the **picker**); then the tools **Picker · Sound · Cards · Cinema · Awards ·
+Fix** (plus **Guesses · Scores · Names · Crew & log · Preflight** when they apply). A **Next step** line
+always says what to do now.
+
+The bar's **Dashboard | Classic** switch picks how the tools sit; this browser remembers it.
+
+- **Dashboard** (the default): the console fills the window and every tool is open at once, in columns
+  beside the stage preview (two or three on a big screen). On a big, tall screen, Guesses, Scores and
+  Crew & log sit under the answer sheet, and Fix and Names under the rail. Click a tool's title to fold
+  it; the scene strip's **Cards** and **Cinema** open theirs.
+- **Classic**: the previous layout, with one tabbed drawer under the stage preview.
 
 | What                                | Button                                                                                                                                        | Key                                            |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
