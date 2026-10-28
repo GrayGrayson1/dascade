@@ -107,6 +107,11 @@ export function elementFallbackVolume(s: MixSettings, flags: Pick<JukeboxMixFlag
   return unit(masterLevel(s) * jukeboxLevel(s, flags));
 }
 
+/** A video's element.volume when it can't join the graph (mixer.routeMedia refused): the master level. */
+export function mediaFallbackVolume(s: Pick<MixSettings, 'muted' | 'masterVolume'>): number {
+  return masterLevel(s);
+}
+
 /** 'auto' = on unless reduced motion or effects are off. */
 export function visualizerEnabled(s: { visualizer: VisualizerPref; reducedMotion: boolean; fx: 'high' | 'low' | 'off' }): boolean {
   if (s.visualizer === 'on') return true;
