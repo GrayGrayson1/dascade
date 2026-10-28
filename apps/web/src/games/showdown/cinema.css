@@ -1,0 +1,266 @@
+/* =====================================================================
+ * Cinema (cinema.ts): the presenter's video in a frame, a layer over the stage in the stage window.
+ * Game art, in the show's look (--sd-* from [data-look]) and the show's pinned fonts. The frame is
+ * still while the video plays (Teams spends its bandwidth on the picture); the only motion is the
+ * curtain opening as the scene comes up, and that stops with reduced motion or effects off.
+ * ===================================================================== */
+
+.sd-cinema {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  container-type: size;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  align-items: center;
+  gap: 2cqh;
+  padding: 3cqh 3cqw 5cqh;
+  overflow: hidden;
+  color: var(--sd-ink, #fff3e0);
+  font-family: var(--font-ui);
+  background: radial-gradient(120% 95% at 50% -5%, var(--sd-sky-top, #2a1150) 0%, var(--sd-sky-bottom, #07030f) 70%);
+}
+.sd-cinema[hidden] {
+  display: none;
+}
+
+.sd-cinema__marquee {
+  margin: 0;
+  font-family: var(--sd-title-font, var(--font-display));
+  font-size: 5.4cqh;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sd-gold, #ff9a3c);
+  text-shadow:
+    0 0.4cqh 0 #00000099,
+    0 0 3cqh color-mix(in srgb, var(--sd-gold, #ff9a3c) 45%, transparent);
+}
+
+.sd-cinema__set {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-height: 80cqh;
+  min-height: 0;
+}
+
+.sd-cinema__glass {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 4 / 3;
+  max-width: 82cqw;
+  overflow: hidden;
+  background: #000;
+}
+.sd-cinema__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.sd-cinema__drape,
+.sd-cinema__side,
+.sd-cinema__plaque {
+  display: none;
+}
+
+/* ---------- Retro TV (the default) ---------- */
+.sd-cinema[data-frame='tv'] .sd-cinema__set {
+  gap: 2.4cqh;
+  padding: 3cqh;
+  border-radius: 4cqh;
+  background: linear-gradient(180deg, #7b4b2b 0%, #5b361d 60%, #44270f 100%);
+  box-shadow:
+    inset 0 0 0 0.8cqh #2b170b,
+    inset 0 1cqh 2.6cqh #ffd6a02e,
+    0 2.6cqh 5cqh #000000a6;
+}
+.sd-cinema[data-frame='tv'] .sd-cinema__glass {
+  border-radius: 5.6cqh / 4.2cqh;
+  box-shadow:
+    0 0 0 1.6cqh #1b120c,
+    inset 0 0 5cqh #000000e6;
+}
+.sd-cinema[data-frame='tv'] .sd-cinema__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3cqh;
+  width: 11cqh;
+  align-self: stretch;
+  padding-top: 3cqh;
+}
+.sd-cinema__knob {
+  width: 7.5cqh;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #f1dcae, #8a6a3a 68%, #4a3216);
+  box-shadow: 0 0.5cqh 1.1cqh #00000099;
+}
+.sd-cinema__grille {
+  flex: 1;
+  width: 8.4cqh;
+  max-height: 26cqh;
+  border-radius: 1.2cqh;
+  background: repeating-linear-gradient(0deg, #2b170b 0 0.7cqh, #73492a 0.7cqh 1.4cqh);
+}
+
+/* ---------- Haunted cinema ---------- */
+.sd-cinema[data-frame='cinema'] .sd-cinema__set {
+  width: 94cqw;
+  padding: 4cqh 18cqw 0;
+  border-radius: 1.2cqh;
+  background: radial-gradient(70% 70% at 50% 55%, #2a0c1c, #0c0408);
+  border-top: 4cqh solid #3b0a14;
+  box-shadow: inset 0 3.2cqh 0 -2.2cqh #ffe9a8;
+}
+.sd-cinema[data-frame='cinema'] .sd-cinema__glass {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  width: 100%;
+  max-height: 100%;
+  box-shadow:
+    0 0 0 0.8cqh #0b0b0b,
+    0 0 8cqh #ffdc9638;
+}
+.sd-cinema[data-frame='cinema'] .sd-cinema__drape {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 17cqw;
+  background: repeating-linear-gradient(90deg, #6d0d1c 0 3.4cqh, #a3172c 3.4cqh 5.1cqh, #55091a 5.1cqh 6.8cqh);
+  box-shadow: inset 0 -6cqh 6cqh #00000080;
+}
+.sd-cinema__drape--l {
+  left: 0;
+  border-radius: 0 0 40% 0;
+}
+.sd-cinema__drape--r {
+  right: 0;
+  border-radius: 0 0 0 40%;
+}
+
+/* ---------- Gilded portrait ---------- */
+.sd-cinema[data-frame='portrait'] .sd-cinema__set {
+  flex-direction: column;
+  gap: 1.8cqh;
+  padding: 3.6cqh;
+  border-radius: 1.2cqh;
+  background: linear-gradient(135deg, #f7d77a, #b8862b 28%, #fbe7a1 50%, #9c6b1c 72%, #e8c066);
+  box-shadow:
+    inset 0 0 0 0.9cqh #6b4a12,
+    inset 0 0 0 1.8cqh #f4d37a,
+    inset 0 0 0 2.4cqh #8a5f17,
+    0 2.6cqh 5cqh #00000099;
+}
+.sd-cinema[data-frame='portrait'] .sd-cinema__glass {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  box-shadow: inset 0 0 0 0.8cqh #3a2508;
+}
+.sd-cinema[data-frame='portrait'] .sd-cinema__plaque {
+  display: block;
+  margin: 0;
+  padding: 0.5cqh 2.6cqh;
+  border-radius: 0.6cqh;
+  font-family: var(--font-display);
+  font-size: 2.6cqh;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #2a1806;
+  background: linear-gradient(#ecc670, #a87a24);
+}
+
+/* ---------- The curtain that opens on the scene ---------- */
+.sd-cinema__curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  pointer-events: none;
+  visibility: hidden;
+}
+.sd-cinema__curtain i {
+  flex: 1;
+  /* The stage's scene curtain (stageShowcase.css .sd-wipe), in the show's look. */
+  background: repeating-linear-gradient(
+    90deg,
+    var(--sd-tile-b, #150828) 0 3.4cqh,
+    var(--sd-tile-a, #3d1868) 3.4cqh 5.3cqh,
+    var(--sd-tile-b, #150828) 5.3cqh 6.8cqh
+  );
+  box-shadow: inset 0 -6cqh 6cqh #00000080;
+}
+.sd-cinema__curtain i:first-child {
+  border-right: 0.5cqh solid var(--sd-gold, #ff9a3c);
+}
+.sd-cinema__curtain i:last-child {
+  border-left: 0.5cqh solid var(--sd-gold, #ff9a3c);
+}
+.sd-cinema[data-wipe='open'] .sd-cinema__curtain {
+  visibility: visible;
+  animation: sd-cinema-curtain-away 0s linear 1.2s forwards;
+}
+.sd-cinema[data-wipe='open'] .sd-cinema__curtain i:first-child {
+  animation: sd-cinema-curtain-l 1s cubic-bezier(0.6, 0, 0.3, 1) 0.1s forwards;
+}
+.sd-cinema[data-wipe='open'] .sd-cinema__curtain i:last-child {
+  animation: sd-cinema-curtain-r 1s cubic-bezier(0.6, 0, 0.3, 1) 0.1s forwards;
+}
+@keyframes sd-cinema-curtain-l {
+  to {
+    transform: translateX(-101%);
+  }
+}
+@keyframes sd-cinema-curtain-r {
+  to {
+    transform: translateX(101%);
+  }
+}
+@keyframes sd-cinema-curtain-away {
+  to {
+    visibility: hidden;
+  }
+}
+/* Instant with reduced motion or effects off. */
+:root[data-reduced-motion='true'] .sd-cinema__curtain,
+:root[data-fx='off'] .sd-cinema__curtain {
+  display: none;
+}
+
+/* ---------- The presenter's preview (the console's stage preview: no video there) ---------- */
+.sd-cinema--mock {
+  position: absolute;
+  z-index: auto;
+}
+.sd-cinema__mockplay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.6cqh;
+  margin: 0;
+  padding: 3cqh;
+  text-align: center;
+  font-size: 3.4cqh;
+  color: #f4efe2;
+}
+.sd-cinema__mockplay b {
+  font-size: 4.6cqh;
+  color: var(--sd-gold, #ff9a3c);
+}
+.sd-cinema__mockname {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

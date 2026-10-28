@@ -125,6 +125,11 @@ export interface ShowcaseCopy {
   standingsTitle: string;
   standingsEmpty: string;
   standingsHost: string;
+  /** Cinema (the presenter's video plays in the stage window): what every other screen shows, and the host's line. */
+  cinemaKicker: string;
+  cinemaTitle: string;
+  cinemaSub: string;
+  cinemaHost: string;
   /** Under the top five: "{n} on the board — your rank is on your phone". */
   standingsOf: string;
   /** The medal wall's name and its sub line. */
@@ -206,6 +211,10 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       standingsTitle: 'Top Guessers',
       standingsEmpty: 'No points yet — lock in your Top 10!',
       standingsHost: 'Here’s how the crowd is doing!',
+      cinemaKicker: 'Intermission',
+      cinemaTitle: 'Cartoon break',
+      cinemaSub: 'Watch the Teams share: the show is back right after',
+      cinemaHost: 'Grab some popcorn! We’re back right after this.',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
@@ -270,6 +279,10 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       standingsTitle: 'Top Guessers',
       standingsEmpty: 'No points yet — lock in your Top 10, ghouls!',
       standingsHost: 'Let’s see who’s haunting the top of the board!',
+      cinemaKicker: 'Intermission',
+      cinemaTitle: 'Cartoon break',
+      cinemaSub: 'Watch the Teams share: the show is back right after',
+      cinemaHost: 'Grab your candy corn! We’re back right after this spooky little film.',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',

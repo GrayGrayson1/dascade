@@ -14,6 +14,7 @@
 import './showdown.css';
 import './stageShowcase.css';
 import './picker.css';
+import './cinema.css';
 import { type CSSProperties, type ReactNode } from 'react';
 import {
   SHOWDOWN_TEAMS,

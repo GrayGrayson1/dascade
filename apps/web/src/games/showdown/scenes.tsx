@@ -28,6 +28,7 @@ import {
 import { SpecialGlyph } from './Board.tsx';
 import { LOOK_COPY, fill, joinAddress, type ShowcaseCopy } from './look.ts';
 import { finaleView, medalList, medalWords, placeWord, podiumColumns, type FinaleView } from './standings.ts';
+import { clipTime, useCinema } from './cinema.ts';
 
 const len = (s: string) => Array.from(s).length;
 
@@ -292,6 +293,64 @@ export function CardScene({
         {winners ? <PrizeWinners podium={podium} stars={stars} copy={LOOK_COPY[look].showcase} /> : null}
       </div>
       {card === 'welcome' ? <JoinHint code={code} look={look} className="sd-scene__join" /> : null}
+    </section>
+  );
+}
+
+/**
+ * Cinema (cinema.ts) as a stage draws it. The presenter's own screens show the frame with what's
+ * playing (their stage window plays the video itself, in a layer over this). Every other screen
+ * gets the cartoon-break card: the video lives only in the presenter's browser.
+ */
+export function CinemaScene({ look }: { look: ShowdownLook }) {
+  const cinema = useCinema();
+  const copy = LOOK_COPY[look].showcase;
+  const clip = cinema.clips.find((c) => c.id === cinema.clipId);
+  if (clip) {
+    const status = cinema.playing ? '▶ Playing' : cinema.ended ? 'The end' : 'Ready';
+    return (
+      <div className="sd-cinema sd-cinema--mock" data-frame={cinema.frame} data-look={look} data-part="showdown-cinema-preview">
+        <p className="sd-cinema__marquee">Now showing · {copy.cinemaTitle}</p>
+        <div className="sd-cinema__set">
+          <span className="sd-cinema__drape sd-cinema__drape--l" />
+          <span className="sd-cinema__drape sd-cinema__drape--r" />
+          <div className="sd-cinema__glass">
+            <p className="sd-cinema__mockplay">
+              <b>{status}</b>
+              <span className="sd-cinema__mockname">{clip.name}</span>
+              <span className="sd-num">
+                {clipTime(cinema.time)} / {clipTime(cinema.duration)}
+              </span>
+            </p>
+          </div>
+          <div className="sd-cinema__side" aria-hidden>
+            <i className="sd-cinema__knob" />
+            <i className="sd-cinema__knob" />
+            <i className="sd-cinema__grille" />
+          </div>
+          <p className="sd-cinema__plaque">{copy.cinemaKicker}</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <section className="sd-scene sd-scene--card" data-card="cinema" aria-label={copy.cinemaTitle}>
+      <div className="sd-scene__rays" aria-hidden />
+      <div className="sd-scene__halo" aria-hidden />
+      <div className="sd-scene__lockup sd-scene__lockup--card">
+        <CardArt card="break" look={look} />
+        <p className="sd-scene__kicker">
+          <Words text={copy.cinemaKicker} />
+        </p>
+        <h2 className="sd-scene__headline" style={{ '--len': Math.max(6, len(copy.cinemaTitle)) } as CSSProperties}>
+          <Words text={copy.cinemaTitle} />
+        </h2>
+        <p className="sd-scene__tagline">
+          <Flourish />
+          <span>{copy.cinemaSub}</span>
+          <Flourish />
+        </p>
+      </div>
     </section>
   );
 }

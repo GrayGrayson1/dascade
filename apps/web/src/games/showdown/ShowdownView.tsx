@@ -71,7 +71,19 @@ import {
   useStageWindow,
 } from './stageWindow.ts';
 import { takeHashCrew, useScreenMode } from './access.ts';
-import { useCrew, useEvent, useFinale, useLook, useMe, useRole, useShowSounds, useShowdownSettings, type RoleInfo } from './state.ts';
+import {
+  useCrew,
+  useEvent,
+  useFinale,
+  useLook,
+  useMe,
+  useRole,
+  useSceneCard,
+  useShowSounds,
+  useShowdownSettings,
+  type RoleInfo,
+} from './state.ts';
+import { cinemaScene } from './cinema.ts';
 
 /** The shared lobby with the show's setup panels (the lobby is rendered from here, not the shell). */
 const LOBBY_MODULE: GameClientModule = {
@@ -123,6 +135,14 @@ export function ShowdownView() {
   useEffect(() => {
     if (stageWin.open && showName) setStageWindowTitle(showName);
   }, [stageWin.open, showName]);
+
+  // Cinema: the presenter's stage window follows the room's scene (cinema.ts plays the video there).
+  // Nothing on unmount: a video playing through a moment without the room keeps playing.
+  const sceneCard = useSceneCard();
+  const presenting = role.role === 'presenter';
+  useEffect(() => {
+    if (presenting && stageWin.open) cinemaScene(sceneCard === 'cinema', look);
+  }, [presenting, stageWin.open, sceneCard, look]);
 
   const portal =
     stageWin.container && role.role === 'presenter'
