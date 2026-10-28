@@ -2609,3 +2609,56 @@
 :root[data-reduced-motion='true'] .sd-joinpop[data-phase='out'] {
   display: none;
 }
+
+/* ---------- The awards ceremony (Awards A): the finale's podium with photos, and fireworks ---------- */
+.sd-podium--awards .sd-podium__who {
+  gap: 1.2cqh;
+}
+.sd-award__photo {
+  display: grid;
+  place-items: center;
+  width: 17cqh;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 0.6cqh solid var(--sd-panel-edge);
+  background: color-mix(in srgb, var(--sd-sky-top) 80%, black);
+  box-shadow: 0 1cqh 2cqh #000a;
+}
+.sd-podium__place[data-rank='1'] .sd-award__photo {
+  width: 22cqh;
+  border-color: var(--sd-gold);
+  box-shadow:
+    0 0 4cqh color-mix(in srgb, var(--sd-gold) 50%, transparent),
+    0 1cqh 2cqh #000a;
+}
+.sd-award__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sd-award__photo span {
+  font-family: var(--sd-title-font);
+  font-size: 6cqh;
+  color: var(--sd-ink);
+}
+.sd-award__photo--hidden span {
+  color: var(--sd-ink-dim);
+}
+.sd-scene--awards .sd-podium__block {
+  height: 9cqh;
+}
+.sd-scene--awards .sd-podium__place[data-rank='2'] .sd-podium__block {
+  height: 13cqh;
+}
+.sd-scene--awards .sd-podium__place[data-rank='1'] .sd-podium__block {
+  height: 18cqh;
+}
+.sd-fireworks {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

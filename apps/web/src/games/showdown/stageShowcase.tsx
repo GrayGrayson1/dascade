@@ -77,7 +77,17 @@ import {
   type MotionPrefs,
 } from './state.ts';
 import { BatBurst, Beams, Confetti, Reactions, useRecent } from './stageFx.tsx';
-import { CardScene, CategoryScene, CinemaScene, FinaleScene, JoinHint, LobbyScene, OpeningScene, StandingsScene } from './scenes.tsx';
+import {
+  AwardsScene,
+  CardScene,
+  CategoryScene,
+  CinemaScene,
+  FinaleScene,
+  JoinHint,
+  LobbyScene,
+  OpeningScene,
+  StandingsScene,
+} from './scenes.tsx';
 import { finaleView, placeWord } from './standings.ts';
 import type { BoardPops } from './Board.tsx';
 import { playersEqual } from '../../net/hooks.ts';
@@ -88,7 +98,7 @@ import { PickerSpotlight, usePickMoment, type PickMoment } from './PickerSpotlig
 import { HotSeat, hotSeatUp } from './HotSeat.tsx';
 import type { ShowdownDisplay } from '@dascade/shared/games/showdown';
 
-export type ShowcaseScene = 'lobby' | 'card' | 'standings' | 'cinema' | 'opening' | 'category' | 'board' | 'finale';
+export type ShowcaseScene = 'lobby' | 'card' | 'standings' | 'cinema' | 'awards' | 'opening' | 'category' | 'board' | 'finale';
 
 /** How long each moment stays up (ms). */
 const MISS_MS = 1400;
@@ -149,17 +159,19 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
     ? 'standings'
     : sceneCard === 'cinema'
       ? 'cinema'
-      : card
-        ? 'card'
-        : inShow
-          ? board.stage === 'intro'
-            ? 'opening'
-            : board.stage === 'title'
-              ? 'category'
-              : 'board'
-          : phase === 'RESULTS' && finale
-            ? 'finale'
-            : 'lobby';
+      : sceneCard === 'awards'
+        ? 'awards'
+        : card
+          ? 'card'
+          : inShow
+            ? board.stage === 'intro'
+              ? 'opening'
+              : board.stage === 'title'
+                ? 'category'
+                : 'board'
+            : phase === 'RESULTS' && finale
+              ? 'finale'
+              : 'lobby';
   const sceneAt = useSince(scene);
   const wipe = useSceneWipe(scene);
   // The podium holds the name on the board (a holding card or a title card hides it, the turn goes on).
@@ -246,6 +258,8 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
           <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr} />
         ) : scene === 'cinema' ? (
           <CinemaScene look={look} />
+        ) : scene === 'awards' ? (
+          <AwardsScene look={look} motion={motion} />
         ) : scene === 'card' && card ? (
           <CardScene card={card} settings={settings} look={look} code={code} finale={phase === 'RESULTS' ? finale : null} qr={qr} />
         ) : scene === 'opening' ? (
@@ -321,7 +335,7 @@ const WIPE_MS = 1300;
  * appears, and the caller skips it without motion (reduced motion, effects off).
  */
 function useSceneWipe(scene: ShowcaseScene): number | null {
-  const group = scene === 'card' || scene === 'standings' ? 'cards' : scene === 'cinema' ? 'cinema' : 'show';
+  const group = scene === 'card' || scene === 'standings' ? 'cards' : scene === 'cinema' || scene === 'awards' ? scene : 'show';
   const last = useRef(group);
   const [at, setAt] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -632,6 +646,7 @@ function ShowHost({
   if (scene === 'card' && card) line = cue ?? cardLine(look, card);
   else if (scene === 'standings') line = cue ?? { key: 'standings', text: copy.showcase.standingsHost, mood: 'happy' };
   else if (scene === 'cinema') line = cue ?? { key: 'cinema', text: copy.showcase.cinemaHost, mood: 'happy' };
+  else if (scene === 'awards') line = cue ?? { key: 'awards', text: copy.showcase.awardsHost, mood: 'wow' };
   else if (scene === 'finale' && finale && finaleKind === 'medals')
     line = cue ?? { key: 'finale:medals', text: copy.showcase.starsHost, mood: 'cheer' };
   else if (scene === 'finale' && finale && finaleKind && finaleKind !== 'wrap') {

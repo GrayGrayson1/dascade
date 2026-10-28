@@ -30,6 +30,9 @@ import { LOOK_COPY, fill, joinAddress, type ShowcaseCopy } from './look.ts';
 import { finaleView, medalList, medalWords, placeWord, podiumColumns, type FinaleView } from './standings.ts';
 import { clipTime, useCinema } from './cinema.ts';
 import { JoinTicket } from './qr.tsx';
+import { awardSteps, fireworksAt, revealedPlaces, useAwards, type AwardPlace } from './awards.ts';
+import { Fireworks } from './fireworks.tsx';
+import type { MotionPrefs } from './state.ts';
 
 const len = (s: string) => Array.from(s).length;
 
@@ -369,6 +372,139 @@ export function CinemaScene({ look }: { look: ShowdownLook }) {
       </div>
     </section>
   );
+}
+
+/**
+ * The awards ceremony (awards.ts) as a stage draws it. On the presenter's device (their stage window
+ * and preview): the title card, then each category's podium (2nd, 1st, 3rd) as the console reveals
+ * 3rd → 2nd → 1st, with each winner's photo and name, and fireworks over the last winner. Everywhere
+ * else the awards live only in the presenter's browser: the "Awards on stage" card.
+ */
+export function AwardsScene({ look, motion }: { look: ShowdownLook; motion: MotionPrefs }) {
+  const awards = useAwards();
+  const copy = LOOK_COPY[look].showcase;
+  const steps = awardSteps(awards.categories);
+  const at = Math.min(awards.at, steps.length - 1);
+  const step = at >= 0 ? steps[at] : undefined;
+  if (!step) {
+    return (
+      <section className="sd-scene sd-scene--card" data-card="awards" aria-label={copy.awardsAway}>
+        <div className="sd-scene__rays" aria-hidden />
+        <div className="sd-scene__halo" aria-hidden />
+        <div className="sd-scene__lockup sd-scene__lockup--card">
+          <CardArt card="prizes" look={look} />
+          <p className="sd-scene__kicker">
+            <Words text={copy.awardsTitle} />
+          </p>
+          <h2 className="sd-scene__headline" style={{ '--len': 16 } as CSSProperties}>
+            <Words text="Awards on stage" />
+          </h2>
+          <p className="sd-scene__tagline">
+            <Flourish />
+            <span>Watch the Teams share</span>
+            <Flourish />
+          </p>
+        </div>
+      </section>
+    );
+  }
+  if (step.kind === 'title' || step.kind === 'thanks') {
+    return (
+      <section
+        className="sd-scene sd-scene--card sd-scene--awards"
+        data-part="showdown-awards"
+        data-step="title"
+        aria-label={copy.awardsTitle}
+      >
+        <div className="sd-scene__rays" aria-hidden />
+        <div className="sd-scene__halo" aria-hidden />
+        <div className="sd-scene__lockup sd-scene__lockup--card">
+          <CardArt card="prizes" look={look} />
+          <h2 className="sd-scene__headline" style={{ '--len': Math.max(8, len(copy.awardsTitle)) } as CSSProperties}>
+            <Words text={copy.awardsTitle} />
+          </h2>
+          <p className="sd-scene__tagline">
+            <Flourish />
+            <span>{copy.awardsSub}</span>
+            <Flourish />
+          </p>
+        </div>
+      </section>
+    );
+  }
+  const category = awards.categories[step.cat];
+  if (!category) return null;
+  const shown = revealedPlaces(steps, at, step.cat);
+  const columns = ([2, 1, 3] as const).filter((p) => category.places[p - 1].name.trim() !== '');
+  return (
+    <section
+      className="sd-scene sd-scene--finale sd-scene--podium sd-scene--awards"
+      data-part="showdown-awards"
+      data-step={step.kind === 'place' ? `place-${step.place}` : 'category'}
+      aria-label={category.title}
+    >
+      <div className="sd-scene__rays" aria-hidden />
+      <div className="sd-scene__halo" aria-hidden />
+      <div className="sd-scene__lockup sd-scene__lockup--finale">
+        <p className="sd-scene__kicker">
+          <Words text={copy.awardsTitle} />
+        </p>
+        <h2 className="sd-scene__headline sd-podium__title" style={{ '--len': Math.max(10, len(category.title)) } as CSSProperties}>
+          <Words text={category.title} />
+        </h2>
+        <ol className="sd-podium sd-podium--awards" aria-label={category.title}>
+          {columns.map((place: AwardPlace) => {
+            const up = shown.has(place);
+            const entry = category.places[place - 1];
+            const photo = entry.photo ? awards.photos[entry.photo] : undefined;
+            return (
+              <li
+                key={place}
+                className="sd-podium__place"
+                data-rank={place}
+                data-up={up ? 'true' : undefined}
+                aria-label={up ? `${placeWord(place)}: ${entry.name}` : `${placeWord(place)}: coming up`}
+              >
+                <div className="sd-podium__who" aria-hidden>
+                  {up ? (
+                    <>
+                      <span className="sd-award__photo" data-empty={photo ? undefined : 'true'}>
+                        {photo ? <img src={photo} alt="" /> : <span>{initials(entry.name)}</span>}
+                      </span>
+                      <span className="sd-podium__name">{entry.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="sd-award__photo sd-award__photo--hidden">
+                        <span>?</span>
+                      </span>
+                      <span className="sd-podium__name sd-podium__name--hidden">?</span>
+                    </>
+                  )}
+                </div>
+                <div className="sd-podium__block" aria-hidden>
+                  <span className="sd-podium__rank">
+                    <Nums text={placeWord(place)} />
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      {fireworksAt(steps, at) ? <Fireworks motion={motion} /> : null}
+    </section>
+  );
+}
+
+/** "Morgan R." → "MR" (a winner without a photo). */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => Array.from(w)[0]!.toUpperCase())
+    .join('');
 }
 
 /** The lobby before the show (no card up): a holding screen with the event, the show and the code. */

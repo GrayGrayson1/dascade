@@ -132,6 +132,11 @@ export interface ShowcaseCopy {
   cinemaHost: string;
   /** The join ticket's headline (QR A). */
   scanToPlay: string;
+  /** The awards ceremony (Awards A): its title card, the host's line, and what other screens show. */
+  awardsTitle: string;
+  awardsSub: string;
+  awardsHost: string;
+  awardsAway: string;
   /** Under the top five: "{n} on the board — your rank is on your phone". */
   standingsOf: string;
   /** The medal wall's name and its sub line. */
@@ -218,6 +223,10 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       cinemaSub: 'Watch the Teams share: the show is back right after',
       cinemaHost: 'Grab some popcorn! We’re back right after this.',
       scanToPlay: 'Scan to play',
+      awardsTitle: 'The Awards',
+      awardsSub: 'And the winners are…',
+      awardsHost: 'Drumroll, please!',
+      awardsAway: 'Awards on stage: watch the Teams share',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
@@ -287,6 +296,10 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       cinemaSub: 'Watch the Teams share: the show is back right after',
       cinemaHost: 'Grab your candy corn! We’re back right after this spooky little film.',
       scanToPlay: 'Scan to play',
+      awardsTitle: 'DAS-O-Ween Awards',
+      awardsSub: 'And the winners are…',
+      awardsHost: 'Drumroll, please… the moment you’ve all been dying for!',
+      awardsAway: 'Awards on stage: watch the Teams share',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
