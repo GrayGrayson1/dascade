@@ -2119,3 +2119,342 @@
 :root[data-reduced-motion='true'] .sd-scene__dark {
   display: none !important;
 }
+
+/* =====================================================================
+ * Two-tier scoring on the stage: called-it pops, the hot seat's medals, the Standings card, the
+ * paced finale (the Spotlight Stars, the podium) and Prize time's winners. Entrances only with
+ * motion on; with motion off everything simply stands in its final state.
+ * ===================================================================== */
+
+/* ---- Called-it pops: "+9 · 6 called it" on a flipped tile (counts, never names) ---- */
+.sd-tile[data-pop] {
+  z-index: 2;
+}
+.sd-tile__pop {
+  position: absolute;
+  top: 0;
+  right: 1cqw;
+  z-index: 3;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(-45%);
+  padding: 0.3cqh 0.7cqw;
+  border-radius: 99px;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: calc(1.55cqh * var(--sd-type, 1));
+  line-height: 1.15;
+  color: var(--sd-pts-ink);
+  background: linear-gradient(180deg, var(--sd-pts-a), var(--sd-pts-b));
+  box-shadow:
+    0 0 0 0.2cqh color-mix(in srgb, var(--sd-pts-b) 60%, black),
+    0 0.4cqh 0.8cqh #0008;
+  pointer-events: none;
+}
+.sd-tile__pop b {
+  font-weight: 900;
+}
+.sd-tile__pop-called {
+  font-weight: 700;
+}
+/* A hidden gem (found only by Reveal remaining) pays double: it gets the special colour. */
+.sd-tile__pop[data-gem] {
+  color: #1b0f33;
+  background: linear-gradient(180deg, #fff3b0, var(--sd-special, var(--sd-gold)));
+}
+.sd-stage[data-motion='on'] .sd-tile__pop[data-fresh] {
+  animation: sd-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s both;
+}
+.sd-mini .sd-tile__pop {
+  right: 8px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+/* ---- The hot seat's medals, pinned as each tile flips ---- */
+.sd-hotseat__medals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4cqw;
+  font-size: calc(3.4cqh * var(--sd-type, 1));
+  line-height: 1;
+}
+.sd-hotseat__medal {
+  filter: drop-shadow(0 0.3cqh 0.4cqh #000a);
+}
+.sd-stage[data-motion='on'] .sd-hotseat__medal {
+  animation: sd-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) calc(0.6s + var(--i, 0) * 0.08s) both;
+}
+
+/* ---- Standings card and the medal wall ---- */
+.sd-scene__lockup--standings {
+  gap: 1.6cqh;
+}
+.sd-standings__title.sd-scene__headline {
+  font-size: calc(9cqh * var(--sd-title-k, 1));
+}
+.sd-standings {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: start;
+  gap: 3cqw;
+}
+.sd-standings__list,
+.sd-stars,
+.sd-prizes__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1cqh;
+}
+.sd-standings__row,
+.sd-stars__row,
+.sd-prizes__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1.4cqw;
+  min-width: 34cqw;
+  padding: 1.1cqh 1.6cqw;
+  border-radius: 1.6cqh;
+  text-align: left;
+  font-family: var(--font-ui);
+  color: var(--sd-ink);
+  background: linear-gradient(180deg, #ffffff12, transparent 40%), var(--sd-panel);
+  border: 0.3cqh solid var(--sd-panel-edge);
+  box-shadow: 0 0.9cqh 2cqh #000a;
+}
+.sd-stars__row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 30cqw;
+}
+.sd-standings__row[data-rank='1'],
+.sd-prizes__row[data-rank='1'] {
+  border-color: var(--sd-gold);
+  box-shadow:
+    0 0 2.6cqh color-mix(in srgb, var(--sd-gold) 45%, transparent),
+    0 0.9cqh 2cqh #000a;
+}
+.sd-standings__rank {
+  min-width: 2.4ch;
+  font-weight: 800;
+  font-size: 4cqh;
+  line-height: 1;
+  text-align: center;
+  color: var(--sd-gold);
+}
+.sd-standings__name,
+.sd-stars__name,
+.sd-prizes__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 900;
+  font-size: 3.4cqh;
+  line-height: 1.15;
+}
+.sd-standings__pts,
+.sd-prizes__pts {
+  font-weight: 700;
+  font-size: 2.4cqh;
+  white-space: nowrap;
+  color: var(--sd-ink-dim);
+}
+.sd-standings__pts .sd-num,
+.sd-prizes__pts .sd-num {
+  font-weight: 800;
+  font-size: 3.6cqh;
+  color: var(--sd-ink);
+}
+.sd-stars__medals {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.8cqw;
+  font-size: 3.4cqh;
+  line-height: 1;
+  white-space: nowrap;
+}
+.sd-stars__count {
+  margin-left: 0.15em;
+  font-weight: 800;
+  font-size: 0.66em;
+  color: var(--sd-ink);
+}
+.sd-standings__sub {
+  margin: 0 0 0.4cqh;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: 2.2cqh;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sd-gold);
+}
+.sd-standings__of {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 2.2cqh;
+  color: var(--sd-ink-dim);
+}
+.sd-standings__empty {
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+.sd-stage[data-motion='on'] :is(.sd-standings__row, .sd-stars__row, .sd-prizes__row) {
+  animation: sd-rise 0.55s calc(0.6s + var(--i, 0) * 0.12s) ease-out both;
+}
+
+/* ---- The paced finale: the podium (2nd, 1st, 3rd), each place revealed in turn ---- */
+.sd-podium__title.sd-scene__headline,
+.sd-scene--stars .sd-scene__headline {
+  font-size: calc(9cqh * var(--sd-title-k, 1));
+}
+.sd-podium {
+  list-style: none;
+  margin: 1cqh 0 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1.6cqw;
+}
+.sd-podium__place {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 1.2cqh;
+  width: 22cqw;
+}
+.sd-podium__who {
+  display: grid;
+  justify-items: center;
+  gap: 0.6cqh;
+  min-height: 9cqh;
+  align-content: end;
+}
+.sd-podium__name {
+  max-width: 22cqw;
+  overflow-wrap: anywhere;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: 4cqh;
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--sd-ink);
+  text-shadow: 0 0.3cqh 0 #000a;
+}
+.sd-podium__place[data-rank='1'] .sd-podium__name {
+  font-size: 5cqh;
+  color: var(--sd-gold);
+  text-shadow:
+    0 0 2cqh color-mix(in srgb, var(--sd-gold) 60%, transparent),
+    0 0.3cqh 0 #000a;
+}
+.sd-podium__name--hidden {
+  color: var(--sd-ink-dim);
+}
+.sd-podium__pts {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 2.2cqh;
+  color: var(--sd-ink-dim);
+}
+.sd-podium__pts .sd-num {
+  font-weight: 800;
+  font-size: 3.2cqh;
+  color: var(--sd-ink);
+}
+.sd-podium__block {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 11cqh;
+  border-radius: 1.6cqh 1.6cqh 0 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sd-frame-a) 70%, transparent), var(--sd-frame-b));
+  border: 0.3cqh solid var(--sd-panel-edge);
+  box-shadow:
+    inset 0 0 2cqh #0006,
+    0 1cqh 2cqh #000a;
+}
+.sd-podium__place[data-rank='2'] .sd-podium__block {
+  height: 16cqh;
+}
+.sd-podium__place[data-rank='1'] .sd-podium__block {
+  height: 22cqh;
+  border-color: var(--sd-gold);
+  box-shadow:
+    inset 0 0 2cqh #0006,
+    0 0 4cqh color-mix(in srgb, var(--sd-gold) 45%, transparent),
+    0 1cqh 2cqh #000a;
+}
+.sd-podium__rank {
+  font-family: var(--sd-title-font);
+  font-size: 5cqh;
+  line-height: 1;
+  color: #fff8ec;
+  text-shadow: 0 0.4cqh 0 #000a;
+}
+.sd-podium__place:not([data-up]) .sd-podium__block {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+.sd-stage[data-motion='on'] .sd-podium__place[data-up] .sd-podium__who {
+  animation: sd-zoom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.sd-stage[data-motion='on'] .sd-scene--podium .sd-podium__block {
+  animation: sd-rise 0.6s ease-out both;
+}
+
+/* ---- Prize time with the winners ---- */
+.sd-scene--card[data-winners] .sd-cardart {
+  height: 10cqh;
+}
+.sd-scene--card[data-winners] .sd-scene__headline {
+  font-size: calc(8cqh * var(--sd-title-k, 1));
+}
+.sd-prizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.6cqh 3cqw;
+}
+.sd-prizes__block {
+  display: grid;
+  gap: 0.6cqh;
+}
+.sd-prizes__place {
+  min-width: 3.4ch;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: 2.6cqh;
+  color: var(--sd-gold);
+}
+
+/* Narrow stages (4:3, phones): one column, a smaller podium. */
+@container sd (aspect-ratio < 1.45) {
+  .sd-standings {
+    grid-auto-flow: row;
+    gap: 2cqh;
+  }
+  .sd-standings__row,
+  .sd-stars__row,
+  .sd-prizes__row {
+    min-width: 56cqw;
+  }
+  .sd-podium__place {
+    width: 26cqw;
+  }
+  .sd-podium__name {
+    font-size: 3.2cqh;
+  }
+  .sd-podium__place[data-rank='1'] .sd-podium__name {
+    font-size: 4cqh;
+  }
+}

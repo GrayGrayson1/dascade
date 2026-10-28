@@ -1,0 +1,213 @@
+/* =====================================================================
+ * DAS Survey Showdown — the audience's Top 10 scorecard (two-tier scoring, the crowd's side).
+ * Audience chrome: theme tokens (it follows the viewer's DASCADE theme), numbers in --font-num.
+ * One layout for phones and desktop tabs; it flows, nothing is phone-only. Namespaced `sdk`.
+ * States carry words (locked, on the board, spot on); colour only reinforces them.
+ * ===================================================================== */
+
+.sdk {
+  min-width: 0;
+}
+.sdk__title {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.sdk__left {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.sdk .dc-num {
+  font-family: var(--font-num);
+}
+
+/* ---------- Your points, place and medals ---------- */
+.sdk__summary {
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-weight: 700;
+  color: var(--text-0);
+}
+.sdk__points {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sdk__points svg {
+  color: var(--warning);
+}
+.sdk__chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+}
+.sdk__medals {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sdk__medal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-size: 1.15em;
+}
+.sdk__medal .dc-num {
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+}
+
+/* ---------- "Called it! +9, +1 spot on" ---------- */
+.sdk__flash {
+  margin: 0;
+  min-height: 0;
+}
+.sdk__flash[data-on] {
+  margin: 0 0 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-weight: 800;
+  color: var(--text-0);
+  background: color-mix(in srgb, var(--success) 28%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, var(--success) 60%, transparent);
+  animation: sdk-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.sdk[data-motion='off'] .sdk__flash[data-on] {
+  animation: none;
+}
+@keyframes sdk-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.sdk__how {
+  margin: 0 0 8px;
+  font-size: var(--fs-xs);
+}
+
+/* ---------- The rows ---------- */
+.sdk__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.sdk__row {
+  display: grid;
+  grid-template-columns: 2em minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+}
+.sdk__row[data-state='locked'] {
+  border-color: var(--line-strong, var(--line));
+}
+.sdk__row[data-called] {
+  background: color-mix(in srgb, var(--success) 16%, var(--surface-sunken));
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+}
+.sdk__row[data-state='board'],
+.sdk__row[data-state='closed'] {
+  border-style: dashed;
+}
+.sdk__num {
+  display: grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 999px;
+  font-weight: 800;
+  color: var(--text-0);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+}
+.sdk__row[data-called] .sdk__num {
+  background: var(--success);
+  color: var(--on-success, #04150b);
+  border-color: transparent;
+}
+.sdk__form {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.sdk__form .dc-input,
+.sdk__form input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sdk__form .dc-btn {
+  flex: none;
+}
+.sdk__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.sdk__text {
+  font-weight: 700;
+  color: var(--text-0);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.sdk__text--board {
+  font-weight: 600;
+  color: var(--text-1);
+}
+.sdk__hit {
+  color: var(--success);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sdk__bonus,
+.sdk__gem {
+  font-size: var(--fs-xs);
+}
+.sdk__lock,
+.sdk__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.sdk__spot {
+  flex-basis: 100%;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.sdk__empty {
+  color: var(--text-2);
+}
+.sdk__loose {
+  margin: 8px 0 0;
+  padding: 0 0 0 1.2em;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}

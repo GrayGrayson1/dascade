@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   SHOWDOWN_CARDS,
   SHOWDOWN_MSG,
+  SHOWDOWN_STANDINGS_CARD,
   clockRemaining,
   parseBoard,
   resolveShowdownLook,
@@ -29,6 +30,8 @@ import {
   type ShowdownPermission,
   type ShowdownPickerPrivate,
   type ShowdownPreflightData,
+  type ShowdownScoreboard,
+  type ShowdownScoresView,
   type ShowdownSeatState,
   isSoundStation,
 } from '@dascade/shared/games/showdown';
@@ -149,6 +152,34 @@ export function useLook(settings: Pick<ShowdownSettings, 'look'> | null | undefi
 export function useMode(settings: Pick<ShowdownSettings, 'mode'> | null | undefined): ShowdownMode {
   const board = useBoard();
   return board?.mode ?? settings?.mode ?? 'classic';
+}
+
+/** The public scoreboard (top Guessers, the medal wall), null when scoring is off. Stage-safe. */
+export function useScoreboard(): ShowdownScoreboard | null {
+  const json = useShowSelector((s) => s.scoreJson) ?? '';
+  return useMemo(() => {
+    if (!json) return null;
+    try {
+      return JSON.parse(json) as ShowdownScoreboard;
+    } catch {
+      return null;
+    }
+  }, [json]);
+}
+
+/** The Standings card is up on the stage (two-tier scoring). Stage-safe. */
+export function useStandingsCard(): boolean {
+  return (useShowSelector((s) => s.card) ?? '') === SHOWDOWN_STANDINGS_CARD;
+}
+
+/** The paced finale's step (index into finaleSteps(finale)). Stage-safe. */
+export function useFinaleStep(): number {
+  return useShowSelector((s) => s.finaleStep) ?? 0;
+}
+
+/** The presenter's full score list (presenter and `scores.export` crew only; null for everyone else). */
+export function useScoresView(): ShowdownScoresView | null {
+  return useLatestMessage<ShowdownScoresView | null>(SHOWDOWN_MSG.scores) ?? null;
 }
 
 /** The holding card on the stage (null = none). */

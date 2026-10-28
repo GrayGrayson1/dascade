@@ -72,6 +72,8 @@ export interface ShowState {
   readonly results: readonly ShowdownRoundResult[];
   /** Revealed flags of rounds already left behind (index = round), for audience scoring. */
   readonly past: readonly (readonly boolean[])[];
+  /** Which of those were revealed late (Reveal remaining: hidden gems). Absent in older black boxes. */
+  readonly pastLate?: readonly (readonly boolean[])[];
   /** Reveal counter. */
   readonly seq: number;
   /** Board revision: bumps on every applied command. */
@@ -134,6 +136,7 @@ export function createShow(rounds: readonly ShowdownRoundDef[], opts: CreateShow
     roundHow: '',
     results: [],
     past: [],
+    pastLate: [],
     seq: 0,
     rev: 1,
     steal: mode === 'showcase' ? false : opts.steal,
@@ -165,6 +168,7 @@ const hiddenSlots = (round: ShowRound): SlotState[] => round.answers.map(() => (
 function enterRound(state: ShowState, index: number): ShowState {
   const round = state.rounds[index]!;
   const past = state.round >= 0 ? withPast(state) : state.past;
+  const pastLate = state.round >= 0 ? withPastLate(state) : (state.pastLate ?? []);
   return {
     ...state,
     round: index,
@@ -177,6 +181,7 @@ function enterRound(state: ShowState, index: number): ShowState {
     roundWinner: -1,
     roundHow: '',
     past,
+    pastLate,
   };
 }
 
@@ -185,6 +190,12 @@ function withPast(state: ShowState): ShowState['past'] {
   const past = state.past.slice();
   past[state.round] = state.slots.map((s) => s.revealed);
   return past;
+}
+
+function withPastLate(state: ShowState): NonNullable<ShowState['pastLate']> {
+  const late = (state.pastLate ?? []).slice();
+  late[state.round] = state.slots.map((s) => s.revealed && s.late);
+  return late;
 }
 
 /** The round's bank goes to `team` (or is lost: -1). */
@@ -285,7 +296,12 @@ function revealShowcase(s: ShowState, cmd: Extract<ShowCommand, { a: 'reveal' }>
   if (cleared && next.roundHow === '') {
     const found = foundIn(slots);
     const how: ShowdownWin = found === slots.length ? 'sweep' : 'none';
-    next = { ...next, stage: 'done', roundHow: how, results: [...next.results, { index: next.round, winner: -1, points: 0, how, found, total: slots.length }] };
+    next = {
+      ...next,
+      stage: 'done',
+      roundHow: how,
+      results: [...next.results, { index: next.round, winner: -1, points: 0, how, found, total: slots.length }],
+    };
   }
   events.push(revealEvent(rev, cmd.slot, answer, { top: cmd.slot === 0, late, cleared, special, sweep: Boolean(cmd.sweep) }));
   return { ok: true, state: next, events };
@@ -299,7 +315,8 @@ function strike(state: ShowState): StepResult {
     const d = decide(failed, state.control, 'defend');
     return { ok: true, state: d.state, events: [strikeEvent, d.event] };
   }
-  if (state.stage !== 'live') return fail('wrong_stage', state.stage === 'title' ? 'Show the question first.' : 'Strikes only count while a team is playing.');
+  if (state.stage !== 'live')
+    return fail('wrong_stage', state.stage === 'title' ? 'Show the question first.' : 'Strikes only count while a team is playing.');
   if (state.control === -1) return fail('not_allowed', 'Pick the team in control first.');
   if (state.strikes >= SHOWDOWN_LIMITS.strikes) return fail('noop', 'That team is already out of strikes.');
   const strikes = state.strikes + 1;
@@ -309,7 +326,11 @@ function strike(state: ShowState): StepResult {
     return { ok: true, state: { ...state, strikes, rev }, events: [{ type: 'strike', rev, strikes, steal: false, stealFailed: false }] };
   }
   if (state.steal) {
-    return { ok: true, state: { ...state, strikes, rev, stage: 'steal' }, events: [{ type: 'strike', rev, strikes, steal: true, stealFailed: false }] };
+    return {
+      ok: true,
+      state: { ...state, strikes, rev, stage: 'steal' },
+      events: [{ type: 'strike', rev, strikes, steal: true, stealFailed: false }],
+    };
   }
   const struck = { ...state, strikes, rev };
   const d = decide(struck, -1, 'none');
@@ -317,7 +338,8 @@ function strike(state: ShowState): StepResult {
 }
 
 function award(state: ShowState, team: TeamIndex): StepResult {
-  if (state.stage !== 'live' && state.stage !== 'steal' && state.stage !== 'done') return fail('wrong_stage', 'There is nothing to award yet.');
+  if (state.stage !== 'live' && state.stage !== 'steal' && state.stage !== 'done')
+    return fail('wrong_stage', 'There is nothing to award yet.');
   if (state.roundHow !== '') return fail('not_allowed', 'This round has already been decided — use Undo to change it.');
   if (state.bank <= 0) return fail('not_allowed', 'There are no points in the bank yet.');
   const d = decide(state, team, 'manual');
@@ -329,12 +351,21 @@ function next(state: ShowState): StepResult {
   const closed = closeUndecided(state);
   if (state.round >= state.rounds.length - 1) {
     const rev = closed.rev + 1;
-    return { ok: true, state: { ...closed, stage: 'done', past: withPast(closed), rev }, events: [], finished: true };
+    return {
+      ok: true,
+      state: { ...closed, stage: 'done', past: withPast(closed), pastLate: withPastLate(closed), rev },
+      events: [],
+      finished: true,
+    };
   }
   const entered = enterRound(closed, state.round + 1);
   const rev = entered.rev + 1;
   const round = entered.rounds[entered.round]!;
-  return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: entered.round, multiplier: round.multiplier, answers: round.answers.length }] };
+  return {
+    ok: true,
+    state: { ...entered, rev },
+    events: [{ type: 'round', rev, round: entered.round, multiplier: round.multiplier, answers: round.answers.length }],
+  };
 }
 
 /** Presenter Showcase: the current round back on its title card, every tile hidden again. */
@@ -380,10 +411,18 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
       const entered = enterRound(state, 0);
       const rev = entered.rev + 1;
       const first = entered.rounds[0]!;
-      return { ok: true, state: { ...entered, rev }, events: [{ type: 'round', rev, round: 0, multiplier: first.multiplier, answers: first.answers.length }] };
+      return {
+        ok: true,
+        state: { ...entered, rev },
+        events: [{ type: 'round', rev, round: 0, multiplier: first.multiplier, answers: first.answers.length }],
+      };
     }
     case 'question': {
-      if (state.stage !== 'title') return fail(state.stage === 'intro' ? 'wrong_stage' : 'noop', state.stage === 'intro' ? 'Start round 1 first.' : 'The question is already up.');
+      if (state.stage !== 'title')
+        return fail(
+          state.stage === 'intro' ? 'wrong_stage' : 'noop',
+          state.stage === 'intro' ? 'Start round 1 first.' : 'The question is already up.',
+        );
       const rev = state.rev + 1;
       return { ok: true, state: { ...state, stage: 'live', rev }, events: [{ type: 'question', rev }] };
     }
@@ -404,7 +443,11 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
       const delta = Math.trunc(cmd.delta);
       if (!delta || Math.abs(delta) > SHOWDOWN_LIMITS.adjustMax) return fail('noop', 'Nothing to adjust.');
       const rev = state.rev + 1;
-      return { ok: true, state: { ...state, scores: addScore(state.scores, cmd.team, delta), rev }, events: [{ type: 'adjust', rev, team: cmd.team, delta }] };
+      return {
+        ok: true,
+        state: { ...state, scores: addScore(state.scores, cmd.team, delta), rev },
+        events: [{ type: 'adjust', rev, team: cmd.team, delta }],
+      };
     }
     case 'next':
       return next(state);
@@ -418,7 +461,7 @@ export function step(state: ShowState, cmd: ShowCommand): StepResult {
 /** Closes the current round if it is still open (the show ends early) and returns the final state. */
 export function finalizeShow(state: ShowState): ShowState {
   const closed = closeUndecided(state);
-  return closed.round >= 0 ? { ...closed, past: withPast(closed) } : closed;
+  return closed.round >= 0 ? { ...closed, past: withPast(closed), pastLate: withPastLate(closed) } : closed;
 }
 
 /** Leading team, or -1 for a tie (always -1 in Presenter Showcase: it has no teams). */
@@ -432,6 +475,12 @@ export function showWinner(state: Pick<ShowState, 'scores'> & Partial<Pick<ShowS
 export function revealedIn(state: ShowState, round: number): readonly boolean[] {
   if (round === state.round) return state.slots.map((s) => s.revealed);
   return state.past[round] ?? [];
+}
+
+/** Which tiles of a round were revealed late — by Reveal remaining, nobody found them (hidden gems). */
+export function lateIn(state: ShowState, round: number): readonly boolean[] {
+  if (round === state.round) return state.slots.map((s) => s.revealed && s.late);
+  return state.pastLate?.[round] ?? [];
 }
 
 /** The hidden slot a Reveal remaining sweep flips next: the lowest on the board (#10 before #9). */

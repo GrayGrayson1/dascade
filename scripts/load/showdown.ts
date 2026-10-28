@@ -146,6 +146,18 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
     const answers = sheets().at(-1)!.answers;
     const errorsBefore = errorCount(bots);
 
+    // Two-tier scoring (the rehearsal scores the crowd): everyone locks answer #(i % 10) into its own
+    // spot on their Top 10, double-sent (the second is refused: the spot is taken), plus a miss in the
+    // next spot. Scores are derived from the board, so the duplicate never scores twice.
+    const spotOf = (i: number) => i % answers.length;
+    await burst(ctx, audience, (b, i) => {
+      const s = spotOf(i);
+      b.room.send('showdown:guess', { round: 0, text: answers[s]!.text, pos: s });
+      b.room.send('showdown:guess', { round: 0, text: answers[s]!.text, pos: s });
+      b.room.send('showdown:guess', { round: 0, text: `no such answer ${i}`, pos: (s + 1) % answers.length });
+    });
+    const guessed = await ctx.waitFor(() => json(host).guessesIn === audience.length * 2, 6000);
+
     // The crowd cheers while the presenter finds five answers (each reveal double-sent) and buzzes misses.
     const cheering = burst(ctx, audience, (b) => {
       for (let r = 0; r < 6; r++) b.room.send('showdown:react', { r });
@@ -219,6 +231,17 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
       0,
     );
 
+    // Every phone's private score: the tile's value (doubled for the sweep's hidden gems) +1 for the spot.
+    const lateSlots = new Set([3, 5, 7, 8, 9]);
+    const wantPoints = (i: number) => (lateSlots.has(spotOf(i)) ? 2 : 1) * (10 - spotOf(i)) + 1;
+    const lastScore = (b: (typeof audience)[number]) =>
+      ((b.payloads.get(ME) ?? []) as Array<{ score?: { points: number } }>).at(-1)?.score?.points ?? -1;
+    const scoredOk = await ctx.waitFor(() => audience.every((b, i) => lastScore(b) === wantPoints(i)), 6000);
+    const scoreboard = JSON.parse(json(audience[0]!).scoreJson || 'null') as { top: Array<{ points: number }> } | null;
+    const topOk =
+      (scoreboard?.top.length ?? 0) === Math.min(5, audience.length) &&
+      scoreboard!.top[0]!.points === Math.max(...audience.map((_, i) => wantPoints(i)));
+
     act({ a: 'next', rev: board()!.rev });
     await ctx.waitFor(() => board()?.round === 1, 4000);
     act({ a: 'finish', rev: board()!.rev });
@@ -238,9 +261,12 @@ export function register(add: AddScenario, ctx: ScenarioContext): void {
         swept &&
         lateOk &&
         orderOk &&
+        guessed &&
+        scoredOk &&
+        topOk &&
         finale &&
         allConnected(bots),
-      details: `round-played ${revealMs.toFixed(0)}ms misses=${missesSeen} no-leak=${!earlyLeak && !sheetLeak} picks=${winners.length}/${picks} in ${pickMs.toFixed(0)}ms unique-no-skippers=${picksOk} seen-by-all=${picksSeen} youre-up-private=${youreUpOk} skip-private=${!skipLeak} sweep-order=${orderOk ? order.join('>') : `WRONG ${order.join('>')}`} late-flags=${lateOk} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
+      details: `round-played ${revealMs.toFixed(0)}ms guesses=${guessed} scores=${scoredOk} top5=${topOk} misses=${missesSeen} no-leak=${!earlyLeak && !sheetLeak} picks=${winners.length}/${picks} in ${pickMs.toFixed(0)}ms unique-no-skippers=${picksOk} seen-by-all=${picksSeen} youre-up-private=${youreUpOk} skip-private=${!skipLeak} sweep-order=${orderOk ? order.join('>') : `WRONG ${order.join('>')}`} late-flags=${lateOk} reactions-seen=${reactionsSeen} finale=${finale} errors=${errorCount(bots) - errorsBefore} joinFailures=${failures}`,
     });
     await ctx.leaveAll(bots);
   });

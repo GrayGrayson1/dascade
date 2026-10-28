@@ -111,6 +111,66 @@ Showdown. What differs:
 - **Theme music:** a looping procedural bed under the opening, the category cards and the holding
   cards, on devices that play show sounds (a per-device toggle).
 
+## Two-tier scoring (Presenter Showcase)
+
+Brian's picks from the Scoring Studio (see "Scoring decisions" below). **The two tiers never touch:**
+the hot seat earns **medals**, the crowd earns **points**; no medal turns into points and no points buy
+medals. Everything is **derived** from the board, the guess book, the hot-seat credits and the
+finished turns (`packages/game-core/src/showdown/scoring.ts`, `scoreShow`), never accumulated: an
+Undo, a restart or a restored black box recomputes exactly, and a repeated message can't score twice.
+
+**Settings** (lobby → Scoring; all with defaults so older black boxes still parse):
+
+| Setting | Values | DAS-O-Ween | Ordinary rooms |
+|---|---|---|---|
+| `points` — Score the crowd | on / off | on | off (the show runs as before) |
+| `guesses` — Guesses per board | 1–10 | 10 | 3 |
+| `medals` — Medal ceremony | `never` / `round` (after each round) / `end` | `round` | `never` |
+| `reveal` — Showtime | `standings` (Standings + paced finale) / `finale` (just the finale) | `standings` | `standings` |
+| `gems` — Hidden gems | on / off | on | on |
+| `pops` — Called-it pops | on / off | on | on |
+
+The DAS-O-Ween presets also switch phone guesses on (`audience: true`).
+
+**The crowd — Called it.** Phones (and desktop tabs: one responsive component) get a **Top 10
+scorecard**: numbered rows #1–#N, each taking one guess (`showdown:guess {round, text, pos}`), up to
+the `guesses` setting. A guess locked in before its answer flips scores the tile's value — #1 = 10 …
+#10 = 1 (`answerValue`) — however it flipped (the hot seat, the chat, out loud, the sweep). **+1** when
+the answer lands in the spot you put it; **+20** for a perfect list (every answer on the board, each in
+its exact spot). **Hidden gems:** a tile only Reveal remaining found (`late`) pays double (the spot
+bonus stays +1). Matching is unchanged (server-side, typo-tolerant, aliases, secret until the flip);
+another spelling of an answer you already locked never scores; a used spot, or a spot whose answer is
+already showing, is refused. Phones show your points, rank ("27 pts · 4th of 38", ties share a place)
+and medals privately (`ShowdownMe.score`), and flash "Called it! +9, +1 spot on".
+
+**The hot seat — medals.** A tile flipped while someone is in the hot seat is credited to them
+(`credits`, `${round}:${slot}` → who and which draw): 🎃 the special answer, 🥇 #1–#3, 🥈 #4–#7, 🥉
+#8–#10; a turn marked done with nothing credited to its draw is a 🎗️ Brave ribbon. An Undo that hides
+a tile takes its credit (and medal) back; the presenter can take a wrong credit off a tile
+(`showdown:credit {round, slot}`, `scores.fix`, audited as `credit.remove`). **Spotlight Stars** is the
+medal wall, Olympic order (pumpkins, golds, silvers, bronzes, ribbons). With medals **Never** nothing
+shows on screen; the export still lists who found what.
+
+**Public and private.** `scoreJson` (public) is the top five Guessers plus the medal wall, built only
+from revealed answers, without people a moderator hid, and empty with scoring off — so public scores
+move only when a tile flips. The presenter (and the producer, `scores.export`) get the full live list
+privately (`showdown:scores`): the console's **Scores** tab with Download CSV / JSON
+(`showdown:scores-export`; the JSON never contains an unrevealed answer) and Remove a wrong credit.
+Spectators and big screens get nothing private.
+
+**Showtime.** With Standings on, the console offers **Show standings** once a round's board is complete:
+a stage card (`card: 'standings'`) with the top five and, with medals After each round, the Spotlight
+Stars. The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
+public `finaleStep`, a `finale` event per step so every screen plays the cue once) through
+`finaleSteps(finale)`: the wrap-up → the medal ceremony (unless Never) → 3rd → 2nd → 1st (the podium
+is the top three Guessers; ties share a place). Prize time lists the podium and the medal winners.
+Called-it pops put "+9 · 6 called it" over a flipped tile on the stage and the console preview
+(counts only, never names).
+
+**Outcome and stats.** A showcase player's score is their points; `playerStats` add `medals` and
+`positionHits`; placements stay one group. **Black box:** the guess book (with spots and matches),
+the finished turns and the finale step are in the snapshot; older boxes restore without them.
+
 ## The Presenter Tour
 
 An animated, self-paced walk through running a Presenter Showcase show (about 3½ minutes, ten

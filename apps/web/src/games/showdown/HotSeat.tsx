@@ -5,24 +5,39 @@
  * up. The turn timer is written in words ("answering · 0:12"), and when their answer flips the podium
  * says so ("Called it! ✓ #4 found") while the tile carries the credit (Board.tsx).
  *
+ * With medals on (two-tier scoring), each find this turn pins its medal on the nameplate the moment
+ * its tile flips: 🎃 the special answer, 🥇 #1–#3, 🥈 #4–#7, 🥉 #8–#10 (standings.ts).
+ *
  * The name is the public display name only. Under reduced motion the podium appears without moving.
  * Narrow stages (below a 1.45 aspect, where the status column wraps under the board) get a compact
  * podium at the start of the status row (stageShowcase.css / picker.css).
  */
 import { useEffect, useState, type CSSProperties } from 'react';
-import type { ShowdownBoardView } from '@dascade/shared/games/showdown';
+import { SHOWDOWN_MEDAL_INFO, type ShowdownBoardView } from '@dascade/shared/games/showdown';
 import { serverNow } from '../../net/hooks.ts';
 import { fill, type ShowcaseCopy } from './look.ts';
 import type { PickMoment } from './PickerSpotlight.tsx';
+import { medalsOnBoard } from './standings.ts';
 
 /** The podium is up: someone is in the hot seat, the stage has landed, and the landing card has gone. */
 export function hotSeatUp(moment: PickMoment): boolean {
   return moment.landed && Boolean(moment.name) && moment.phase !== 'sweep' && moment.phase !== 'card';
 }
 
-export function HotSeat({ moment, board, copy }: { moment: PickMoment; board: ShowdownBoardView; copy: ShowcaseCopy }) {
+export function HotSeat({
+  moment,
+  board,
+  copy,
+  medals = false,
+}: {
+  moment: PickMoment;
+  board: ShowdownBoardView;
+  copy: ShowcaseCopy;
+  /** Pin medals on the nameplate (the show's medal setting isn't Never). */
+  medals?: boolean;
+}) {
   if (!hotSeatUp(moment)) return null;
-  return <Podium key={moment.drawNo} name={moment.name} landAt={moment.landAt} board={board} copy={copy} />;
+  return <Podium key={moment.drawNo} name={moment.name} landAt={moment.landAt} board={board} copy={copy} medals={medals} />;
 }
 
 /** "0:12" — time spent answering (floored: it counts up). */
@@ -44,13 +59,26 @@ export function calledRank(board: Pick<ShowdownBoardView, 'slots'>, name: string
   return best >= 0 ? best + 1 : 0;
 }
 
-function Podium({ name, landAt, board, copy }: { name: string; landAt: number; board: ShowdownBoardView; copy: ShowcaseCopy }) {
+function Podium({
+  name,
+  landAt,
+  board,
+  copy,
+  medals,
+}: {
+  name: string;
+  landAt: number;
+  board: ShowdownBoardView;
+  copy: ShowcaseCopy;
+  medals: boolean;
+}) {
   const [now, setNow] = useState(() => serverNow());
   useEffect(() => {
     const t = setInterval(() => setNow(serverNow()), 1000);
     return () => clearInterval(t);
   }, []);
   const rank = calledRank(board, name);
+  const pinned = medals ? medalsOnBoard(board, name) : [];
   const elapsed = formatElapsed(landAt ? now - landAt : 0);
   const chars = Array.from(name);
   const wlen = Math.max(4, ...name.split(/\s+/).map((w) => Array.from(w).length));
@@ -68,6 +96,23 @@ function Podium({ name, landAt, board, copy }: { name: string; landAt: number; b
         <b className="sd-hotseat__name" style={{ '--len': Math.max(4, chars.length), '--wlen': wlen } as CSSProperties}>
           {name}
         </b>
+        {pinned.length ? (
+          <span className="sd-hotseat__medals" aria-label={pinned.map((m) => SHOWDOWN_MEDAL_INFO[m].title).join(', ')}>
+            {pinned.map((m, i) => (
+              <span
+                key={`${m}-${i}`}
+                className="sd-hotseat__medal"
+                data-part="showdown-medal-pin"
+                data-medal={m}
+                title={SHOWDOWN_MEDAL_INFO[m].title}
+                style={{ '--i': i } as CSSProperties}
+                aria-hidden
+              >
+                {SHOWDOWN_MEDAL_INFO[m].icon}
+              </span>
+            ))}
+          </span>
+        ) : null}
         <span className="sd-hotseat__meter">
           {rank ? (
             <>

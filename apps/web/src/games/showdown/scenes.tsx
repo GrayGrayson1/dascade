@@ -4,7 +4,11 @@
  * screen and the closing "That's a wrap!". Each is a composition of big type over the look's set; the
  * host is drawn by the stage (one figure that glides between scenes), never here.
  *
- * Everything is public (settings, the board's category, the finale's found/total). Motion: the
+ * Two-tier scoring adds the Standings card (the top Guessers and, with medals after each round, the
+ * Spotlight Stars), the paced finale (the medal ceremony, then the podium 3rd → 2nd → 1st, stepped by
+ * the presenter) and the winners on Prize time.
+ *
+ * Everything is public (settings, the board's category, the finale, the scoreboard). Motion: the
  * entrances run only with motion on (stageShowcase.css gates them under [data-motion='on']); with
  * motion off a scene simply stands in its final state.
  */
@@ -16,10 +20,14 @@ import {
   type ShowdownCard,
   type ShowdownFinale,
   type ShowdownLook,
+  type ShowdownScoreRow,
+  type ShowdownScoreboard,
   type ShowdownSettings,
+  type ShowdownStar,
 } from '@dascade/shared/games/showdown';
 import { SpecialGlyph } from './Board.tsx';
-import { LOOK_COPY, fill, joinAddress } from './look.ts';
+import { LOOK_COPY, fill, joinAddress, type ShowcaseCopy } from './look.ts';
+import { finaleView, medalList, medalWords, placeWord, podiumColumns, type FinaleView } from './standings.ts';
 
 const len = (s: string) => Array.from(s).length;
 
@@ -40,7 +48,10 @@ export function Words({ text }: { text: string }) {
 
 /** The show's title as marquee words ("DAS Survey Showdown" → "Survey", "Showdown": the badge says DAS). */
 export function marqueeWords(title: string): string[] {
-  const words = title.replace(/^DAS\s+/i, '').split(/\s+/).filter(Boolean);
+  const words = title
+    .replace(/^DAS\s+/i, '')
+    .split(/\s+/)
+    .filter(Boolean);
   return words.length ? words : [title];
 }
 
@@ -64,7 +75,17 @@ function Marquee({ title, className }: { title: string; className?: string }) {
 }
 
 /** The short join hint (phones are an optional extra in a showcase). */
-export function JoinHint({ code, look, className, short = false }: { code: string; look: ShowdownLook; className?: string; short?: boolean }) {
+export function JoinHint({
+  code,
+  look,
+  className,
+  short = false,
+}: {
+  code: string;
+  look: ShowdownLook;
+  className?: string;
+  short?: boolean;
+}) {
   if (!code) return null;
   const join = joinAddress(code);
   return (
@@ -93,7 +114,17 @@ function Flourish() {
 // ---------------------------------------------------------------------------
 
 /** The opening: lights come up from dark, the DAS badge pops, the marquee title, the tagline. */
-export function OpeningScene({ settings, look, code, rehearsal }: { settings: ShowdownSettings | null; look: ShowdownLook; code: string; rehearsal: boolean }) {
+export function OpeningScene({
+  settings,
+  look,
+  code,
+  rehearsal,
+}: {
+  settings: ShowdownSettings | null;
+  look: ShowdownLook;
+  code: string;
+  rehearsal: boolean;
+}) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const copy = LOOK_COPY[look].showcase;
   return (
@@ -164,7 +195,10 @@ function CardArt({ card, look }: { card: ShowdownCard; look: ShowdownLook }): Re
       <svg className="sd-cardart sd-cardart--hourglass" viewBox="0 0 80 110" aria-hidden focusable="false">
         <rect x="8" y="4" width="64" height="8" rx="4" className="sd-cardart__frame" />
         <rect x="8" y="98" width="64" height="8" rx="4" className="sd-cardart__frame" />
-        <path d="M16 12 C16 40 36 46 36 55 C36 64 16 70 16 98 L64 98 C64 70 44 64 44 55 C44 46 64 40 64 12 Z" className="sd-cardart__glass" />
+        <path
+          d="M16 12 C16 40 36 46 36 55 C36 64 16 70 16 98 L64 98 C64 70 44 64 44 55 C44 46 64 40 64 12 Z"
+          className="sd-cardart__glass"
+        />
         <path className="sd-cardart__sand-top" d="M22 22 L58 22 C56 38 44 44 40 52 C36 44 24 38 22 22 Z" />
         <path className="sd-cardart__sand-bottom" d="M22 96 C26 84 34 78 40 76 C46 78 54 84 58 96 Z" />
         <line className="sd-cardart__stream" x1="40" y1="54" x2="40" y2="94" />
@@ -188,7 +222,13 @@ function CardArt({ card, look }: { card: ShowdownCard; look: ShowdownLook }): Re
             <path d="M-7 -3 l3.5 -4 l1.5 5 z M7 -3 l-3.5 -4 l-1.5 5 z M-7 4 Q0 10 7 4 Z" fill="#ffe08a" />
           </g>
         ) : (
-          <path d="M60 28 l4.4 9.4 10.3 1.2 -7.6 7 2.1 10.1 -9.2 -5.2 -9.2 5.2 2.1 -10.1 -7.6 -7 10.3 -1.2 z" fill="#fff6d0" stroke="#b07a1a" strokeWidth="1.5" strokeLinejoin="round" />
+          <path
+            d="M60 28 l4.4 9.4 10.3 1.2 -7.6 7 2.1 10.1 -9.2 -5.2 -9.2 5.2 2.1 -10.1 -7.6 -7 10.3 -1.2 z"
+            fill="#fff6d0"
+            stroke="#b07a1a"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
         )}
         <g className="sd-cardart__sparkles" fill="#fff8dc">
           <path d="M14 8 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z" />
@@ -201,8 +241,20 @@ function CardArt({ card, look }: { card: ShowdownCard; look: ShowdownLook }): Re
   return null;
 }
 
-/** A holding card, in any phase: welcome / be right back / prize time / thanks. */
-export function CardScene({ card, settings, look, code }: { card: ShowdownCard; settings: ShowdownSettings | null; look: ShowdownLook; code: string }) {
+/** A holding card, in any phase: welcome / be right back / prize time / thanks. Prize time lists the finale's winners. */
+export function CardScene({
+  card,
+  settings,
+  look,
+  code,
+  finale = null,
+}: {
+  card: ShowdownCard;
+  settings: ShowdownSettings | null;
+  look: ShowdownLook;
+  code: string;
+  finale?: ShowdownFinale | null;
+}) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const event = settings ? eventTitle(settings) : show;
   const c = LOOK_COPY[look].cards[card];
@@ -210,8 +262,11 @@ export function CardScene({ card, settings, look, code }: { card: ShowdownCard; 
   const kicker = fill(c.kicker, vars);
   const title = c.title ? fill(c.title, vars) : event;
   const sub = fill(c.sub, vars);
+  const podium = finale?.podium ?? [];
+  const stars = finale && (finale.medals ?? 'never') !== 'never' ? (finale.stars ?? []) : [];
+  const winners = card === 'prizes' && (podium.length > 0 || stars.length > 0);
   return (
-    <section className="sd-scene sd-scene--card" data-card={card} aria-label={title} key={card}>
+    <section className="sd-scene sd-scene--card" data-card={card} data-winners={winners ? 'true' : undefined} aria-label={title} key={card}>
       <div className="sd-scene__rays" aria-hidden />
       <div className="sd-scene__halo" aria-hidden />
       <div className="sd-scene__lockup sd-scene__lockup--card">
@@ -227,11 +282,14 @@ export function CardScene({ card, settings, look, code }: { card: ShowdownCard; 
         <h2 className="sd-scene__headline" style={{ '--len': Math.max(6, len(title)) } as CSSProperties}>
           <Words text={title} />
         </h2>
-        <p className="sd-scene__tagline">
-          <Flourish />
-          <span>{sub}</span>
-          <Flourish />
-        </p>
+        {winners ? null : (
+          <p className="sd-scene__tagline">
+            <Flourish />
+            <span>{sub}</span>
+            <Flourish />
+          </p>
+        )}
+        {winners ? <PrizeWinners podium={podium} stars={stars} copy={LOOK_COPY[look].showcase} /> : null}
       </div>
       {card === 'welcome' ? <JoinHint code={code} look={look} className="sd-scene__join" /> : null}
     </section>
@@ -239,7 +297,17 @@ export function CardScene({ card, settings, look, code }: { card: ShowdownCard; 
 }
 
 /** The lobby before the show (no card up): a holding screen with the event, the show and the code. */
-export function LobbyScene({ settings, look, code, rehearsal }: { settings: ShowdownSettings | null; look: ShowdownLook; code: string; rehearsal: boolean }) {
+export function LobbyScene({
+  settings,
+  look,
+  code,
+  rehearsal,
+}: {
+  settings: ShowdownSettings | null;
+  look: ShowdownLook;
+  code: string;
+  rehearsal: boolean;
+}) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const event = settings ? eventTitle(settings) : show;
   const copy = LOOK_COPY[look].showcase;
@@ -269,10 +337,29 @@ export function LobbyScene({ settings, look, code, rehearsal }: { settings: Show
   );
 }
 
-/** "That's a wrap!" — the closing: the show's title and a recap of each round. No winner. */
-export function FinaleScene({ finale, settings, look, titles }: { finale: ShowdownFinale; settings: ShowdownSettings | null; look: ShowdownLook; titles: readonly string[] }) {
+/**
+ * The closing, paced by the presenter (the room's `finaleStep`): "That's a wrap!" with each round's
+ * recap; then, with two-tier scoring, the Spotlight Stars ceremony and the podium, 3rd → 2nd → 1st.
+ * Without a podium or medals it's the wrap alone (no team winner is ever invented).
+ */
+export function FinaleScene({
+  finale,
+  settings,
+  look,
+  titles,
+  step = 0,
+}: {
+  finale: ShowdownFinale;
+  settings: ShowdownSettings | null;
+  look: ShowdownLook;
+  titles: readonly string[];
+  step?: number;
+}) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const copy = LOOK_COPY[look].showcase;
+  const view = finaleView(finale, step);
+  if (view.kind === 'medals') return <FinaleStars key="medals" stars={finale.stars ?? []} show={show} copy={copy} />;
+  if (view.kind !== 'wrap') return <FinalePodium key="podium" podium={finale.podium ?? []} view={view} show={show} copy={copy} />;
   return (
     <section className="sd-scene sd-scene--finale" aria-label={copy.wrap}>
       <div className="sd-scene__rays" aria-hidden />
@@ -323,5 +410,266 @@ export function FinaleScene({ finale, settings, look, titles }: { finale: Showdo
         ) : null}
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Two-tier scoring: the Standings card, the medal wall, the podium, Prize time's winners
+// ---------------------------------------------------------------------------
+
+/** Text with its numbers in the number face. */
+function Nums({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\d+)/).map((part, i) =>
+        /^\d+$/.test(part) ? (
+          <span key={i} className="sd-num">
+            {part}
+          </span>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+/** The medal wall: names with their medals (icons and counts), Olympic order as given. */
+export function StarsWall({ stars, max = 8, className }: { stars: readonly ShowdownStar[]; max?: number; className?: string }) {
+  const shown = stars.slice(0, max);
+  return (
+    <ol className={`sd-stars ${className ?? ''}`} aria-label="Spotlight Stars">
+      {shown.map((star, i) => (
+        <li
+          key={star.playerId}
+          className="sd-stars__row"
+          style={{ '--i': i } as CSSProperties}
+          aria-label={`${star.name}: ${medalWords(star.medals)}`}
+        >
+          <span className="sd-stars__name">{star.name}</span>
+          <span className="sd-stars__medals" aria-hidden>
+            {medalList(star.medals).map((m) => (
+              <span key={m.kind} className="sd-stars__medal" data-medal={m.kind} title={m.title}>
+                <span className="sd-stars__icon">{m.icon}</span>
+                {m.count > 1 ? <span className="sd-num sd-stars__count">×{m.count}</span> : null}
+              </span>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StandingRows({ rows, copy }: { rows: readonly ShowdownScoreRow[]; copy: ShowcaseCopy }) {
+  return (
+    <ol className="sd-standings__list" aria-label={copy.standingsTitle}>
+      {rows.map((row, i) => (
+        <li
+          key={row.playerId}
+          className="sd-standings__row"
+          data-rank={row.rank}
+          style={{ '--i': i } as CSSProperties}
+          aria-label={`${placeWord(row.rank)}: ${row.name}, ${row.points} ${copy.pts}`}
+        >
+          <span className="sd-standings__rank sd-num" aria-hidden>
+            {row.rank}
+          </span>
+          <span className="sd-standings__name" aria-hidden>
+            {row.name}
+          </span>
+          <span className="sd-standings__pts" aria-hidden>
+            <span className="sd-num">{row.points}</span> {copy.pts}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The Standings card (between rounds): the top five Guessers and, with medals after each round, the Spotlight Stars. */
+export function StandingsScene({ scoreboard, look }: { scoreboard: ShowdownScoreboard | null; look: ShowdownLook }) {
+  const copy = LOOK_COPY[look].showcase;
+  const top = scoreboard?.points ? scoreboard.top : [];
+  const stars = scoreboard && scoreboard.medals === 'round' ? scoreboard.stars : [];
+  const both = Boolean(scoreboard?.points) && stars.length > 0;
+  return (
+    <section
+      className="sd-scene sd-scene--card sd-scene--standings"
+      data-part="showdown-standings"
+      data-both={both ? 'true' : undefined}
+      aria-label={copy.standingsTitle}
+    >
+      <div className="sd-scene__rays" aria-hidden />
+      <div className="sd-scene__halo" aria-hidden />
+      <div className="sd-scene__lockup sd-scene__lockup--standings">
+        <p className="sd-scene__kicker">
+          <Words text={copy.standingsKicker} />
+        </p>
+        <h2 className="sd-scene__headline sd-standings__title" style={{ '--len': 14 } as CSSProperties}>
+          <Words text={scoreboard?.points ? copy.standingsTitle : copy.stars} />
+        </h2>
+        <div className="sd-standings">
+          {scoreboard?.points ? (
+            top.length ? (
+              <StandingRows rows={top} copy={copy} />
+            ) : (
+              <p className="sd-scene__tagline sd-standings__empty">{copy.standingsEmpty}</p>
+            )
+          ) : null}
+          {stars.length ? (
+            <div className="sd-standings__stars">
+              {both ? <p className="sd-standings__sub">{copy.stars}</p> : null}
+              <StarsWall stars={stars} max={both ? 5 : 8} />
+            </div>
+          ) : null}
+        </div>
+        {scoreboard?.points && scoreboard.of > top.length ? (
+          <p className="sd-standings__of">
+            <Nums text={fill(copy.standingsOf, { n: scoreboard.of })} />
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** The finale's medal ceremony. */
+function FinaleStars({ stars, show, copy }: { stars: readonly ShowdownStar[]; show: string; copy: ShowcaseCopy }) {
+  return (
+    <section className="sd-scene sd-scene--finale sd-scene--stars" data-part="showdown-finale-stars" aria-label={copy.stars}>
+      <div className="sd-scene__rays" aria-hidden />
+      <div className="sd-scene__halo" aria-hidden />
+      <div className="sd-scene__lockup sd-scene__lockup--finale">
+        <p className="sd-scene__kicker">
+          <Words text={show} />
+        </p>
+        <h2 className="sd-scene__headline" style={{ '--len': 16 } as CSSProperties}>
+          <Words text={copy.stars} />
+        </h2>
+        <p className="sd-scene__tagline">
+          <Flourish />
+          <span>{copy.starsSub}</span>
+          <Flourish />
+        </p>
+        <StarsWall stars={stars} max={8} className="sd-stars--finale" />
+      </div>
+    </section>
+  );
+}
+
+/** The finale's podium: 2nd, 1st, 3rd; each place revealed in turn (3rd → 2nd → 1st), ties together. */
+function FinalePodium({
+  podium,
+  view,
+  show,
+  copy,
+}: {
+  podium: readonly ShowdownScoreRow[];
+  view: FinaleView;
+  show: string;
+  copy: ShowcaseCopy;
+}) {
+  const columns = podiumColumns(podium);
+  return (
+    <section
+      className="sd-scene sd-scene--finale sd-scene--podium"
+      data-part="showdown-finale-podium"
+      data-step={view.kind}
+      aria-label={copy.podium}
+    >
+      <div className="sd-scene__rays" aria-hidden />
+      <div className="sd-scene__halo" aria-hidden />
+      <div className="sd-scene__lockup sd-scene__lockup--finale">
+        <p className="sd-scene__kicker">
+          <Words text={show} />
+        </p>
+        <h2 className="sd-scene__headline sd-podium__title" style={{ '--len': 16 } as CSSProperties}>
+          <Words text={copy.podium} />
+        </h2>
+        <ol className="sd-podium" aria-label={copy.podium}>
+          {columns.map((col) => {
+            const up = view.places.has(col.rank);
+            return (
+              <li
+                key={col.rank}
+                className="sd-podium__place"
+                data-rank={col.rank}
+                data-up={up ? 'true' : undefined}
+                aria-label={
+                  up
+                    ? `${placeWord(col.rank)}: ${col.rows.map((r) => `${r.name}, ${r.points} ${copy.pts}`).join('; ')}`
+                    : `${placeWord(col.rank)}: coming up`
+                }
+              >
+                <div className="sd-podium__who" aria-hidden>
+                  {up ? (
+                    col.rows.map((r) => (
+                      <span key={r.playerId} className="sd-podium__name">
+                        {r.name}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="sd-podium__name sd-podium__name--hidden">?</span>
+                  )}
+                  {up ? (
+                    <span className="sd-podium__pts">
+                      <span className="sd-num">{col.rows[0]!.points}</span> {copy.pts}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="sd-podium__block" aria-hidden>
+                  <span className="sd-podium__rank">
+                    <Nums text={placeWord(col.rank)} />
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+/** Prize time with the finale's winners: the podium and the medal winners. */
+function PrizeWinners({
+  podium,
+  stars,
+  copy,
+}: {
+  podium: readonly ShowdownScoreRow[];
+  stars: readonly ShowdownStar[];
+  copy: ShowcaseCopy;
+}) {
+  return (
+    <div className="sd-prizes" data-part="showdown-prize-winners">
+      {podium.length ? (
+        <div className="sd-prizes__block">
+          <p className="sd-standings__sub">{copy.podium}</p>
+          <ol className="sd-prizes__list" aria-label={copy.podium}>
+            {[...podium]
+              .sort((a, b) => a.rank - b.rank)
+              .map((r) => (
+                <li key={r.playerId} className="sd-prizes__row" data-rank={r.rank}>
+                  <span className="sd-prizes__place">
+                    <Nums text={placeWord(r.rank)} />
+                  </span>
+                  <span className="sd-prizes__name">{r.name}</span>
+                  <span className="sd-prizes__pts">
+                    <span className="sd-num">{r.points}</span> {copy.pts}
+                  </span>
+                </li>
+              ))}
+          </ol>
+        </div>
+      ) : null}
+      {stars.length ? (
+        <div className="sd-prizes__block">
+          <p className="sd-standings__sub">{copy.stars}</p>
+          <StarsWall stars={stars} max={6} />
+        </div>
+      ) : null}
+    </div>
   );
 }

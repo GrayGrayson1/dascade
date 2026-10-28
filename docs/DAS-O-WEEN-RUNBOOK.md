@@ -169,6 +169,28 @@ draw only if **Crew in the random draw** is on in the setup (off for DAS-O-Ween)
 
 ---
 
+## Scores and medals (two tiers that never touch)
+
+DAS-O-Ween scores the crowd and gives the hot seat medals (setup → **Scoring**; all of it can be
+switched off there — **Score the crowd** off runs the show exactly as before).
+
+- **The crowd** fills a private **Top 10** on their phone (or laptop): one guess per spot, up to 10.
+  When an answer flips — however it was found — everyone who had it scores **#1 = 10 … #10 = 1**, **+1**
+  if it was in the same spot, **+20** for a perfect list. Answers only **Reveal remaining** found
+  (hidden gems) pay double. Phones show their own points and rank privately.
+- **The hot seat** earns medals for answers flipped during their turn: 🥇 #1–#3, 🥈 #4–#7, 🥉 #8–#10,
+  🎃 for #5 (the special), and a 🎗️ Brave ribbon for a turn with no find. A medal pins on as the tile
+  flips. **Wrong credit** (someone in the chat named it mid-turn)? **Scores** tab → **Remove** next to it.
+- **Between rounds**: when the board is complete, **Show standings** puts the top five (and, with
+  medals after each round, the Spotlight Stars) on the stage. Take it down like any card.
+- **The finale**: on the results screen, step through it — the medal ceremony, then 3rd, 2nd, 1st —
+  each with its drumroll and applause. Then **Prize time** lists the winners.
+- **Download** the scores any time (**Scores** tab, or the results screen): CSV for a spreadsheet, JSON
+  for the full record. It never contains an answer that hasn't flipped.
+- **Later, not built yet:** a scorekeeper crediting answers given in the chat or out loud to the
+  person who said them. Until then, chat and spoken answers count for the hot seat's medals only when
+  they're flipped during that person's turn.
+
 ## Guests and names
 
 - The join link **dascade.onrender.com/r/CODE** asks for one thing: the name coworkers know you by.

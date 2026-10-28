@@ -52,8 +52,15 @@ import {
   ShowdownSkipSchema,
   ShowdownStationSchema,
   permissionsOf,
+  SHOWDOWN_STANDINGS_CARD,
   ShowdownCardSchema,
   ShowdownClaimSchema,
+  ShowdownCreditSchema,
+  ShowdownFinaleSchema,
+  answerValue,
+  emptyMedals,
+  finaleSteps,
+  medalCount,
   ShowdownContentSchema,
   ShowdownCueSchema,
   ShowdownGuessSchema,
@@ -78,7 +85,11 @@ import {
   type ShowdownCrewRole,
   type ShowdownIssuableRole,
   type ShowdownMe,
+  type ShowdownMyGuess,
   type ShowdownPermission,
+  type ShowdownScoreboard,
+  type ShowdownScoresFile,
+  type ShowdownScoresView,
   type ShowdownPickPayload,
   type ShowdownPickerPrivate,
   type ShowdownPreflightData,
@@ -104,16 +115,20 @@ import {
   currentRound,
   drawPick,
   finalizeShow,
+  lateIn,
   nextSweepSlot,
   pickPool,
   pickRounds,
   revealedIn,
+  scoreShow,
   sheetView,
   showWinner,
   specialSlot,
   step,
   type PickRules,
   type PickSeat,
+  type ScoreTurn,
+  type ShowScores,
   type ShowCommand,
   type ShowState,
 } from '@dascade/game-core/showdown';
@@ -149,6 +164,10 @@ const PRESENTER_PHASES: readonly Phase[] = ['LOBBY', 'COUNTDOWN', 'PLAYING', 'IN
  * answer, and the celebration after it.
  */
 const SWEEP_MS = { lead: 900, step: 1700, suspense: 2600, special: 4200 };
+/** The public scoreboard: the top Guessers on the stage, and how many Spotlight Stars it lists. */
+const TOP_SHOWN = 5;
+const STARS_SHOWN = 12;
+const NO_GUESSES: ReadonlyMap<string, readonly { slot: number; pos: number; repeat: boolean }[]> = new Map();
 
 export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> {
   readonly gameId = 'showdown' as const;
@@ -235,8 +254,16 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   private readonly excluded = new Set<string>();
   /** Whom the last draw picked: True random never draws them twice in a row. */
   private lastPicked = '';
-  /** "Called by": `${round}:${slot}` → who was in the hot seat when it flipped. */
-  private readonly credits = new Map<string, { id: string; name: string }>();
+  /** "Called by": `${round}:${slot}` → who was in the hot seat when it flipped, and for which draw. */
+  private readonly credits = new Map<string, { id: string; name: string; draw?: number }>();
+
+  // ---- Two-tier scoring (Presenter Showcase): crowd points and hot-seat medals, derived ----
+  /** Turns marked done this show (a turn with nothing credited to its draw is a Brave ribbon). */
+  private doneTurns: ScoreTurn[] = [];
+  /** The latest recomputation (null outside a show). */
+  private scores: ShowScores | null = null;
+  /** Last full list sent to the presenter / scores crew, per player (JSON), to send only changes. */
+  private readonly lastScores = new Map<string, string>();
 
   protected defaultSettings(): ShowdownSettings {
     return defaultShowdownSettings(new Date());
@@ -272,7 +299,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       phases: ['LOBBY', 'PLAYING'],
     });
     this.handle(SHOWDOWN_MSG.screen, ShowdownScreenSchema, (p, { on }) => this.setScreen(p, on), { phases: PRESENTER_PHASES });
-    this.handle(SHOWDOWN_MSG.guess, ShowdownGuessSchema, (p, payload) => this.guess(p, payload.round, payload.text), {
+    this.handle(SHOWDOWN_MSG.guess, ShowdownGuessSchema, (p, payload) => this.guess(p, payload.round, payload.text, payload.pos), {
       phases: ['PLAYING'],
       playersOnly: true,
       rate: RATE.chat,
@@ -300,6 +327,18 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.handle(SHOWDOWN_MSG.preset, ShowdownPresetSchema, (p, { id }) => this.loadPreset(p, id), {
       phases: ['LOBBY', 'RESULTS'],
       rate: { burst: 4, perSecond: 1 },
+    });
+    this.handle(SHOWDOWN_MSG.finale, ShowdownFinaleSchema, (p, { step }) => this.finaleStep(p, step), {
+      phases: ['RESULTS'],
+      rate: { burst: 6, perSecond: 2 },
+    });
+    this.handle(SHOWDOWN_MSG.scoresExport, ShowdownEmptySchema, (p) => this.exportScores(p), {
+      phases: PRESENTER_PHASES,
+      rate: { burst: 3, perSecond: 0.5 },
+    });
+    this.handle(SHOWDOWN_MSG.credit, ShowdownCreditSchema, (p, { round, slot }) => this.removeCredit(p, round, slot), {
+      phases: ['PLAYING'],
+      rate: { burst: 6, perSecond: 2 },
     });
     this.handle(SHOWDOWN_MSG.card, ShowdownCardSchema, (p, { card }) => this.setCard(p, card), {
       phases: PRESENTER_PHASES,
@@ -429,6 +468,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.lastPicked = '';
     this.resetPicker();
     this.credits.clear();
+    this.doneTurns = [];
+    this.state.finaleStep = 0;
     this.publish([{ type: 'intro', rev: this.show.rev }]);
     if (!this.presenterOnline()) this.watchPresenter();
     if (this.event) {
@@ -445,6 +486,11 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.lastPicked = '';
     this.resetPicker();
     this.credits.clear();
+    this.doneTurns = [];
+    this.scores = null;
+    this.state.scoreJson = '';
+    this.state.finaleStep = 0;
+    this.refreshScoresAll();
     this.markSnapshot();
     this.stopSweep(false);
     this.resetClock(0);
@@ -496,6 +542,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   protected override onPlayerRemoved(player: PlayerRecord, _reason: RemovalReason): void {
     this.lastMe.delete(player.id);
     this.lastCrew.delete(player.id);
+    this.lastScores.delete(player.id);
     this.state.teams.delete(player.id);
     this.state.screens.delete(player.id);
     this.state.seats.delete(player.id);
@@ -523,7 +570,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   protected override syncPrivate(player: PlayerRecord): void {
     this.lastCrew.delete(player.id);
+    this.lastScores.delete(player.id);
     this.refreshCrew(player);
+    this.refreshScores(player);
     if (this.can(player, 'audit.read')) this.sendTo(player, SHOWDOWN_MSG.audit, this.auditView());
     if (player.id === this.presenterId) {
       this.sendTo(player, SHOWDOWN_MSG.pass, { pass: this.presenterPass });
@@ -775,8 +824,11 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.markSnapshot();
   }
 
-  private setCard(player: PlayerRecord, card: ShowdownCard | ''): void {
+  private setCard(player: PlayerRecord, card: ShowdownCard | typeof SHOWDOWN_STANDINGS_CARD | ''): void {
     if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.card, 'not_host', 'Only the presenter changes the stage.');
+    if (card === SHOWDOWN_STANDINGS_CARD && !this.scoringOn()) {
+      return this.reject(player, SHOWDOWN_MSG.card, 'not_allowed', 'Standings need Score the crowd or medals switched on.');
+    }
     this.state.card = card;
     this.markSnapshot();
   }
@@ -840,7 +892,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const hot = this.state.hotSeat ? this.getPlayer(this.state.hotSeat) : undefined;
     if (hot && result.state.mode === 'showcase') {
       for (const e of result.events) {
-        if (e.type === 'reveal' && !e.late) this.credits.set(`${result.state.round}:${e.slot}`, { id: hot.id, name: hot.state.name });
+        if (e.type === 'reveal' && !e.late)
+          this.credits.set(`${result.state.round}:${e.slot}`, { id: hot.id, name: hot.state.name, draw: this.state.drawNo });
       }
     }
     if (result.finished) {
@@ -858,6 +911,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const newRound = prev.round !== next.round || events.some((e) => e.type === 'restart' || e.type === 'reset' || e.type === 'round');
     if (newRound) {
       this.misses = 0;
+      // The standings belong to the break between rounds: the next round (or a restart) takes them down.
+      if (this.state.card === SHOWDOWN_STANDINGS_CARD) this.state.card = '';
       this.resetClock(this.state.clockMax || this.getSettings().minutes * this.minuteMs);
       // PCK-05 A: the pool refills when the next round starts (late joiners included).
       this.resetPicker();
@@ -1054,6 +1109,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     for (const e of events) {
       this.broadcast(SHOWDOWN_MSG.event, e.type === 'reveal' ? { ...e, callers: matches[e.slot] ?? 0 } : e);
     }
+    this.recomputeScores();
     this.refreshSheet();
     this.refreshMeAll();
     this.markSnapshot();
@@ -1074,13 +1130,27 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const crowd: string[] = [];
     for (const [id, team] of this.playedFor) (team === -1 ? crowd : members[team]).push(id);
     const rounds = show.rounds;
-    const callers = [...this.guesses.players()]
-      .map((id) => {
-        const me = this.guesses.me(id, show.round, rounds, (r) => revealedIn(show, r));
-        return { playerId: id, name: this.nameOf(id), points: me.points, calls: me.calls, team: this.playedFor.get(id) ?? -1 };
-      })
-      .filter((c) => c.calls > 0)
-      .sort((a, b) => b.points - a.points || b.calls - a.calls || a.name.localeCompare(b.name));
+    // Two-tier scoring: the crowd's points and the hot seat's medals, from the final board.
+    this.recomputeScores();
+    const tiers = show.mode === 'showcase' ? this.scores : null;
+    const crowdPoints = tiers !== null && settings.points;
+    const callers = crowdPoints
+      ? tiers.people
+          .filter((p) => p.calls > 0)
+          .map((p) => ({
+            playerId: p.playerId,
+            name: p.name,
+            points: p.points,
+            calls: p.calls,
+            team: this.playedFor.get(p.playerId) ?? -1,
+          }))
+      : [...this.guesses.players()]
+          .map((id) => {
+            const me = this.guesses.me(id, show.round, rounds, (r) => revealedIn(show, r));
+            return { playerId: id, name: this.nameOf(id), points: me.points, calls: me.calls, team: this.playedFor.get(id) ?? -1 };
+          })
+          .filter((c) => c.calls > 0)
+          .sort((a, b) => b.points - a.points || b.calls - a.calls || a.name.localeCompare(b.name));
     const finale: ShowdownFinale = {
       mode: show.mode,
       winner,
@@ -1089,10 +1159,25 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       results: show.results.map((r) => ({ ...r })),
       callers: callers.slice(0, 5).map((c) => ({ ...c, team: c.team as -1 | 0 | 1 })),
       members: [members[0].map((id) => this.nameOf(id)), members[1].map((id) => this.nameOf(id))],
+      ...(tiers
+        ? {
+            // The podium: the top three Guessers (ties share a place); nobody a moderator hid.
+            podium: crowdPoints
+              ? tiers.people
+                  .filter((p) => p.rank >= 1 && p.rank <= 3 && !this.hidden.has(p.playerId))
+                  .map(({ playerId, name, points, rank }) => ({ playerId, name, points, rank }))
+              : [],
+            stars: settings.medals !== 'never' ? tiers.stars.filter((x) => !this.hidden.has(x.playerId)).slice(0, STARS_SHOWN) : [],
+            medals: settings.medals,
+          }
+        : {}),
     };
+    this.state.finaleStep = 0;
     this.state.boardJson = this.boardJson(show);
     this.state.rev = show.rev;
     this.state.finaleJson = JSON.stringify(finale);
+    // The finale takes the stage: a standings card left up would hide the podium.
+    if (this.state.card === SHOWDOWN_STANDINGS_CARD) this.state.card = '';
     if (this.state.hotSeat) this.endTurn(null, 'cleared');
 
     const placements = winner === -1 ? [[...members[0], ...members[1], ...crowd]] : [members[winner], members[winner === 0 ? 1 : 0]];
@@ -1102,6 +1187,12 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     for (const [id, team] of this.playedFor) scores[id] = team === -1 ? (called.get(id) ?? 0) : show.scores[team];
     const playerStats: Record<string, Record<string, number>> = {};
     for (const c of callers) playerStats[c.playerId] = { calls: c.calls, bestCallPoints: c.points };
+    // Two-tier extras: medals from the hot seat, answers called in the right spot.
+    for (const p of tiers?.people ?? []) {
+      const medals = medalCount(p.medals);
+      if (!medals && !p.positionHits) continue;
+      playerStats[p.playerId] = { ...(playerStats[p.playerId] ?? {}), medals, positionHits: p.positionHits };
+    }
     // A show ended before round 1 was played reports nothing (nobody won or lost anything).
     if (show.round >= 0)
       this.reportOutcome({ placements, scores, reason, details: { playerStats, teamScores: [...show.scores], rounds: rounds.length } });
@@ -1228,7 +1319,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   // Audience
   // ===========================================================================
 
-  private guess(player: PlayerRecord, round: number, text: string): void {
+  private guess(player: PlayerRecord, round: number, text: string, pos?: number): void {
     const show = this.show;
     const type = SHOWDOWN_MSG.guess;
     if (!this.getSettings().audience) return this.reject(player, type, 'not_allowed', 'Audience guesses are off for this show.');
@@ -1239,7 +1330,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const def = currentRound(show);
     if (!def) return;
     const limit = this.getSettings().guesses;
-    const result = this.guesses.submit(player.id, show.round, def, text, revealedIn(show, show.round), limit);
+    // The Top 10 scorecard: each guess is locked into a spot (Score the crowd in a showcase).
+    const spot = show.mode === 'showcase' && this.getSettings().points && pos !== undefined ? pos : -1;
+    const result = this.guesses.submit(player.id, show.round, def, text, revealedIn(show, show.round), limit, spot);
     if (!result.ok) {
       const message =
         result.reason === 'limit'
@@ -1338,10 +1431,50 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       };
       me.picked = this.state.hotSeat === player.id;
     }
+    // Two-tier scoring: your points, rank and medals, and your scorecard's spots and bonuses.
+    if (show && show.mode === 'showcase' && this.scores) {
+      const sc = this.scores.byId.get(player.id);
+      me.score = {
+        points: sc?.points ?? 0,
+        rank: sc?.rank ?? 0,
+        of: this.scores.of,
+        medals: sc ? { ...sc.medals } : emptyMedals(),
+        positionHits: sc?.positionHits ?? 0,
+        perfect: sc?.perfect ?? 0,
+        gems: sc?.gems ?? 0,
+        round: show.round >= 0 ? (sc?.rounds[show.round] ?? 0) : 0,
+      };
+      if (settings.points) {
+        me.guesses = this.scorecard(player.id, show);
+        me.points = me.score.points;
+        me.calls = sc?.calls ?? 0;
+      }
+    }
     const json = JSON.stringify(me);
     if (this.lastMe.get(player.id) === json) return;
     this.lastMe.set(player.id, json);
     this.sendTo(player, SHOWDOWN_MSG.me, me);
+  }
+
+  /** Your guesses this round as the Top 10 scorecard shows them (a match only once its answer is up). */
+  private scorecard(id: string, show: ShowState): ShowdownMyGuess[] {
+    if (show.round < 0) return [];
+    const revealed = revealedIn(show, show.round);
+    const late = lateIn(show, show.round);
+    const gems = this.getSettings().gems;
+    return this.guesses.mine(id, show.round).map((g) => {
+      const up = g.slot >= 0 && revealed[g.slot] === true;
+      const called = up && !g.repeat;
+      const gem = called && gems && late[g.slot] === true;
+      return {
+        text: g.text,
+        slot: up ? g.slot : -1,
+        points: called ? answerValue(g.slot, gem) : 0,
+        pos: g.pos,
+        bonus: called && g.pos === g.slot ? 1 : 0,
+        ...(gem ? { gem: true } : {}),
+      };
+    });
   }
 
   private refreshMeAll(): void {
@@ -1363,8 +1496,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     const roles: string[] = this.rolesOf(player);
     if (this.isPresenter(player)) roles.push('presenter');
     const perms = permissionsOf(roles);
-    // Outside event rooms only the picker exists (it works in every Presenter Showcase room).
-    return this.event ? perms : perms.filter((p) => p.startsWith('picker.'));
+    // Outside event rooms the presenter keeps the picker and the scores (there's no crew).
+    return this.event ? perms : perms.filter((p) => p.startsWith('picker.') || p.startsWith('scores.'));
   }
 
   private can(player: PlayerRecord, perm: ShowdownPermission): boolean {
@@ -1619,7 +1752,10 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
   }
 
   private refreshCrewAll(): void {
-    for (const p of this.players.values()) this.refreshCrew(p);
+    for (const p of this.players.values()) {
+      this.refreshCrew(p);
+      this.refreshScores(p);
+    }
   }
 
   // ===========================================================================
@@ -1856,6 +1992,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (how === 'done') {
       this.state.done.set(id, true);
       this.turns.set(id, (this.turns.get(id) ?? 0) + 1);
+      // A finished turn: a Brave ribbon if nothing gets credited to this draw.
+      if (this.show) this.doneTurns.push({ draw: this.state.drawNo, id, name: this.nameOf(id), round: this.show.round });
     }
     if (player && (how === 'done' || how === 'noAnswer')) {
       this.log({
@@ -1876,6 +2014,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
         how,
       } satisfies ShowdownEvent);
     }
+    if (how === 'done') this.recomputeScores();
     this.refreshPicker();
     this.refreshMeAll();
     this.refreshCrewAll();
@@ -1890,6 +2029,169 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     else this.skips.delete(player.id);
     this.refreshPicker();
     this.refreshMe(player);
+    this.markSnapshot();
+  }
+
+  // ===========================================================================
+  // Two-tier scoring (Presenter Showcase): crowd points and hot-seat medals, never accumulated
+  // ===========================================================================
+
+  /** Scoring shows at all: Score the crowd, or medals that aren't Never. */
+  private scoringOn(): boolean {
+    const s = this.getSettings();
+    return s.mode === 'showcase' && (s.points || s.medals !== 'never');
+  }
+
+  /**
+   * Recompute every score from the board, the guess book, the credits and the finished turns (an
+   * Undo, a restart or a restore is exact; a repeated message can't score twice), then publish the
+   * scoreboard — built only from revealed answers, without hidden people.
+   */
+  private recomputeScores(): void {
+    const show = this.show;
+    const settings = this.getSettings();
+    if (!show || show.mode !== 'showcase' || !this.scoringOn()) {
+      this.scores = null;
+      if (this.state.scoreJson) this.state.scoreJson = '';
+      for (const p of this.players.values()) this.refreshScores(p);
+      return;
+    }
+    this.scores = scoreShow({
+      rounds: show.rounds,
+      revealed: (r) => revealedIn(show, r),
+      late: (r) => lateIn(show, r),
+      guesses: (r) => (settings.points ? this.guesses.round(r) : NO_GUESSES),
+      credits: this.credits,
+      turns: this.doneTurns,
+      gems: settings.gems,
+      nameOf: (id) => this.nameOf(id),
+    });
+    const board: ShowdownScoreboard = {
+      points: settings.points,
+      medals: settings.medals,
+      top: settings.points
+        ? this.scores.people
+            .filter((p) => p.points > 0 && !this.hidden.has(p.playerId))
+            .slice(0, TOP_SHOWN)
+            .map(({ playerId, name, points, rank }) => ({ playerId, name, points, rank }))
+        : [],
+      of: this.scores.of,
+      stars: settings.medals !== 'never' ? this.scores.stars.filter((x) => !this.hidden.has(x.playerId)).slice(0, STARS_SHOWN) : [],
+    };
+    const json = JSON.stringify(board);
+    if (this.state.scoreJson !== json) this.state.scoreJson = json;
+    for (const p of this.players.values()) this.refreshScores(p);
+  }
+
+  /** The full live list for the presenter and `scores.export` crew (sent only when it changed). */
+  private refreshScores(player: PlayerRecord): void {
+    if (!player.client) return;
+    const scores = this.scores;
+    const view: ShowdownScoresView | null =
+      scores && this.can(player, 'scores.export')
+        ? {
+            people: scores.people,
+            stars: scores.stars,
+            credits: scores.finds.map(({ round, slot, name, medal }) => ({ round, slot, name, medal })),
+          }
+        : null;
+    const json = view ? JSON.stringify(view) : 'null';
+    const last = this.lastScores.get(player.id);
+    if (last === json || (json === 'null' && last === undefined)) return;
+    this.lastScores.set(player.id, json);
+    this.sendTo(player, SHOWDOWN_MSG.scores, view);
+  }
+
+  private refreshScoresAll(): void {
+    for (const p of this.players.values()) this.refreshScores(p);
+  }
+
+  /** The whole score record for a download: never an unrevealed answer (a mid-show export can't leak the board). */
+  private exportScores(player: PlayerRecord): void {
+    const type = SHOWDOWN_MSG.scoresExport;
+    if (!this.can(player, 'scores.export'))
+      return this.reject(player, type, 'not_allowed', 'Only the presenter or the producer can download the scores.');
+    const show = this.show;
+    const scores = this.scores;
+    if (!show || !scores)
+      return this.reject(
+        player,
+        type,
+        'not_allowed',
+        'There are no scores yet — Score the crowd or medals are off, or the show hasn’t started.',
+      );
+    const settings = this.getSettings();
+    const finds = new Map(scores.finds.map((f) => [`${f.round}:${f.slot}`, f]));
+    const rounds: ShowdownScoresFile['rounds'] = [];
+    for (let r = 0; r < show.rounds.length && r <= Math.max(show.round, 0); r++) {
+      const def = show.rounds[r]!;
+      const revealed = revealedIn(show, r);
+      const late = lateIn(show, r);
+      const callers = this.guesses.matchesPerSlot(r, def.answers.length);
+      const answers: ShowdownScoresFile['rounds'][number]['answers'] = [];
+      def.answers.forEach((a, i) => {
+        if (revealed[i] !== true) return;
+        const gem = settings.gems && late[i] === true;
+        const find = finds.get(`${r}:${i}`);
+        answers.push({
+          pos: i,
+          text: a.text,
+          value: answerValue(i, gem),
+          late: late[i] === true,
+          callers: callers[i] ?? 0,
+          foundBy: find?.name ?? '',
+          medal: find?.medal ?? '',
+        });
+      });
+      rounds.push({ index: r, title: def.title ?? '', answers });
+    }
+    this.sendTo(player, type, {
+      room: this.roomId,
+      title: this.getSettings().title || 'DAS Survey Showdown',
+      exportedAt: Date.now(),
+      settings: { points: settings.points, medals: settings.medals, gems: settings.gems, guesses: settings.guesses },
+      rounds,
+      people: scores.people,
+      stars: scores.stars,
+    } satisfies ShowdownScoresFile);
+    if (this.event) this.log({ ...this.actor(player), action: 'scores.export', after: `${scores.people.length} people` });
+  }
+
+  /** A wrong hot-seat credit (a chat answer flipped mid-turn): off the tile, and its medal with it. Audited. */
+  private removeCredit(player: PlayerRecord, round: number, slot: number): void {
+    if (!this.can(player, 'scores.fix'))
+      return this.reject(player, SHOWDOWN_MSG.credit, 'not_allowed', 'Only the presenter or the producer can change a credit.');
+    const show = this.show;
+    const key = `${round}:${slot}`;
+    const credit = this.credits.get(key);
+    if (!show || !credit) return;
+    this.credits.delete(key);
+    this.log({
+      ...this.actor(player),
+      action: 'credit.remove',
+      target: credit.id,
+      targetName: credit.name,
+      before: `#${slot + 1} in round ${round + 1}`,
+    });
+    this.state.boardJson = this.boardJson(show);
+    this.recomputeScores();
+    this.refreshMeAll();
+    this.markSnapshot();
+  }
+
+  /** The paced finale: the presenter moves it on (or back); each step plays its cue once on every screen. */
+  private finaleStep(player: PlayerRecord, step: number): void {
+    if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.finale, 'not_host', 'Only the presenter runs the finale.');
+    let finale: ShowdownFinale | null;
+    try {
+      finale = this.state.finaleJson ? (JSON.parse(this.state.finaleJson) as ShowdownFinale) : null;
+    } catch {
+      finale = null;
+    }
+    const steps = finaleSteps(finale);
+    if (step >= steps.length || step === this.state.finaleStep) return;
+    this.state.finaleStep = step;
+    this.broadcast(SHOWDOWN_MSG.event, { type: 'finale', rev: this.show?.rev ?? 0, step, kind: steps[step]! } satisfies ShowdownEvent);
     this.markSnapshot();
   }
 
@@ -2122,6 +2424,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
         excluded: [...this.excluded],
         lastPicked: this.lastPicked,
       },
+      scoring: { guesses: this.guesses.export(), doneTurns: this.doneTurns, finaleStep: this.state.finaleStep },
       station: this.state.soundStation,
       clock: {
         left: Math.round(this.clockLeftNow()),
@@ -2215,6 +2518,12 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
         this.autoDispose = false;
         this.djLockChanged();
       } else this.state.finaleJson = snap.finaleJson;
+      // Guesses and scores come back with the show (before this, a restart wiped every score).
+      if (snap.scoring) {
+        this.guesses.import(snap.scoring.guesses);
+        this.doneTurns = snap.scoring.doneTurns.map((t) => ({ ...t }));
+        if (snap.phase === 'RESULTS') this.state.finaleStep = Math.max(0, Math.min(8, snap.scoring.finaleStep));
+      }
       this.state.boardJson = this.boardJson(this.show);
       this.state.rev = this.show.rev;
       this.state.round = Math.max(0, this.show.round + 1);
@@ -2229,6 +2538,7 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     // The presenter's seat waits for them like any absent presenter's: a live show never stalls.
     if (this.phase === 'PLAYING') this.watchPresenter();
     this.refreshPicker();
+    this.recomputeScores();
     this.markMetadataDirty();
     // Seats nobody came back for leave quietly once the show isn't live.
     this.schedule('restore-claims', RESTORE_CLAIM_MS, () => {
@@ -2298,6 +2608,8 @@ interface ShowdownSnapshot {
     excluded?: string[];
     lastPicked?: string;
   };
+  /** Two-tier scoring (absent in black boxes sealed before it): the guess book, finished turns, the finale's step. */
+  scoring?: { guesses: unknown; doneTurns: ScoreTurn[]; finaleStep: number };
   station: string;
   clock: { left: number; max: number; show: boolean; timeUp: boolean; warned: boolean; armed: boolean };
   card: string;
@@ -2358,6 +2670,12 @@ function isSnapshot(s: ShowdownSnapshot): boolean {
     return false;
   if (picker.excluded !== undefined && !(isArr(picker.excluded) && picker.excluded.every(isStr))) return false;
   if (picker.lastPicked !== undefined && !isStr(picker.lastPicked)) return false;
+  const scoring = raw.scoring;
+  if (scoring !== undefined) {
+    if (!isObj(scoring) || !isArr(scoring.guesses) || !isArr(scoring.doneTurns) || !isNum(scoring.finaleStep)) return false;
+    const turnOk = (t: unknown) => isObj(t) && isNum(t.draw) && isStr(t.id) && isStr(t.name) && isNum(t.round);
+    if (!scoring.doneTurns.every(turnOk)) return false;
+  }
   const clock = raw.clock;
   if (!isObj(clock) || !isNum(clock.left) || !isNum(clock.max) || typeof clock.show !== 'boolean') return false;
   return isStr(raw.card) && isNum(raw.misses) && isNum(raw.cueSeq);

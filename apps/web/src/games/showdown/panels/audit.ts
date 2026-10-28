@@ -105,6 +105,10 @@ export function auditWords(e: ShowdownAuditEntry): string {
       return `took ${them} out of the random draw`;
     case 'picker.include':
       return who === 'Everyone' ? 'put everyone back in the random draw' : `put ${them} back in the random draw`;
+    case 'scores.export':
+      return `downloaded the scores${e.after ? ` (${e.after})` : ''}`;
+    case 'credit.remove':
+      return `took ${who ? `${who}’s` : 'a'} hot-seat credit off ${e.before || 'a tile'}`;
     case 'audio.station':
       return `moved the sound station to ${e.after || who || 'the presenter’s console'}`;
     case 'audio.failover':

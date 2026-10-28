@@ -135,3 +135,49 @@ describe('GuessBook', () => {
     expect(book.me('a', 0, [ROUND], () => none).guesses[0]!.text).toBe('x'.repeat(40));
   });
 });
+
+describe('GuessBook: the Top 10 scorecard', () => {
+  const TEN: ShowdownRoundDef = {
+    id: 'ten',
+    prompt: 'Name a thing.',
+    answers: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet'].map((text) => ({
+      text,
+      points: 0,
+      aliases: [],
+    })),
+  };
+  const hidden = Array.from({ length: 10 }, () => false);
+
+  it('locks each guess into a spot: a used spot, a spot whose answer is showing and a spot off the board are refused', () => {
+    const book = new GuessBook();
+    expect(book.submit('a', 0, TEN, 'Bravo', hidden, 10, 1)).toEqual({ ok: true, slot: 1 });
+    expect(book.submit('a', 0, TEN, 'Echo', hidden, 10, 1)).toEqual({ ok: false, reason: 'spot' });
+    const shown = hidden.map((_, i) => i === 3);
+    expect(book.submit('a', 0, TEN, 'Echo', shown, 10, 3)).toEqual({ ok: false, reason: 'spotRevealed' });
+    expect(book.submit('a', 0, ROUND, 'Lamp', none, 10, 5)).toEqual({ ok: false, reason: 'spotRange' });
+    expect(book.mine('a', 0)).toEqual([expect.objectContaining({ text: 'Bravo', slot: 1, pos: 1, repeat: false })]);
+    expect(book.me('a', 0, [TEN], () => hidden).guesses).toEqual([{ text: 'Bravo', slot: -1, points: 0, pos: 1 }]);
+  });
+
+  it('exports and imports for the black box (matches included, nothing re-matched)', () => {
+    const book = new GuessBook();
+    book.submit('a', 0, TEN, 'Bravo', hidden, 10, 0);
+    book.submit('a', 0, TEN, 'bravoo', hidden, 10, 2);
+    book.submit('b', 1, TEN, 'Zulu', hidden, 10, 9);
+    const copy = new GuessBook();
+    copy.import(JSON.parse(JSON.stringify(book.export())));
+    expect(copy.round(0).get('a')).toEqual([
+      expect.objectContaining({ slot: 1, pos: 0, repeat: false }),
+      expect.objectContaining({ slot: 1, pos: 2, repeat: true }),
+    ]);
+    expect(copy.mine('b', 1)).toEqual([expect.objectContaining({ text: 'Zulu', slot: -1, pos: 9 })]);
+    expect(copy.count(0)).toBe(2);
+    // A repeat locked after the restore is still caught.
+    expect(copy.submit('a', 0, TEN, 'Bravo', hidden, 10, 5)).toEqual({ ok: false, reason: 'duplicate' });
+    // Junk is skipped, never thrown.
+    copy.import([[0, [['x', [['ok', 1, 1, 0], 'junk', [1, 2]]]]], 'junk', null]);
+    expect(copy.mine('x', 0)).toHaveLength(1);
+    copy.import('nope');
+    expect(copy.count(0)).toBe(0);
+  });
+});

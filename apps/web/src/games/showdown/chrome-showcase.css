@@ -1454,7 +1454,8 @@ button.sdc-audio {
 .sdc-drawer__tab {
   position: relative;
   flex: 1 1 0;
-  min-width: 0;
+  /* Never narrower than its longest word: nine tabs share one row without breaking "Guesses". */
+  min-width: min-content;
   min-height: 44px;
   display: inline-flex;
   flex-direction: column;
@@ -1473,8 +1474,8 @@ button.sdc-audio {
 }
 .sdc-drawer__label {
   max-width: 100%;
-  overflow-wrap: break-word;
-  hyphens: auto;
+  overflow-wrap: normal;
+  hyphens: manual;
 }
 .sdc-drawer__tab:hover {
   color: var(--text-0);
