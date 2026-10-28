@@ -105,6 +105,19 @@ Showdown. What differs:
   show's look (`.sd-wipe`), instantly with reduced motion or effects off. Scenes are cards
   (`SHOWDOWN_SCENE_CARDS`, accepted by `ShowdownCardSchema`, kept out of `SHOWDOWN_CARDS` like the
   Standings card); the server refuses them in Team Showdown.
+  - **The join QR** (Production Desk, QR A; `qr.tsx`): the join link in capitals
+    (`HTTPS://DASCADE.ONRENDER.COM/R/CODE`: alphanumeric mode fits version 2, 25×25, at error
+    correction M, against version 3 in lowercase; `/R/` reaches the join screen because routes ignore
+    case). Drawn in the browser by `lean-qr` (MIT, no dependencies), loaded on its own the first time a
+    QR is drawn: only on the stage window, the console and big screens, never on phones (the stage's
+    display context; `useDisplayInfo`). Black on white, a 4-module quiet zone, no logo, the same in
+    every look, with the readable link and the room code under it. A big ticket (about 40 % of the
+    stage's height) on the lobby and the Welcome card; a medium one on Be right back and the Standings;
+    text only during rounds. The **Join pop-up** (`J`, or the Cards tab; `showdown:joinpop {on}`,
+    presenter only) sets `joinAt`: every stage window and big screen shows the ticket over the board for
+    `SHOWDOWN_JOIN_POP_MS` (20 s, by the server's clock), then it slides away. **Copy QR image** (the
+    Cards tab and the lobby's Join QR) puts a PNG on the clipboard for the Teams chat (saved as a file
+    where the browser can't copy images).
   - **Cinema** (`cinema.ts`): the presenter loads video files in the drawer's **Cinema** tab. Each
     becomes an object URL in this browser: nothing uploads, and no file, name or frame reaches the
     server, the black box, an export or a log (only the frame choice is remembered on the device).
@@ -389,15 +402,15 @@ not the presenter's theme.
 
 Everything is new files, plus a few one-line registrations.
 
-| Layer          | Files                                                                                                                                                                                                                                                                                                                        |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Contract       | `packages/shared/src/games/showdown.ts`: settings, messages, Zod payloads, views, `validateShowContent`, looks, pack metadata                                                                                                                                                                                                |
-| Engine (pure)  | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset rounds, server-only), tests                                                                  |
-| Server         | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts`                                                                              |
-| Client         | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css` |
-| Floor          | `apps/web/src/arcade/scenes/showdown.ts` (attract scene)                                                                                                                                                                                                                                                                     |
-| Presenter Tour | `apps/web/src/games/showdown/source.ts` (the show source the stage hooks read), `apps/web/src/games/showdown/tour/` (demo source, timeline, script, player, mock console, film), the `/tutorial/showdown` route in `apps/web/src/app/App.tsx`                                                                                |
-| Tests          | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `e2e/showdown-cinema.spec.ts` (a video made in the browser at run time, never a file in the repo), `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`)                                                           |
+| Layer          | Files                                                                                                                                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract       | `packages/shared/src/games/showdown.ts`: settings, messages, Zod payloads, views, `validateShowContent`, looks, pack metadata                                                                                                                                                                                                   |
+| Engine (pure)  | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset rounds, server-only), tests                                                                     |
+| Server         | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts`                                                                                 |
+| Client         | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css`    |
+| Floor          | `apps/web/src/arcade/scenes/showdown.ts` (attract scene)                                                                                                                                                                                                                                                                        |
+| Presenter Tour | `apps/web/src/games/showdown/source.ts` (the show source the stage hooks read), `apps/web/src/games/showdown/tour/` (demo source, timeline, script, player, mock console, film), the `/tutorial/showdown` route in `apps/web/src/app/App.tsx`                                                                                   |
+| Tests          | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `e2e/showdown-cinema.spec.ts` (a video made in the browser at run time, never a file in the repo), `e2e/showdown-qr.spec.ts` (the QR checked module by module), `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`) |
 
 Notes:
 

@@ -93,7 +93,10 @@ new boards). They live in a show file on your computer:
 1. In the meeting, press **Share** and turn on **Include sound**.
 2. Choose **Window** → **DAS-O-Ween Trivia — STAGE (share this)**. (Never the 🔒 PRESENTER tab.)
 3. Ask a colleague what they see and hear (the preflight's share check).
-4. Post the join link in the chat: **dascade.onrender.com/r/CODE** (the code is on the Welcome card).
+4. Post the join link **and its QR** in the chat: in the console's **Cards** tab (or the lobby's
+   **Join QR**), press **Copy QR image** and paste it into the Teams chat, then **Copy link** and
+   paste that too (**dascade.onrender.com/r/CODE**). People watching on a laptop can also scan the
+   ticket on the Welcome card with their phone.
 
 Keep the stage window open: don't minimise it, or Teams freezes on its last picture.
 
@@ -123,11 +126,11 @@ jukebox pauses during Cinema and comes back in the next break.
 
 | Time  | What's happening                     | What you do                                                                                                                                                                                                                                                           |
 | ----- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0–15  | Introductions, Halloween backgrounds | **Welcome** card. The DAS-O-Ween record can play from the jukebox.                                                                                                                                                                                                    |
+| 0–15  | Introductions, Halloween backgrounds | **Welcome** card (it carries the big QR ticket). At 0:00 post the link and its QR in the chat. The DAS-O-Ween record can play from the jukebox.                                                                                                                       |
 | 15–20 | Opening, then the old cartoon        | **Welcome** card. For the cartoon: Cinema tab → choose the cartoon → `V` → **Play**. When it ends, `Cards` → Welcome (or `B`).                                                                                                                                        |
 | 20    | The game starts                      | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks.                                                                                                                                                     |
 | 20–32 | Round 1                              | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs). |
-| 32–33 | Intermission                         | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first.                                                                                                                                                                                       |
+| 32–33 | Intermission                         | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first. Latecomers: press `J` for the Join pop-up (the QR over the board for 20 s).                                                                                                           |
 | 33–45 | Round 2                              | The same. Then **Finish show** (two steps + hold).                                                                                                                                                                                                                    |
 | 45–50 | Second clip                          | Cinema tab → choose the second clip → `V` → **Play**. Then `B`.                                                                                                                                                                                                       |
 | 50–60 | Prizes                               | **Prize time**, then **Thanks for playing**                                                                                                                                                                                                                           |
