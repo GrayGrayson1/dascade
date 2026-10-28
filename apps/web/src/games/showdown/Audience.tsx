@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react';
 import {
   SHOWDOWN_CARD_INFO,
+  SHOWDOWN_SCENE_INFO,
   SHOWDOWN_LIMITS,
   SHOWDOWN_MSG,
   SHOWDOWN_TEAMS,
@@ -35,7 +36,19 @@ import { playShowSound } from './sounds.ts';
 import { PoolCard } from './PoolCard.tsx';
 import { PickMoment } from './YoureUp.tsx';
 import { Scorecard } from './Scorecard.tsx';
-import { formatClock, useBoard, useCard, useClock, useHype, useMe, useMotion, useShowSounds, useSweep, type RoleInfo } from './state.ts';
+import {
+  formatClock,
+  useBoard,
+  useCard,
+  useClock,
+  useHype,
+  useMe,
+  useMotion,
+  useSceneCard,
+  useShowSounds,
+  useSweep,
+  type RoleInfo,
+} from './state.ts';
 import './chrome-showcase.css';
 
 export function AudienceView({
@@ -444,6 +457,7 @@ function ShowcaseMini({ board, look, show }: { board: ShowdownBoardView; look: S
   const clock = useClock();
   const feed = useShowFeed();
   const card = useCard();
+  const scene = useSceneCard();
   const sweeping = useSweep();
   const copy = LOOK_COPY[look];
   const miss = feed.last.miss;
@@ -476,7 +490,11 @@ function ShowcaseMini({ board, look, show }: { board: ShowdownBoardView; look: S
           {copy.showcase.according} {board.source}
         </p>
       ) : null}
-      {card ? (
+      {scene ? (
+        <p className="sdc-mini__card" role="status" data-part="showdown-scene-card">
+          <span aria-hidden>{SHOWDOWN_SCENE_INFO[scene].icon}</span> {SHOWDOWN_SCENE_INFO[scene].away}
+        </p>
+      ) : card ? (
         <p className="sdc-mini__card" role="status">
           <span aria-hidden>{SHOWDOWN_CARD_INFO[card].icon}</span> On the stage: {SHOWDOWN_CARD_INFO[card].title}
         </p>
