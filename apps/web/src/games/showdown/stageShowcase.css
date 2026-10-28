@@ -2494,3 +2494,118 @@
 :root[data-reduced-motion='true'] .sd-wipe {
   display: none;
 }
+
+/* ---------- The join ticket (QR A): black on white, a quiet zone, the same in every look ---------- */
+.sd-qr {
+  display: block;
+  aspect-ratio: 1;
+  width: auto;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.sd-ticket {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  justify-items: center;
+  gap: 1.2cqh;
+  padding: 2.2cqh 2.2cqh 1.8cqh;
+  border-radius: 2.4cqh;
+  color: #1a0b24;
+  background: #f6efe2;
+  box-shadow:
+    0 0 0 0.7cqh var(--sd-gold),
+    0 2.6cqh 5cqh #000000a6;
+}
+.sd-ticket__scan {
+  font-family: var(--sd-title-font);
+  font-size: 4.2cqh;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sd-ticket__addr {
+  font-family: var(--font-num);
+  font-size: 2.3cqh;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sd-ticket__code {
+  display: flex;
+  gap: 0.6cqh;
+}
+.sd-ticket__code span {
+  min-width: 3.6cqh;
+  padding: 0.2cqh 0.8cqh;
+  border-radius: 0.6cqh;
+  font-family: var(--font-num);
+  font-size: 3cqh;
+  font-weight: 700;
+  text-align: center;
+  color: #f6efe2;
+  background: #1a0b24;
+}
+/* Big (the Welcome card and the lobby): the code about 40 % of the stage's height, right of the title. */
+.sd-ticket[data-size='big'] {
+  top: 50%;
+  right: 5cqw;
+  transform: translateY(-54%);
+}
+.sd-ticket[data-size='big'] .sd-qr {
+  height: 40cqh;
+}
+.sd-scene[data-ticket='big'] {
+  padding-right: 40cqw;
+}
+.sd-scene[data-ticket='big'] .sd-scene__lockup {
+  max-width: 54cqw;
+}
+.sd-scene[data-ticket='big'] .sd-scene__headline {
+  max-width: 52cqw;
+}
+/* Medium (between rounds, and the Join pop-up). */
+.sd-ticket[data-size='medium'] {
+  right: 2.4cqw;
+  bottom: 4cqh;
+}
+.sd-ticket[data-size='medium'] .sd-qr {
+  height: 26cqh;
+}
+.sd-ticket[data-size='medium'] .sd-ticket__scan {
+  font-size: 3.2cqh;
+}
+.sd-scene[data-ticket='medium'] {
+  padding-right: 24cqw;
+}
+
+/* The Join pop-up: the ticket slides in over the board, stays 20 s (the server's clock), slides away. */
+.sd-joinpop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.sd-joinpop .sd-ticket {
+  animation: sd-joinpop-in 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+@keyframes sd-joinpop-in {
+  from {
+    transform: translateX(120%);
+  }
+}
+.sd-joinpop[data-phase='out'] .sd-ticket {
+  animation: sd-joinpop-out 0.6s ease-in forwards;
+}
+@keyframes sd-joinpop-out {
+  to {
+    transform: translateX(120%);
+  }
+}
+.sd-stage[data-motion='off'] .sd-joinpop .sd-ticket,
+:root[data-reduced-motion='true'] .sd-joinpop .sd-ticket {
+  animation: none;
+}
+.sd-stage[data-motion='off'] .sd-joinpop[data-phase='out'],
+:root[data-reduced-motion='true'] .sd-joinpop[data-phase='out'] {
+  display: none;
+}

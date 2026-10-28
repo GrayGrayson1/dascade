@@ -55,6 +55,7 @@ import {
   SHOWDOWN_STANDINGS_CARD,
   isSceneCard,
   ShowdownCardSchema,
+  ShowdownJoinPopSchema,
   ShowdownClaimSchema,
   ShowdownCreditSchema,
   ShowdownFinaleSchema,
@@ -345,6 +346,10 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.handle(SHOWDOWN_MSG.card, ShowdownCardSchema, (p, { card }) => this.setCard(p, card), {
       phases: PRESENTER_PHASES,
       rate: { burst: 8, perSecond: 2 },
+    });
+    this.handle(SHOWDOWN_MSG.joinPop, ShowdownJoinPopSchema, (p, { on }) => this.joinPop(p, on), {
+      phases: PRESENTER_PHASES,
+      rate: { burst: 4, perSecond: 1 },
     });
     // ---- The picker ----
     // Include / exclude work in any phase (people are set up before doors); draws need a live show.
@@ -838,6 +843,12 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     if (card !== '' && this.phase === 'PLAYING' && this.state.clockEndsAt > 0) this.runClock(false);
     this.state.card = card;
     this.markSnapshot();
+  }
+
+  /** The Join pop-up (QR A): every stage shows the join ticket for SHOWDOWN_JOIN_POP_MS from now. */
+  private joinPop(player: PlayerRecord, on: boolean): void {
+    if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.joinPop, 'not_host', 'Only the presenter changes the stage.');
+    this.state.joinAt = on ? Date.now() : 0;
   }
 
   private cue(player: PlayerRecord, cue: string): void {

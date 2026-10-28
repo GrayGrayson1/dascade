@@ -51,7 +51,15 @@ import { sfx } from '../../audio/audio.ts';
 import { seasonClock } from '../../themes/seasonalController.ts';
 import type { SettingsPanelProps } from '../types.ts';
 import { ContentEditor } from './ContentEditor.tsx';
-import { AudioStatus, BigScreenLinkButton, PresenterTools, StageCards, StageWindowButton, loadEventPreset } from './consoleParts.tsx';
+import {
+  AudioStatus,
+  BigScreenLinkButton,
+  JoinQrTools,
+  PresenterTools,
+  StageCards,
+  StageWindowButton,
+  loadEventPreset,
+} from './consoleParts.tsx';
 import { copyText, screenLink, setScreenMode, useScreenMode } from './access.ts';
 import { useEvent, useLook, usePass, useRehearsal, useRole, useRosters, useShowdownSettings } from './state.ts';
 import { CrewPanel, NamesPanel, PickerPanel, PreflightPanel } from './panels/index.ts';
@@ -714,6 +722,13 @@ export function ShowdownPlayerSetup() {
           <span className="dc-field__label">Stage cards</span>
           <StageCards />
           <span className="dc-field__hint">Put up Welcome while people arrive; it comes down when the show starts.</span>
+        </div>
+        <div className="sdc-setup__cards">
+          <span className="dc-field__label">Join QR</span>
+          <JoinQrTools code={code} />
+          <span className="dc-field__hint">
+            The stage shows it on Welcome. Paste the image and the link in the Teams chat at the start.
+          </span>
         </div>
         <PresenterTools code={code} pass={pass} />
         {crewChecks}

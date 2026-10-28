@@ -10,6 +10,7 @@ import {
   SHOWDOWN_CARDS,
   SHOWDOWN_MSG,
   SHOWDOWN_STANDINGS_CARD,
+  SHOWDOWN_JOIN_POP_MS,
   isSceneCard,
   clockRemaining,
   parseBoard,
@@ -188,6 +189,28 @@ export function useScoresView(): ShowdownScoresView | null {
 export function useCard(): ShowdownCard | null {
   const card = useShowSelector((s) => s.card) ?? '';
   return (SHOWDOWN_CARDS as readonly string[]).includes(card) ? (card as ShowdownCard) : null;
+}
+
+/** How long the Join pop-up takes to slide away. */
+const JOIN_OUT_MS = 700;
+
+/**
+ * The Join pop-up (QR A): 'in' for SHOWDOWN_JOIN_POP_MS after the presenter pressed J (the server's
+ * clock), then 'out' while it slides away, else null. Taken down early, it goes at once. Stage-safe.
+ */
+export function useJoinPop(): 'in' | 'out' | null {
+  const at = useShowSelector((s) => s.joinAt) ?? 0;
+  const [, force] = useState(0);
+  const until = at > 0 ? at + SHOWDOWN_JOIN_POP_MS : 0;
+  const now = serverNow();
+  const phase = until > 0 && now < until ? 'in' : until > 0 && now < until + JOIN_OUT_MS ? 'out' : null;
+  useEffect(() => {
+    if (!phase) return;
+    const next = phase === 'in' ? until : until + JOIN_OUT_MS;
+    const t = setTimeout(() => force((n) => n + 1), Math.max(0, next - serverNow()) + 30);
+    return () => clearTimeout(t);
+  }, [phase, until]);
+  return phase;
 }
 
 /** The stage scene up instead of the Show (Cinema), or null. Stage-safe. */

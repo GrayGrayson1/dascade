@@ -130,6 +130,8 @@ export interface ShowcaseCopy {
   cinemaTitle: string;
   cinemaSub: string;
   cinemaHost: string;
+  /** The join ticket's headline (QR A). */
+  scanToPlay: string;
   /** Under the top five: "{n} on the board — your rank is on your phone". */
   standingsOf: string;
   /** The medal wall's name and its sub line. */
@@ -215,6 +217,7 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       cinemaTitle: 'Cartoon break',
       cinemaSub: 'Watch the Teams share: the show is back right after',
       cinemaHost: 'Grab some popcorn! We’re back right after this.',
+      scanToPlay: 'Scan to play',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
@@ -283,6 +286,7 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       cinemaTitle: 'Cartoon break',
       cinemaSub: 'Watch the Teams share: the show is back right after',
       cinemaHost: 'Grab your candy corn! We’re back right after this spooky little film.',
+      scanToPlay: 'Scan to play',
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',

@@ -29,6 +29,7 @@ import { SpecialGlyph } from './Board.tsx';
 import { LOOK_COPY, fill, joinAddress, type ShowcaseCopy } from './look.ts';
 import { finaleView, medalList, medalWords, placeWord, podiumColumns, type FinaleView } from './standings.ts';
 import { clipTime, useCinema } from './cinema.ts';
+import { JoinTicket } from './qr.tsx';
 
 const len = (s: string) => Array.from(s).length;
 
@@ -249,12 +250,15 @@ export function CardScene({
   look,
   code,
   finale = null,
+  qr = false,
 }: {
   card: ShowdownCard;
   settings: ShowdownSettings | null;
   look: ShowdownLook;
   code: string;
   finale?: ShowdownFinale | null;
+  /** Draw the join QR (the stage window, the console, big screens; never phones): big on Welcome, medium on Be right back. */
+  qr?: boolean;
 }) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const event = settings ? eventTitle(settings) : show;
@@ -266,8 +270,16 @@ export function CardScene({
   const podium = finale?.podium ?? [];
   const stars = finale && (finale.medals ?? 'never') !== 'never' ? (finale.stars ?? []) : [];
   const winners = card === 'prizes' && (podium.length > 0 || stars.length > 0);
+  const ticket = qr && code ? (card === 'welcome' ? 'big' : card === 'break' ? 'medium' : null) : null;
   return (
-    <section className="sd-scene sd-scene--card" data-card={card} data-winners={winners ? 'true' : undefined} aria-label={title} key={card}>
+    <section
+      className="sd-scene sd-scene--card"
+      data-card={card}
+      data-winners={winners ? 'true' : undefined}
+      data-ticket={ticket ?? undefined}
+      aria-label={title}
+      key={card}
+    >
       <div className="sd-scene__rays" aria-hidden />
       <div className="sd-scene__halo" aria-hidden />
       <div className="sd-scene__lockup sd-scene__lockup--card">
@@ -292,7 +304,11 @@ export function CardScene({
         )}
         {winners ? <PrizeWinners podium={podium} stars={stars} copy={LOOK_COPY[look].showcase} /> : null}
       </div>
-      {card === 'welcome' ? <JoinHint code={code} look={look} className="sd-scene__join" /> : null}
+      {ticket ? (
+        <JoinTicket code={code} look={look} size={ticket} />
+      ) : card === 'welcome' ? (
+        <JoinHint code={code} look={look} className="sd-scene__join" />
+      ) : null}
     </section>
   );
 }
@@ -361,17 +377,21 @@ export function LobbyScene({
   look,
   code,
   rehearsal,
+  qr = false,
 }: {
   settings: ShowdownSettings | null;
   look: ShowdownLook;
   code: string;
   rehearsal: boolean;
+  /** Draw the big join ticket (the stage window, the console, big screens; never phones). */
+  qr?: boolean;
 }) {
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
   const event = settings ? eventTitle(settings) : show;
   const copy = LOOK_COPY[look].showcase;
+  const ticket = qr && Boolean(code);
   return (
-    <section className="sd-scene sd-scene--lobby" aria-label={show}>
+    <section className="sd-scene sd-scene--lobby" aria-label={show} data-ticket={ticket ? 'big' : undefined}>
       <div className="sd-scene__rays" aria-hidden />
       <div className="sd-scene__halo" aria-hidden />
       <div className="sd-scene__lockup">
@@ -391,7 +411,7 @@ export function LobbyScene({
         </p>
         {rehearsal ? <span className="sd-tag sd-scene__tag">{copy.rehearsal}</span> : null}
       </div>
-      <JoinHint code={code} look={look} className="sd-scene__join" />
+      {ticket ? <JoinTicket code={code} look={look} size="big" /> : <JoinHint code={code} look={look} className="sd-scene__join" />}
     </section>
   );
 }
@@ -547,7 +567,18 @@ function StandingRows({ rows, copy }: { rows: readonly ShowdownScoreRow[]; copy:
 }
 
 /** The Standings card (between rounds): the top five Guessers and, with medals after each round, the Spotlight Stars. */
-export function StandingsScene({ scoreboard, look }: { scoreboard: ShowdownScoreboard | null; look: ShowdownLook }) {
+export function StandingsScene({
+  scoreboard,
+  look,
+  code = '',
+  qr = false,
+}: {
+  scoreboard: ShowdownScoreboard | null;
+  look: ShowdownLook;
+  /** With `qr`, the medium join ticket beside the standings (never on phones). */
+  code?: string;
+  qr?: boolean;
+}) {
   const copy = LOOK_COPY[look].showcase;
   const top = scoreboard?.points ? scoreboard.top : [];
   const stars = scoreboard && scoreboard.medals === 'round' ? scoreboard.stars : [];
@@ -557,6 +588,7 @@ export function StandingsScene({ scoreboard, look }: { scoreboard: ShowdownScore
       className="sd-scene sd-scene--card sd-scene--standings"
       data-part="showdown-standings"
       data-both={both ? 'true' : undefined}
+      data-ticket={qr && code ? 'medium' : undefined}
       aria-label={copy.standingsTitle}
     >
       <div className="sd-scene__rays" aria-hidden />
@@ -589,6 +621,7 @@ export function StandingsScene({ scoreboard, look }: { scoreboard: ShowdownScore
           </p>
         ) : null}
       </div>
+      {qr && code ? <JoinTicket code={code} look={look} size="medium" /> : null}
     </section>
   );
 }

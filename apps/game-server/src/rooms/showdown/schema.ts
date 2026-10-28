@@ -40,6 +40,8 @@ export const ShowdownState = BaseRoomState.extend(
     scoreJson: t.string().default(''),
     /** The paced finale's step on the results screen (index into finaleSteps()). */
     finaleStep: t.uint8().default(0),
+    /** The Join pop-up: server epoch ms it went up (0 = down); stages show it for SHOWDOWN_JOIN_POP_MS. */
+    joinAt: t.number().default(0),
     /** The event preset that made this an event room ('' = an ordinary room). */
     event: t.string().default(''),
     // The picker: public (a pick is public the moment it lands). Who skipped is never here.
