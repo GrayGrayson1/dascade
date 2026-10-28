@@ -5,7 +5,8 @@
  *
  * Presenter Showcase has no teams: a mini board with the round, the question and the clock, how many
  * answers the crowd has found, the cheer pad (reactions float up on the stage), and — only when the
- * presenter allows it — private guesses that say "you called it" when they flip. It is also the phone
+ * presenter allows it — private guesses that say "you called it" when they flip. With Score the crowd
+ * on, those guesses go on your Top 10 scorecard (Scorecard.tsx) with your points, place and medals. It is also the phone
  * companion of the picker (DSP-03 B): the pool card with Skip me, "<name> is answering", and the
  * full-screen "You're up!" on the phone that was picked.
  */
@@ -33,6 +34,7 @@ import { setScreenMode } from './access.ts';
 import { playShowSound } from './sounds.ts';
 import { PoolCard } from './PoolCard.tsx';
 import { PickMoment } from './YoureUp.tsx';
+import { Scorecard } from './Scorecard.tsx';
 import { formatClock, useBoard, useCard, useClock, useHype, useMe, useMotion, useShowSounds, useSweep, type RoleInfo } from './state.ts';
 import './chrome-showcase.css';
 
@@ -417,7 +419,17 @@ function ShowcaseAudience({
           </span>
         </div>
         {settings?.audience && role.role === 'audience' ? (
-          <ShowcaseGuessBox board={board} look={look} limit={settings?.guesses ?? SHOWDOWN_LIMITS.guessesDefault} />
+          // Score the crowd: the Top 10 scorecard (one component for phones and desktop tabs). Off: as before.
+          settings.points ? (
+            <Scorecard
+              board={board}
+              look={look}
+              limit={settings.guesses ?? SHOWDOWN_LIMITS.guessesDefault}
+              medals={settings.medals ?? 'never'}
+            />
+          ) : (
+            <ShowcaseGuessBox board={board} look={look} limit={settings.guesses ?? SHOWDOWN_LIMITS.guessesDefault} />
+          )
         ) : null}
         {wide ? <ShowcaseCheerPad look={look} /> : null}
         <DeviceOptions code={code} role={role} />
