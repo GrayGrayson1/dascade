@@ -2536,3 +2536,75 @@ button.sdc-audio {
   font-weight: 700;
   overflow-wrap: anywhere;
 }
+
+/* The Awards desk (Awards A): each award's places, a photo button and a name. */
+.sdc-award {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 10px 10px;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.sdc-award__head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 0 4px;
+}
+.sdc-award__title {
+  font-weight: 800;
+  min-width: 0;
+}
+.sdc-award__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 3px;
+  border-radius: 8px;
+  outline: 2px dashed transparent;
+}
+.sdc-award__row.is-over {
+  outline-color: var(--accent);
+}
+.sdc-award__place {
+  width: 30px;
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+.sdc-award__photo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px dashed var(--line);
+  background: var(--surface-sunken);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.sdc-award__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sdc-award__name {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.sdc-award__said {
+  flex-basis: 100%;
+}
+.sdc-awards__now b {
+  color: var(--text);
+}
+.sdc-closing__scene {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}

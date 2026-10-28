@@ -110,6 +110,7 @@ import {
 } from './consoleSafety.ts';
 import { TourButton } from './tour/TourButton.tsx';
 import { CinemaPanel } from './panels/CinemaPanel.tsx';
+import { AwardsPanel, startAwards } from './panels/AwardsPanel.tsx';
 import { cinemaView, useCinema } from './cinema.ts';
 import './chrome-showcase.css';
 
@@ -235,12 +236,23 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
 
   // ---- Scenes A: what the stage window shows (B = Show, V = Cinema); the server pauses the round clock on leaving Show ----
   const goScene = useCallback(
-    (to: 'show' | 'cinema') => {
+    (to: 'show' | 'cinema' | 'awards') => {
       if (to === 'show') {
         if (!live.current.stageUp) return;
         sfx('select');
         session.send(SHOWDOWN_MSG.card, { card: '' });
         setAnnounce('Back to the show: the board is on the stage.');
+        return;
+      }
+      if (to === 'awards') {
+        if (live.current.sceneCard === 'awards') return;
+        if (!startAwards()) {
+          openTab('awards');
+          setAnnounce('Fill in the winners first (Awards tab).');
+          return;
+        }
+        openTab('awards');
+        setAnnounce('The awards are on the stage. Press Next for each step.');
         return;
       }
       const c = cinemaView();
@@ -483,6 +495,13 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       render: () => <CinemaPanel onScene={(on) => goScene(on ? 'cinema' : 'show')} />,
     },
     {
+      id: 'awards',
+      label: 'Awards',
+      icon: 'trophy',
+      alert: sceneCard === 'awards' ? 'The awards are on the stage' : undefined,
+      render: () => <AwardsPanel />,
+    },
+    {
       id: 'fix',
       label: 'Fix',
       icon: 'refresh',
@@ -563,7 +582,13 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
           <span aria-hidden>{SHOWDOWN_SCENE_INFO[sceneCard].icon}</span>
           <span>
             <b>{SHOWDOWN_SCENE_INFO[sceneCard].title}</b> is on the stage —{' '}
-            {cinema.playing ? 'your video is playing.' : cinema.ended ? 'the video ended.' : 'press Play in the Cinema tab.'}
+            {sceneCard === 'awards'
+              ? 'press Next in the Awards tab for each step.'
+              : cinema.playing
+                ? 'your video is playing.'
+                : cinema.ended
+                  ? 'the video ended.'
+                  : 'press Play in the Cinema tab.'}
           </span>
           <Button size="sm" variant="secondary" onClick={() => goScene('show')}>
             Back to the show <Kbd>B</Kbd>
@@ -676,11 +701,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               }}
             />
           ) : null}
-          <SceneStrip
-            scene={sceneCard === 'cinema' ? 'cinema' : card || standingsUp ? 'cards' : 'show'}
-            onScene={goScene}
-            onCards={() => openTab('cards')}
-          />
+          <SceneStrip scene={sceneCard ?? (card || standingsUp ? 'cards' : 'show')} onScene={goScene} onCards={() => openTab('cards')} />
           <div className="sdc-side__preview" data-part="showdown-preview">
             <div className="sd-preview" aria-hidden inert>
               {preview}
@@ -1452,8 +1473,8 @@ function SceneStrip({
   onScene,
   onCards,
 }: {
-  scene: 'show' | 'cinema' | 'cards';
-  onScene: (to: 'show' | 'cinema') => void;
+  scene: 'show' | 'cinema' | 'awards' | 'cards';
+  onScene: (to: 'show' | 'cinema' | 'awards') => void;
   onCards: () => void;
 }) {
   return (
@@ -1463,6 +1484,9 @@ function SceneStrip({
       </button>
       <button type="button" className="sdc-scene" aria-pressed={scene === 'cinema'} onClick={() => onScene('cinema')} data-scene="cinema">
         <PixelIcon name="play" aria-hidden /> Cinema <Kbd>V</Kbd>
+      </button>
+      <button type="button" className="sdc-scene" aria-pressed={scene === 'awards'} onClick={() => onScene('awards')} data-scene="awards">
+        <PixelIcon name="trophy" aria-hidden /> Awards
       </button>
       <button type="button" className="sdc-scene" aria-pressed={scene === 'cards'} onClick={onCards} data-scene="cards">
         <PixelIcon name="copy" aria-hidden /> Cards

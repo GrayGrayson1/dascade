@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType, 
 import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
+  SHOWDOWN_SCENE_INFO,
   SHOWDOWN_TEAMS,
   finaleSteps,
   showTitle,
@@ -28,7 +29,7 @@ import {
 } from '@dascade/shared/games/showdown';
 import { Button, GameTheme, IconButton, PixelIcon } from '@dascade/ui';
 import { GAME_CATALOG } from '@dascade/shared';
-import { useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
+import { session, useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
 import { audioReady, onAudioReadyChange, sfx } from '../../audio/audio.ts';
@@ -84,6 +85,7 @@ import {
   type RoleInfo,
 } from './state.ts';
 import { cinemaScene } from './cinema.ts';
+import { AwardsPanel } from './panels/AwardsPanel.tsx';
 
 /** The shared lobby with the show's setup panels (the lobby is rendered from here, not the shell). */
 const LOBBY_MODULE: GameClientModule = {
@@ -358,8 +360,14 @@ function ShowcaseResults({
   const title = settings ? showTitle(settings) : '';
   const results = finale?.results ?? [];
   const presenter = role.role === 'presenter';
+  const scene = useSceneCard();
   const closing = (
     <section className="sd-panel sdc-closing" aria-label="That’s a wrap">
+      {scene && !presenter ? (
+        <p className="sdc-closing__scene" role="status" data-part="showdown-scene-card">
+          <span aria-hidden>{SHOWDOWN_SCENE_INFO[scene].icon}</span> {SHOWDOWN_SCENE_INFO[scene].away}
+        </p>
+      ) : null}
       <p className="sdc-closing__title">{copy.wrap}</p>
       <p className="sdc-closing__sub">{title ? `Thanks for playing ${title}!` : copy.wrapSub}</p>
       {results.length ? (
@@ -389,6 +397,13 @@ function ShowcaseResults({
           // The presenter's next moves first: the paced finale, a stage card for the rest of the event, or another show.
           <>
             <FinaleControls finale={finale} settings={settings} />
+            <section className="sd-panel sdc-afterpanel" aria-labelledby="sdc-awards-title" data-part="showdown-results-awards">
+              <h3 className="sd-panel__title" id="sdc-awards-title">
+                Awards
+              </h3>
+              <AwardsPanel finale={finale} />
+              <SceneBack />
+            </section>
             <section className="sd-panel sdc-afterpanel" aria-label="Stage cards">
               <h3 className="sd-panel__title">Stage cards</h3>
               <p className="sd-muted">
@@ -470,6 +485,23 @@ function FinaleControls({ finale, settings }: { finale: ShowdownFinale | null; s
         {said}
       </p>
     </section>
+  );
+}
+
+/** After the quiz, a stage scene (the awards) comes down to the finale with this. */
+function SceneBack() {
+  const scene = useSceneCard();
+  if (!scene) return null;
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      icon="arrow-left"
+      onClick={() => session.send(SHOWDOWN_MSG.card, { card: '' })}
+      data-part="showdown-scene-back"
+    >
+      Back to the finale
+    </Button>
   );
 }
 
