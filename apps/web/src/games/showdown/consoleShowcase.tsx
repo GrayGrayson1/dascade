@@ -92,6 +92,16 @@ import {
 } from './panels/index.ts';
 import { StationBadge } from './StationBadge.tsx';
 import { ConsoleDrawer, type DrawerTab } from './ConsoleDrawer.tsx';
+import {
+  ConsoleDashboard,
+  LayoutSwitch,
+  ToolStack,
+  UNDER_RAIL,
+  UNDER_SHEET,
+  useConsoleLayout,
+  useRoomyConsole,
+  useToolFocus,
+} from './ConsoleDashboard.tsx';
 import { HoldButton, type HoldButtonHandle } from './HoldButton.tsx';
 import { UndoToast, useUndoOffer } from './UndoToast.tsx';
 import { EndShowPanel, type EndKind } from './EndShowPanel.tsx';
@@ -195,6 +205,9 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const [panel, setPanel] = useState<EndKind | null>(null);
   const [announce, setAnnounce] = useState('');
   const [drawerFocus, setDrawerFocus] = useState({ id: '', n: 0 });
+  const layout = useConsoleLayout();
+  const roomy = useRoomyConsole();
+  useToolFocus(layout === 'dashboard' ? drawerFocus : undefined);
   const openTab = useCallback((id: string) => setDrawerFocus((f) => ({ id, n: f.n + 1 })), []);
   const undo = useUndoOffer(board?.rev ?? -1, sheet?.undo ?? 0);
   const sweepHold = useRef<HoldButtonHandle>(null);
@@ -532,6 +545,49 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       render: () => <PreflightPanel look={look} code={code} title={title} />,
     });
 
+  // The Dashboard's tools: on a big, tall screen the statuses and logs go under the answer sheet and the
+  // small tools under the rail; the rest (all of them otherwise) in the columns beside.
+  const under = layout === 'dashboard' && roomy;
+  const sheetTools = under ? tabs.filter((t) => UNDER_SHEET.includes(t.id)) : [];
+  const railTools = under ? tabs.filter((t) => UNDER_RAIL.includes(t.id)) : [];
+  const sideTools = under ? tabs.filter((t) => !UNDER_SHEET.includes(t.id) && !UNDER_RAIL.includes(t.id)) : tabs;
+
+  // The stage preview, its scene strip and End show's confirm: over the drawer (Classic), or first in the
+  // first tools column (Dashboard).
+  const side = (
+    <>
+      {panel ? (
+        <EndShowPanel
+          kind={panel}
+          board={board}
+          sheet={sheet}
+          look={look}
+          sweeping={sweeping}
+          revealNeedsHold={needsHold}
+          onClose={closePanel}
+          onRevealFirst={() => {
+            setPanel(null);
+            sweepNow();
+          }}
+          onConfirm={() => {
+            setPanel(null);
+            act(panel === 'finish' ? 'next' : 'finish');
+          }}
+        />
+      ) : null}
+      <SceneStrip scene={sceneCard ?? (card || standingsUp ? 'cards' : 'show')} onScene={goScene} onCards={() => openTab('cards')} />
+      <div className="sdc-side__preview" data-part="showdown-preview">
+        <div className="sd-preview" aria-hidden inert>
+          {preview}
+        </div>
+        <p className="sd-preview__caption">
+          <PixelIcon name="eye" /> What the audience sees
+          {stageWin.open ? ' (live in the stage window)' : ' — open the stage window to share it'}
+        </p>
+      </div>
+    </>
+  );
+
   return (
     <div
       className="sd-console sdc"
@@ -540,6 +596,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       data-armed={armedView ? 'true' : undefined}
       data-part="showdown-console"
       data-mode="showcase"
+      data-layout={layout}
     >
       <PrivateBand />
       <header className="sdc-bar">
@@ -562,6 +619,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         {event ? <StationBadge compact /> : null}
         {!event || station.mine ? <AudioStatus look={look} /> : null}
         <span className="sdc-bar__group">
+          <LayoutSwitch />
           <TourButton look={look} size="sm" compact label="Presenter tour" />
           <StageWindowButton code={code} title={title} size="sm" openLabel="Stage window" />
         </span>
@@ -640,6 +698,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
             <AnswerSheet board={board} sheet={sheet} look={look} found={found} armed={armedView?.slot ?? -1} onTile={onTile} />
           </section>
           <RoundStrip board={board} sheet={sheet} look={look} found={found} picker={picker} />
+          <ToolStack tabs={sheetTools} where="sheet" />
         </div>
 
         <section className="sdc-rail" aria-label="Show controls">
@@ -679,41 +738,28 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
           <div className="sdc-rail__picker" data-part="showdown-picker-slot">
             <PickerStrip look={look} board={board} />
           </div>
+          <ToolStack tabs={railTools} where="rail" />
         </section>
 
-        <section className="sdc-side" aria-label="Stage preview and tools">
-          {panel ? (
-            <EndShowPanel
-              kind={panel}
-              board={board}
-              sheet={sheet}
-              look={look}
-              sweeping={sweeping}
-              revealNeedsHold={needsHold}
-              onClose={closePanel}
-              onRevealFirst={() => {
-                setPanel(null);
-                sweepNow();
-              }}
-              onConfirm={() => {
-                setPanel(null);
-                act(panel === 'finish' ? 'next' : 'finish');
-              }}
+        {layout === 'dashboard' ? (
+          <>
+            <ConsoleDashboard
+              tabs={sideTools}
+              lead={
+                <section className="sdc-side" aria-label="Stage preview">
+                  {side}
+                </section>
+              }
             />
-          ) : null}
-          <SceneStrip scene={sceneCard ?? (card || standingsUp ? 'cards' : 'show')} onScene={goScene} onCards={() => openTab('cards')} />
-          <div className="sdc-side__preview" data-part="showdown-preview">
-            <div className="sd-preview" aria-hidden inert>
-              {preview}
-            </div>
-            <p className="sd-preview__caption">
-              <PixelIcon name="eye" /> What the audience sees
-              {stageWin.open ? ' (live in the stage window)' : ' — open the stage window to share it'}
-            </p>
-          </div>
-          <ConsoleDrawer tabs={tabs} focus={drawerFocus} />
-          <UndoToast api={undo} onUndo={() => act('undo')} />
-        </section>
+            <UndoToast api={undo} onUndo={() => act('undo')} />
+          </>
+        ) : (
+          <section className="sdc-side" aria-label="Stage preview and tools">
+            {side}
+            <ConsoleDrawer tabs={tabs} focus={drawerFocus} />
+            <UndoToast api={undo} onUndo={() => act('undo')} />
+          </section>
+        )}
       </div>
 
       <Dock board={board} hidden={hidden} sweeping={sweeping} needsHold={needsHold} onMiss={miss} onSweep={sweepNow} onHalt={halt} />

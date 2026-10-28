@@ -1685,6 +1685,154 @@ button.sdc-audio {
   line-height: 1.45;
 }
 
+/* ---------- Dashboard layout (ConsoleDashboard.tsx): every tool open, in columns beside the show ---------- */
+.sd-console.sdc[data-layout='dashboard'] {
+  max-width: none;
+}
+.sdc[data-layout='dashboard'] .sdc-main {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) 288px 372px;
+  grid-template-areas: 'sheet rail tools';
+}
+/* Big screens: the tools get two or three columns, the answer sheet keeps at least 560 px. */
+@media (min-width: 1700px) {
+  .sdc[data-layout='dashboard'] .sdc-main {
+    grid-template-columns: minmax(560px, 1fr) 288px minmax(372px, 1.25fr);
+  }
+}
+.sdc-tools {
+  grid-area: tools;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.sdc-tools__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sd-panel.sdc-tool {
+  /* Holds its screen-reader-only headings, so they never stretch the page from inside the scrolling area. */
+  position: relative;
+  min-width: 0;
+  padding: 0;
+}
+.sdc-tool__head {
+  margin: 0;
+}
+.sdc-tool__fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--text-0);
+  font: 700 var(--fs-sm) / 1.2 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.sdc-tool__fold:hover {
+  background: var(--surface-hover);
+}
+.sdc-tool__fold:focus-visible {
+  outline-offset: -3px;
+}
+.sdc-tool__name {
+  flex: none;
+}
+.sdc-tool__alert {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--warning);
+}
+.sdc-tool__chev {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-2);
+}
+.sdc-tool__body {
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+/* The room under the answer sheet and the rail (a big, tall screen): what's left of the column, scrolling
+   up and down on its own so the answers and the controls never move. */
+.sdc-under {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+/* The undo toast rides over the foot of the tools area. */
+.sdc[data-layout='dashboard'] .sdc-main > .sdc-undotoast {
+  left: auto;
+  width: min(460px, 100%);
+}
+/* The switch in the bar. */
+.sdc-layout {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+.sdc-layout__opt {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  color: var(--text-2);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-ui);
+  cursor: pointer;
+}
+.sdc-layout__opt:hover {
+  color: var(--text-0);
+}
+.sdc-layout__opt[aria-pressed='true'] {
+  color: var(--text-0);
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+@media (max-width: 1179px) {
+  .sdc[data-layout='dashboard'] .sdc-main {
+    grid-template-columns: minmax(0, 1fr) 240px minmax(308px, 1fr);
+  }
+}
+@media (max-width: 899px) {
+  .sdc[data-layout='dashboard'] .sdc-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'sheet' 'rail' 'tools';
+  }
+}
+/* The window-sized console: the tools area scrolls up and down on its own, never sideways. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .sdc[data-layout='dashboard'] > .sdc-main {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .sdc-tools {
+    align-self: stretch;
+    min-height: 0;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    padding: 3px;
+    margin: -3px;
+  }
+}
+
 /* ---------- Stage cards (console, lobby, results) ---------- */
 .sdc-cards {
   display: grid;
