@@ -17,10 +17,10 @@ The game is DASCADE's **DAS Survey Showdown** in its **Presenter Showcase** form
 
 ## The one rule: share the stage, never the console
 
-| Window | Its title | What it shows | Share it? |
-|---|---|---|---|
-| **Presenter console** (your browser tab) | **🔒 PRESENTER — don't share** (lock icon, striped PRIVATE band, red frame) | Every answer, the controls, the clock | **Never.** |
-| **Stage window** (a pop-up the console opens) | **DAS-O-Ween Trivia — STAGE (share this)** | The public show: the board, the host, the picks | **Yes.** In Teams, share *this window*. |
+| Window                                        | Its title                                                                   | What it shows                                   | Share it?                               |
+| --------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| **Presenter console** (your browser tab)      | **🔒 PRESENTER — don't share** (lock icon, striped PRIVATE band, red frame) | Every answer, the controls, the clock           | **Never.**                              |
+| **Stage window** (a pop-up the console opens) | **DAS-O-Ween Trivia — STAGE (share this)**                                  | The public show: the board, the host, the picks | **Yes.** In Teams, share _this window_. |
 
 The answers are never sent to the stage window or to anyone's phone until you flip them. Sharing the
 wrong window is the only way they could leak — the preflight asks a colleague to confirm what Teams shows.
@@ -49,12 +49,15 @@ new boards). They live in a show file on your computer:
 1. In a fresh room, **Load** **DAS-O-Ween rehearsal (demo answers)**. It loads two practice boards
    (candy and costumes); the console and stage say **REHEARSAL**.
 2. Press **Stage window** (allow pop-ups), share it in a Teams meeting with a colleague, and check the
-   picture *and the sound* on the other end.
+   picture _and the sound_ on the other end.
 3. Have two or three people open the join link on their phones (`dascade.onrender.com/r/CODE`).
 4. Press **Start game** and run a whole practice round: show the question; flip a few answers; **arm
    #5 and take it**; press **Wrong**; **pick** someone, mark them done, pick again, try **No answer**;
    pause the clock and add a minute; **Reveal remaining**; next round; **Finish show** (it's a two-step
    panel with a hold); put up **Prize time**.
+5. Try **Cinema** on the real work laptop, through the Teams share: drawer → **Cinema** → **Load
+   video…**, pick the cartoon file, press `V`, then **Play**. Check the colleague hears it (see the
+   Teams checklist below), then press `B` for the board.
 
 ---
 
@@ -74,12 +77,16 @@ new boards). They live in a show file on your computer:
    - Make a **Backup presenter** link for your backup and a **Moderator** link for whoever watches
      names. Send each privately (a direct message, not the event chat). They open it on their laptop.
 5. Press **Stage window**. Put it on your second monitor and press its **Full screen** button (on a
-   single screen, side by side with the console).
-6. Under **Stage cards**, press **Welcome**.
-7. Open **Preflight** (also in the console's drawer). Wait for **GO**. It checks the stage window,
+   single screen, side by side with the console). That click also lets the stage window play video
+   with sound later.
+6. Drawer → **Cinema** → **Load video…**: pick the cartoon and the second clip (MP4, H.264 video and
+   AAC sound, 1080p or smaller). They stay in this browser; nothing uploads. Choose a frame (Retro TV,
+   Haunted cinema or Gilded portrait). If the console page reloads, load them again.
+7. Under **Stage cards**, press **Welcome**.
+8. Open **Preflight** (also in the console's drawer). Wait for **GO**. It checks the stage window,
    sound on the sharing device ("heard 2 s ago"), the loaded show (not the rehearsal boards), your
    backup presenter being online, the server (not freshly deployed), the black box, and asks you to
-   confirm: *a colleague says Teams shows the STAGE window*, *the join link is posted*, *the freeze is on*.
+   confirm: _a colleague says Teams shows the STAGE window_, _the join link is posted_, _the freeze is on_.
 
 ### Sharing in Teams
 
@@ -90,18 +97,40 @@ new boards). They live in a show file on your computer:
 
 Keep the stage window open: don't minimise it, or Teams freezes on its last picture.
 
+**Teams checklist for video sound** (try it on the real laptop before the day):
+
+- Share with **Include sound** on (or **Share audio** mid-share).
+- **Mac:** Teams needs its audio driver and the **Screen & System Audio Recording** permission
+  (System Settings → Privacy & Security). On a managed Mac the driver may need IT.
+- **Windows:** Teams and Windows must use the same speaker. Set Sound → **Communications** → **Do
+  nothing**, so Windows doesn't turn the shared sound down.
+- If the video stutters for viewers, press **Optimize** in Teams' presenter toolbar.
+
+### Scenes: what the stage window shows
+
+The scene strip above the console's preview switches the stage window; you never re-share in Teams.
+
+| Scene      | Key | What the share shows                                                       | Phones and big-screen links            |
+| ---------- | --- | -------------------------------------------------------------------------- | -------------------------------------- |
+| **Show**   | `B` | The board, exactly where you left it                                       | The board                              |
+| **Cinema** | `V` | Your video in its frame (press **Play** in the Cinema tab)                 | "Cartoon break: watch the Teams share" |
+| **Cards**  |     | Opens the Cards tab: Welcome, Be right back, Standings, Prize time, Thanks | The card                               |
+
+Leaving the Show while the round clock runs **pauses the clock**; press `P` to start it again. The
+jukebox pauses during Cinema and comes back in the next break.
+
 ### Event cue sheet (60 minutes)
 
-| Time | What's happening | What you do |
-|---|---|---|
-| 0–15 | Introductions, Halloween backgrounds | **Welcome** card. The DAS-O-Ween record can play from the jukebox. |
-| 15–20 | Opening, then the old cartoon | **Welcome** card; for the cartoon, share the video, then the stage again. |
-| 20 | The game starts | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks. |
-| 20–32 | Round 1 | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs). |
-| 32–33 | Intermission | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first. |
-| 33–45 | Round 2 | The same. Then **Finish show** (two steps + hold). |
-| 45–50 | Second clip | **Be right back**, or share the clip |
-| 50–60 | Prizes | **Prize time**, then **Thanks for playing** |
+| Time  | What's happening                     | What you do                                                                                                                                                                                                                                                           |
+| ----- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0–15  | Introductions, Halloween backgrounds | **Welcome** card. The DAS-O-Ween record can play from the jukebox.                                                                                                                                                                                                    |
+| 15–20 | Opening, then the old cartoon        | **Welcome** card. For the cartoon: Cinema tab → choose the cartoon → `V` → **Play**. When it ends, `Cards` → Welcome (or `B`).                                                                                                                                        |
+| 20    | The game starts                      | Take the card down, **Start game**. The jukebox pauses itself when a question goes live and comes back in breaks.                                                                                                                                                     |
+| 20–32 | Round 1                              | **Start round 1**, **Show the question** (the clock starts). Flip what the chat names; **Pick** someone to answer out loud; **Wrong** for misses. At 1:00 a tower bell tolls; the last ten seconds tick. Then **Reveal remaining** (hold it if the clock still runs). |
+| 32–33 | Intermission                         | **Next round**. Fair mode carries on: whoever hasn't had a turn yet goes first.                                                                                                                                                                                       |
+| 33–45 | Round 2                              | The same. Then **Finish show** (two steps + hold).                                                                                                                                                                                                                    |
+| 45–50 | Second clip                          | Cinema tab → choose the second clip → `V` → **Play**. Then `B`.                                                                                                                                                                                                       |
+| 50–60 | Prizes                               | **Prize time**, then **Thanks for playing**                                                                                                                                                                                                                           |
 
 ---
 
@@ -112,19 +141,19 @@ Reveal remaining, Undo / Next, the **picker**); the **stage preview** over a dra
 **Picker · Sound · Cards · Fix** (plus **Names · Crew & log · Preflight** for crew). A **Next step**
 line always says what to do now.
 
-| What | Button | Key |
-|---|---|---|
-| Start a round / show the question | **Start round 1**, **Show the question** (starts the clock) | `Q` |
-| Someone named an answer | Click it on the sheet — it flips at once | `1`–`9`, `0` = #10 |
-| **The special (#5)** | A click or its key **arms** it ("Special armed"); **Take special** reveals it; Esc disarms | its key, then `Space` |
-| Wrong guess | **WRONG** (as often as you like; never a strike) | `X` |
-| Celebrate again | **Celebrate!** (Sound tab) | `C` |
-| Clock | **Pause** / **Start**, **+1 min** / **−1 min** | `P` |
-| Show what's left | **Reveal remaining** — a plain click when the clock is paused or out; **press and hold** while it still runs. Press again to stop / carry on. | `R` (hold while the clock runs; `R`/Esc stops) |
-| Next round | **Next round** — acts at once, with an **Undo** for 12 seconds if answers were still hidden | `N` |
-| Finish / End show | Opens a panel listing what's still hidden; **press and hold** its button (1.2 s). Keyboard: Tab to it, hold Enter. It can't be undone. | — |
-| Oops | **Undo** (one step at a time) | `U` |
-| Restart this round / the whole show | **Fix** tab, **press and hold** — then an Undo toast | — |
+| What                                | Button                                                                                                                                        | Key                                            |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Start a round / show the question   | **Start round 1**, **Show the question** (starts the clock)                                                                                   | `Q`                                            |
+| Someone named an answer             | Click it on the sheet — it flips at once                                                                                                      | `1`–`9`, `0` = #10                             |
+| **The special (#5)**                | A click or its key **arms** it ("Special armed"); **Take special** reveals it; Esc disarms                                                    | its key, then `Space`                          |
+| Wrong guess                         | **WRONG** (as often as you like; never a strike)                                                                                              | `X`                                            |
+| Celebrate again                     | **Celebrate!** (Sound tab)                                                                                                                    | `C`                                            |
+| Clock                               | **Pause** / **Start**, **+1 min** / **−1 min**                                                                                                | `P`                                            |
+| Show what's left                    | **Reveal remaining** — a plain click when the clock is paused or out; **press and hold** while it still runs. Press again to stop / carry on. | `R` (hold while the clock runs; `R`/Esc stops) |
+| Next round                          | **Next round** — acts at once, with an **Undo** for 12 seconds if answers were still hidden                                                   | `N`                                            |
+| Finish / End show                   | Opens a panel listing what's still hidden; **press and hold** its button (1.2 s). Keyboard: Tab to it, hold Enter. It can't be undone.        | —                                              |
+| Oops                                | **Undo** (one step at a time)                                                                                                                 | `U`                                            |
+| Restart this round / the whole show | **Fix** tab, **press and hold** — then an Undo toast                                                                                          | —                                              |
 
 No pop-up dialogs interrupt you mid-show: reversible things act at once with an Undo; the one
 irreversible thing (ending the show) takes two steps and a hold.
@@ -139,19 +168,20 @@ private: nobody can tell who skipped, not even you; only the pool count shows). 
 draw only if **Crew in the random draw** is on in the setup (off for DAS-O-Ween).
 
 **Two modes** (setup → **Picker**):
+
 - **Fair mode** (DAS-O-Ween's): fewest turns first. Everyone gets a turn before anyone gets a second
   one; once everyone has had one, the next lap opens by itself. Turns count for the whole show.
 - **True random**: anyone in the draw, every time — a finished turn doesn't take you out — but never
   the same person twice in a row.
 
-| What | Button | Key |
-|---|---|---|
-| Pick someone | **Pick someone · 37 in the pool** | `K` |
-| Pick a particular person | **Spotlight…** next to Pick: type a name, Enter. Works on anyone seated — even if they've had a turn, are excluded, have Skip me on, or are crew. Never you, a big screen or a spectator. (You and the producer.) | `F` |
-| They answered | **Mark done** — counts their turn | `D` |
-| They didn't | **No answer** — no turn counted, no penalty | `A` |
-| No-show after 30 s | **Reroll** with a reason (No answer / Not there / Other) — draws again without them; it's logged | — |
-| Take someone out of the draw / put them back | **Picker** tab → **Exclude** / **Include** next to their name, or **Include everyone**. You and every crew member, any time (lobby too). | — |
+| What                                         | Button                                                                                                                                                                                                            | Key |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| Pick someone                                 | **Pick someone · 37 in the pool**                                                                                                                                                                                 | `K` |
+| Pick a particular person                     | **Spotlight…** next to Pick: type a name, Enter. Works on anyone seated — even if they've had a turn, are excluded, have Skip me on, or are crew. Never you, a big screen or a spectator. (You and the producer.) | `F` |
+| They answered                                | **Mark done** — counts their turn                                                                                                                                                                                 | `D` |
+| They didn't                                  | **No answer** — no turn counted, no penalty                                                                                                                                                                       | `A` |
+| No-show after 30 s                           | **Reroll** with a reason (No answer / Not there / Other) — draws again without them; it's logged                                                                                                                  | —   |
+| Take someone out of the draw / put them back | **Picker** tab → **Exclude** / **Include** next to their name, or **Include everyone**. You and every crew member, any time (lobby too).                                                                          | —   |
 
 - The server draws (fairly, with its own random generator); every screen only replays it.
 - **You see the name first** ("Priya S. — on stage in 2 s"), so you can read it before the stage lands.
@@ -222,16 +252,19 @@ switched off there — **Score the crowd** off runs the show exactly as before).
 
 ## If something goes wrong
 
-| Problem | What happens / what to do |
-|---|---|
-| Your laptop drops or you close the console | Your seat is held for **30 minutes** and the room stays alive. Open the room link again in the same browser: you're the presenter again, the show exactly where it was. |
-| You can't get back | Your **backup presenter** presses **Take over the show** on their crew screen (only possible while you're offline). Or your producer link → **Make … presenter**. |
-| The server restarts (a deploy or a crash) | **Don't close the console.** It holds the show's *black box*: as soon as the server is back it restores the show under the same code — board, picks, crew — silently (no sounds replay), with the clock paused (press `P`). Phones put themselves back in their seats. The stage window shows "We'll be right back" meanwhile and stays shared. |
-| The stage window doesn't open | Allow pop-ups for dascade.onrender.com and press **Stage window** again. Or open the **Big-screen link** (Fix → Presenter tools) on another computer and share that. |
-| No sound in Teams | Re-share with **Include sound**. Check the top bar's sound status ("✓ heard … ago"); click the console once if it says sound is locked. |
-| You closed the stage window | Press **Stage window** again and re-pick it in Teams. |
-| A bad name on stage | **Names** → Rename or Hide. |
-| Everything failed | Create a new room, load **DAS-O-Ween 2026** and your show file, start, and use **Next round** to jump ahead. |
+| Problem                                      | What happens / what to do                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your laptop drops or you close the console   | Your seat is held for **30 minutes** and the room stays alive. Open the room link again in the same browser: you're the presenter again, the show exactly where it was.                                                                                                                                                                         |
+| You can't get back                           | Your **backup presenter** presses **Take over the show** on their crew screen (only possible while you're offline). Or your producer link → **Make … presenter**.                                                                                                                                                                               |
+| The server restarts (a deploy or a crash)    | **Don't close the console.** It holds the show's _black box_: as soon as the server is back it restores the show under the same code — board, picks, crew — silently (no sounds replay), with the clock paused (press `P`). Phones put themselves back in their seats. The stage window shows "We'll be right back" meanwhile and stays shared. |
+| The stage window doesn't open                | Allow pop-ups for dascade.onrender.com and press **Stage window** again. Or open the **Big-screen link** (Fix → Presenter tools) on another computer and share that.                                                                                                                                                                            |
+| No sound in Teams                            | Re-share with **Include sound**. Check the top bar's sound status ("✓ heard … ago"); click the console once if it says sound is locked.                                                                                                                                                                                                         |
+| You closed the stage window                  | Press **Stage window** again and re-pick it in Teams. Cinema: press **Play** again (the video starts over).                                                                                                                                                                                                                                     |
+| **Play** says the stage window needs a click | Click anywhere in the stage window once: the video starts. (Browsers allow sound only after a click there; the Full screen button counts.)                                                                                                                                                                                                      |
+| The video won't play                         | Use an MP4 (H.264 video, AAC sound). Fallback: **Be right back**, then share the video player with Include sound, then share the stage again.                                                                                                                                                                                                   |
+| The connection drops during the video        | The video keeps playing in the stage window; the show comes back under it.                                                                                                                                                                                                                                                                      |
+| A bad name on stage                          | **Names** → Rename or Hide.                                                                                                                                                                                                                                                                                                                     |
+| Everything failed                            | Create a new room, load **DAS-O-Ween 2026** and your show file, start, and use **Next round** to jump ahead.                                                                                                                                                                                                                                    |
 
 Shortcut keys don't work while you're typing in a text box. Click the console background first.
 

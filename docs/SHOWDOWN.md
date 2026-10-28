@@ -21,25 +21,25 @@ It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/
 
 ## How a show runs
 
-| Who | Where | What they see |
-|---|---|---|
-| **Presenter** (the room's creator) | Presenter console (laptop/tablet) | Everything: the answer sheet, the controls, a live preview of the stage, the audience's guesses |
-| **Stage** | The **stage window** (a second window from the console; drag it to the projector and go fullscreen) or any device opened with the **big-screen link** (`/room/<code>?screen=1`) | The public show: marquee, board, scores, strikes, host, reactions |
-| **Audience / contestants** | Phones (`/r/<code>`) | Team badge, a live mini board, private guesses, the cheer pad |
+| Who                                | Where                                                                                                                                                                           | What they see                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Presenter** (the room's creator) | Presenter console (laptop/tablet)                                                                                                                                               | Everything: the answer sheet, the controls, a live preview of the stage, the audience's guesses |
+| **Stage**                          | The **stage window** (a second window from the console; drag it to the projector and go fullscreen) or any device opened with the **big-screen link** (`/room/<code>?screen=1`) | The public show: marquee, board, scores, strikes, host, reactions                               |
+| **Audience / contestants**         | Phones (`/r/<code>`)                                                                                                                                                            | Team badge, a live mini board, private guesses, the cheer pad                                   |
 
 1. **Lobby.** The presenter picks the look, the questions (built-in packs or their own rounds), the
    scoring and the team names. Everyone else is balanced into Team Delta or Team Sierra and can switch.
    The presenter opens the stage window, or puts the big-screen link on the TV. Nobody readies up: the
-   presenter presses *Start game* when they like (ready-up starts off in Showdown rooms; the Room
-   panel's *Players ready up before the start* switch turns it on).
+   presenter presses _Start game_ when they like (ready-up starts off in Showdown rooms; the Room
+   panel's _Players ready up before the start_ switch turns it on).
 2. **Start.** The stage opens on the marquee (intro sting, host welcome, both teams, join code).
-3. **Each round:** a title card, then *Show the question*. The face-off reveals don't count for anyone
-   yet. *Team X play* hands over control. Reveals bank `points × multiplier`. A miss is ✕, and three
-   ✕ open a **steal**: one guess for the other team. A reveal steals the bank, and *Steal missed*
+3. **Each round:** a title card, then _Show the question_. The face-off reveals don't count for anyone
+   yet. _Team X play_ hands over control. Reveals bank `points × multiplier`. A miss is ✕, and three
+   ✕ open a **steal**: one guess for the other team. A reveal steals the bank, and _Steal missed_
    leaves it with the team in control. Revealing the whole board is a **clean sweep** (applause and
-   confetti). After a round is decided, *Reveal the rest* flips the remaining tiles for show.
-4. **Finale.** *Next round* after the last round, or *End show*, ends the show. The winner is revealed,
-   with a round recap and the top "Survey Sayers" from the audience. *Play again* returns to the lobby.
+   confetti). After a round is decided, _Reveal the rest_ flips the remaining tiles for show.
+4. **Finale.** _Next round_ after the last round, or _End show_, ends the show. The winner is revealed,
+   with a round recap and the top "Survey Sayers" from the audience. _Play again_ returns to the lobby.
 
 The console guides each step ("Next step") and has keyboard shortcuts: `1`–`0` reveal, `Q` question,
 `←`/`→` team in control, `X` strike, `N` next, `U` undo. Digits go by key position, so AZERTY works
@@ -65,7 +65,7 @@ Showdown. What differs:
 - **No teams.** Nobody is put on a team (the server refuses team picks and moves). Switching the
   format in the lobby clears the teams, and switching back deals them out again. Cheers still float up
   on the stage.
-- **Rounds** are usually *ranked lists*: every answer at 0 points means "keep my order, no points"
+- **Rounds** are usually _ranked lists_: every answer at 0 points means "keep my order, no points"
   (`ranked`). Rounds with points work too, but the showcase never shows points. A round can also have:
   - a category (`title`), shown on its title card;
   - an attribution (`source`), shown as "According to …" with the question. Never name a poll that
@@ -79,7 +79,7 @@ Showdown. What differs:
   within 450 ms is the same miss.
 - **The special answer**: the reveal event says `special: true`. Every screen plays the celebration
   (banner, confetti, lights, the host, the `special` sting). The `celebrate` cue plays it again on
-  demand. The special *position* is public (the crowd hunts for it); its text is not.
+  demand. The special _position_ is public (the crowd hunts for it); its text is not.
 - **Round clock** (`minutes`, default 10; `stageClock` shows it on the stage too). The server keeps
   it: `clockEndsAt` (server epoch ms while running) or `clockLeft` (paused, negative = overtime), and
   `clockMax`. Clients count down against `serverNow()`. It starts when the question goes up. The
@@ -97,11 +97,30 @@ Showdown. What differs:
   steps.
 - **Stage cards** (`showdown:card`): Welcome (the `eventName` headline), Be right back, Prize time and
   Thanks for playing. The presenter can put one up on every stage in any phase (the lobby, the show,
-  the results); starting a show takes it down.
+  the results); starting a show takes it down. Putting any card (or a scene) up while the round clock
+  runs **pauses the clock** where it is; `P` starts it again.
+- **Stage scenes** (Production Desk, Scenes A + Video A): the console's scene strip switches the stage
+  window between **Show** (`B`: no card, the board exactly as it was), **Cinema** (`V`) and **Cards**
+  (opens the Cards tab), so the presenter never re-shares in Teams. Each switch opens a curtain in the
+  show's look (`.sd-wipe`), instantly with reduced motion or effects off. Scenes are cards
+  (`SHOWDOWN_SCENE_CARDS`, accepted by `ShowdownCardSchema`, kept out of `SHOWDOWN_CARDS` like the
+  Standings card); the server refuses them in Team Showdown.
+  - **Cinema** (`cinema.ts`): the presenter loads video files in the drawer's **Cinema** tab. Each
+    becomes an object URL in this browser: nothing uploads, and no file, name or frame reaches the
+    server, the black box, an export or a log (only the frame choice is remembered on the device).
+    The chosen clip plays in a frame (Retro TV, Haunted cinema, Gilded portrait) in the stage window,
+    as **plain DOM** layered over the stage (`.sd-cinema`), not React: it keeps playing when the
+    console loses its room for a moment (the portal unmounts then; `holdStageWindow` leaves a playing
+    video uncovered), and the frame never re-renders while it plays. Its sound joins the one mixer
+    (`mixer.routeMedia` → the master bus; `element.volume` follows the master level where the browser
+    refuses). A browser that won't start sound in a window nobody has clicked says so in the console,
+    and the next click in the stage window starts it. Every other screen shows the "Cartoon break:
+    watch the Teams share" card; the console's preview shows the frame and what's playing. The
+    jukebox pauses during Cinema (`musicSegment` → `cinema`) with no theme bed under it.
 - **Event presets** (`showdown:preset {id}`, lobby or results). Each preset's settings are public
   metadata (`SHOWDOWN_EVENT_INFO`). **`dasoween-2026` is settings only** (`settingsOnly`, ADM-01): the
   real boards are never in the repo — the presenter loads them from a show file (the content editor's
-  *Load show file* / *Load from this device*) before doors, in either order (a settings-only preset
+  _Load show file_ / _Load from this device_) before doors, in either order (a settings-only preset
   keeps the rounds already loaded; `validateStart` refuses a custom show with no rounds).
   `dasoween-rehearsal` loads practice boards (server-only, `packages/game-core/src/showdown/events.ts`),
   and every screen says "Rehearsal" (`state.rehearsal`) until the presenter saves rounds of their own.
@@ -121,14 +140,14 @@ Undo, a restart or a restored black box recomputes exactly, and a repeated messa
 
 **Settings** (lobby → Scoring; all with defaults so older black boxes still parse):
 
-| Setting | Values | DAS-O-Ween | Ordinary rooms |
-|---|---|---|---|
-| `points` — Score the crowd | on / off | on | off (the show runs as before) |
-| `guesses` — Guesses per board | 1–10 | 10 | 3 |
-| `medals` — Medal ceremony | `never` / `round` (after each round) / `end` | `round` | `never` |
-| `reveal` — Showtime | `standings` (Standings + paced finale) / `finale` (just the finale) | `standings` | `standings` |
-| `gems` — Hidden gems | on / off | on | on |
-| `pops` — Called-it pops | on / off | on | on |
+| Setting                       | Values                                                              | DAS-O-Ween  | Ordinary rooms                |
+| ----------------------------- | ------------------------------------------------------------------- | ----------- | ----------------------------- |
+| `points` — Score the crowd    | on / off                                                            | on          | off (the show runs as before) |
+| `guesses` — Guesses per board | 1–10                                                                | 10          | 3                             |
+| `medals` — Medal ceremony     | `never` / `round` (after each round) / `end`                        | `round`     | `never`                       |
+| `reveal` — Showtime           | `standings` (Standings + paced finale) / `finale` (just the finale) | `standings` | `standings`                   |
+| `gems` — Hidden gems          | on / off                                                            | on          | on                            |
+| `pops` — Called-it pops       | on / off                                                            | on          | on                            |
 
 The DAS-O-Ween presets also switch phone guesses on (`audience: true`).
 
@@ -175,7 +194,7 @@ the finished turns and the finale step are in the snapshot; older boxes restore 
 
 An animated, self-paced walk through running a Presenter Showcase show (about 3½ minutes, ten
 chapters): `/tutorial/showdown`, or **Watch the presenter tour** on the presenter's setup card and
-**Tour** in the showcase console's top bar (a large dialog). The film cut, *Boo's Backstage Tour*, is
+**Tour** in the showcase console's top bar (a large dialog). The film cut, _Boo's Backstage Tour_, is
 the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1080.
 
 - **The real stage, a demo show.** The stage hooks (`useBoard`, `useClock`, `useCard`, `useSweep`,
@@ -288,11 +307,12 @@ with `strictName` is refused with `JoinErrorCode.NAME_TAKEN` (message = the name
 instead) so the screen can ask for an initial first, with "Keep Sam 2" as the fallback.
 
 **Continuity** (OPS-01 C):
-- *Keep-alive*: the presenter's and the crew's seats are held for 30 minutes (`reconnectGraceFor`, an
+
+- _Keep-alive_: the presenter's and the crew's seats are held for 30 minutes (`reconnectGraceFor`, an
   additive `BaseGameRoom` hook), a presenter away mid-show ends it only after 30 minutes, and a live
   event room doesn't auto-dispose (back on at the results; a safety timer closes it after 30 minutes
   with nobody connected). The console pings `/api/health` every 4 minutes (keep-warm).
-- *The black box*: after each change (at most once a second, and every 15 s while the clock runs) the
+- _The black box_: after each change (at most once a second, and every 15 s while the clock runs) the
   server seals a snapshot of the room — engine state, rounds, settings, seats with hashed seat tokens,
   crew link hashes, the picker, the audit tail, the clock — with AES-256-GCM under a key derived from
   `DASCADE_SAVE_SECRET` (HKDF, its own label; `apps/game-server/src/rooms/showdown/blackbox.ts`) and
@@ -324,7 +344,7 @@ not the presenter's theme.
 - **Presenter = host, and never migrates.** `ShowdownRoom.canBecomeHost` only allows the presenter.
   The role moves only through:
   - the secret **presenter pass**, which the server sends to the presenter only. The console's
-    *Copy presenter link* gives `/room/<code>#presenter=<pass>`; the pass is in the fragment, so it
+    _Copy presenter link_ gives `/room/<code>#presenter=<pass>`; the pass is in the fragment, so it
     never reaches server logs. A browser that held the pass also reclaims an empty presenter seat by
     itself.
   - an explicit **hand-over**.
@@ -343,8 +363,8 @@ not the presenter's theme.
   only the aggregate `guessesIn` count; after it, `callers` per revealed slot.
 - Every presenter command carries the board revision it was made against. A stale or double-clicked
   command is ignored. Reveals are idempotent by slot and carry the round instead of the revision (a
-  fast presenter can flip several before the board catches up), so a late one, e.g. *Reveal the rest*
-  racing *Next round*, never flips a tile of the next board. Held keys don't auto-repeat commands.
+  fast presenter can flip several before the board catches up), so a late one, e.g. _Reveal the rest_
+  racing _Next round_, never flips a tile of the next board. Held keys don't auto-repeat commands.
   Score adjustments queue on the console (one in flight per revision), so quick +5 clicks all count.
   Undo restores the previous engine state, and the revision keeps rising.
 - **Room size:** up to 100 seats, and the default is the limit, so everyone who joins plays. The
@@ -352,7 +372,7 @@ not the presenter's theme.
   load scenario passes with 61 and 100 clients.
 - **Disconnects:** the seat is held for 180 s (`reconnectGraceSeconds`; 30 minutes for the presenter
   and the crew in an event room). If the presenter is gone for 10 minutes mid-show (30 in an event room), the show ends with the scores as they stand and the role is freed, so the room
-  never stalls: anyone can *Become the presenter* from the results screen or the lobby (the old pass
+  never stalls: anyone can _Become the presenter_ from the results screen or the lobby (the old pass
   still works until then).
 - **Big screens never present:** a hand-over to a stage display is refused. A big-screen link opened in
   the presenter's own browser takes the presenter's seat (seats are per browser), so that tab shows a
@@ -369,15 +389,15 @@ not the presenter's theme.
 
 Everything is new files, plus a few one-line registrations.
 
-| Layer | Files |
-|---|---|
-| Contract | `packages/shared/src/games/showdown.ts`: settings, messages, Zod payloads, views, `validateShowContent`, looks, pack metadata |
-| Engine (pure) | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset rounds, server-only), tests |
-| Server | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts` |
-| Client | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css` |
-| Floor | `apps/web/src/arcade/scenes/showdown.ts` (attract scene) |
-| Presenter Tour | `apps/web/src/games/showdown/source.ts` (the show source the stage hooks read), `apps/web/src/games/showdown/tour/` (demo source, timeline, script, player, mock console, film), the `/tutorial/showdown` route in `apps/web/src/app/App.tsx` |
-| Tests | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`) |
+| Layer          | Files                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract       | `packages/shared/src/games/showdown.ts`: settings, messages, Zod payloads, views, `validateShowContent`, looks, pack metadata                                                                                                                                                                                                |
+| Engine (pure)  | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset rounds, server-only), tests                                                                  |
+| Server         | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts`                                                                              |
+| Client         | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css` |
+| Floor          | `apps/web/src/arcade/scenes/showdown.ts` (attract scene)                                                                                                                                                                                                                                                                     |
+| Presenter Tour | `apps/web/src/games/showdown/source.ts` (the show source the stage hooks read), `apps/web/src/games/showdown/tour/` (demo source, timeline, script, player, mock console, film), the `/tutorial/showdown` route in `apps/web/src/app/App.tsx`                                                                                |
+| Tests          | `e2e/showdown.spec.ts`, `e2e/showdown-showcase.spec.ts`, `e2e/showdown-tour.spec.ts`, `e2e/showdown-cinema.spec.ts` (a video made in the browser at run time, never a file in the repo), `scripts/load/showdown.ts` (scenarios `showdown` and `showdown-showcase`)                                                           |
 
 Notes:
 
@@ -422,7 +442,7 @@ Notes:
 ## Sound
 
 Every sound is a procedural voice on the shared synth (`sounds.ts`); a few play Brian's recordings
-instead (see *Recorded sounds* below). They use the one AudioContext and the SFX bus, so mute, volume and
+instead (see _Recorded sounds_ below). They use the one AudioContext and the SFX bus, so mute, volume and
 the jukebox dip all apply. Sounds include the clang (a struck plate;
 a haunted bell in Halloween), the top-answer sparkle, the strike buzzer (ghostly in Halloween), steal
 stings, the award, applause, the intro fanfare (an organ toccata with thunder in Halloween), drumroll,
@@ -483,18 +503,18 @@ LOAD_URL=http://localhost:2610 LOAD_SCENARIOS=showdown,showdown-showcase pnpm lo
 
 Manual walkthrough:
 
-1. Open `/play/showdown` and *Create game*. You're the presenter. In *Your setup*, press
+1. Open `/play/showdown` and _Create game_. You're the presenter. In _Your setup_, press
    **Open stage window** (allow pop-ups) and move the window to a second screen.
 2. Join from a phone or a private window with the room code; you land on a team. Optionally open
    `/room/<code>?screen=1` on a third device for a big screen.
-3. *Start game*. In the console, press *Start round 1*, then *Show the question*, then *Team Delta
-   play*. Reveal answers by clicking the sheet or pressing `1`–`0`, and use `X` for strikes.
+3. _Start game_. In the console, press _Start round 1_, then _Show the question_, then _Team Delta
+   play_. Reveal answers by clicking the sheet or pressing `1`–`0`, and use `X` for strikes.
 4. **Privacy check:** on the audience device, the board shows only numbers for hidden tiles. Searching
    the page or DevTools for an unrevealed answer finds nothing. Only the presenter's tab has the sheet.
 5. **Sync check:** every reveal, strike and score change appears on all screens at once. Refresh any
    screen and it comes back to the same board.
 6. To force a look, set it in the lobby settings, or use `?season=2026-10-15` / `?season=2026-11-15`
-   with *Seasonal*.
+   with _Seasonal_.
 
 ## Scoring decisions (Brian, 2026-10-27)
 
@@ -502,7 +522,7 @@ From the Showdown Scoring Studio (<https://claude.ai/artifact/QtmwM4qoUUKqvQNDAT
 DAS-O-Ween show on 2026-10-29. Brian's picks, verbatim:
 
 > 1. We like the Medal Ceremony idea, but it should be a toggle between Never, after each round, and at the end of the whole game
-> 2 - called it - if they get position right (guess number 2 answer in the number 2 spot, etc) they get a bonus point as well. Anyone that guesses all of them in a row gets 20 bonus points
+>    2 - called it - if they get position right (guess number 2 answer in the number 2 spot, etc) they get a bonus point as well. Anyone that guesses all of them in a row gets 20 bonus points
 >
 > 3 - how many in the list - first option is best, but it should be easy to make this a selection rather than just all or nothing. Make it a part of the setup process
 > not on here - add the ability to choose a name to spotlight, whether they have gone already or not. Also, crew/producers should be able to be selected for spotlight as well, and it should be a choice if they are also in the running for random spotlight
@@ -528,7 +548,7 @@ His answers to the four open questions (one question round, 2026-10-27), each th
 on a phone and in a desktop browser tab: one component with a responsive layout, never a phone-only
 path, and e2e covers both (chromium and mobile).
 
-**Later (noted, not built):** *Scorekeeper credits* — a crew member credits answers given in the
+**Later (noted, not built):** _Scorekeeper credits_ — a crew member credits answers given in the
 meeting chat or out loud to the person who gave them (studio decision 4, Brian's preferred approach,
 deferred). Also not chosen: Pumpkin patch, Double final round, First-caller star, the Awards show.
 
@@ -547,13 +567,13 @@ deferred). Also not chosen: Pumpkin patch, Double final round, First-caller star
 ### To revisit: leaving a show
 
 For the DAS-O-Ween show (Brian, 2026-10-27), Survey Showdown's main screens hide every way back to
-the arcade: the top bar's Leave, the lobby bar's Leave (bottom left), the results' *Back to cabinet*
-and *Leave*, and the Leave in the big screen's and the crew screen's corners. The invite's join card
-(`/room/<code>` without a saved name) drops its *Arcade* button and centres *Join game*. One list
+the arcade: the top bar's Leave, the lobby bar's Leave (bottom left), the results' _Back to cabinet_
+and _Leave_, and the Leave in the big screen's and the crew screen's corners. The invite's join card
+(`/room/<code>` without a saved name) drops its _Arcade_ button and centres _Join game_. One list
 switches all of it: `NO_ARCADE_EXIT` in `apps/web/src/shell/arcadeExit.ts`.
 
 Still there on purpose, so nobody is stuck on a room that's gone: the reconnecting card's Leave, the
-connection-lost and error screens' *Back to arcade*, the join card for a dead code, the event join
+connection-lost and error screens' _Back to arcade_, the join card for a dead code, the event join
 link's "This show isn't open right now" card, and the browser's Back. The cabinet page
 (`/play/showdown`), where the presenter creates the room, isn't inside a show and keeps its way back.
 
