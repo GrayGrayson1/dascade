@@ -1089,6 +1089,9 @@ export function eventSounds(e: ShowdownEvent, mode: ShowdownMode = 'classic'): A
       // As scheduled the moment the draw is made (the live show times the landing against the
       // server clock: pickSounds(e.landAt, serverNow()) in useShowSync).
       return pickSounds(e.landAt, e.landAt - SHOWDOWN_PICK_LAND_MS);
+    case 'finale':
+      // The paced finale: a drumroll into 3rd and 2nd, the big finish for 1st, applause for the medals.
+      return e.kind === 'first' ? [['finale', 0]] : e.kind === 'medals' ? [['applause', 0]] : e.kind === 'wrap' ? [] : [['drumroll', 0]];
     case 'pickEnd':
     case 'station':
       return [];

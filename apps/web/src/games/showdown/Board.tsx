@@ -7,6 +7,8 @@
  * muted, and the special answer's slot (a public position, never its text) carries a marker the
  * crowd can hunt for, then a permanent frame once it's up. A tile flipped while someone was in the
  * hot seat credits them ("called by Priya S."): the server sends `calledBy` only once it's revealed.
+ * With Score the crowd and Called-it pops on, a flipped tile also pops its crowd value and how many
+ * called it ("+9 · 6 called it" — counts only, never names; standings.ts).
  *
  * Fresh reveals only: a tile animates when it turns while mounted, so a late joiner (or a refreshed
  * screen) sees tiles already turned. Every tile animates on its own, so overlapping reveals (a fast
@@ -16,6 +18,15 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { SHOWDOWN_LIMITS, type ShowdownBoardView, type ShowdownSlotView } from '@dascade/shared/games/showdown';
 import { cx } from '@dascade/ui';
 import { teamClass } from './state.ts';
+import { fill } from './look.ts';
+import { popFor } from './standings.ts';
+
+/** Called-it pops (Presenter Showcase with Score the crowd): hidden gems double; the words from the look. */
+export interface BoardPops {
+  gems: boolean;
+  /** "{n} called it". */
+  called: string;
+}
 
 /** How long a fresh reveal's anticipation + flip + burst + glint runs. */
 export const REVEAL_MS = 1500;
@@ -32,6 +43,8 @@ export interface BoardProps {
   specialLabel?: string;
   /** The hot-seat credit's words (look copy): "called by". */
   creditLabel?: string;
+  /** Called-it pops on flipped tiles (null = off). */
+  pops?: BoardPops | null;
 }
 
 export function Board({
@@ -41,6 +54,7 @@ export function Board({
   spotlight = -1,
   specialLabel = 'Special',
   creditLabel = 'called by',
+  pops = null,
 }: BoardProps) {
   const n = board.slots.length;
   const cols = compact || n < 4 ? 1 : 2;
@@ -68,6 +82,7 @@ export function Board({
           spotlight={spotlight === i && !slot.revealed}
           specialLabel={specialLabel}
           creditLabel={creditLabel}
+          pops={showcase ? pops : null}
         />
       ))}
     </ol>
@@ -83,6 +98,7 @@ function Tile({
   spotlight,
   specialLabel,
   creditLabel,
+  pops,
 }: {
   index: number;
   slot: ShowdownSlotView;
@@ -92,6 +108,7 @@ function Tile({
   spotlight: boolean;
   specialLabel: string;
   creditLabel: string;
+  pops: BoardPops | null;
 }) {
   // The flip is a transition (or, fresh, an animation), so it only plays on a change seen while
   // mounted: a late joiner's revealed tiles are simply already turned.
@@ -102,9 +119,11 @@ function Tile({
   const rank = index + 1;
   // Only ever on a revealed tile (the server adds it with the answer); never on a classic board.
   const credit = showcase && slot.revealed && slot.calledBy ? slot.calledBy : '';
+  const pop = pops ? popFor(slot, index, pops.gems) : null;
+  const popCalled = pop && pop.callers > 0 && pops ? fill(pops.called, { n: pop.callers }) : '';
   const label = slot.revealed
     ? showcase
-      ? `Answer ${rank}: ${text}${slot.note ? ` (${slot.note})` : ''}${special ? ', the special answer' : ''}${slot.late ? ', not found' : ''}${credit ? `, ${creditLabel} ${credit}` : ''}`
+      ? `Answer ${rank}: ${text}${slot.note ? ` (${slot.note})` : ''}${special ? ', the special answer' : ''}${slot.late ? ', not found' : ''}${credit ? `, ${creditLabel} ${credit}` : ''}${pop ? `, worth ${pop.value}${popCalled ? `, ${popCalled}` : ''}` : ''}`
       : `Answer ${rank}: ${text}, ${slot.points} points`
     : `Answer ${rank}: hidden${showcase && special ? ' (the special answer)' : ''}`;
   return (
@@ -118,6 +137,7 @@ function Tile({
       data-fresh={fresh ? 'true' : undefined}
       data-spot={spotlight ? 'true' : undefined}
       data-credit={credit ? 'true' : undefined}
+      data-pop={pop ? 'true' : undefined}
       style={{ '--i': index, '--len': Math.max(8, len), '--wlen': wlen } as CSSProperties}
       aria-label={label}
     >
@@ -167,6 +187,32 @@ function Tile({
       {credit ? (
         <span className="sd-tile__credit" data-fresh={fresh ? 'true' : undefined} aria-hidden>
           {creditLabel} <b>{credit}</b>
+        </span>
+      ) : null}
+      {pop ? (
+        <span
+          className="sd-tile__pop"
+          data-part="showdown-pop"
+          data-slot={index}
+          data-gem={pop.gem ? 'true' : undefined}
+          data-fresh={fresh ? 'true' : undefined}
+          aria-hidden
+        >
+          <b className="sd-num">+{pop.value}</b>
+          {popCalled ? (
+            <span className="sd-tile__pop-called">
+              {' · '}
+              {popCalled.split(/(\d+)/).map((part, i) =>
+                /^\d+$/.test(part) ? (
+                  <span key={i} className="sd-num">
+                    {part}
+                  </span>
+                ) : (
+                  part
+                ),
+              )}
+            </span>
+          ) : null}
         </span>
       ) : null}
     </li>

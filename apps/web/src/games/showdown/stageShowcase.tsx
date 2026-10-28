@@ -15,6 +15,10 @@
  *     server drew (PickerSpotlight.tsx), then the hot-seat podium holds their name in the host's
  *     column for the whole turn while Boo steps aside (HotSeat.tsx, VIS-02 C).
  *
+ * Two-tier scoring (when the show scores the crowd or gives medals): called-it pops on flipped tiles
+ * ("+9 · 6 called it"), medals pinned on the hot-seat podium, the Standings card between rounds, and
+ * the paced finale — the Spotlight Stars, then the podium 3rd → 2nd → 1st (scenes.tsx, standings.ts).
+ *
  * Display profiles (DSP-02 C, display.ts): the stage picks Stream-safe or Projector for the way it's
  * watched (`data-display` on the root; the CSS does the rest) and caps its particles on Stream-safe.
  * Its fonts are pinned to the show's (never the viewer's DASCADE theme).
@@ -29,6 +33,7 @@ import {
   type ShowdownBoardView,
   type ShowdownCard,
   type ShowdownFinale,
+  type ShowdownFinaleStepKind,
   type ShowdownLook,
   type ShowdownSettings,
 } from '@dascade/shared/games/showdown';
@@ -58,16 +63,21 @@ import {
   useCard,
   useClock,
   useFinale,
+  useFinaleStep,
   useMotion,
   useRehearsal,
+  useScoreboard,
   useShowCode,
   useShowPhase,
+  useStandingsCard,
   useSweep,
   type ClockView,
   type MotionPrefs,
 } from './state.ts';
 import { BatBurst, Beams, Confetti, Reactions, useRecent } from './stageFx.tsx';
-import { CardScene, CategoryScene, FinaleScene, JoinHint, LobbyScene, OpeningScene } from './scenes.tsx';
+import { CardScene, CategoryScene, FinaleScene, JoinHint, LobbyScene, OpeningScene, StandingsScene } from './scenes.tsx';
+import { finaleView, placeWord } from './standings.ts';
+import type { BoardPops } from './Board.tsx';
 import { playersEqual } from '../../net/hooks.ts';
 import { useShowSelector } from './source.ts';
 import { SHOW_FONTS, useDisplay, type DisplayContext } from './display.ts';
@@ -75,7 +85,7 @@ import { PickerSpotlight, usePickMoment, type PickMoment } from './PickerSpotlig
 import { HotSeat, hotSeatUp } from './HotSeat.tsx';
 import type { ShowdownDisplay } from '@dascade/shared/games/showdown';
 
-export type ShowcaseScene = 'lobby' | 'card' | 'opening' | 'category' | 'board' | 'finale';
+export type ShowcaseScene = 'lobby' | 'card' | 'standings' | 'opening' | 'category' | 'board' | 'finale';
 
 /** How long each moment stays up (ms). */
 const MISS_MS = 1400;
@@ -109,6 +119,9 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
   const phase = useShowPhase();
   const code = useShowCode();
   const card = useCard();
+  const standings = useStandingsCard();
+  const scoreboard = useScoreboard();
+  const finaleStep = useFinaleStep();
   const sweep = useSweep();
   const rehearsal = useRehearsal();
   const clock = useClock();
@@ -124,20 +137,29 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
 
   const inShow = phase === 'PLAYING' && board !== null;
-  const scene: ShowcaseScene = card
-    ? 'card'
-    : inShow
-      ? board.stage === 'intro'
-        ? 'opening'
-        : board.stage === 'title'
-          ? 'category'
-          : 'board'
-      : phase === 'RESULTS' && finale
-        ? 'finale'
-        : 'lobby';
+  const scene: ShowcaseScene = standings
+    ? 'standings'
+    : card
+      ? 'card'
+      : inShow
+        ? board.stage === 'intro'
+          ? 'opening'
+          : board.stage === 'title'
+            ? 'category'
+            : 'board'
+        : phase === 'RESULTS' && finale
+          ? 'finale'
+          : 'lobby';
   const sceneAt = useSince(scene);
   // The podium holds the name on the board (a holding card or a title card hides it, the turn goes on).
   const podium = hotSeatUp(pick) && scene === 'board';
+  // Two-tier scoring: pops on flipped tiles (Score the crowd + Called-it pops), medals on the podium.
+  const pops = useMemo<BoardPops | null>(
+    () => (settings?.points && settings.pops ? { gems: settings.gems, called: copy.showcase.popCalled } : null),
+    [settings?.points, settings?.pops, settings?.gems, copy],
+  );
+  const medals = Boolean(settings && settings.medals !== 'never');
+  const finaleKind = scene === 'finale' && finale ? finaleView(finale, finaleStep).kind : null;
 
   // ---- moments ----
   const miss = feed.last.miss;
@@ -163,6 +185,9 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
   const timeupOn = useRecent(feed.last.timeup?.at, TIMEUP_MS);
   const crowd = useRecent(feed.cheer && feed.cheer.count >= CROWD_COUNT ? feed.cheer.at : undefined, 1400);
   const finaleFx = useRecent(scene === 'finale' ? sceneAt : undefined, FINALE_FX_MS);
+  // The podium's 1st place: the confetti again.
+  const firstAt = useSince(finaleKind === 'first' ? 'first' : null);
+  const firstFx = useRecent(firstAt, FINALE_FX_MS);
 
   const shake = missOn && motion.motion && variant === 'screen' && miss ? `${miss.e.round}:${miss.e.n}` : undefined;
   const found = board ? board.slots.filter((s) => s.revealed && !s.late).length : 0;
@@ -203,16 +228,19 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
             sweep={sweep}
             suspenseSlot={suspenseSlot}
             timeup={timeupOn}
-            hotseat={podium ? <HotSeat moment={pick} board={board} copy={copy.showcase} /> : null}
+            hotseat={podium ? <HotSeat moment={pick} board={board} copy={copy.showcase} medals={medals} /> : null}
+            pops={pops}
           />
+        ) : scene === 'standings' ? (
+          <StandingsScene scoreboard={scoreboard} look={look} />
         ) : scene === 'card' && card ? (
-          <CardScene card={card} settings={settings} look={look} code={code} />
+          <CardScene card={card} settings={settings} look={look} code={code} finale={phase === 'RESULTS' ? finale : null} />
         ) : scene === 'opening' ? (
           <OpeningScene settings={settings} look={look} code={code} rehearsal={rehearsal} />
         ) : scene === 'category' && board ? (
           <CategoryScene board={board} look={look} />
         ) : scene === 'finale' && finale ? (
-          <FinaleScene finale={finale} settings={settings} look={look} titles={titles} />
+          <FinaleScene finale={finale} settings={settings} look={look} titles={titles} step={finaleStep} />
         ) : (
           <LobbyScene settings={settings} look={look} code={code} rehearsal={rehearsal} />
         )}
@@ -234,6 +262,7 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
         motion={motion.motion}
         pick={pick}
         nameOf={nameOf}
+        finaleKind={finaleKind}
       />
       <PickerSpotlight moment={pick} copy={copy.showcase} motion={motion} />
       {missOn && miss ? <MissX key={`${miss.e.round}:${miss.e.n}:${miss.at}`} /> : null}
@@ -252,6 +281,7 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
         />
       ) : null}
       {finaleFx && motion.particles > 0 ? <Confetti key={`finale:${sceneAt}`} count={motion.particles} look={look} big /> : null}
+      {firstFx && !finaleFx && motion.particles > 0 ? <Confetti key={`first:${firstAt}`} count={motion.particles} look={look} big /> : null}
       <Reactions feed={feed} look={look} motion={motion} />
       {corner ? <div className="sd-stage__corner">{corner}</div> : null}
     </div>
@@ -335,6 +365,7 @@ function BoardScene({
   suspenseSlot,
   timeup,
   hotseat,
+  pops,
 }: {
   board: ShowdownBoardView;
   show: string;
@@ -348,6 +379,8 @@ function BoardScene({
   timeup: boolean;
   /** The hot-seat podium (in the host's column, never over the board). */
   hotseat: ReactNode;
+  /** Called-it pops on flipped tiles (null = off). */
+  pops: BoardPops | null;
 }) {
   const sc = copy.showcase;
   const n = board.round + 1;
@@ -402,7 +435,7 @@ function BoardScene({
             </h2>
           </header>
           <div className="sd-sc__frame">
-            <Board board={board} spotlight={suspenseSlot} specialLabel={sc.special} creditLabel={sc.calledBy} />
+            <Board board={board} spotlight={suspenseSlot} specialLabel={sc.special} creditLabel={sc.calledBy} pops={pops} />
           </div>
         </section>
         <StatusColumn board={board} copy={copy} look={look} code={code} clock={clock} timeup={timeup} />
@@ -522,6 +555,7 @@ function ShowHost({
   motion,
   pick,
   nameOf,
+  finaleKind,
 }: {
   look: ShowdownLook;
   copy: LookCopy;
@@ -539,6 +573,8 @@ function ShowHost({
   motion: boolean;
   pick: PickMoment;
   nameOf: (playerId: string) => string;
+  /** The paced finale's step on screen (null outside the finale). */
+  finaleKind: ShowdownFinaleStepKind | null;
 }) {
   const fresh = useRecent(feed.line ? feed.lineAt : undefined, BUBBLE_MS);
   let ev = fresh ? feed.line : null;
@@ -549,7 +585,17 @@ function ShowHost({
   const cue = ev && ev.key.startsWith('cue:') ? ev : null;
   let line: HostLine | null;
   if (scene === 'card' && card) line = cue ?? cardLine(look, card);
-  else if (scene === 'finale' && finale) line = cue ?? farewellLine(look, finale);
+  else if (scene === 'standings') line = cue ?? { key: 'standings', text: copy.showcase.standingsHost, mood: 'happy' };
+  else if (scene === 'finale' && finale && finaleKind === 'medals')
+    line = cue ?? { key: 'finale:medals', text: copy.showcase.starsHost, mood: 'cheer' };
+  else if (scene === 'finale' && finale && finaleKind && finaleKind !== 'wrap') {
+    const place = finaleKind === 'first' ? 1 : finaleKind === 'second' ? 2 : 3;
+    line = cue ?? {
+      key: `finale:${finaleKind}`,
+      text: fill(copy.showcase.podiumHost, { place: placeWord(place) }),
+      mood: place === 1 ? 'celebrate' : 'wow',
+    };
+  } else if (scene === 'finale' && finale) line = cue ?? farewellLine(look, finale);
   else if (scene === 'lobby') line = cue ?? cardLine(look, 'welcome');
   else if (scene === 'opening') line = ev && !/^(intro|reset|undo):/.test(ev.key) ? ev : openingLine(look, show);
   else if (scene === 'category' && board) line = ev && !/^(round|restart|undo):/.test(ev.key) ? ev : categoryLine(look, board);

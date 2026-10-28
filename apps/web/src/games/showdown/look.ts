@@ -117,6 +117,27 @@ export interface ShowcaseCopy {
   foundRank: string;
   /** The credit on a tile someone in the hot seat called ("called by Priya"). */
   calledBy: string;
+  // ---- Two-tier scoring (crowd points, hot-seat medals) ----
+  /** Called-it pop under a flipped tile's value: "{n} called it". */
+  popCalled: string;
+  /** The Standings card: kicker, headline, the line with no points yet, the host's line. */
+  standingsKicker: string;
+  standingsTitle: string;
+  standingsEmpty: string;
+  standingsHost: string;
+  /** Under the top five: "{n} on the board — your rank is on your phone". */
+  standingsOf: string;
+  /** The medal wall's name and its sub line. */
+  stars: string;
+  starsSub: string;
+  /** "pts" after a score. */
+  pts: string;
+  /** The finale's podium kicker, and the host's lines for the medal ceremony and each place. */
+  podium: string;
+  starsHost: string;
+  podiumHost: string;
+  /** Prize time's winners. */
+  winners: string;
 }
 
 export interface LookCopy {
@@ -180,6 +201,19 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       calledIt: 'Called it!',
       foundRank: '#{n} found',
       calledBy: 'called by',
+      popCalled: '{n} called it',
+      standingsKicker: 'The scoreboard so far',
+      standingsTitle: 'Top Guessers',
+      standingsEmpty: 'No points yet — lock in your Top 10!',
+      standingsHost: 'Here’s how the crowd is doing!',
+      standingsOf: '{n} on the board — your rank is on your phone',
+      stars: 'Spotlight Stars',
+      starsSub: 'Medals from the hot seat',
+      pts: 'pts',
+      podium: 'The Top Guessers',
+      starsHost: 'A round of applause for our Spotlight Stars!',
+      podiumHost: 'And in {place} place…',
+      winners: 'Tonight’s winners',
     },
     cards: {
       welcome: { kicker: 'Welcome to', title: '', sub: '{show} starts soon' },
@@ -231,6 +265,19 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       calledIt: 'Called it!',
       foundRank: '#{n} found',
       calledBy: 'called by',
+      popCalled: '{n} called it',
+      standingsKicker: 'The haunted scoreboard',
+      standingsTitle: 'Top Guessers',
+      standingsEmpty: 'No points yet — lock in your Top 10, ghouls!',
+      standingsHost: 'Let’s see who’s haunting the top of the board!',
+      standingsOf: '{n} on the board — your rank is on your phone',
+      stars: 'Spotlight Stars',
+      starsSub: 'Medals from the hot seat',
+      pts: 'pts',
+      podium: 'The Top Guessers',
+      starsHost: 'A spooktacular round of applause for our Spotlight Stars!',
+      podiumHost: 'And in {place} place… (drumroll, please!)',
+      winners: 'Tonight’s winners',
     },
     cards: {
       welcome: { kicker: 'Welcome, boils & ghouls', title: '', sub: '{show} starts soon' },
@@ -616,9 +663,10 @@ export function lineForEvent(e: ShowdownEvent, ctx: LineContext): HostLine | nul
       return pickEndLine(ctx.look, e, ctx.nameOf?.(e.playerId) ?? '');
     case 'clockWarn':
       return clockWarnLine(ctx.look, e.round);
-    // The last ten seconds tick and the sound station moves without a word from the host.
+    // The last ten seconds tick, the sound station moves and the finale steps without a word from the host.
     case 'tick':
     case 'station':
+    case 'finale':
       return null;
   }
 }
