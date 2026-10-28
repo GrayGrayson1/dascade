@@ -2578,7 +2578,11 @@
   padding-right: 24cqw;
 }
 
-/* The Join pop-up: the ticket slides in over the board, stays 20 s (the server's clock), slides away. */
+/*
+ * The Join pop-up: the ticket slides in over the status column (the clock stays in view and the
+ * answers are never covered), stays 20 s (the server's clock), slides away. It's as wide as that
+ * column and its margins, less a gap before the board's frame; a long address breaks before /r/.
+ */
 .sd-joinpop {
   position: absolute;
   inset: 0;
@@ -2586,7 +2590,23 @@
   pointer-events: none;
 }
 .sd-joinpop .sd-ticket {
+  right: 1cqw;
+  bottom: 2.2cqh;
+  box-sizing: border-box;
+  width: calc(var(--sc-pad-x) + var(--sc-status-w) + var(--sc-gap) - 1.8cqw - 0.7cqh);
+  gap: 0.8cqh;
+  padding: 1.8cqh 1.6cqh 1.6cqh;
   animation: sd-joinpop-in 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.sd-joinpop .sd-ticket .sd-qr {
+  width: 100%;
+  height: auto;
+}
+.sd-joinpop .sd-ticket__addr {
+  font-size: 2.1cqh;
+  line-height: 1.1;
+  white-space: normal;
+  text-align: center;
 }
 @keyframes sd-joinpop-in {
   from {

@@ -81,11 +81,17 @@ export function JoinTicket({
 }) {
   if (!code) return null;
   const join = joinAddress(code);
+  // Where the ticket is narrow (the Join pop-up), a long address breaks before /r/.
+  const at = join.short.lastIndexOf('/r/');
   return (
     <div className={cx('sd-ticket', className)} data-size={size} data-part="showdown-join-ticket">
       <span className="sd-ticket__scan">{LOOK_COPY[look].showcase.scanToPlay}</span>
       <QrCode text={joinQrText(code)} label={`QR code for ${join.short}`} className="sd-ticket__qr" />
-      <span className="sd-ticket__addr">{join.short}</span>
+      <span className="sd-ticket__addr">
+        {join.short.slice(0, at)}
+        <wbr />
+        {join.short.slice(at)}
+      </span>
       <span className="sd-ticket__code" aria-label={`Room code ${code}`}>
         {code.split('').map((c, i) => (
           <span key={i}>{c}</span>
