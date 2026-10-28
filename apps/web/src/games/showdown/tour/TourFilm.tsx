@@ -402,7 +402,7 @@ function Outro({ act, look }: { act: Act; look: ShowdownLook }) {
             </li>
             <li>
               <PixelIcon name="info" />
-              Every detail is in the runbook: <b>docs/DAS-O-WEEN-RUNBOOK.md</b> in the DASCADE repo.
+              Every detail is in the <b>DAS-O-Ween runbook</b>.
             </li>
           </ul>
         </div>

@@ -25,9 +25,6 @@ import { DEMO_SETTINGS, DEMO_SETTINGS_BEFORE, TOUR_CHAPTERS } from './script.ts'
 import { beatsOf, chapterLength, parseCaption, tourLength } from './timeline.ts';
 import { useTour, type Tour } from './useTour.ts';
 
-/** The runbook, for reading after the tour. */
-export const RUNBOOK_URL = 'https://github.com/GrayGrayson1/dascade/blob/main/docs/DAS-O-WEEN-RUNBOOK.md';
-
 export interface TourPlayerProps {
   /** Start in this look (the viewer can switch). */
   look?: ShowdownLook;
@@ -238,9 +235,6 @@ export function TourPlayer({
               <Button variant="primary" icon="refresh" onClick={tour.play}>
                 Watch again
               </Button>
-              <a className="dc-btn dc-btn--secondary" href={RUNBOOK_URL} target="_blank" rel="noreferrer">
-                <PixelIcon name="info" /> Read the runbook
-              </a>
               {onClose ? (
                 <Button variant="ghost" onClick={onClose}>
                   {closeLabel}
