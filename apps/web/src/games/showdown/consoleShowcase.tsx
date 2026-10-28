@@ -48,7 +48,16 @@ import { sfx } from '../../audio/audio.ts';
 import { Stage } from './Stage.tsx';
 import { useShowFeed } from './fx.ts';
 import { useStageWindow } from './stageWindow.ts';
-import { AudioStatus, PresenterTools, PrivateBand, StageCards, StageWindowButton, usePresenterWindowChrome } from './consoleParts.tsx';
+import {
+  AudioStatus,
+  JoinQrTools,
+  PresenterTools,
+  PrivateBand,
+  StageCards,
+  StageWindowButton,
+  putJoinPop,
+  usePresenterWindowChrome,
+} from './consoleParts.tsx';
 import {
   formatClock,
   useBoard,
@@ -60,6 +69,7 @@ import {
   usePicker,
   useRehearsal,
   useScoresView,
+  useJoinPop,
   useSceneCard,
   useSheet,
   useShowSounds,
@@ -166,6 +176,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const card = useCard();
   const standingsUp = useStandingsCard();
   const sceneCard = useSceneCard();
+  const joinUp = useJoinPop() === 'in';
   const cinema = useCinema();
   const scoresView = useScoresView();
   const timeUp = useTimeUp();
@@ -190,8 +201,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const armedRef = useRef<ArmedSpecial | null>(null);
 
   const stageUp = Boolean(card || standingsUp || sceneCard);
-  const live = useRef({ board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard });
-  live.current = { board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard };
+  const live = useRef({ board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard, joinUp });
+  live.current = { board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard, joinUp };
 
   const setArmed = useCallback((next: ArmedSpecial | null) => {
     armedRef.current = next;
@@ -386,6 +397,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         if (!cur.stageUp) return;
         run.goScene('show');
       } else if (k === 'v') run.goScene('cinema');
+      else if (k === 'j') putJoinPop(!cur.joinUp);
       else if (k === 'c') run.cue('celebrate');
       else if (k === 'p') {
         if (b.stage === 'intro') return;
@@ -454,8 +466,14 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       id: 'cards',
       label: 'Cards',
       icon: 'eye',
-      alert: card ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage` : standingsUp ? 'The standings are on the stage' : undefined,
-      render: () => <CardsTab onClock={clockOp} standings={standingsOffered(settings)} />,
+      alert: card
+        ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage`
+        : standingsUp
+          ? 'The standings are on the stage'
+          : joinUp
+            ? 'The Join pop-up is up'
+            : undefined,
+      render: () => <CardsTab code={code} onClock={clockOp} standings={standingsOffered(settings)} />,
     },
     {
       id: 'cinema',
@@ -1382,7 +1400,7 @@ function SoundTab({ look, onCue }: { look: ShowdownLook; onCue: (c: ShowdownCue)
 }
 
 /** Drawer → Cards: the holding cards, and whether the stage shows the clock. */
-function CardsTab({ onClock, standings }: { onClock: (op: ShowdownClockOp) => void; standings: boolean }) {
+function CardsTab({ code, onClock, standings }: { code: string; onClock: (op: ShowdownClockOp) => void; standings: boolean }) {
   const clock = useClock();
   const standingsUp = useStandingsCard();
   return (
@@ -1390,6 +1408,13 @@ function CardsTab({ onClock, standings }: { onClock: (op: ShowdownClockOp) => vo
       <div className="sdc-tabsection">
         <h3 className="sd-panel__title">Stage cards</h3>
         <StageCards compact />
+      </div>
+      <div className="sdc-tabsection">
+        <h3 className="sd-panel__title">Join QR</h3>
+        <p className="sd-muted">
+          The Join pop-up puts the QR over the board for 20 seconds, for latecomers. Copy the image for the Teams chat.
+        </p>
+        <JoinQrTools code={code} popup />
       </div>
       {standings ? (
         <div className="sdc-tabsection">

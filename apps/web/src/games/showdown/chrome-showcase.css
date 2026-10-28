@@ -2512,3 +2512,27 @@ button.sdc-audio {
     min-height: 100%;
   }
 }
+
+/* The join QR tools (QR A): a small preview, the link, Copy QR image / Copy link / Join pop-up. */
+.sdc-joinqr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: flex-start;
+}
+.sdc-joinqr__qr {
+  width: 96px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.sdc-joinqr__side {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.sdc-joinqr__addr {
+  font-family: var(--font-num);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}

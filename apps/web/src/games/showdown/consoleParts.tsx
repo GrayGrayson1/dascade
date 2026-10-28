@@ -17,14 +17,16 @@ import {
   type ShowdownLook,
   type ShowdownPublicState,
 } from '@dascade/shared/games/showdown';
-import { Button, IconButton, PixelIcon, Select, cx } from '@dascade/ui';
+import { Button, IconButton, Kbd, PixelIcon, Select, cx } from '@dascade/ui';
 import { playersEqual, session, useRoomSelector } from '../../net/hooks.ts';
 import { useApp } from '../../app/store.ts';
 import { audioReady, onAudioReadyChange, sfx } from '../../audio/audio.ts';
 import { copyText, presenterLink, screenLink } from './access.ts';
 import { openStageWindow, useStageWindow } from './stageWindow.ts';
 import { playShowSound } from './sounds.ts';
-import { useCard, useShowSounds, useStandingsCard, useThemeMusicPref } from './state.ts';
+import { useCard, useJoinPop, useShowSounds, useStandingsCard, useThemeMusicPref } from './state.ts';
+import { QrCode, copyJoinQr, joinQrText } from './qr.tsx';
+import { joinAddress } from './look.ts';
 
 // ---------------------------------------------------------------------------
 // Which event preset this presenter loaded (the server only says "rehearsal" and how many rounds)
@@ -214,6 +216,75 @@ export function StageCards({ compact = false, className }: { compact?: boolean; 
         </span>
         <span className="sdc-card__title">Off</span>
       </button>
+    </div>
+  );
+}
+
+/** The Join pop-up on every stage (J): the join ticket over the board for 20 s; pressed again, it comes down. */
+export function putJoinPop(on: boolean): void {
+  sfx('select');
+  session.send(SHOWDOWN_MSG.joinPop, { on });
+}
+
+/**
+ * The join QR for the Teams chat and the invite (QR A): a preview, Copy QR image (a PNG on the
+ * clipboard; saved instead where the browser can't copy images) and Copy link. With `popup`, the
+ * Join pop-up button too.
+ */
+export function JoinQrTools({ code, popup = false }: { code: string; popup?: boolean }) {
+  const [said, setSaid] = useState('');
+  const up = useJoinPop() === 'in';
+  if (!code) return null;
+  const join = joinAddress(code);
+  return (
+    <div className="sdc-joinqr" data-part="showdown-join-qr">
+      <QrCode text={joinQrText(code)} label={`QR code for ${join.short}`} className="sdc-joinqr__qr" />
+      <div className="sdc-joinqr__side">
+        <span className="sdc-joinqr__addr">{join.short}</span>
+        <div className="sd-row sd-row--wrap">
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="copy"
+            onClick={async () => {
+              const how = await copyJoinQr(code);
+              setSaid(
+                how === 'copied'
+                  ? 'QR image copied: paste it in the Teams chat.'
+                  : how === 'saved'
+                    ? 'This browser can’t copy images: the QR image was saved instead.'
+                    : 'Couldn’t make the QR image. Copy the link instead.',
+              );
+            }}
+            data-part="showdown-copy-qr"
+          >
+            Copy QR image
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="copy"
+            onClick={async () => setSaid((await copyText(join.url)) ? 'Link copied.' : join.url)}
+          >
+            Copy link
+          </Button>
+          {popup ? (
+            <Button
+              size="sm"
+              variant={up ? 'primary' : 'secondary'}
+              icon="eye"
+              aria-pressed={up}
+              onClick={() => putJoinPop(!up)}
+              data-part="showdown-join-pop-button"
+            >
+              {up ? 'Take the Join pop-up down' : 'Join pop-up'} <Kbd>J</Kbd>
+            </Button>
+          ) : null}
+        </div>
+        <span className="sd-muted" role="status">
+          {said}
+        </span>
+      </div>
     </div>
   );
 }
