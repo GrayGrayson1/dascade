@@ -162,8 +162,10 @@ export const SHOWDOWN_STANDINGS_CARD = 'standings';
  *   cinema → the presenter's own video file plays in a frame in the stage window; every other screen
  *            (phones, big-screen links) shows "Cartoon break: watch the Teams share". The video never
  *            leaves the presenter's browser.
+ *   awards → the awards ceremony from the presenter's Awards desk (names and photos stay in their
+ *            browser); every other screen shows "Awards on stage: watch the Teams share".
  */
-export const SHOWDOWN_SCENE_CARDS = ['cinema'] as const;
+export const SHOWDOWN_SCENE_CARDS = ['cinema', 'awards'] as const;
 export type ShowdownSceneCard = (typeof SHOWDOWN_SCENE_CARDS)[number];
 
 export const SHOWDOWN_SCENE_INFO: Record<ShowdownSceneCard, { title: string; blurb: string; icon: string; away: string }> = {
@@ -172,6 +174,12 @@ export const SHOWDOWN_SCENE_INFO: Record<ShowdownSceneCard, { title: string; blu
     blurb: 'Your video, in a frame, in the stage window.',
     icon: '🎬',
     away: 'Cartoon break: watch the Teams share',
+  },
+  awards: {
+    title: 'Awards',
+    blurb: 'The awards ceremony from the Awards desk, in the stage window.',
+    icon: '🏆',
+    away: 'Awards on stage: watch the Teams share',
   },
 };
 
