@@ -76,9 +76,11 @@ new boards). They live in a show file on your computer:
      issues and revokes links).
    - Make a **Backup presenter** link for your backup and a **Moderator** link for whoever watches
      names. Send each privately (a direct message, not the event chat). They open it on their laptop.
-5. Press **Stage window**. Put it on your second monitor and press its **Full screen** button (on a
-   single screen, side by side with the console). That click also lets the stage window play video
-   with sound later.
+5. Press **Stage window**. Put it on your second monitor, click in it and press **F** for full
+   screen: that hides the window's title and address bar, so Teams shows only the stage. (Its **Full
+   screen** button, top right, does the same; it shows when you move the mouse over the window. F11
+   works too. **Esc** leaves full screen, F goes back.) On a single screen, keep it side by side with
+   the console instead. That click also lets the stage window play video with sound later.
 6. Drawer → **Cinema** → **Load video…**: pick the cartoon and the second clip (MP4, H.264 video and
    AAC sound, 1080p or smaller). They stay in this browser; nothing uploads. Choose a frame (Retro TV,
    Haunted cinema or Gilded portrait). If the console page reloads, load them again.
@@ -92,7 +94,8 @@ new boards). They live in a show file on your computer:
 
 1. In the meeting, press **Share** and turn on **Include sound**.
 2. Choose **Window** → **DAS-O-Ween Trivia — STAGE (share this)**. (Never the 🔒 PRESENTER tab.)
-3. Ask a colleague what they see and hear (the preflight's share check).
+3. Ask a colleague what they see and hear (the preflight's share check). If they see a browser bar
+   (`about:blank`) above the stage, click the stage window and press **F**.
 4. Post the join link **and its QR** in the chat: in the console's **Cards** tab (or the lobby's
    **Join QR**), press **Copy QR image** and paste it into the Teams chat, then **Copy link** and
    paste that too (**dascade.onrender.com/r/CODE**). People watching on a laptop can also scan the
@@ -282,6 +285,7 @@ switched off there — **Score the crowd** off runs the show exactly as before).
 | No sound in Teams                            | Re-share with **Include sound**. Check the top bar's sound status ("✓ heard … ago"); click the console once if it says sound is locked.                                                                                                                                                                                                         |
 | You closed the stage window                  | Press **Stage window** again and re-pick it in Teams. Cinema: press **Play** again (the video starts over).                                                                                                                                                                                                                                     |
 | **Play** says the stage window needs a click | Click anywhere in the stage window once: the video starts. (Browsers allow sound only after a click there; the Full screen button counts.)                                                                                                                                                                                                      |
+| Teams shows a browser bar above the stage    | Click the stage window and press **F** (or move the mouse over it and press **Full screen**, top right — it works during Cinema too). Esc leaves full screen; the show carries on either way.                                                                                                                                                   |
 | The video won't play                         | Use an MP4 (H.264 video, AAC sound). Fallback: **Be right back**, then share the video player with Include sound, then share the stage again.                                                                                                                                                                                                   |
 | The connection drops during the video        | The video keeps playing in the stage window; the show comes back under it.                                                                                                                                                                                                                                                                      |
 | A bad name on stage                          | **Names** → Rename or Hide.                                                                                                                                                                                                                                                                                                                     |
