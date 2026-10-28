@@ -427,6 +427,22 @@ describe('Presenter Showcase — keeping control', () => {
     expect(t.server.state.card).toBe('break');
   });
 
+  it('the Join pop-up: the presenter puts it up on every stage (and takes it down); nobody else can', async () => {
+    const t = await setup();
+    await loadPreset(t);
+    const at = Date.now();
+    t.host.room.send(SHOWDOWN_MSG.joinPop, { on: true });
+    await waitFor(() => json(t.a).joinAt >= at, 2000, 'pop-up on every stage');
+    t.a.room.send(SHOWDOWN_MSG.joinPop, { on: false });
+    await waitFor(() => t.a.errors.some((e) => e.type === SHOWDOWN_MSG.joinPop), 2000, 'audience refused');
+    expect(t.server.state.joinAt).toBeGreaterThanOrEqual(at);
+    await start(t);
+    t.host.room.send(SHOWDOWN_MSG.joinPop, { on: false });
+    await waitFor(() => json(t.b).joinAt === 0, 2000, 'taken down');
+    t.host.room.send(SHOWDOWN_MSG.joinPop, { on: 'yes' });
+    await waitFor(() => t.host.errors.some((e) => e.type === SHOWDOWN_MSG.joinPop), 2000, 'bad payload refused');
+  });
+
   it('a showcase ends with no winner: the crowd counts, everyone shares one place', async () => {
     const t = await setup();
     await loadPreset(t);

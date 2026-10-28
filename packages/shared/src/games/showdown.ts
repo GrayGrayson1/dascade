@@ -177,6 +177,12 @@ export const SHOWDOWN_SCENE_INFO: Record<ShowdownSceneCard, { title: string; blu
 
 export const isSceneCard = (card: string): card is ShowdownSceneCard => (SHOWDOWN_SCENE_CARDS as readonly string[]).includes(card);
 
+/**
+ * The Join pop-up (Production Desk, QR A): the join ticket (the QR, the link, the room code) slides
+ * over every stage for this long, then away; the board stays live behind it. For latecomers.
+ */
+export const SHOWDOWN_JOIN_POP_MS = 20_000;
+
 export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: string; icon: string }> = {
   welcome: { title: 'Welcome', blurb: 'The event’s name and “the show starts soon”.', icon: '🎪' },
   break: { title: 'Be right back', blurb: 'For a video, a break or technical trouble.', icon: '⏸️' },
@@ -585,6 +591,8 @@ export const SHOWDOWN_MSG = {
   preset: 'showdown:preset',
   /** client → server (presenter, any phase) {card}: put a holding card on every stage ('' = none). */
   card: 'showdown:card',
+  /** client → server (presenter, any phase) {on}: the Join pop-up over every stage for SHOWDOWN_JOIN_POP_MS (off = take it down). */
+  joinPop: 'showdown:joinpop',
   /** server → presenter only: the answer sheet (ShowdownSheet), null when you are not (or no longer) the presenter. */
   sheet: 'showdown:sheet',
   /** server → presenter only: {pass} (null for everyone else). */
@@ -749,6 +757,7 @@ export const ShowdownGuessSchema = z
   })
   .strict();
 export const ShowdownFinaleSchema = z.object({ step: z.number().int().min(0).max(8) }).strict();
+export const ShowdownJoinPopSchema = z.object({ on: z.boolean() }).strict();
 export const ShowdownCreditSchema = z
   .object({
     round: z.number().int().min(0).max(1000),
@@ -1311,6 +1320,8 @@ export interface ShowdownPublicState extends BaseRoomView {
   scoreJson: string;
   /** The paced finale's step on the results screen (index into finaleSteps(); 0 = the wrap-up). */
   finaleStep: number;
+  /** The Join pop-up (QR A): server epoch ms the presenter put it up (0 = down); stages show it for SHOWDOWN_JOIN_POP_MS. */
+  joinAt: number;
 
   // ---- Event rooms ----
   /** The event preset that made this an event room ('' = an ordinary room). */
