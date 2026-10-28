@@ -18,6 +18,11 @@ export const config = {
   simulatedLatencyMs: num(process.env.DASCADE_LATENCY_MS, 0),
   /** Relax per-IP matchmaking limits (tests / load simulation). */
   relaxedLimits: process.env.DASCADE_RELAXED_LIMITS === '1' || process.env.NODE_ENV === 'test',
+  /** Extra origins allowed by CORS, comma-separated (a web client hosted elsewhere; see lib/cors.ts). */
+  corsOrigins: (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   /** Public Supabase URL the browser talks to (for the CSP connect-src). */
   supabasePublicUrl: process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
   supabase: {
