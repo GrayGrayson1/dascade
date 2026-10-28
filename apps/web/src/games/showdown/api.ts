@@ -28,6 +28,15 @@ export const showdownApi = {
   exclude: (playerId: string) => pick({ a: 'exclude', playerId }),
   include: (playerId: string) => pick({ a: 'include', playerId }),
   includeAll: () => pick({ a: 'includeAll' }),
+  /** Two-tier scoring: move the paced finale on (presenter, results screen). */
+  finaleStep: (step: number) => session.send(SHOWDOWN_MSG.finale, { step }),
+  /** Ask for the score record (the answer arrives as SHOWDOWN_MSG.scoresExport). */
+  exportScores: () => session.send(SHOWDOWN_MSG.scoresExport, {}),
+  /** Take a wrong hot-seat credit (and its medal) off a tile. */
+  removeCredit: (round: number, slot: number) => session.send(SHOWDOWN_MSG.credit, { round, slot }),
+  /** Lock a guess into a spot on your Top 10 scorecard (pos 0 = #1). */
+  guess: (round: number, text: string, pos?: number) =>
+    session.send(SHOWDOWN_MSG.guess, pos === undefined ? { round, text } : { round, text, pos }),
   /** Your own Skip me switch. */
   skip: (on: boolean) => session.send(SHOWDOWN_MSG.skip, { on }),
 

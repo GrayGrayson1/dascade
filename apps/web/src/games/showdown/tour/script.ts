@@ -79,7 +79,7 @@ export const DEMO_ROUNDS: readonly [DemoRound, DemoRound] = [
   },
 ];
 
-/** The show's settings once the DAS-O-Ween 2026 preset is loaded (as the preset sets them). */
+/** The show’s settings once the DAS-O-Ween 2026 preset is loaded (the tour shows the show without crowd scoring). */
 export const DEMO_SETTINGS: ShowdownSettings = {
   mode: 'showcase',
   title: 'DAS-O-Ween Trivia',
@@ -98,6 +98,11 @@ export const DEMO_SETTINGS: ShowdownSettings = {
   guesses: 10,
   pickMode: 'fair',
   crewDraw: false,
+  points: false,
+  medals: 'never',
+  reveal: 'standings',
+  gems: true,
+  pops: true,
 };
 
 /** Before the preset: a new room's defaults. */

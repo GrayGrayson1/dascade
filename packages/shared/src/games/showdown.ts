@@ -148,6 +148,13 @@ export const SHOWDOWN_MODE_INFO: Record<ShowdownMode, { title: string; blurb: st
 export const SHOWDOWN_CARDS = ['welcome', 'break', 'prizes', 'thanks'] as const;
 export type ShowdownCard = (typeof SHOWDOWN_CARDS)[number];
 
+/**
+ * The Standings card (two-tier scoring): the top Guessers and, with medals after each round, the
+ * Spotlight Stars. A stage card like the others, offered between rounds; kept out of SHOWDOWN_CARDS
+ * (the holding cards every show has).
+ */
+export const SHOWDOWN_STANDINGS_CARD = 'standings';
+
 export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: string; icon: string }> = {
   welcome: { title: 'Welcome', blurb: 'The event’s name and “the show starts soon”.', icon: '🎪' },
   break: { title: 'Be right back', blurb: 'For a video, a break or technical trouble.', icon: '⏸️' },
@@ -393,6 +400,21 @@ export const SHOWDOWN_PICK_MODE_INFO: Record<ShowdownPickMode, { title: string; 
   },
 };
 
+/** Two-tier scoring: the hot seat earns medals, the crowd earns points, and neither touches the other. */
+export const SHOWDOWN_MEDAL_MODES = ['never', 'round', 'end'] as const;
+export type ShowdownMedalMode = (typeof SHOWDOWN_MEDAL_MODES)[number];
+export const SHOWDOWN_MEDAL_MODE_INFO: Record<ShowdownMedalMode, { title: string; blurb: string }> = {
+  never: { title: 'Never', blurb: 'No medals on screen. The export still lists who found what from the hot seat.' },
+  round: { title: 'After each round', blurb: 'Medals pin on as tiles flip; a ceremony on the standings card and in the finale.' },
+  end: { title: 'At the end', blurb: 'Medals pin on as tiles flip; the ceremony waits for the finale.' },
+};
+export const SHOWDOWN_REVEAL_MODES = ['standings', 'finale'] as const;
+export type ShowdownRevealMode = (typeof SHOWDOWN_REVEAL_MODES)[number];
+export const SHOWDOWN_REVEAL_MODE_INFO: Record<ShowdownRevealMode, { title: string; blurb: string }> = {
+  standings: { title: 'Standings + paced finale', blurb: 'Show the top five between rounds, then step through the finale.' },
+  finale: { title: 'Just the finale', blurb: 'No standings between rounds; step through the finale at the end.' },
+};
+
 export const ShowdownSettingsSchema = z.object({
   /** Team Showdown (teams, strikes, steals, scores) or Presenter Showcase (one board, no teams). */
   mode: z.enum(SHOWDOWN_MODES),
@@ -432,6 +454,16 @@ export const ShowdownSettingsSchema = z.object({
   pickMode: z.enum(SHOWDOWN_PICK_MODES).default('fair'),
   /** Crew (producer, backup presenters, moderators) are in the random draw too; by name they always can be. */
   crewDraw: z.boolean().default(false),
+  /** Score the crowd (Presenter Showcase): called-it points for phone guesses. Off = the show runs as before. */
+  points: z.boolean().default(false),
+  /** The hot seat's medals: never on screen, a ceremony after each round, or only at the end. */
+  medals: z.enum(SHOWDOWN_MEDAL_MODES).default('never'),
+  /** Standings between rounds plus the paced finale, or just the finale. */
+  reveal: z.enum(SHOWDOWN_REVEAL_MODES).default('standings'),
+  /** Hidden gems: an answer only Reveal remaining found pays double. */
+  gems: z.boolean().default(true),
+  /** Called-it pops: a flipped tile shows "+9 · 6 called it" (counts, never names). */
+  pops: z.boolean().default(true),
 });
 export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
@@ -458,6 +490,11 @@ export function defaultShowdownSettings(now: Date = new Date()): ShowdownSetting
     guesses: SHOWDOWN_LIMITS.guessesDefault,
     pickMode: 'fair',
     crewDraw: false,
+    points: false,
+    medals: 'never',
+    reveal: 'standings',
+    gems: true,
+    pops: true,
   };
 }
 
@@ -536,6 +573,14 @@ export const SHOWDOWN_MSG = {
   event: 'showdown:event',
   /** server → all: aggregated reactions of the last moment (ShowdownReactions). */
   reactions: 'showdown:reactions',
+  /** client → server (presenter, results) {step}: move the paced finale on (ShowdownFinaleStep index). */
+  finale: 'showdown:finale',
+  /** server → the presenter and `scores.export` crew: the full live list (ShowdownScoresView), null when off. */
+  scores: 'showdown:scores',
+  /** client → server (`scores.export`) {}: server → that client: the whole score record (ShowdownScoresFile). */
+  scoresExport: 'showdown:scores-export',
+  /** client → server (`scores.fix`) {round, slot}: take a wrong hot-seat credit (and its medal) off a tile. */
+  credit: 'showdown:credit',
 
   // ---- The audience picker (Presenter Showcase; see "Picker" below) ----
   /**
@@ -668,7 +713,30 @@ export const ShowdownCueSchema = z.object({ cue: z.enum(SHOWDOWN_CUES) }).strict
 export const ShowdownTeamSchema = z.object({ team }).strict();
 export const ShowdownMoveSchema = z.object({ playerId: z.string().min(1).max(64), team: z.union([z.literal(-1), team]) }).strict();
 export const ShowdownScreenSchema = z.object({ on: z.boolean() }).strict();
-export const ShowdownGuessSchema = z.object({ round: z.number().int().min(0).max(1000), text: z.string().max(200) }).strict();
+/** `pos` = the spot on your Top 10 scorecard (0 = #1); a showcase that scores the crowd needs it. */
+export const ShowdownGuessSchema = z
+  .object({
+    round: z.number().int().min(0).max(1000),
+    text: z.string().max(200),
+    pos: z
+      .number()
+      .int()
+      .min(0)
+      .max(SHOWDOWN_LIMITS.answersMax - 1)
+      .optional(),
+  })
+  .strict();
+export const ShowdownFinaleSchema = z.object({ step: z.number().int().min(0).max(8) }).strict();
+export const ShowdownCreditSchema = z
+  .object({
+    round: z.number().int().min(0).max(1000),
+    slot: z
+      .number()
+      .int()
+      .min(0)
+      .max(SHOWDOWN_LIMITS.answersMax - 1),
+  })
+  .strict();
 /** Reaction kinds: index into the look's reaction set (clap, fire, wow, laugh, love, party). */
 export const SHOWDOWN_REACTION_KINDS = 6;
 export const ShowdownReactSchema = z
@@ -683,7 +751,9 @@ export const ShowdownReactSchema = z
 export const ShowdownClaimSchema = z.object({ pass: z.string().min(1).max(64) }).strict();
 export const ShowdownHandoverSchema = z.object({ playerId: z.string().min(1).max(64) }).strict();
 export const ShowdownTakeoverSchema = z.object({}).strict();
-export const ShowdownCardSchema = z.object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS)]) }).strict();
+export const ShowdownCardSchema = z
+  .object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS), z.literal(SHOWDOWN_STANDINGS_CARD)]) })
+  .strict();
 
 // ---------------------------------------------------------------------------
 // Picker (PCK-01…05, VIS-02, DSP-03): the server draws who answers next; screens only replay it.
@@ -769,6 +839,10 @@ export const SHOWDOWN_PERMISSIONS = [
   'audit.read',
   'audit.export',
   'preflight.read',
+  /** Download the score record (CSV / JSON). */
+  'scores.export',
+  /** Take a wrong hot-seat credit off a tile. */
+  'scores.fix',
 ] as const;
 export type ShowdownPermission = (typeof SHOWDOWN_PERMISSIONS)[number];
 
@@ -804,6 +878,8 @@ export const SHOWDOWN_ROLE_PERMISSIONS: Record<ShowdownCrewRole | 'presenter', r
     'audit.read',
     'audit.export',
     'preflight.read',
+    'scores.export',
+    'scores.fix',
   ],
   presenter: [
     'people.rename',
@@ -815,6 +891,8 @@ export const SHOWDOWN_ROLE_PERMISSIONS: Record<ShowdownCrewRole | 'presenter', r
     'audio.station',
     'audit.read',
     'preflight.read',
+    'scores.export',
+    'scores.fix',
   ],
   backup: ['picker.manage'],
   moderator: ['people.rename', 'people.hide', 'picker.manage'],
@@ -923,6 +1001,8 @@ export const SHOWDOWN_AUDIT_ACTIONS = [
   'picker.choose',
   'picker.exclude',
   'picker.include',
+  'scores.export',
+  'credit.remove',
   'audio.station',
   'audio.failover',
   'show.end',
@@ -1057,11 +1137,17 @@ const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
   source: 'custom',
   minutes: 10,
   stageClock: true,
-  audience: false,
+  // Phones lock in a Top 10 for crowd points (any format can still call answers out loud or in the chat).
+  audience: true,
   display: 'auto',
   guesses: 10,
   pickMode: 'fair',
   crewDraw: false,
+  points: true,
+  medals: 'round',
+  reveal: 'standings',
+  gems: true,
+  pops: true,
 };
 
 export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
@@ -1199,6 +1285,10 @@ export interface ShowdownPublicState extends BaseRoomView {
   sweep: boolean;
   /** The loaded rounds are an event preset's practice boards. */
   rehearsal: boolean;
+  /** JSON ShowdownScoreboard ('' = nothing to show): built only from revealed answers. */
+  scoreJson: string;
+  /** The paced finale's step on the results screen (index into finaleSteps(); 0 = the wrap-up). */
+  finaleStep: number;
 
   // ---- Event rooms ----
   /** The event preset that made this an event room ('' = an ordinary room). */
@@ -1304,6 +1394,36 @@ export interface ShowdownMyGuess {
   /** Slot it called once that answer was revealed (-1 = not (yet) on the board). */
   slot: number;
   points: number;
+  /** The scorecard spot it was locked into (0 = #1; -1 = none: Team Showdown, or an older phone). */
+  pos?: number;
+  /** +1 when the answer landed in that spot (only once revealed). */
+  bonus?: number;
+  /** Found only by Reveal remaining: a hidden gem (double points). */
+  gem?: boolean;
+}
+
+/** Medals by kind: 🎃 the special answer, 🥇 #1–#3, 🥈 #4–#7, 🥉 #8–#10, 🎗️ a brave turn with no find. */
+export interface ShowdownMedals {
+  pumpkin: number;
+  gold: number;
+  silver: number;
+  bronze: number;
+  ribbon: number;
+}
+
+/** Your crowd score (private to you). */
+export interface ShowdownMyScore {
+  points: number;
+  /** 1-based, ties share a place (0 = no points yet). */
+  rank: number;
+  /** People with points. */
+  of: number;
+  medals: ShowdownMedals;
+  positionHits: number;
+  perfect: number;
+  gems: number;
+  /** This round's points so far. */
+  round: number;
 }
 
 /** One player's private view of their audience game. */
@@ -1331,6 +1451,116 @@ export interface ShowdownMe {
   };
   /** You're in the hot seat right now ("You're up!"). */
   picked?: boolean;
+  /** Two-tier scoring (Score the crowd on, or medals on): your points, rank and medals. */
+  score?: ShowdownMyScore;
+}
+
+/** One line of the standings (the top five on the stage; the whole list in the presenter's Scores tab). */
+export interface ShowdownScoreRow {
+  playerId: string;
+  name: string;
+  points: number;
+  /** 1-based; ties share a place. */
+  rank: number;
+}
+
+/** A Spotlight Star: someone who earned medals from the hot seat. */
+export interface ShowdownStar {
+  playerId: string;
+  name: string;
+  medals: ShowdownMedals;
+}
+
+/** The public scoreboard (`scoreJson`): top Guessers and the medal wall, from revealed answers only. */
+export interface ShowdownScoreboard {
+  /** Score the crowd is on. */
+  points: boolean;
+  medals: ShowdownMedalMode;
+  /** The top five Guessers (empty with points off). */
+  top: ShowdownScoreRow[];
+  /** People with any points. */
+  of: number;
+  /** The medal wall, sorted Olympic-style (empty with medals Never). */
+  stars: ShowdownStar[];
+}
+
+/** The presenter's full list (Scores tab) and the export's people. */
+export interface ShowdownScorePerson extends ShowdownScoreRow {
+  medals: ShowdownMedals;
+  positionHits: number;
+  perfect: number;
+  gems: number;
+  calls: number;
+  /** Points per round. */
+  rounds: number[];
+}
+
+/** One revealed answer in the score record (never an unrevealed one). */
+export interface ShowdownScoreAnswer {
+  pos: number;
+  text: string;
+  value: number;
+  late: boolean;
+  callers: number;
+  /** Who was in the hot seat when it flipped ('' = nobody). */
+  foundBy: string;
+  medal: keyof ShowdownMedals | '';
+}
+
+/** The presenter's Scores tab (`showdown:scores`, presenter and `scores.export` crew only). */
+export interface ShowdownScoresView {
+  people: ShowdownScorePerson[];
+  stars: ShowdownStar[];
+  /** Tiles with a hot-seat credit, for "remove a wrong credit". */
+  credits: Array<{ round: number; slot: number; name: string; medal: keyof ShowdownMedals }>;
+}
+
+/** The downloadable record (CSV / JSON are built from it in the browser). */
+export interface ShowdownScoresFile {
+  room: string;
+  title: string;
+  exportedAt: number;
+  settings: Pick<ShowdownSettings, 'points' | 'medals' | 'gems' | 'guesses'>;
+  rounds: Array<{ index: number; title: string; answers: ShowdownScoreAnswer[] }>;
+  people: ShowdownScorePerson[];
+  stars: ShowdownStar[];
+}
+
+export const emptyMedals = (): ShowdownMedals => ({ pumpkin: 0, gold: 0, silver: 0, bronze: 0, ribbon: 0 });
+export const medalCount = (m: ShowdownMedals): number => m.pumpkin + m.gold + m.silver + m.bronze + m.ribbon;
+export const SHOWDOWN_MEDAL_INFO: Record<keyof ShowdownMedals, { title: string; icon: string }> = {
+  pumpkin: { title: 'Golden Pumpkin', icon: '🎃' },
+  gold: { title: 'Gold', icon: '🥇' },
+  silver: { title: 'Silver', icon: '🥈' },
+  bronze: { title: 'Bronze', icon: '🥉' },
+  ribbon: { title: 'Brave ribbon', icon: '🎗️' },
+};
+
+/** A tile's crowd value: #1 = 10 … #10 = 1 (doubled for a hidden gem). */
+export function answerValue(slot: number, gem = false): number {
+  const base = Math.max(0, SHOWDOWN_LIMITS.answersMax - slot);
+  return gem ? base * 2 : base;
+}
+
+/** The medal a hot-seat find earns: the special answer is the Golden Pumpkin; else by position. */
+export function medalFor(slot: number, special: number): keyof ShowdownMedals {
+  if (slot === special) return 'pumpkin';
+  return slot <= 2 ? 'gold' : slot <= 6 ? 'silver' : 'bronze';
+}
+
+/** The paced finale, step by step. */
+export type ShowdownFinaleStepKind = 'wrap' | 'medals' | 'third' | 'second' | 'first';
+
+/** The finale's steps for these results: the wrap-up, the medal ceremony (unless Never or none), then the podium's places, 3rd → 1st. */
+export function finaleSteps(finale: Pick<ShowdownFinale, 'podium' | 'stars' | 'medals'> | null | undefined): ShowdownFinaleStepKind[] {
+  const out: ShowdownFinaleStepKind[] = ['wrap'];
+  if (!finale) return out;
+  if ((finale.medals ?? 'never') !== 'never' && (finale.stars?.length ?? 0) > 0) out.push('medals');
+  const places = new Set((finale.podium ?? []).map((p) => p.rank));
+  if (places.has(3)) out.push('third');
+  if (places.has(2)) out.push('second');
+  if (places.has(1)) out.push('first');
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1401,6 +1631,8 @@ export type ShowdownEvent =
       /** Spotlight a name: chosen by the presenter or crew, not drawn. */
       chosen?: boolean;
     }
+  /** The paced finale moved on (`step` = index into finaleSteps(), `kind` = what it shows). */
+  | { type: 'finale'; rev: number; step: number; kind: ShowdownFinaleStepKind }
   /** The hot seat emptied: their turn counted (done), they're back in the pool (noAnswer/reroll), or a moderator hid them. */
   | { type: 'pickEnd'; rev: number; drawNo: number; playerId: string; how: 'done' | 'noAnswer' | 'reroll' | 'cleared' }
   /** The sound station moved ('' = back to the presenter's console); `lost` = the old station stopped answering. */
@@ -1423,6 +1655,11 @@ export interface ShowdownFinale {
   /** Top "called it" audience members. */
   callers: Array<{ playerId: string; name: string; points: number; calls: number; team: TeamSlot }>;
   members: [string[], string[]];
+  /** Two-tier scoring: the top three Guessers (ties share a place; empty with Score the crowd off). */
+  podium?: ShowdownScoreRow[];
+  /** The Spotlight Stars, Olympic order (empty with medals Never). */
+  stars?: ShowdownStar[];
+  medals?: ShowdownMedalMode;
 }
 
 export const SHOWDOWN_STATS = {
@@ -1430,4 +1667,8 @@ export const SHOWDOWN_STATS = {
   calls: 'calls',
   /** Best called-it points in one show. */
   bestCallPoints: 'bestCallPoints',
+  /** Spotlight medals from the hot seat (summed across shows). */
+  medals: 'medals',
+  /** Answers called in the right spot on the scorecard. */
+  positionHits: 'positionHits',
 } as const;

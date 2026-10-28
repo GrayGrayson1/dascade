@@ -116,6 +116,8 @@ export const STAT_EXTRA_LABELS: Record<string, string> = {
   // DAS Survey Showdown
   calls: 'Answers called',
   bestCallPoints: 'Best Survey Sayer score',
+  medals: 'Spotlight medals',
+  positionHits: 'Called in the right spot',
 };
 
 /** Extras whose key ends in `Ms` are durations in milliseconds (e.g. `minLapMs`). */
