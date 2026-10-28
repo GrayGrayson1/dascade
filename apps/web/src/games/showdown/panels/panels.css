@@ -947,8 +947,9 @@
   }
 }
 
-/* Inside the console's drawer the tab already names the panel: keep the heading for screen readers only. */
-.sdc-drawer .sdp-panel > .sd-panel__title {
+/* Inside the console's drawer (or a dashboard tool) the tab already names the panel: keep the heading for screen readers only. */
+.sdc-drawer .sdp-panel > .sd-panel__title,
+.sdc-tool .sdp-panel > .sd-panel__title {
   position: absolute;
   width: 1px;
   height: 1px;

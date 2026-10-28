@@ -12,11 +12,21 @@ const baseURL = external ?? `http://localhost:${port}`;
  * October is Halloween season: no spec should meet the floor's seasonal invite by accident. Every
  * context — including the ones specs open with browser.newContext() — starts with the QA override set
  * to 'off' (apps/web/src/themes/seasonalController.ts); e2e/seasonal.spec.ts opts in with `?season=…`.
- * A spec that passes its own `storageState` must add this entry itself.
+ * The Showdown console starts in its Classic layout (the tabbed drawer the specs drive);
+ * e2e/showdown-dashboard.spec.ts switches to the Dashboard. A spec that passes its own `storageState`
+ * must add these entries itself.
  */
 const seasonOff = {
   cookies: [],
-  origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: 'dascade:qa:season', value: 'off' }] }],
+  origins: [
+    {
+      origin: new URL(baseURL).origin,
+      localStorage: [
+        { name: 'dascade:qa:season', value: 'off' },
+        { name: 'dascade:showdown:console-layout', value: 'classic' },
+      ],
+    },
+  ],
 };
 
 export default defineConfig({
