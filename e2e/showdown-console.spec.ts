@@ -68,6 +68,11 @@ async function expectAllOnScreen(page: Page, parts: Record<string, string>): Pro
   expect(report).toEqual(expected);
 }
 
+/** How many rows the elements matching `selector` sit on. */
+async function rows(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).evaluateAll((els) => new Set(els.map((el) => Math.round(el.getBoundingClientRect().top))).size);
+}
+
 const LIVE_PARTS = {
   'PRIVATE band': '[data-part="showdown-private-band"]',
   'answer sheet (#1)': '[data-part="showdown-answer"][data-slot="0"]',
@@ -104,6 +109,10 @@ test.describe('Presenter Showcase console', () => {
       await page.setViewportSize(size);
       await page.waitForTimeout(300);
       await expectAllOnScreen(page, LIVE_PARTS);
+      // The scene strip, the drawer's tabs and the keys legend each keep to one row.
+      for (const sel of ['[data-part="showdown-scenes"] > button', '.sdc-drawer__tab', 'footer.sdc-keys > span']) {
+        expect(await rows(page, sel), `${sel} at ${size.width}×${size.height}`).toBe(1);
+      }
     }
 
     // Someone in the hot seat: the picker's Mark done / No answer are on screen too.
