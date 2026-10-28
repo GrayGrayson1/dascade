@@ -10,6 +10,7 @@ import { registerApiRoutes } from './http/routes.ts';
 import { config } from './config.ts';
 import { log } from './lib/log.ts';
 import { stampClientIp } from './lib/clientIp.ts';
+import { installCors } from './lib/cors.ts';
 import { installPlatformServices } from './platform/index.ts';
 
 type RoomClass = new () => Room;
@@ -54,6 +55,7 @@ export const EXPOSED_MATCHMAKE_METHODS = ['create', 'joinById', 'reconnect'];
 
 export async function createDascadeServer(options: CreateServerOptions = {}) {
   matchMaker.controller.exposedMethods = [...EXPOSED_MATCHMAKE_METHODS];
+  installCors(!config.isProduction, config.corsOrigins);
   installPlatformServices();
   const rooms: Record<string, ReturnType<typeof defineRoom>> = {};
   const classes = await loadRoomClasses(options.games ?? envGames(), config.isProduction, (id, err) =>

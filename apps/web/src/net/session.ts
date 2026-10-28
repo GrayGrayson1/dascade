@@ -275,7 +275,12 @@ function superseded(my: number, room: Room): boolean {
 }
 
 function getClient(): Client {
-  client ??= new Client(serverUrl());
+  if (!client) {
+    client = new Client(serverUrl());
+    // The site sets no cookies, so matchmaking never sends credentials (the SDK's default is 'include'):
+    // the server then needs no Access-Control-Allow-Credentials, even from the Vite dev server.
+    client.http.options.credentials = 'omit';
+  }
   return client;
 }
 
