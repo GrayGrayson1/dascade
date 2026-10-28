@@ -155,6 +155,28 @@ export type ShowdownCard = (typeof SHOWDOWN_CARDS)[number];
  */
 export const SHOWDOWN_STANDINGS_CARD = 'standings';
 
+/**
+ * Stage scenes (Production Desk, Scenes A): the scene strip switches the stage window between the
+ * Show (no card), these scenes and the holding cards, so the presenter never re-shares in Teams.
+ * Cards like the others on every stage, kept out of SHOWDOWN_CARDS (the holding cards' grid):
+ *   cinema → the presenter's own video file plays in a frame in the stage window; every other screen
+ *            (phones, big-screen links) shows "Cartoon break: watch the Teams share". The video never
+ *            leaves the presenter's browser.
+ */
+export const SHOWDOWN_SCENE_CARDS = ['cinema'] as const;
+export type ShowdownSceneCard = (typeof SHOWDOWN_SCENE_CARDS)[number];
+
+export const SHOWDOWN_SCENE_INFO: Record<ShowdownSceneCard, { title: string; blurb: string; icon: string; away: string }> = {
+  cinema: {
+    title: 'Cinema',
+    blurb: 'Your video, in a frame, in the stage window.',
+    icon: '🎬',
+    away: 'Cartoon break: watch the Teams share',
+  },
+};
+
+export const isSceneCard = (card: string): card is ShowdownSceneCard => (SHOWDOWN_SCENE_CARDS as readonly string[]).includes(card);
+
 export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: string; icon: string }> = {
   welcome: { title: 'Welcome', blurb: 'The event’s name and “the show starts soon”.', icon: '🎪' },
   break: { title: 'Be right back', blurb: 'For a video, a break or technical trouble.', icon: '⏸️' },
@@ -752,7 +774,7 @@ export const ShowdownClaimSchema = z.object({ pass: z.string().min(1).max(64) })
 export const ShowdownHandoverSchema = z.object({ playerId: z.string().min(1).max(64) }).strict();
 export const ShowdownTakeoverSchema = z.object({}).strict();
 export const ShowdownCardSchema = z
-  .object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS), z.literal(SHOWDOWN_STANDINGS_CARD)]) })
+  .object({ card: z.union([z.literal(''), z.enum(SHOWDOWN_CARDS), z.literal(SHOWDOWN_STANDINGS_CARD), z.enum(SHOWDOWN_SCENE_CARDS)]) })
   .strict();
 
 // ---------------------------------------------------------------------------
@@ -1271,7 +1293,7 @@ export interface ShowdownPublicState extends BaseRoomView {
   customRounds: number;
   /** JSON ShowdownFinale once the show is over ('' otherwise). */
   finaleJson: string;
-  /** The holding card on every stage ('' = none): ShowdownCard. */
+  /** The holding card on every stage ('' = none): a ShowdownCard, the Standings card or a ShowdownSceneCard. */
   card: string;
   /** Presenter Showcase: the round clock. Running while clockEndsAt > 0 (server epoch ms). */
   clockEndsAt: number;

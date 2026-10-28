@@ -159,8 +159,15 @@ async function act(t: Show, payload: Record<string, unknown> & { a: ShowdownActP
   const withRev = payload.a === 'reveal' ? payload : { ...payload, rev };
   by.room.send(SHOWDOWN_MSG.act, withRev);
   if (by !== t.host && by.id() !== t.server.state.presenterId) return;
-  await waitFor(() => t.server.state.rev !== rev || t.server.state.phase !== 'PLAYING' || by.errors.length > errors, 2000, `act ${payload.a}`);
-  await synced(t, [t.host, t.a, t.b].filter((c) => c.room.connection.isOpen));
+  await waitFor(
+    () => t.server.state.rev !== rev || t.server.state.phase !== 'PLAYING' || by.errors.length > errors,
+    2000,
+    `act ${payload.a}`,
+  );
+  await synced(
+    t,
+    [t.host, t.a, t.b].filter((c) => c.room.connection.isOpen),
+  );
 }
 
 const live = async (t: Show, team: 0 | 1 = 0) => {
@@ -243,9 +250,21 @@ describe('DAS Survey Showdown — presenter role and secrecy', () => {
     t.a.room.send(SHOWDOWN_MSG.act, { a: 'begin', rev: t.server.state.rev });
     t.b.room.send(SHOWDOWN_MSG.cue, { cue: 'applause' });
     t.a.room.send(SHOWDOWN_MSG.move, { playerId: t.b.id(), team: 0 });
-    await waitFor(() => t.a.errors.filter((e) => e.code === 'not_host').length >= 2 && t.b.errors.some((e) => e.code === 'not_host'), 2000, 'refusals');
+    await waitFor(
+      () => t.a.errors.filter((e) => e.code === 'not_host').length >= 2 && t.b.errors.some((e) => e.code === 'not_host'),
+      2000,
+      'refusals',
+    );
     expect(board(t.a).stage).toBe('intro');
     expect(t.a.cues).toEqual([]);
+  });
+
+  it('stage scenes (Cinema) are for Presenter Showcase only', async () => {
+    const t = await setup();
+    await start(t);
+    t.host.room.send(SHOWDOWN_MSG.card, { card: 'cinema' });
+    await waitFor(() => t.host.errors.some((e) => e.type === SHOWDOWN_MSG.card && e.code === 'not_allowed'), 2000, 'cinema refused');
+    expect(t.server.state.card).toBe('');
   });
 });
 

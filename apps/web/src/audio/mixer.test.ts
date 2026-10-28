@@ -7,6 +7,7 @@ import {
   SFX_DUCK_LEVEL,
   SFX_HOLD_LEVEL,
   elementFallbackVolume,
+  mediaFallbackVolume,
   jukeboxDuckBase,
   gameMusicLevel,
   isJukeboxAudible,
@@ -242,6 +243,22 @@ describe('mixer', () => {
     ctx.refuseMediaSource = false;
     expect(m.routeElement(other)).toBe(false); // never retried
     expect(m.isRouted(other)).toBe(false);
+  });
+
+  it('routes a video straight to the master bus (not the jukebox bus), once', async () => {
+    const m = make();
+    const ctx = m.ensureContext() as unknown as FakeAudioContext;
+    await m.resume();
+    const video = {} as HTMLMediaElement;
+    expect(m.routeMedia(video)).toBe(true);
+    expect(m.routeMedia(video)).toBe(true);
+    expect(m.isRouted(video)).toBe(true);
+    expect(ctx.mediaSources).toBe(1);
+    const src = ctx.nodes.find((n) => n.kind === 'mediaSource')!;
+    expect(src.connections).toEqual([m.buses()!.master]);
+    // Its fallback (no graph) still obeys master volume and mute.
+    expect(mediaFallbackVolume(S({ masterVolume: 0.5 }))).toBe(0.5);
+    expect(mediaFallbackVolume(S({ muted: true }))).toBe(0);
   });
 
   it('resume reports failure when the context stays suspended (iOS interrupted)', async () => {

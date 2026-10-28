@@ -10,11 +10,13 @@ import {
   SHOWDOWN_CARDS,
   SHOWDOWN_MSG,
   SHOWDOWN_STANDINGS_CARD,
+  isSceneCard,
   clockRemaining,
   parseBoard,
   resolveShowdownLook,
   type ShowdownBoardView,
   type ShowdownCard,
+  type ShowdownSceneCard,
   type ShowdownMode,
   type ShowdownContentPrivate,
   type ShowdownFinale,
@@ -186,6 +188,12 @@ export function useScoresView(): ShowdownScoresView | null {
 export function useCard(): ShowdownCard | null {
   const card = useShowSelector((s) => s.card) ?? '';
   return (SHOWDOWN_CARDS as readonly string[]).includes(card) ? (card as ShowdownCard) : null;
+}
+
+/** The stage scene up instead of the Show (Cinema), or null. Stage-safe. */
+export function useSceneCard(): ShowdownSceneCard | null {
+  const card = useShowSelector((s) => s.card) ?? '';
+  return isSceneCard(card) ? card : null;
 }
 
 /** A Reveal remaining sweep is running. */

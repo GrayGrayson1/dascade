@@ -6,7 +6,7 @@
  *
  * The last tab you picked is remembered for this browser tab (presentation only).
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PixelIcon, cx, handleRovingKeys, rovingTabIndex, type IconName } from '@dascade/ui';
 
 export interface DrawerTab {
@@ -36,14 +36,30 @@ function writeTab(id: string): void {
   }
 }
 
-export function ConsoleDrawer({ tabs, label = 'Console tools' }: { tabs: readonly DrawerTab[]; label?: string }) {
+export function ConsoleDrawer({
+  tabs,
+  label = 'Console tools',
+  focus,
+}: {
+  tabs: readonly DrawerTab[];
+  label?: string;
+  /** Opens this tab whenever `n` changes (the scene strip's Cards and Cinema). */
+  focus?: { id: string; n: number };
+}) {
   const [picked, setPicked] = useState(readTab);
-  const current = tabs.find((t) => t.id === picked) ?? tabs[0];
-  if (!current) return null;
   const pick = (id: string) => {
     setPicked(id);
     writeTab(id);
   };
+  const focusN = focus?.n ?? 0;
+  const focusId = focus?.id ?? '';
+  useEffect(() => {
+    if (focusN <= 0 || !focusId) return;
+    setPicked(focusId);
+    writeTab(focusId);
+  }, [focusN, focusId]);
+  const current = tabs.find((t) => t.id === picked) ?? tabs[0];
+  if (!current) return null;
   return (
     <section className="sd-panel sdc-drawer" aria-label={label} data-part="showdown-drawer">
       <div className="sdc-drawer__tabs" role="tablist" aria-label={label} onKeyDown={(e) => handleRovingKeys(e, 'tab')}>

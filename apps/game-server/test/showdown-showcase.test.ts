@@ -391,6 +391,42 @@ describe('Presenter Showcase — keeping control', () => {
     await waitFor(() => json(t.b).card === '', 2000, 'card off');
   });
 
+  it('scenes: Cinema is a card on every stage, leaving the Show pauses the round clock, Show brings the board back as it was', async () => {
+    const t = await setup();
+    await loadPreset(t);
+    await start(t);
+    await act(t, { a: 'begin' });
+    await act(t, { a: 'question' });
+    await act(t, { a: 'reveal', slot: 1 });
+    expect(t.server.state.clockEndsAt).toBeGreaterThan(Date.now());
+    const before = board(t.a);
+
+    t.host.room.send(SHOWDOWN_MSG.card, { card: 'cinema' });
+    await waitFor(() => json(t.b).card === 'cinema', 2000, 'cinema on every stage');
+    // The clock stopped where it was (the server owns it); P starts it again.
+    expect(t.server.state.clockEndsAt).toBe(0);
+    const left = t.server.state.clockLeft;
+    expect(left).toBeGreaterThan(0);
+    await sleep(300);
+    expect(t.server.state.clockLeft).toBe(left);
+
+    // Show: the board exactly as it was, the clock still paused.
+    t.host.room.send(SHOWDOWN_MSG.card, { card: '' });
+    await waitFor(() => json(t.b).card === '', 2000, 'back to the show');
+    expect(board(t.a)).toEqual(before);
+    expect(t.server.state.clockEndsAt).toBe(0);
+    await act(t, { a: 'clock', op: 'start' });
+    expect(t.server.state.clockEndsAt).toBeGreaterThan(Date.now());
+
+    // A holding card pauses it too; only the presenter changes the scene.
+    t.host.room.send(SHOWDOWN_MSG.card, { card: 'break' });
+    await waitFor(() => json(t.a).card === 'break', 2000, 'card up');
+    expect(t.server.state.clockEndsAt).toBe(0);
+    t.a.room.send(SHOWDOWN_MSG.card, { card: 'cinema' });
+    await waitFor(() => t.a.errors.some((e) => e.type === SHOWDOWN_MSG.card), 2000, 'audience refused');
+    expect(t.server.state.card).toBe('break');
+  });
+
   it('a showcase ends with no winner: the crowd counts, everyone shares one place', async () => {
     const t = await setup();
     await loadPreset(t);

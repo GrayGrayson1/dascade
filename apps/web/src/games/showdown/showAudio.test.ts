@@ -156,6 +156,18 @@ describe('the jukebox plays the breaks', () => {
     // A holding card mid-round is a break.
     expect(seg('PLAYING', 'live', 'break')).toBe('break');
     expect(seg('RESULTS', 'done')).toBe('break');
+    // Cinema: the presenter's video is the only sound, whatever was on the stage.
+    expect(musicSegment({ phase: 'PLAYING', stage: 'live', card: null, scene: 'cinema' })).toBe('cinema');
+    expect(musicSegment({ phase: 'LOBBY', stage: null, card: null, scene: 'cinema' })).toBe('cinema');
+  });
+
+  it('Cinema holds the jukebox; leaving it, the usual rules decide', () => {
+    expect(jukeboxStep('break', 'cinema')).toBe('hold');
+    expect(jukeboxStep('live', 'cinema')).toBe('hold');
+    // Back to a live question: still held. Back to a break, or to the lobby: given back.
+    expect(jukeboxStep('cinema', 'live')).toBe('hold');
+    expect(jukeboxStep('cinema', 'break')).toBe('release');
+    expect(jukeboxStep('cinema', 'neutral')).toBe('release');
   });
 
   it('holds the jukebox as a question goes live and gives it back in each break, once per change', () => {
@@ -195,6 +207,8 @@ describe('the jukebox plays the breaks', () => {
     expect(bedWanted(on)).toBe(true);
     expect(bedWanted({ ...on, stage: 'intro' })).toBe(true);
     expect(bedWanted({ ...on, stage: 'live' })).toBe(false);
+    // No theme bed under the presenter's video.
+    expect(bedWanted({ ...on, scene: 'cinema' })).toBe(false);
     expect(bedWanted({ ...on, stage: 'live', card: 'break' })).toBe(true);
     expect(bedWanted({ ...on, phase: 'LOBBY', stage: null, card: 'welcome' })).toBe(true);
     expect(bedWanted({ ...on, phase: 'LOBBY', stage: null })).toBe(false);

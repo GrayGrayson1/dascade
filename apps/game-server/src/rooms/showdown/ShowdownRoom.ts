@@ -53,6 +53,7 @@ import {
   ShowdownStationSchema,
   permissionsOf,
   SHOWDOWN_STANDINGS_CARD,
+  isSceneCard,
   ShowdownCardSchema,
   ShowdownClaimSchema,
   ShowdownCreditSchema,
@@ -81,6 +82,7 @@ import {
   type ShowdownAuditView,
   type ShowdownBlackBox,
   type ShowdownCard,
+  type ShowdownSceneCard,
   type ShowdownCrewPrivate,
   type ShowdownCrewRole,
   type ShowdownIssuableRole,
@@ -824,11 +826,16 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
     this.markSnapshot();
   }
 
-  private setCard(player: PlayerRecord, card: ShowdownCard | typeof SHOWDOWN_STANDINGS_CARD | ''): void {
+  private setCard(player: PlayerRecord, card: ShowdownCard | typeof SHOWDOWN_STANDINGS_CARD | ShowdownSceneCard | ''): void {
     if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.card, 'not_host', 'Only the presenter changes the stage.');
     if (card === SHOWDOWN_STANDINGS_CARD && !this.scoringOn()) {
       return this.reject(player, SHOWDOWN_MSG.card, 'not_allowed', 'Standings need Score the crowd or medals switched on.');
     }
+    if (isSceneCard(card) && !this.showcase) {
+      return this.reject(player, SHOWDOWN_MSG.card, 'not_allowed', 'Stage scenes are for Presenter Showcase.');
+    }
+    // Leaving the Show for a card or a scene stops the round clock where it is; P starts it again (Scenes A).
+    if (card !== '' && this.phase === 'PLAYING' && this.state.clockEndsAt > 0) this.runClock(false);
     this.state.card = card;
     this.markSnapshot();
   }

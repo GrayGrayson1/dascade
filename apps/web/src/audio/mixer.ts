@@ -49,6 +49,12 @@ export interface Mixer {
    * returns false if routing isn't possible (no context, not running, or the browser refused).
    */
   routeElement(el: HTMLMediaElement): boolean;
+  /**
+   * Routes a video's sound (Survey Showdown's Cinema) straight to the master bus, so the user's master
+   * volume and mute apply and the jukebox bus (its volume, its visualizer) stays out of it. Same rules
+   * as routeElement: idempotent, false when routing isn't possible (then use mediaFallbackVolume).
+   */
+  routeMedia(el: HTMLMediaElement): boolean;
   isRouted(el: HTMLMediaElement): boolean;
   setSettings(s: MixSettings): void;
   setJukeboxFlags(f: JukeboxMixFlags): void;
@@ -103,6 +109,22 @@ export function createMixer(deps: MixerDeps): Mixer {
   const contextListeners = new Set<(ctx: AudioContext) => void>();
   const stateListeners = new Set<() => void>();
   const random = deps.random ?? Math.random;
+
+  function route(el: HTMLMediaElement, into: (b: MixerBuses) => AudioNode): boolean {
+    if (routed.has(el)) return true;
+    if (refused.has(el) || !ctx || !buses || ctx.state !== 'running') return false;
+    try {
+      const src = ctx.createMediaElementSource(el);
+      src.connect(into(buses));
+      routed.add(el);
+      return true;
+    } catch {
+      // Some browsers/devices refuse (or the element was already captured): never retry, fall
+      // back to element.volume so the sound still plays (no visualizer).
+      refused.add(el);
+      return false;
+    }
+  }
 
   function apply(immediate = false): void {
     if (!ctx || !buses) return;
@@ -190,21 +212,8 @@ export function createMixer(deps: MixerDeps): Mixer {
     buses: () => buses,
     noiseBuffer: () => noise,
     analyser: () => buses?.analyser ?? null,
-    routeElement(el) {
-      if (routed.has(el)) return true;
-      if (refused.has(el) || !ctx || !buses || ctx.state !== 'running') return false;
-      try {
-        const src = ctx.createMediaElementSource(el);
-        src.connect(buses.analyser);
-        routed.add(el);
-        return true;
-      } catch {
-        // Some browsers/devices refuse (or the element was already captured): never retry, fall
-        // back to element.volume so music still plays (visualizer off).
-        refused.add(el);
-        return false;
-      }
-    },
+    routeElement: (el) => route(el, (b) => b.analyser),
+    routeMedia: (el) => route(el, (b) => b.master),
     isRouted: (el) => routed.has(el),
     setSettings(s) {
       settings = { ...s };

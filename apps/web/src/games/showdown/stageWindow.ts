@@ -343,6 +343,8 @@ export function holdStageWindow(card: { title: string; line: string }): void {
   try {
     const target = state.container.ownerDocument;
     clearHold(target);
+    // A video playing in the Cinema scene (cinema.ts) keeps playing, uncovered: the room comes back under it.
+    if (target.querySelector('.sd-cinema:not([hidden])[data-playing="true"]')) return;
     const hold = target.createElement('div');
     hold.className = `${HOLD_CLASS} sd-stage`;
     hold.setAttribute('data-mode', 'showcase');
@@ -367,6 +369,17 @@ export function holdStageWindow(card: { title: string; line: string }): void {
   } catch {
     /* the window's page can't be reached right now: nothing to hold */
   }
+}
+
+/** The stage window right now (for code outside React: the Cinema layer). */
+export function stageWindowState(): StageWindowState {
+  return state;
+}
+
+/** Called whenever the stage window opens, closes or is rebuilt in a new page. */
+export function onStageWindowChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
 }
 
 export function useStageWindow(): StageWindowState {

@@ -5,8 +5,10 @@
  *   - the answer sheet on the left (the ten answers, the special one marked), with the rundown and
  *     this round's counts under it;
  *   - the rail: a huge WRONG, the round clock, Reveal remaining, Undo / Next and the picker;
- *   - a pinned stage preview over a tabbed drawer (Picker, Sound, Cards, Fix, Scores with two-tier
- *     scoring on, and for the crew: Names, Crew & log, Preflight), so nothing needs scrolling at 1280×720;
+ *   - the scene strip (Show · Cinema · Cards: what the stage window shows, so nobody re-shares in
+ *     Teams), a pinned stage preview and a tabbed drawer under it (Picker, Sound, Cards, Cinema, Fix,
+ *     Scores with two-tier scoring on, and for the crew: Names, Crew & log, Preflight), so nothing
+ *     needs scrolling at 1280×720;
  *   - one "Next step" line that always says what to do now.
  *
  * Safety (PRS-02 D, PRS-03 D): every tile flips on the first click, except the special answer, which
@@ -27,6 +29,7 @@ import {
   SHOWDOWN_SONG_MS,
   SHOWDOWN_CARD_INFO,
   SHOWDOWN_MSG,
+  SHOWDOWN_SCENE_INFO,
   SHOWDOWN_STANDINGS_CARD,
   showTitle,
   type ShowdownActPayload,
@@ -41,6 +44,7 @@ import {
 } from '@dascade/shared/games/showdown';
 import { Badge, Button, Kbd, PixelIcon, Toggle } from '@dascade/ui';
 import { serverNow, session, useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
+import { sfx } from '../../audio/audio.ts';
 import { Stage } from './Stage.tsx';
 import { useShowFeed } from './fx.ts';
 import { useStageWindow } from './stageWindow.ts';
@@ -56,6 +60,7 @@ import {
   usePicker,
   useRehearsal,
   useScoresView,
+  useSceneCard,
   useSheet,
   useShowSounds,
   useStandingsCard,
@@ -94,6 +99,8 @@ import {
   type ArmedSpecial,
 } from './consoleSafety.ts';
 import { TourButton } from './tour/TourButton.tsx';
+import { CinemaPanel } from './panels/CinemaPanel.tsx';
+import { cinemaView, useCinema } from './cinema.ts';
 import './chrome-showcase.css';
 
 type BoardAct = 'begin' | 'question' | 'next' | 'undo' | 'finish' | 'restart' | 'reset';
@@ -158,6 +165,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const rehearsal = useRehearsal();
   const card = useCard();
   const standingsUp = useStandingsCard();
+  const sceneCard = useSceneCard();
+  const cinema = useCinema();
   const scoresView = useScoresView();
   const timeUp = useTimeUp();
   const picker = usePicker();
@@ -173,13 +182,16 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const [armed, setArmedState] = useState<ArmedSpecial | null>(null);
   const [panel, setPanel] = useState<EndKind | null>(null);
   const [announce, setAnnounce] = useState('');
+  const [drawerFocus, setDrawerFocus] = useState({ id: '', n: 0 });
+  const openTab = useCallback((id: string) => setDrawerFocus((f) => ({ id, n: f.n + 1 })), []);
   const undo = useUndoOffer(board?.rev ?? -1, sheet?.undo ?? 0);
   const sweepHold = useRef<HoldButtonHandle>(null);
   const panelOpener = useRef<HTMLElement | null>(null);
   const armedRef = useRef<ArmedSpecial | null>(null);
 
-  const live = useRef({ board, sheet, sweeping, running, timeUp, picker, panel });
-  live.current = { board, sheet, sweeping, running, timeUp, picker, panel };
+  const stageUp = Boolean(card || standingsUp || sceneCard);
+  const live = useRef({ board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard });
+  live.current = { board, sheet, sweeping, running, timeUp, picker, panel, stageUp, sceneCard };
 
   const setArmed = useCallback((next: ArmedSpecial | null) => {
     armedRef.current = next;
@@ -209,6 +221,31 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const clockOp = useCallback((op: ShowdownClockOp) => send({ a: 'clock', op }), [send]);
   const cue = useCallback((c: ShowdownCue) => session.send(SHOWDOWN_MSG.cue, { cue: c }), []);
   const halt = useCallback(() => send({ a: 'halt' }), [send]);
+
+  // ---- Scenes A: what the stage window shows (B = Show, V = Cinema); the server pauses the round clock on leaving Show ----
+  const goScene = useCallback(
+    (to: 'show' | 'cinema') => {
+      if (to === 'show') {
+        if (!live.current.stageUp) return;
+        sfx('select');
+        session.send(SHOWDOWN_MSG.card, { card: '' });
+        setAnnounce('Back to the show: the board is on the stage.');
+        return;
+      }
+      const c = cinemaView();
+      if (!c.clipId || !c.window) {
+        openTab('cinema');
+        setAnnounce(!c.window ? 'Open the stage window first: the video plays there.' : 'Load a video first (Cinema tab).');
+        return;
+      }
+      if (live.current.sceneCard === 'cinema') return;
+      sfx('select');
+      session.send(SHOWDOWN_MSG.card, { card: 'cinema' });
+      openTab('cinema');
+      setAnnounce('Cinema is on the stage. Press Play when you’re ready.');
+    },
+    [openTab],
+  );
 
   // ---- PRS-02: the special arms; TAKE SPECIAL (Space) sends it ----
   const onTile = useCallback(
@@ -305,8 +342,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   //
   // The listeners mount once: the commands they call change identity (the undo offer moves on), so
   // they're read through a ref — a re-subscribe mid-hold would lose R's keyup and let the sweep fire.
-  const keyActs = useRef({ act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp });
-  keyActs.current = { act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp };
+  const keyActs = useRef({ act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp, goScene });
+  keyActs.current = { act, onTile, take, disarm, miss, halt, sweepNow, requestNext, cue, clockOp, goScene };
   /** Space took the special: its keyup mustn't also press whatever button has focus. */
   const swallowSpace = useRef(false);
   /** R is being held (Reveal remaining while the clock runs). */
@@ -345,7 +382,11 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
           rHeld.current = true;
           sweepHold.current.start();
         } else run.sweepNow();
-      } else if (k === 'c') run.cue('celebrate');
+      } else if (k === 'b') {
+        if (!cur.stageUp) return;
+        run.goScene('show');
+      } else if (k === 'v') run.goScene('cinema');
+      else if (k === 'c') run.cue('celebrate');
       else if (k === 'p') {
         if (b.stage === 'intro') return;
         run.clockOp(cur.running ? 'pause' : 'start');
@@ -415,6 +456,13 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       icon: 'eye',
       alert: card ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage` : standingsUp ? 'The standings are on the stage' : undefined,
       render: () => <CardsTab onClock={clockOp} standings={standingsOffered(settings)} />,
+    },
+    {
+      id: 'cinema',
+      label: 'Cinema',
+      icon: 'play',
+      alert: sceneCard === 'cinema' ? 'Cinema is on the stage' : undefined,
+      render: () => <CinemaPanel onScene={(on) => goScene(on ? 'cinema' : 'show')} />,
     },
     {
       id: 'fix',
@@ -492,7 +540,18 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         </Button>
       </header>
 
-      {card ? (
+      {sceneCard ? (
+        <div className="sdc-cardup" role="status" data-part="showdown-scene-up">
+          <span aria-hidden>{SHOWDOWN_SCENE_INFO[sceneCard].icon}</span>
+          <span>
+            <b>{SHOWDOWN_SCENE_INFO[sceneCard].title}</b> is on the stage —{' '}
+            {cinema.playing ? 'your video is playing.' : cinema.ended ? 'the video ended.' : 'press Play in the Cinema tab.'}
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => goScene('show')}>
+            Back to the show <Kbd>B</Kbd>
+          </Button>
+        </div>
+      ) : card ? (
         <div className="sdc-cardup" role="status">
           <span aria-hidden>{SHOWDOWN_CARD_INFO[card].icon}</span>
           <span>
@@ -599,6 +658,11 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               }}
             />
           ) : null}
+          <SceneStrip
+            scene={sceneCard === 'cinema' ? 'cinema' : card || standingsUp ? 'cards' : 'show'}
+            onScene={goScene}
+            onCards={() => openTab('cards')}
+          />
           <div className="sdc-side__preview" data-part="showdown-preview">
             <div className="sd-preview" aria-hidden inert>
               {preview}
@@ -608,7 +672,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
               {stageWin.open ? ' (live in the stage window)' : ' — open the stage window to share it'}
             </p>
           </div>
-          <ConsoleDrawer tabs={tabs} />
+          <ConsoleDrawer tabs={tabs} focus={drawerFocus} />
           <UndoToast api={undo} onUndo={() => act('undo')} />
         </section>
       </div>
@@ -1349,6 +1413,35 @@ function CardsTab({ onClock, standings }: { onClock: (op: ShowdownClockOp) => vo
           <Toggle label="Show the clock on the stage" checked={clock.stage} onChange={(on) => onClock(on ? 'show' : 'hide')} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The scene strip (Scenes A): what the stage window shows. Show = the board (B); Cinema = the
+ * presenter's video (V); Cards = the holding cards (opens the Cards tab). One window on the share all
+ * hour: nobody re-shares in Teams.
+ */
+function SceneStrip({
+  scene,
+  onScene,
+  onCards,
+}: {
+  scene: 'show' | 'cinema' | 'cards';
+  onScene: (to: 'show' | 'cinema') => void;
+  onCards: () => void;
+}) {
+  return (
+    <div className="sdc-scenes" role="group" aria-label="Stage scene" data-part="showdown-scenes">
+      <button type="button" className="sdc-scene" aria-pressed={scene === 'show'} onClick={() => onScene('show')} data-scene="show">
+        <PixelIcon name="star" aria-hidden /> Show <Kbd>B</Kbd>
+      </button>
+      <button type="button" className="sdc-scene" aria-pressed={scene === 'cinema'} onClick={() => onScene('cinema')} data-scene="cinema">
+        <PixelIcon name="play" aria-hidden /> Cinema <Kbd>V</Kbd>
+      </button>
+      <button type="button" className="sdc-scene" aria-pressed={scene === 'cards'} onClick={onCards} data-scene="cards">
+        <PixelIcon name="copy" aria-hidden /> Cards
+      </button>
     </div>
   );
 }

@@ -14,7 +14,8 @@
  *
  * The music (AUD-04 C): in Presenter Showcase event rooms the jukebox pauses as a question goes live
  * and comes back in the breaks (a title card, a holding card, the results) — only if the show paused
- * it — and the theme bed never plays over the jukebox. Room DJ is the server's (locked while PLAYING).
+ * it — and the theme bed never plays over the jukebox. Cinema (the presenter's video) pauses it too,
+ * with no bed: the video is the only sound. Room DJ is the server's (locked while PLAYING).
  *
  * Nothing replays: board events are live messages, and the sounds this hook derives from state (the
  * called-it chime, the card whoosh, the finale) stay quiet for a moment after every (re)connect, so a
@@ -65,6 +66,7 @@ import {
   useMode,
   useMotion,
   usePass,
+  useSceneCard,
   useShowSounds,
   useStation,
   useThemeMusicPref,
@@ -81,6 +83,7 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
   const board = useBoard();
   const mode = useMode(settings);
   const card = useCard();
+  const scene = useSceneCard();
   const phase = useRoomSelector<ShowdownPublicState, string>((s) => s.phase) ?? 'LOBBY';
   const [musicPref] = useThemeMusicPref();
   const motion = useMotion();
@@ -240,7 +243,7 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
 
   // ---- The jukebox steps aside for live questions (AUD-04: Presenter Showcase event rooms) ----
   const stage = board?.stage ?? null;
-  const segment = musicSegment({ phase, stage, card });
+  const segment = musicSegment({ phase, stage, card, scene });
   const linkJukebox = event && mode === 'showcase' && loaded && (role.role === 'presenter' || role.role === 'screen');
   const lastSegment = useRef<MusicSegment | null>(null);
   useEffect(() => {
@@ -261,7 +264,7 @@ export function useShowSync(role: RoleInfo, look: ShowdownLook, code: string, se
   const jukeboxVolume = useApp((s) => s.settings.jukeboxVolume);
   const jukeboxOn = useJukebox((s) => jukeboxAudible(s, { jukeboxVolume }));
   const jukeboxBusy = event && (jukeboxOn || held !== '');
-  const musicOn = bedWanted({ mode, musicPref, audible, phase, stage, card, jukeboxBusy });
+  const musicOn = bedWanted({ mode, musicPref, audible, phase, stage, card, scene, jukeboxBusy });
   useEffect(() => {
     if (!musicOn) {
       themeMusic.stop();
