@@ -1427,6 +1427,56 @@ button.sdc-audio {
   display: none;
 }
 
+/* ---------- Side: the scene strip (Show / Cinema / Awards / Cards), one row over the preview ---------- */
+.sdc-scenes {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+.sdc-scene {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--text-1);
+  font: 700 var(--fs-xs) / 1.1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sdc-scene:hover {
+  color: var(--text-0);
+  background: var(--surface-hover);
+}
+.sdc-scene[aria-pressed='true'] {
+  color: var(--text-0);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.sdc-scene .dc-kbd {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  font-size: 9px;
+}
+/* The narrower side column (900–1179 px) keeps the names; B and V still work. */
+@media (max-width: 1179px) {
+  .sdc-scene {
+    gap: 4px;
+    padding-inline: 4px;
+  }
+  .sdc-scene .dc-kbd {
+    display: none;
+  }
+}
+
 /* ---------- Side: the pinned stage preview over the drawer ---------- */
 .sdc-side__preview {
   flex: none;
@@ -1454,7 +1504,7 @@ button.sdc-audio {
 .sdc-drawer__tab {
   position: relative;
   flex: 1 1 0;
-  /* Never narrower than its longest word: nine tabs share one row without breaking "Guesses". */
+  /* Never narrower than its longest word: eleven tabs share one row (9 px labels) without breaking "Guesses". */
   min-width: min-content;
   min-height: 44px;
   display: inline-flex;
@@ -1462,12 +1512,12 @@ button.sdc-audio {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 4px 1px 3px;
+  padding: 4px 2px 3px;
   border: 0;
   border-bottom: 3px solid transparent;
   background: none;
   color: var(--text-2);
-  font: 700 10px / 1.05 var(--font-ui);
+  font: 700 9px / 1.05 var(--font-ui);
   letter-spacing: 0;
   text-align: center;
   cursor: pointer;
@@ -1698,6 +1748,16 @@ button.sdc-audio {
   height: 20px;
   padding: 0 4px;
   font-size: 10px;
+}
+/* 1280-wide laptops: a little tighter, so the legend stays on one line. */
+@media (max-width: 1365px) {
+  .sd-console__keys.sdc-keys {
+    gap: 2px 10px;
+  }
+  .sd-console__keys.sdc-keys .dc-kbd {
+    min-width: 18px;
+    padding: 0 3px;
+  }
 }
 
 /* ---------- Narrow screens: one column, the quick controls stay at the bottom ---------- */
