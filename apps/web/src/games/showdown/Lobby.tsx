@@ -25,6 +25,10 @@ import {
   SHOWDOWN_PACK_INFO,
   SHOWDOWN_PICK_MODES,
   SHOWDOWN_PICK_MODE_INFO,
+  SHOWDOWN_MEDAL_MODES,
+  SHOWDOWN_MEDAL_MODE_INFO,
+  SHOWDOWN_REVEAL_MODES,
+  SHOWDOWN_REVEAL_MODE_INFO,
   SHOWDOWN_SCORING,
   SHOWDOWN_SCORING_INFO,
   SHOWDOWN_TEAMS,
@@ -527,10 +531,53 @@ function ShowcaseOptions({ settings, canEdit, update }: SettingsPanelProps<Showd
           onChange={(audience) => update({ audience })}
         />
         <span className="dc-field__hint">
-          For a meeting, leave phone guesses off: people guess in the chat and you flip what they name.
+          Phones lock in a private Top 10 for crowd points. People can still shout or type answers in the chat — you flip what they name.
         </span>
       </div>
-      <GuessesField settings={settings} canEdit={canEdit} update={update} />
+      <fieldset className="sdc-optgroup" data-part="showdown-scoring-options">
+        <legend className="dc-field__label">Scoring</legend>
+        <Toggle
+          label="Score the crowd"
+          checked={settings.points ?? false}
+          disabled={!canEdit}
+          onChange={(points) => update(points && !settings.audience ? { points, audience: true } : { points })}
+        />
+        <span className="dc-field__hint">
+          Called it: an answer you locked in before it flipped scores #1 = 10 … #10 = 1, +1 in the right spot, +20 for a perfect list. Off:
+          the show runs without crowd points.
+        </span>
+        <GuessesField settings={settings} canEdit={canEdit} update={update} />
+        <Toggle
+          label="Hidden gems (answers nobody found pay double)"
+          checked={settings.gems ?? true}
+          disabled={!canEdit || !settings.points}
+          onChange={(gems) => update({ gems })}
+        />
+        <Toggle
+          label="Called-it pops on the stage (“+9 · 6 called it”)"
+          checked={settings.pops ?? true}
+          disabled={!canEdit || !settings.points}
+          onChange={(pops) => update({ pops })}
+        />
+        <span className="dc-field__label">Medal ceremony (the hot seat)</span>
+        <Segmented
+          label="Medal ceremony"
+          value={settings.medals ?? 'never'}
+          disabled={!canEdit}
+          onChange={(medals) => medals !== settings.medals && update({ medals })}
+          options={SHOWDOWN_MEDAL_MODES.map((m) => ({ value: m, label: SHOWDOWN_MEDAL_MODE_INFO[m].title }))}
+        />
+        <span className="dc-field__hint">{SHOWDOWN_MEDAL_MODE_INFO[settings.medals ?? 'never'].blurb}</span>
+        <span className="dc-field__label">Showtime</span>
+        <Segmented
+          label="Showtime"
+          value={settings.reveal ?? 'standings'}
+          disabled={!canEdit}
+          onChange={(reveal) => reveal !== settings.reveal && update({ reveal })}
+          options={SHOWDOWN_REVEAL_MODES.map((m) => ({ value: m, label: SHOWDOWN_REVEAL_MODE_INFO[m].title }))}
+        />
+        <span className="dc-field__hint">{SHOWDOWN_REVEAL_MODE_INFO[settings.reveal ?? 'standings'].blurb}</span>
+      </fieldset>
       <fieldset className="sdc-optgroup" data-part="showdown-picker-options">
         <legend className="dc-field__label">Picker</legend>
         <Segmented

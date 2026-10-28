@@ -24,7 +24,7 @@ import { audioReady, onAudioReadyChange, sfx } from '../../audio/audio.ts';
 import { copyText, presenterLink, screenLink } from './access.ts';
 import { openStageWindow, useStageWindow } from './stageWindow.ts';
 import { playShowSound } from './sounds.ts';
-import { useCard, useShowSounds, useThemeMusicPref } from './state.ts';
+import { useCard, useShowSounds, useStandingsCard, useThemeMusicPref } from './state.ts';
 
 // ---------------------------------------------------------------------------
 // Which event preset this presenter loaded (the server only says "rehearsal" and how many rounds)
@@ -173,6 +173,8 @@ export function BigScreenLinkButton({
  */
 export function StageCards({ compact = false, className }: { compact?: boolean; className?: string }) {
   const card = useCard();
+  // The Standings card (two-tier scoring) isn't one of these four, but it's a card on the stage: Off isn't pressed.
+  const standingsUp = useStandingsCard();
   const put = (next: ShowdownCard | '') => {
     sfx('select');
     session.send(SHOWDOWN_MSG.card, { card: next });
@@ -203,7 +205,7 @@ export function StageCards({ compact = false, className }: { compact?: boolean; 
       <button
         type="button"
         className="sdc-card sdc-card--off"
-        aria-pressed={card === null}
+        aria-pressed={card === null && !standingsUp}
         onClick={() => put('')}
         aria-label="No stage card (show the board)"
       >

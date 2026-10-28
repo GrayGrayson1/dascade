@@ -5,8 +5,8 @@
  *   - the answer sheet on the left (the ten answers, the special one marked), with the rundown and
  *     this round's counts under it;
  *   - the rail: a huge WRONG, the round clock, Reveal remaining, Undo / Next and the picker;
- *   - a pinned stage preview over a tabbed drawer (Picker, Sound, Cards, Fix, and for the crew:
- *     Names, Crew & log, Preflight), so nothing needs scrolling at 1280×720;
+ *   - a pinned stage preview over a tabbed drawer (Picker, Sound, Cards, Fix, Scores with two-tier
+ *     scoring on, and for the crew: Names, Crew & log, Preflight), so nothing needs scrolling at 1280×720;
  *   - one "Next step" line that always says what to do now.
  *
  * Safety (PRS-02 D, PRS-03 D): every tile flips on the first click, except the special answer, which
@@ -27,6 +27,7 @@ import {
   SHOWDOWN_SONG_MS,
   SHOWDOWN_CARD_INFO,
   SHOWDOWN_MSG,
+  SHOWDOWN_STANDINGS_CARD,
   showTitle,
   type ShowdownActPayload,
   type ShowdownBoardView,
@@ -54,14 +55,26 @@ import {
   usePass,
   usePicker,
   useRehearsal,
+  useScoresView,
   useSheet,
   useShowSounds,
+  useStandingsCard,
   useStation,
   useSweep,
   useThemeMusicPref,
   type PickerView,
 } from './state.ts';
-import { CREW_TAB_LABEL, CrewPanel, NamesPanel, PickerPanel, PickerStrip, PreflightPanel, SoundPanel, crewTabs } from './panels/index.ts';
+import {
+  CREW_TAB_LABEL,
+  CrewPanel,
+  NamesPanel,
+  PickerPanel,
+  PickerStrip,
+  PreflightPanel,
+  ScoresPanel,
+  SoundPanel,
+  crewTabs,
+} from './panels/index.ts';
 import { StationBadge } from './StationBadge.tsx';
 import { ConsoleDrawer, type DrawerTab } from './ConsoleDrawer.tsx';
 import { HoldButton, type HoldButtonHandle } from './HoldButton.tsx';
@@ -130,6 +143,12 @@ const isLast = (b: ShowdownBoardView) => b.round >= b.totalRounds - 1;
 const canSweep = (b: ShowdownBoardView, sweeping: boolean) => b.stage === 'live' && !sweeping && hiddenCount(b) > 0;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
+/** Two-tier scoring shows at all (Score the crowd, or medals that aren't Never). */
+const scoringOn = (s: ShowdownSettings | null) => Boolean(s && s.mode === 'showcase' && (s.points || (s.medals ?? 'never') !== 'never'));
+/** The Standings card is offered between rounds (Standings + paced finale, not Just the finale). */
+const standingsOffered = (s: ShowdownSettings | null) => scoringOn(s) && (s?.reveal ?? 'standings') === 'standings';
+const putStandings = (on: boolean) => session.send(SHOWDOWN_MSG.card, { card: on ? SHOWDOWN_STANDINGS_CARD : '' });
+
 export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; settings: ShowdownSettings | null; code: string }) {
   usePresenterWindowChrome();
   const board = useBoard();
@@ -138,6 +157,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
   const sweeping = useSweep();
   const rehearsal = useRehearsal();
   const card = useCard();
+  const standingsUp = useStandingsCard();
+  const scoresView = useScoresView();
   const timeUp = useTimeUp();
   const picker = usePicker();
   const event = useEvent();
@@ -392,8 +413,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
       id: 'cards',
       label: 'Cards',
       icon: 'eye',
-      alert: card ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage` : undefined,
-      render: () => <CardsTab onClock={clockOp} />,
+      alert: card ? `${SHOWDOWN_CARD_INFO[card].title} is on the stage` : standingsUp ? 'The standings are on the stage' : undefined,
+      render: () => <CardsTab onClock={clockOp} standings={standingsOffered(settings)} />,
     },
     {
       id: 'fix',
@@ -412,6 +433,8 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
     },
   ];
   if (settings?.audience) tabs.push({ id: 'guesses', label: 'Guesses', icon: 'chat', render: () => <AudienceGuesses sheet={sheet} /> });
+  if (scoringOn(settings) || scoresView)
+    tabs.push({ id: 'scores', label: 'Scores', icon: 'trophy', render: () => <ScoresPanel look={look} code={code} /> });
   // Crew tabs, only for those allowed (the server sends the permissions and checks every action again).
   if (crewTabIds.includes('names')) tabs.push({ id: 'names', label: CREW_TAB_LABEL.names, icon: 'pencil', render: () => <NamesPanel /> });
   if (crewTabIds.includes('crew'))
@@ -479,6 +502,16 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
             Take it down
           </Button>
         </div>
+      ) : standingsUp ? (
+        <div className="sdc-cardup" role="status" data-part="showdown-standings-up">
+          <span aria-hidden>🏆</span>
+          <span>
+            <b>The standings</b> are on the stage — the audience can’t see the board right now.
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => putStandings(false)}>
+            Take it down
+          </Button>
+        </div>
       ) : null}
 
       <NextStep
@@ -490,6 +523,7 @@ export function ShowcaseConsole({ look, settings, code }: { look: ShowdownLook; 
         sweeping={sweeping}
         minutes={Math.round(clockMax / 60_000)}
         armed={armedView ? { slot: armedView.slot, text: armedText, mark: specialMark(look) } : null}
+        standings={standingsOffered(settings) ? (standingsUp ? 'up' : 'offer') : null}
         onAct={act}
         onNext={requestNext}
         onSweep={sweepNow}
@@ -638,6 +672,7 @@ function NextStep({
   sweeping,
   minutes,
   armed,
+  standings,
   onAct,
   onNext,
   onSweep,
@@ -653,6 +688,8 @@ function NextStep({
   sweeping: boolean;
   minutes: number;
   armed: { slot: number; text: string; mark: string } | null;
+  /** Two-tier scoring: Show standings is offered between rounds ('up' = it's on the stage now). */
+  standings: 'offer' | 'up' | null;
   onAct: (a: BoardAct) => void;
   onNext: () => void;
   onSweep: () => void;
@@ -765,9 +802,22 @@ function NextStep({
           </>
         );
         action = (
-          <Button variant="primary" size="lg" icon={last ? 'flag' : 'arrow-right'} onClick={onNext}>
-            {last ? 'Finish the show' : 'Next round'} <Kbd>N</Kbd>
-          </Button>
+          <>
+            {standings && !last ? (
+              <Button
+                variant="secondary"
+                icon="trophy"
+                aria-pressed={standings === 'up'}
+                onClick={() => putStandings(standings !== 'up')}
+                data-part="showdown-show-standings"
+              >
+                {standings === 'up' ? 'Hide standings' : 'Show standings'}
+              </Button>
+            ) : null}
+            <Button variant="primary" size="lg" icon={last ? 'flag' : 'arrow-right'} onClick={onNext}>
+              {last ? 'Finish the show' : 'Next round'} <Kbd>N</Kbd>
+            </Button>
+          </>
         );
         break;
     }
@@ -1268,14 +1318,32 @@ function SoundTab({ look, onCue }: { look: ShowdownLook; onCue: (c: ShowdownCue)
 }
 
 /** Drawer → Cards: the holding cards, and whether the stage shows the clock. */
-function CardsTab({ onClock }: { onClock: (op: ShowdownClockOp) => void }) {
+function CardsTab({ onClock, standings }: { onClock: (op: ShowdownClockOp) => void; standings: boolean }) {
   const clock = useClock();
+  const standingsUp = useStandingsCard();
   return (
     <div className="sdc-tab">
       <div className="sdc-tabsection">
         <h3 className="sd-panel__title">Stage cards</h3>
         <StageCards compact />
       </div>
+      {standings ? (
+        <div className="sdc-tabsection">
+          <h3 className="sd-panel__title">Standings</h3>
+          <p className="sd-muted">
+            The top five Guessers and the Spotlight Stars on every stage — best between rounds. Phones show each person their own rank.
+          </p>
+          <Button
+            variant={standingsUp ? 'primary' : 'secondary'}
+            icon="trophy"
+            aria-pressed={standingsUp}
+            onClick={() => putStandings(!standingsUp)}
+            data-part="showdown-standings-card"
+          >
+            {standingsUp ? 'Hide standings' : 'Show standings'}
+          </Button>
+        </div>
+      ) : null}
       {clock.on ? (
         <div className="sdc-tabsection">
           <Toggle label="Show the clock on the stage" checked={clock.stage} onChange={(on) => onClock(on ? 'show' : 'hide')} />

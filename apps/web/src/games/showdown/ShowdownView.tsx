@@ -11,11 +11,12 @@
  * every stage on this device reads, sounds play once here, and a presenter link (#presenter=…) or a
  * pass remembered in this browser reclaims the presenter role.
  */
-import { useEffect, useRef, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   SHOWDOWN_MSG,
   SHOWDOWN_TEAMS,
+  finaleSteps,
   showTitle,
   teamName,
   type ShowdownFinale,
@@ -30,7 +31,7 @@ import { GAME_CATALOG } from '@dascade/shared';
 import { useRoomMessage, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useApp } from '../../app/store.ts';
-import { audioReady, onAudioReadyChange } from '../../audio/audio.ts';
+import { audioReady, onAudioReadyChange, sfx } from '../../audio/audio.ts';
 import { GameStage, LeaveButton, ResultsActions } from '../../shell/common.tsx';
 import { Lobby } from '../../shell/Lobby.tsx';
 import { hidesArcadeExit } from '../../shell/arcadeExit.ts';
@@ -46,6 +47,9 @@ import { useShowSync } from './useShowSync.ts';
 import { CrewView } from './CrewView.tsx';
 import { StationBadge } from './StationBadge.tsx';
 import { showdownApi } from './api.ts';
+import { ScoresDownloads } from './panels/ScoresPanel.tsx';
+import { finaleStepWords } from './panels/scores.ts';
+import { useFinaleStep } from './state.ts';
 import { clearBlackBox, forgetRecoverable, markRecoverable, onRecoveryGiveUp, saveBlackBox } from '../../net/recovery.ts';
 import { canRecover } from '../../shell/ShowRecovery.tsx';
 import { serverUrl } from '../../net/serverUrl.ts';
@@ -362,8 +366,9 @@ function ShowcaseResults({
       </div>
       <div className="sd-results__below">
         {presenter ? (
-          // The presenter's next moves first: a stage card for the rest of the event, or another show.
+          // The presenter's next moves first: the paced finale, a stage card for the rest of the event, or another show.
           <>
+            <FinaleControls finale={finale} settings={settings} />
             <section className="sd-panel sdc-afterpanel" aria-label="Stage cards">
               <h3 className="sd-panel__title">Stage cards</h3>
               <p className="sd-muted">
@@ -385,6 +390,66 @@ function ShowcaseResults({
         )}
       </div>
     </GameStage>
+  );
+}
+
+/**
+ * The paced finale (two-tier scoring), presenter only: the step on the stage now, Back / Next (the
+ * medal ceremony, then 3rd, 2nd and 1st place, each with its cue on every screen), and the score
+ * record as CSV or JSON. Nothing here for anyone else; the server checks it's the presenter.
+ */
+function FinaleControls({ finale, settings }: { finale: ShowdownFinale | null; settings: ShowdownSettings | null }) {
+  const code = useSessionStore((s) => s.code) ?? '';
+  const step = useFinaleStep();
+  const [said, setSaid] = useState('');
+  const steps = finaleSteps(finale);
+  const scoring = Boolean(settings && settings.mode === 'showcase' && (settings.points || (settings.medals ?? 'never') !== 'never'));
+  const at = Math.max(0, Math.min(step, steps.length - 1));
+  const now = steps[at]!;
+  useEffect(() => {
+    if (steps.length > 1) setSaid(`On the stage: ${finaleStepWords(now)}.`);
+  }, [now, steps.length]);
+  if (!finale || (steps.length <= 1 && !scoring)) return null;
+  const next = steps[at + 1];
+  const go = (to: number) => {
+    sfx('select');
+    showdownApi.finaleStep(to);
+  };
+  return (
+    <section className="sd-panel sdc-finalectl" aria-labelledby="sdc-finalectl-title" data-part="showdown-finale-controls">
+      <h3 className="sd-panel__title" id="sdc-finalectl-title">
+        <PixelIcon name="trophy" /> The finale
+      </h3>
+      {steps.length > 1 ? (
+        <>
+          <p className="sdc-finalectl__now">
+            On the stage: <b>{finaleStepWords(now)}</b> · step <span className="dc-num">{at + 1}</span> of{' '}
+            <span className="dc-num">{steps.length}</span>
+          </p>
+          <div className="sd-row sd-row--wrap">
+            <Button variant="ghost" icon="arrow-left" disabled={at === 0} onClick={() => go(at - 1)} data-part="showdown-finale-back">
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              icon={next === 'first' ? 'trophy' : 'arrow-right'}
+              disabled={!next}
+              onClick={() => next && go(at + 1)}
+              data-part="showdown-finale-next"
+            >
+              {next ? `Next: ${finaleStepWords(next)}` : 'That’s the whole finale'}
+            </Button>
+          </div>
+          <p className="sd-muted">Each step plays its moment on every screen: a drumroll for 3rd and 2nd, the big finish for 1st.</p>
+        </>
+      ) : (
+        <p className="sd-muted">No medals or points to step through this time.</p>
+      )}
+      {scoring ? <ScoresDownloads code={code} size="md" /> : null}
+      <p className="visually-hidden" role="status" aria-live="polite">
+        {said}
+      </p>
+    </section>
   );
 }
 

@@ -1054,3 +1054,100 @@
 .sdc-optgroup > legend {
   padding: 0 4px;
 }
+
+/* ---------- Scores (two-tier scoring): the presenter's full list, the medal wall, the files ---------- */
+.sdp-scoredl {
+  display: grid;
+  gap: 4px;
+}
+.sdp-scoredl__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sdp-scorewrap {
+  max-height: min(44vh, 440px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.sdp-scoretable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.sdp-scoretable th,
+.sdp-scoretable td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sdp-scoretable thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-bg);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.sdp-scoretable tbody th {
+  font-weight: 700;
+  color: var(--text-0);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sdp-scoretable .dc-num {
+  font-family: var(--font-num);
+  text-align: right;
+}
+.sdp-scoretable abbr {
+  text-decoration: none;
+  cursor: help;
+}
+.sdp-stars,
+.sdp-credits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.sdp-stars li,
+.sdp-credits li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.sdp-stars b,
+.sdp-credits b {
+  color: var(--text-0);
+}
+.sdp-stars__medals {
+  white-space: nowrap;
+}
+.sdp-credits .dc-num,
+.sdc-finalectl .dc-num {
+  font-family: var(--font-num);
+}
+
+/* The results screen's finale controls (presenter only). */
+.sdc-finalectl {
+  display: grid;
+  gap: 8px;
+}
+.sdc-finalectl__now {
+  margin: 0;
+  color: var(--text-1);
+}
+.sdc-finalectl__now b {
+  color: var(--text-0);
+}
