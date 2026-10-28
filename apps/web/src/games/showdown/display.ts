@@ -99,6 +99,15 @@ export function useDisplay(
   setting: ShowdownDisplaySetting | null | undefined,
   context?: DisplayContext,
 ): ShowdownDisplay {
+  return useDisplayInfo(ref, setting, context).display;
+}
+
+/** useDisplay, plus where the stage is drawn (the join QR shows only in the stage window, the console and big screens). */
+export function useDisplayInfo(
+  ref: RefObject<HTMLElement | null>,
+  setting: ShowdownDisplaySetting | null | undefined,
+  context?: DisplayContext,
+): { display: ShowdownDisplay; context: DisplayContext } {
   const [seen, setSeen] = useState<{ context: DisplayContext; width: number; search: string }>(() => ({
     context: context ?? 'other',
     width: 0,
@@ -126,5 +135,5 @@ export function useDisplay(
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref, context]);
-  return resolveDisplay(setting, seen);
+  return { display: resolveDisplay(setting, seen), context: seen.context };
 }

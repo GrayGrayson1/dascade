@@ -65,6 +65,7 @@ import {
   useFinale,
   useFinaleStep,
   useMotion,
+  useJoinPop,
   useRehearsal,
   useSceneCard,
   useScoreboard,
@@ -81,7 +82,8 @@ import { finaleView, placeWord } from './standings.ts';
 import type { BoardPops } from './Board.tsx';
 import { playersEqual } from '../../net/hooks.ts';
 import { useShowSelector } from './source.ts';
-import { SHOW_FONTS, useDisplay, type DisplayContext } from './display.ts';
+import { SHOW_FONTS, useDisplayInfo, type DisplayContext } from './display.ts';
+import { JoinTicket } from './qr.tsx';
 import { PickerSpotlight, usePickMoment, type PickMoment } from './PickerSpotlight.tsx';
 import { HotSeat, hotSeatUp } from './HotSeat.tsx';
 import type { ShowdownDisplay } from '@dascade/shared/games/showdown';
@@ -130,7 +132,11 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
   const feed = useShowFeed();
   const viewer = useMotion();
   const rootRef = useRef<HTMLDivElement>(null);
-  const display = useDisplay(rootRef, settings?.display, displayContext);
+  const { display, context: drawnIn } = useDisplayInfo(rootRef, settings?.display, displayContext);
+  // The join QR: the stage window, the console and big screens (laptops scan the share); never phones.
+  const qr = drawnIn !== 'other';
+  const joinPhase = useJoinPop();
+  const joinPop = qr && code ? joinPhase : null;
   const motion = useStageMotion(viewer, display);
   const pick = usePickMoment();
   const nameOf = useNameOf(pick);
@@ -237,11 +243,11 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
             pops={pops}
           />
         ) : scene === 'standings' ? (
-          <StandingsScene scoreboard={scoreboard} look={look} />
+          <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr} />
         ) : scene === 'cinema' ? (
           <CinemaScene look={look} />
         ) : scene === 'card' && card ? (
-          <CardScene card={card} settings={settings} look={look} code={code} finale={phase === 'RESULTS' ? finale : null} />
+          <CardScene card={card} settings={settings} look={look} code={code} finale={phase === 'RESULTS' ? finale : null} qr={qr} />
         ) : scene === 'opening' ? (
           <OpeningScene settings={settings} look={look} code={code} rehearsal={rehearsal} />
         ) : scene === 'category' && board ? (
@@ -249,7 +255,7 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
         ) : scene === 'finale' && finale ? (
           <FinaleScene finale={finale} settings={settings} look={look} titles={titles} step={finaleStep} />
         ) : (
-          <LobbyScene settings={settings} look={look} code={code} rehearsal={rehearsal} />
+          <LobbyScene settings={settings} look={look} code={code} rehearsal={rehearsal} qr={qr} />
         )}
       </div>
       <ShowHost
@@ -290,6 +296,11 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
       {finaleFx && motion.particles > 0 ? <Confetti key={`finale:${sceneAt}`} count={motion.particles} look={look} big /> : null}
       {firstFx && !finaleFx && motion.particles > 0 ? <Confetti key={`first:${firstAt}`} count={motion.particles} look={look} big /> : null}
       <Reactions feed={feed} look={look} motion={motion} />
+      {joinPop ? (
+        <div className="sd-joinpop" data-part="showdown-join-pop" data-phase={joinPop}>
+          <JoinTicket code={code} look={look} size="medium" />
+        </div>
+      ) : null}
       {wipe !== null && motion.motion ? (
         <div key={wipe} className="sd-wipe" aria-hidden>
           <i />
