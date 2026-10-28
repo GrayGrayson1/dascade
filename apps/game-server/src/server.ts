@@ -175,10 +175,28 @@ function serveWebClient(app: express.Application): void {
       },
     }),
   );
+  // Dot-paths (/.env, /.git/HEAD) and file names (/package.json) that no static file matched: a plain 404,
+  // never the app page (F-07).
+  app.use((req, res, next) => (isFileLikePath(req.path) ? void res.status(404).type('text/plain').send('Not found') : next()));
+
   // SPA fallback for client routes (never for API / matchmaking / static media: a missing song is a 404, not HTML).
   app.get(/^\/(?!api\/|matchmake\/|assets\/|audio\/).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Content-Security-Policy', cspFor(req));
     res.sendFile(index);
   });
+}
+
+/**
+ * Paths that are never client routes (F-07): a dot segment (`/.env`, `/.git/HEAD`, `/.well-known/…`)
+ * or a file name (`/package.json`, `/server.js`). No client route has a dot in it.
+ */
+export function isFileLikePath(pathname: string): boolean {
+  let decoded = pathname;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // keep the raw path
+  }
+  return [pathname, decoded].some((p) => /\/\.|\.[^/]*$/.test(p));
 }
