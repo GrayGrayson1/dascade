@@ -1409,7 +1409,8 @@ button.sdc-audio {
 }
 .sdc-rail__row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Undo takes its own width, Next the rest: "Start round 1  N" never spills out of the rail. */
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 6px;
 }
 .sdc-rail__row > * {
