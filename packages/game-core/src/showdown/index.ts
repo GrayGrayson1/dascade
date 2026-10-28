@@ -8,6 +8,7 @@ export {
   createShow,
   currentRound,
   finalizeShow,
+  lateIn,
   nextSweepSlot,
   revealedIn,
   sheetView,
@@ -23,7 +24,27 @@ export {
   type StepResult,
   type StepSuccess,
 } from './engine.ts';
-export { GUESS_REJECTION_TEXT, GuessBook, matchSlot, type GuessRejection, type SubmitResult } from './guesses.ts';
+export {
+  GUESS_REJECTION_TEXT,
+  GuessBook,
+  matchSlot,
+  type BookGuess,
+  type GuessBookExport,
+  type GuessRejection,
+  type SubmitResult,
+} from './guesses.ts';
+export {
+  PERFECT_BONUS,
+  SPOT_BONUS,
+  creditKey,
+  olympic,
+  rankOf,
+  scoreShow,
+  type ScoreCredit,
+  type ScoreInput,
+  type ScoreTurn,
+  type ShowScores,
+} from './scoring.ts';
 export { SHOWDOWN_PACKS, pickRounds } from './packs.ts';
 export { SHOWDOWN_EVENT_ROUNDS } from './events.ts';
 export { DEFAULT_PICK_RULES, drawPick, inDraw, pickPool, type PickRules, type PickSeat } from './picker.ts';
