@@ -4,6 +4,7 @@
  * tiles only), the scoreboard (`scoreJson`) and the finale (`finaleJson`).
  */
 import {
+  SHOWDOWN_LIMITS,
   SHOWDOWN_MEDAL_INFO,
   answerValue,
   finaleSteps,
@@ -36,6 +37,65 @@ export function medalList(medals: ShowdownMedals): MedalItem[] {
     icon: SHOWDOWN_MEDAL_INFO[kind].icon,
     title: SHOWDOWN_MEDAL_INFO[kind].title,
   }));
+}
+
+/** The medal kinds anyone on the wall holds, Olympic order: the wall's columns, so the medals line up. */
+export function medalKindsHeld(stars: ReadonlyArray<{ medals: ShowdownMedals }>): MedalKind[] {
+  return MEDAL_ORDER.filter((kind) => stars.some((s) => (s.medals[kind] ?? 0) > 0));
+}
+
+/** Someone's medals in the wall's columns: one cell per kind in `kinds`, count 0 where they hold none. */
+export function medalCells(medals: ShowdownMedals, kinds: readonly MedalKind[]): MedalItem[] {
+  return kinds.map((kind) => ({
+    kind,
+    count: medals[kind] ?? 0,
+    icon: SHOWDOWN_MEDAL_INFO[kind].icon,
+    title: SHOWDOWN_MEDAL_INFO[kind].title,
+  }));
+}
+
+/** One entry of the legend under the scores: an icon (medals) and what earns it. */
+export interface LegendItem {
+  key: string;
+  text: string;
+  icon?: string;
+  /** The icon's name for screen readers. */
+  title?: string;
+}
+
+/** The board spots (1-based, first and last) whose find earns `kind` from the hot seat (medalFor). */
+function spotsFor(kind: MedalKind): [number, number] | null {
+  const spots: number[] = [];
+  for (let slot = 0; slot < SHOWDOWN_LIMITS.answersMax; slot++) if (medalFor(slot, -1) === kind) spots.push(slot + 1);
+  return spots.length ? [spots[0]!, spots.at(-1)!] : null;
+}
+
+/** The legend's medal line, from the rules themselves (medalFor; a turn with nothing found earns the ribbon). */
+export function medalLegend(): LegendItem[] {
+  return MEDAL_ORDER.map((kind) => {
+    const spots = spotsFor(kind);
+    const text =
+      kind === 'pumpkin' ? 'Special answer' : kind === 'ribbon' || !spots ? 'Brave try, nothing found' : `Answer #${spots[0]}–${spots[1]}`;
+    return { key: kind, text, icon: SHOWDOWN_MEDAL_INFO[kind].icon, title: SHOWDOWN_MEDAL_INFO[kind].title };
+  });
+}
+
+/**
+ * The crowd's bonuses (game-core's scoring.ts; standings.test.ts keeps them in step). Not imported:
+ * game-core's showdown module carries the question packs, which never go into the client bundle.
+ */
+export const SPOT_BONUS = 1;
+export const PERFECT_BONUS = 20;
+
+/** The legend's points line: a tile's value, the spot bonus, hidden gems (when on) and a perfect list. */
+export function pointsLegend(gems: boolean): LegendItem[] {
+  const last = SHOWDOWN_LIMITS.answersMax;
+  return [
+    { key: 'value', text: `Answer #1 = ${answerValue(0)} … #${last} = ${answerValue(last - 1)}` },
+    { key: 'spot', text: `+${SPOT_BONUS} right spot` },
+    ...(gems ? [{ key: 'gem', text: 'Hidden gem ×2' }] : []),
+    { key: 'perfect', text: `+${PERFECT_BONUS} perfect list` },
+  ];
 }
 
 /** "1 Golden Pumpkin, 2 Gold" — for screen readers. */

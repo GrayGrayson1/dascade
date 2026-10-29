@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { ShowdownBoardView, ShowdownMedals, ShowdownSlotView } from '@dascade/shared/games/showdown';
-import { finaleView, groupByRank, medalList, medalWords, medalsOnBoard, placeWord, podiumColumns, popFor } from './standings.ts';
+import { PERFECT_BONUS as CORE_PERFECT_BONUS, SPOT_BONUS as CORE_SPOT_BONUS } from '@dascade/game-core/showdown';
+import {
+  PERFECT_BONUS,
+  SPOT_BONUS,
+  finaleView,
+  groupByRank,
+  medalCells,
+  medalKindsHeld,
+  medalLegend,
+  medalList,
+  medalWords,
+  medalsOnBoard,
+  placeWord,
+  podiumColumns,
+  pointsLegend,
+  popFor,
+} from './standings.ts';
 
 const medals = (over: Partial<ShowdownMedals> = {}): ShowdownMedals => ({ pumpkin: 0, gold: 0, silver: 0, bronze: 0, ribbon: 0, ...over });
 const slot = (over: Partial<ShowdownSlotView> = {}): ShowdownSlotView => ({
@@ -100,5 +116,44 @@ describe('standings and the podium', () => {
     expect(finaleView(finale, 9).kind).toBe('first');
     expect(finaleView({ podium: [], stars: [], medals: 'never' }, 3)).toMatchObject({ kind: 'wrap', paced: false });
     expect(finaleView(null, 0).kind).toBe('wrap');
+  });
+});
+
+describe('the medal wall’s columns and the legend', () => {
+  it('gives the wall a column for each kind anyone holds, a blank cell where someone has none', () => {
+    const stars = [{ medals: medals({ gold: 2, ribbon: 1 }) }, { medals: medals({ bronze: 1 }) }];
+    expect(medalKindsHeld(stars)).toEqual(['gold', 'bronze', 'ribbon']);
+    expect(medalKindsHeld([])).toEqual([]);
+    expect(medalCells(medals({ bronze: 1 }), ['gold', 'bronze', 'ribbon']).map((c) => [c.kind, c.count])).toEqual([
+      ['gold', 0],
+      ['bronze', 1],
+      ['ribbon', 0],
+    ]);
+  });
+
+  it('says what earns each medal, from the rules themselves', () => {
+    expect(medalLegend().map((m) => [m.icon, m.text])).toEqual([
+      ['🎃', 'Special answer'],
+      ['🥇', 'Answer #1–3'],
+      ['🥈', 'Answer #4–7'],
+      ['🥉', 'Answer #8–10'],
+      ['🎗️', 'Brave try, nothing found'],
+    ]);
+    expect(medalLegend().every((m) => m.title)).toBe(true);
+  });
+
+  it('says how points add up; hidden gems only when they’re on', () => {
+    expect(pointsLegend(true).map((p) => p.text)).toEqual([
+      'Answer #1 = 10 … #10 = 1',
+      '+1 right spot',
+      'Hidden gem ×2',
+      '+20 perfect list',
+    ]);
+    expect(pointsLegend(false).map((p) => p.key)).toEqual(['value', 'spot', 'perfect']);
+  });
+
+  it('keeps the bonuses in step with the server’s scoring', () => {
+    expect(SPOT_BONUS).toBe(CORE_SPOT_BONUS);
+    expect(PERFECT_BONUS).toBe(CORE_PERFECT_BONUS);
   });
 });
