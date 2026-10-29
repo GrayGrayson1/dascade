@@ -22,7 +22,7 @@ import { playersEqual, session, useRoomSelector } from '../../net/hooks.ts';
 import { useApp } from '../../app/store.ts';
 import { audioReady, onAudioReadyChange, sfx } from '../../audio/audio.ts';
 import { copyText, presenterLink, screenLink } from './access.ts';
-import { openStageWindow, useStageWindow } from './stageWindow.ts';
+import { openStageWindow, useStageFullscreen, useStageWindow } from './stageWindow.ts';
 import { playShowSound } from './sounds.ts';
 import { useCard, useJoinPop, useShowSounds, useStandingsCard, useThemeMusicPref } from './state.ts';
 import { QrCode, copyJoinQr, joinQrText } from './qr.tsx';
@@ -125,6 +125,9 @@ export function StageWindowButton({
   className?: string;
 }) {
   const stageWin = useStageWindow();
+  const full = useStageFullscreen();
+  // Open but not full screen: its browser bar is on the share, so the button says how to lose it.
+  const bar = stageWin.open && !full;
   return (
     <Button
       size={size}
@@ -132,16 +135,19 @@ export function StageWindowButton({
       icon={stageWin.open ? 'check' : 'maximize'}
       className={className}
       data-part="showdown-stage-window"
+      data-fullscreen={stageWin.open ? String(full) : undefined}
       onClick={() => openStage(code, title)}
-      aria-label={stageWin.open ? 'Stage window open' : openLabel}
+      aria-label={stageWin.open ? (bar ? 'Stage window open — not full screen' : 'Stage window open, full screen') : openLabel}
       title={
-        stageWin.open
-          ? 'The stage window is open — click to bring it to the front'
-          : 'Open the stage (no answers) in its own window, to share in the meeting'
+        bar
+          ? 'The stage window is open but not full screen: its browser bar shows on the share. Click here to bring it to the front, then press F in it.'
+          : stageWin.open
+            ? 'The stage window is open and full screen — click to bring it to the front'
+            : 'Open the stage (no answers) in its own window, to share in the meeting'
       }
     >
       {/* (A narrow console bar keeps the icon only; the name stays the button's accessible name.) */}
-      <span className="sdc-lbl-wide">{stageWin.open ? 'Stage window open' : openLabel}</span>
+      <span className="sdc-lbl-wide">{stageWin.open ? (bar ? 'Stage open · press F in it' : 'Stage full screen') : openLabel}</span>
     </Button>
   );
 }
