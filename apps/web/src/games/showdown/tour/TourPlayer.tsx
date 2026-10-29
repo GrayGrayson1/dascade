@@ -138,7 +138,7 @@ export function TourPlayer({
                     <PixelIcon name="eye" /> What the meeting sees
                   </h2>
                   <div className="tour__stage" aria-hidden inert>
-                    <StageWindow open={frame.stage} look={look} settings={settings} title={DEMO_SETTINGS.title} />
+                    <StageWindow open={frame.stage} full={frame.full} look={look} settings={settings} title={DEMO_SETTINGS.title} />
                   </div>
                   <MeetingChat lines={frame.chat} />
                 </section>

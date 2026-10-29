@@ -1,7 +1,7 @@
 /**
- * The Presenter Tour's script: ten chapters that walk the presenter through a DAS-O-Ween Trivia show
- * on the demo stage, in the runbook's order and with the console's own button names
- * (docs/DAS-O-WEEN-RUNBOOK.md).
+ * The Presenter Tour's script: thirteen chapters that walk the presenter through a DAS-O-Ween Trivia
+ * show on the demo stage, in the runbook's order and with the console's own button names
+ * (docs/DAS-O-WEEN-RUNBOOK.md), on the console's Dashboard layout.
  *
  * PRACTICE CONTENT ONLY: the boards are the rehearsal preset's candy and costume lists (practice
  * material, not secrets). The real show's answers never appear here — they live on the server, and
@@ -10,13 +10,18 @@
  * Beats marked `cut: 'film'` are Boo's extra bits in the film cut ("Boo's Backstage Tour").
  */
 import {
+  SHOWDOWN_PICK_LAND_MS,
   type ShowdownBoardView,
   type ShowdownEvent,
   type ShowdownFinale,
+  type ShowdownFinaleStepKind,
+  type ShowdownScoreboard,
   type ShowdownSettings,
   type ShowdownStage,
 } from '@dascade/shared/games/showdown';
-import { EMPTY_SHOW, type DemoClock, type DemoShow } from './demoSource.ts';
+import type { AwardsView } from '../awards.ts';
+import type { CinemaView } from '../cinema.ts';
+import { EMPTY_SHOW, guestId, type DemoClock, type DemoShow } from './demoSource.ts';
 import type { TourBeat, TourChapter } from './timeline.ts';
 
 /** The demo room's code: not a real code (real ones never have an O), so nobody can join it. */
@@ -79,7 +84,7 @@ export const DEMO_ROUNDS: readonly [DemoRound, DemoRound] = [
   },
 ];
 
-/** The show’s settings once the DAS-O-Ween 2026 preset is loaded (the tour shows the show without crowd scoring). */
+/** The show’s settings once the DAS-O-Ween 2026 preset is loaded (crowd points and the hot seat’s medals on). */
 export const DEMO_SETTINGS: ShowdownSettings = {
   mode: 'showcase',
   title: 'DAS-O-Ween Trivia',
@@ -90,7 +95,7 @@ export const DEMO_SETTINGS: ShowdownSettings = {
   rounds: 2,
   scoring: 'flat',
   steal: false,
-  audience: false,
+  audience: true,
   teamNames: ['', ''],
   minutes: 10,
   stageClock: true,
@@ -98,8 +103,8 @@ export const DEMO_SETTINGS: ShowdownSettings = {
   guesses: 10,
   pickMode: 'fair',
   crewDraw: false,
-  points: false,
-  medals: 'never',
+  points: true,
+  medals: 'round',
   reveal: 'standings',
   gems: true,
   pops: true,
@@ -107,6 +112,78 @@ export const DEMO_SETTINGS: ShowdownSettings = {
 
 /** Before the preset: a new room's defaults. */
 export const DEMO_SETTINGS_BEFORE: ShowdownSettings = { ...DEMO_SETTINGS, title: '', eventName: '', mode: 'showcase' };
+
+/** The guests who joined on a phone (practice names: the picker draws from them). */
+export const DEMO_GUESTS: readonly string[] = [
+  'Ada',
+  'Grace',
+  'Hedy',
+  'Linus',
+  'Tim',
+  'Katherine',
+  'Alan',
+  'Margaret',
+  'Dennis',
+  'Barbara',
+  'Ken',
+  'Radia',
+];
+
+const row = (name: string, points: number, rank: number) => ({ playerId: guestId(DEMO_GUESTS.indexOf(name)), name, points, rank });
+
+/** The Standings card between rounds: the top five Guessers. */
+const STANDINGS: ShowdownScoreboard = {
+  points: true,
+  medals: 'round',
+  top: [row('Hedy', 46, 1), row('Ada', 41, 2), row('Linus', 33, 3), row('Grace', 28, 4), row('Tim', 25, 5)],
+  of: 12,
+  stars: [],
+};
+
+/** A pretend photo for the awards (a picture drawn here, not a person). */
+const photo = (emoji: string, bg: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="${bg}"/><text x="60" y="84" font-size="72" text-anchor="middle">${emoji}</text></svg>`,
+  )}`;
+
+/** The Awards desk, filled in during the quiz (one award, so the ceremony fits the tour). */
+function awards(at: number): AwardsView {
+  return {
+    categories: [
+      {
+        id: 'costume',
+        title: 'Best Costume',
+        places: [
+          { name: 'Katherine', photo: 'p1' },
+          { name: 'Alan', photo: 'p2' },
+          { name: 'Margaret', photo: 'p3' },
+        ],
+      },
+    ],
+    photos: { p1: photo('🧛', '#3b1f5c'), p2: photo('🧟', '#1f4d3a'), p3: photo('🎃', '#5c3a12') },
+    at,
+    rolling: false,
+    ready: true,
+  };
+}
+
+/** The cartoon in the Cinema tool (a name only: the tour plays no video). */
+function cinema(patch: Partial<CinemaView> = {}): CinemaView {
+  return {
+    clips: [{ id: 'demo-clip', name: 'Spooky Cartoon.mp4', url: '' }],
+    clipId: 'demo-clip',
+    frame: 'cinema',
+    onStage: false,
+    window: true,
+    playing: false,
+    ended: false,
+    time: 0,
+    duration: 372,
+    blocked: false,
+    failed: false,
+    ...patch,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Builders (revisions only need to be distinct and repeatable: Boo picks his lines by them)
@@ -172,6 +249,9 @@ const FINALE: ShowdownFinale = {
   results: [R1_RESULT, R2_RESULT],
   callers: [],
   members: [[], []],
+  podium: [row('Hedy', 88, 1), row('Ada', 79, 2), row('Linus', 64, 3)],
+  stars: [],
+  medals: 'round',
 };
 
 const ev = {
@@ -184,6 +264,25 @@ const ev = {
   timeup: (round: number): ShowdownEvent => ({ type: 'timeup', rev: nextRev(), round }),
   undo: (): ShowdownEvent => ({ type: 'undo', rev: nextRev() }),
   restart: (round: number): ShowdownEvent => ({ type: 'restart', rev: nextRev(), round }),
+  /** The picker drew `name` (the stage's sounds time the landing from landAt). */
+  pick: (name: string, poolSize: number): ShowdownEvent => ({
+    type: 'pick',
+    rev: nextRev(),
+    drawNo: 1,
+    winnerId: guestId(DEMO_GUESTS.indexOf(name)),
+    name,
+    poolSize,
+    landAt: SHOWDOWN_PICK_LAND_MS,
+    reroll: false,
+  }),
+  pickEnd: (name: string): ShowdownEvent => ({
+    type: 'pickEnd',
+    rev: nextRev(),
+    drawNo: 1,
+    playerId: guestId(DEMO_GUESTS.indexOf(name)),
+    how: 'done',
+  }),
+  finale: (step: number, kind: ShowdownFinaleStepKind): ShowdownEvent => ({ type: 'finale', rev: nextRev(), step, kind }),
 };
 
 /**
@@ -224,7 +323,8 @@ function reveal(
   };
 }
 
-const show = (patch: Partial<DemoShow>): DemoShow => ({ ...EMPTY_SHOW, ...patch });
+/** A demo show: the guests are in the room (the picker's pool) unless the patch says otherwise. */
+const show = (patch: Partial<DemoShow>): DemoShow => ({ ...EMPTY_SHOW, guests: DEMO_GUESTS, ...patch });
 
 /** Reveal remaining, tile by tile from #10 up (`order` = the hidden slots in sweep order). */
 function sweepBeats(
@@ -265,6 +365,11 @@ function sweepBeats(
 // ---------------------------------------------------------------------------
 
 const R1_LIVE_START = clock(10 * MIN - 20_000);
+
+/** A beat that also changes something else on the stage (the reveal builders set only the board). */
+function withShow(beat: Pick<TourBeat, 'show' | 'events'>, patch: Partial<DemoShow>): Pick<TourBeat, 'show' | 'events'> {
+  return { ...beat, show: { ...beat.show, ...patch } };
+}
 
 export const TOUR_CHAPTERS: readonly TourChapter[] = [
   {
@@ -310,7 +415,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       {
         hold: 3800,
         step: 5,
-        caption: 'Phones are optional: anyone can cheer along with the room code. Guesses go in the meeting chat.',
+        caption: 'Guests join on their phones with the room’s QR code: they can be picked to answer, and they score with their own Top 10.',
         boo: { say: 'Phones can cheer. I LOVE cheering.', act: 'float', mood: 'cheer' },
       },
     ],
@@ -327,8 +432,9 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       {
         hold: 1500,
         console: { screen: 'lobby', tab: 'settings', point: 'preset-load', zoom: 1.15 },
-        caption: 'In the lobby, under [[Settings]] → [[Event presets]], press [[Load]] next to [[DAS-O-Ween 2026]].',
-        boo: { say: 'First, the preset: both boards, the clock and my favourite look.', act: 'point', mood: 'happy' },
+        caption:
+          'In the lobby, under [[Settings]] → [[Event presets]], press [[Load]] next to [[DAS-O-Ween 2026]], then load your show file.',
+        boo: { say: 'First, the preset: the clock, the scoring and my favourite look.', act: 'point', mood: 'happy' },
       },
       { hold: 2600, console: { click: true }, preset: true },
       {
@@ -342,6 +448,17 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         stage: true,
         caption: '…and the show pops up in its own window. Drag it to your second screen.',
         boo: { say: 'Ta-da! My dressing room.', act: 'spin', mood: 'wow' },
+      },
+      {
+        hold: 2600,
+        console: { point: 'open-stage', zoom: 1.5 },
+        caption: 'The button says what’s next: click the stage window once and press {{F}} for full screen…',
+      },
+      {
+        hold: 3000,
+        full: true,
+        caption: '…the browser bar is gone from the share, and the button says [[Stage full screen]]. {{Esc}} leaves it.',
+        boo: { say: 'Full screen! Nothing between me and my adoring public.', act: 'float', mood: 'cheer' },
       },
       {
         hold: 2400,
@@ -370,13 +487,24 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       {
         hold: 1200,
         console: { point: 'card-welcome', zoom: 1.4 },
-        caption: 'While people arrive, put up the [[Welcome]] card under [[Stage cards]].',
+        caption: 'While people arrive, put up the [[Welcome]] card: it carries the big join QR.',
       },
       {
-        hold: 3600,
+        hold: 3200,
         console: { click: true },
         show: { card: 'welcome' },
         boo: { say: 'Welcome, boils and ghouls!', act: 'float', mood: 'happy' },
+      },
+      {
+        hold: 1300,
+        console: { point: 'lobby-qr', zoom: 1.4 },
+        caption: 'Post the join link too: [[Copy QR image]] and [[Copy link]], then paste both in the Teams chat.',
+      },
+      {
+        hold: 2600,
+        console: { click: true },
+        toast: 'QR image copied: paste it in the Teams chat.',
+        boo: { say: 'Scan me! Well, scan the ticket. I don’t show up on cameras.', act: 'shrug', mood: 'happy' },
       },
     ],
   },
@@ -388,6 +516,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     screen: 'lobby',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 1400,
@@ -404,8 +533,24 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         boo: { say: 'That’s my entrance music! Fabulous, right?', act: 'spin', mood: 'cheer' },
       },
       {
+        hold: 3600,
+        console: { point: '', zoom: 1 },
+        caption: 'This is the **Dashboard**: your answer sheet, the rail of show controls, and every tool open beside them.',
+        boo: { say: 'Look at all those buttons! Don’t worry, I’ll show you each one.', act: 'point', mood: 'happy' },
+      },
+      {
+        hold: 2600,
+        console: { point: 'tool-sound', zoom: 1.5 },
+        caption: 'Click a tool’s title to fold it away. The console remembers.',
+      },
+      {
+        hold: 2800,
+        console: { point: 'layout-switch', zoom: 1.7 },
+        caption: 'Prefer the older tabbed drawer? [[Classic]] in the bar brings it back, and [[Dashboard]] returns.',
+      },
+      {
         hold: 1300,
-        console: { screen: 'console', point: 'next-step', key: 'Q', zoom: 1.5 },
+        console: { point: 'next-step', key: 'Q', zoom: 1.5 },
         caption: 'Welcome everyone, then press [[Start round 1]].',
       },
       {
@@ -438,6 +583,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 2200,
@@ -473,6 +619,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 2400,
@@ -505,13 +652,79 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ],
   },
   {
-    id: 'special',
-    title: 'Number 5',
-    film: 'Number five!',
-    setup: show({ phase: 'PLAYING', board: board(0, 'live', [0, 1, 2]), clock: clock(8 * MIN + 20_000) }),
+    id: 'picker',
+    title: 'Pick who answers',
+    film: 'Who’s up?',
+    setup: show({ phase: 'PLAYING', board: board(0, 'live', [0, 1, 2]), clock: clock(8 * MIN + 50_000) }),
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
+    beats: [
+      {
+        hold: 1500,
+        console: { screen: 'console', point: 'pick', key: 'K', zoom: 1.6 },
+        caption: 'Want a guest to answer out loud? Press [[Pick someone]] (or {{K}}).',
+        boo: { say: 'Ooh, who will it be? Not me. I’m busy being fabulous.', act: 'listen', mood: 'think' },
+      },
+      {
+        hold: 2400,
+        console: { click: true, key: 'K' },
+        show: { hot: 'Grace' },
+        events: [ev.pick('Grace', DEMO_GUESTS.length - 1)],
+        caption: 'The server draws someone fairly, and **you see the name first**…',
+      },
+      {
+        hold: 3600,
+        console: { point: '', zoom: 1 },
+        caption: '…while the stage sweeps its spotlights and lands on them. Their phone says “You’re up!”',
+        boo: { act: 'spin', mood: 'cheer' },
+      },
+      {
+        hold: 2200,
+        chat: { who: 'Grace', text: 'pumpkin pie?' },
+        console: { point: 'wrong', zoom: 1.5 },
+        caption: 'They answer out loud or in the chat: flip it or press [[Wrong]], as always…',
+      },
+      {
+        hold: 2400,
+        console: { click: true, key: 'X' },
+        events: [ev.miss(0, 4)],
+        boo: { say: 'Pumpkin PIE? So close. So very, very close.', act: 'shrug', mood: 'oops' },
+      },
+      {
+        hold: 1500,
+        console: { point: 'pick-done', key: 'D', zoom: 1.6 },
+        caption: '…then [[Mark done]] (or {{D}}) counts their turn. [[No answer]] (or {{A}}) skips them with no penalty.',
+      },
+      {
+        hold: 2600,
+        console: { click: true, key: 'D' },
+        show: { hot: '', done: ['Grace'] },
+        events: [ev.pickEnd('Grace')],
+      },
+      {
+        hold: 3400,
+        console: { point: 'spotlight', zoom: 1.6 },
+        caption: 'Fair mode gives everyone a turn before anyone gets a second. [[Spotlight…]] (or {{F}}) calls anyone up by name.',
+      },
+      {
+        hold: 3400,
+        console: { point: 'picker-exclude', zoom: 1.5 },
+        caption: 'In the [[Picker]] tool, [[Exclude]] takes someone out of the random draw, and [[Include]] puts them back.',
+        boo: { say: 'Exclude me? You can’t exclude a ghost. I’m everywhere.', act: 'float', mood: 'happy' },
+      },
+    ],
+  },
+  {
+    id: 'special',
+    title: 'Number 5',
+    film: 'Number five!',
+    setup: show({ phase: 'PLAYING', board: board(0, 'live', [0, 1, 2]), clock: clock(8 * MIN + 20_000), done: ['Grace'] }),
+    screen: 'console',
+    stage: true,
+    preset: true,
+    full: true,
     beats: [
       {
         hold: 2400,
@@ -540,15 +753,9 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         boo: { say: 'IT IS! Victory spin!', act: 'spin', mood: 'celebrate' },
       },
       {
-        hold: 1300,
-        console: { point: 'tab-sound', zoom: 1.5 },
-        caption: 'Want it again? Open [[Sound]] in the drawer…',
-      },
-      { hold: 1300, console: { click: true, drawer: 'sound' } },
-      {
-        hold: 1300,
+        hold: 1500,
         console: { point: 'celebrate', key: 'C', zoom: 1.6 },
-        caption: '…and [[Celebrate!]] (or {{C}}) replays it any time.',
+        caption: 'Want it again? [[Celebrate!]] in the [[Sound]] tool (or {{C}}) replays it any time.',
       },
       { hold: 4600, console: { click: true, key: 'C' }, cue: 'celebrate', boo: { say: 'Again! Again!', act: 'spin', mood: 'celebrate' } },
     ],
@@ -557,10 +764,11 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     id: 'clock',
     title: 'Clock & reveal',
     film: 'Tick, tock',
-    setup: show({ phase: 'PLAYING', board: board(0, 'live', [0, 1, 2, 4]), clock: clock(3 * MIN + 10_000) }),
+    setup: show({ phase: 'PLAYING', board: board(0, 'live', [0, 1, 2, 4]), clock: clock(3 * MIN + 10_000), done: ['Grace'] }),
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 1300,
@@ -601,22 +809,45 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       },
       ...sweepBeats(0, [0, 1, 2, 4], [9, 8, 7, 6, 5, 3], 950, { 3: '…and those tiles look different from the ones the crowd found.' }),
       {
-        hold: 3600,
+        hold: 3200,
         console: { point: '', zoom: 1 },
         show: { sweep: false },
         events: [ev.sweep(false)],
         caption: 'Bright tiles: found by the crowd. Darker tiles: revealed at the end.',
       },
+      {
+        hold: 1300,
+        console: { point: 'standings', zoom: 1.6 },
+        caption: 'Between rounds, [[Show standings]] in the [[Cards]] tool puts the top five Guessers on the stage…',
+      },
+      {
+        hold: 3400,
+        console: { click: true },
+        show: { card: 'standings', scores: STANDINGS },
+        boo: { say: 'Look at those scores! Hedy, you legend.', act: 'point', mood: 'cheer' },
+      },
+      {
+        hold: 1100,
+        console: { point: 'standings' },
+        caption: '…and [[Hide standings]] takes them down. Phones show each guest their own rank.',
+      },
+      { hold: 1500, console: { click: true }, show: { card: null } },
     ],
   },
   {
     id: 'next-round',
     title: 'Next round',
     film: 'Round two!',
-    setup: show({ phase: 'PLAYING', board: board(0, 'done', [0, 1, 2, 4], [9, 8, 7, 6, 5, 3], [R1_RESULT]), clock: clock(-30_000, false) }),
+    setup: show({
+      phase: 'PLAYING',
+      board: board(0, 'done', [0, 1, 2, 4], [9, 8, 7, 6, 5, 3], [R1_RESULT]),
+      clock: clock(-30_000, false),
+      scores: STANDINGS,
+    }),
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 1200,
@@ -637,7 +868,23 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         show: { board: board(1, 'live', [], [], [R1_RESULT]), clock: clock(10 * MIN) },
         events: [ev.question()],
       },
-      { hold: 1450, chat: { who: 'Grace', text: 'WITCH' }, console: { point: 'answer-1', click: true, key: '1' }, ...reveal(1, 0, [0]) },
+      {
+        hold: 1300,
+        console: { point: 'join-pop', key: 'J', zoom: 1.6 },
+        caption: 'Latecomers? [[Join pop-up]] (or {{J}}) puts the join QR beside the board for 20 seconds.',
+      },
+      {
+        hold: 3400,
+        console: { click: true, key: 'J' },
+        show: { join: true },
+        boo: { say: 'Come in, come in! Plenty of room. I’m see-through.', act: 'float', mood: 'happy' },
+      },
+      {
+        hold: 1450,
+        chat: { who: 'Grace', text: 'WITCH' },
+        console: { point: 'answer-1', click: true, key: '1', zoom: 1.5 },
+        ...withShow(reveal(1, 0, [0]), { join: false }),
+      },
       {
         hold: 1450,
         chat: { who: 'Linus', text: 'vampire!' },
@@ -667,17 +914,92 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ],
   },
   {
+    id: 'scenes',
+    title: 'Scenes & Cinema',
+    film: 'Cartoon break!',
+    setup: show({
+      phase: 'PLAYING',
+      board: board(1, 'done', [0, 1, 3], [9, 8, 7, 6, 5, 4, 2], [R1_RESULT, R2_RESULT]),
+      clock: clock(-60_000, false),
+      scores: STANDINGS,
+    }),
+    screen: 'console',
+    stage: true,
+    preset: true,
+    full: true,
+    beats: [
+      {
+        hold: 3800,
+        console: { screen: 'console', point: 'scene-show', zoom: 1.6 },
+        caption:
+          'The scene strip picks what the stage window shows: [[Show]] (the board), [[Cinema]], [[Awards]] or [[Cards]]. Nobody re-shares in Teams.',
+        boo: { say: 'One window, many costumes. Just like me.', act: 'point', mood: 'happy' },
+      },
+      {
+        hold: 1400,
+        console: { point: 'cinema-load', tool: 'cinema', zoom: 1.6 },
+        caption: 'Cartoon time? In the [[Cinema]] tool, [[Load video…]] picks a file from this computer. It never uploads.',
+      },
+      { hold: 2200, console: { click: true }, show: { cinema: cinema() } },
+      {
+        hold: 2600,
+        console: { point: 'cinema-frame', zoom: 1.6 },
+        caption: 'Pick its frame: **Retro TV**, **Haunted cinema** or **Gilded portrait**.',
+      },
+      {
+        hold: 1400,
+        console: { point: 'cinema-up', key: 'V', zoom: 1.6 },
+        caption: '[[Put Cinema on the stage]] (or {{V}}) swaps the board for the frame…',
+      },
+      {
+        hold: 3000,
+        console: { click: true, key: 'V' },
+        show: { card: 'cinema', cinema: cinema({ onStage: true }) },
+        boo: { say: 'Popcorn time! I brought extra butter. Ghost butter.', act: 'float', mood: 'happy' },
+      },
+      { hold: 1300, console: { point: 'cinema-play' }, caption: '…then [[Play]]: it plays in the stage window, sound and all.' },
+      { hold: 3000, console: { click: true }, show: { cinema: cinema({ onStage: true, playing: true, time: 3 }) } },
+      {
+        hold: 2800,
+        console: { point: 'cinema-seek', zoom: 1.6 },
+        show: { cinema: cinema({ onStage: true, playing: true, time: 64 }) },
+        caption: 'The seek bar and the 10-second skips move through it.',
+      },
+      {
+        hold: 1400,
+        console: { point: 'cinema-back', key: 'B', zoom: 1.6 },
+        show: { cinema: cinema({ onStage: true, playing: true, time: 69 }) },
+        caption: 'When it ends, [[Back to the show]] (or {{B}}) brings the board back.',
+      },
+      {
+        hold: 2800,
+        console: { click: true, key: 'B' },
+        show: { card: null, cinema: cinema({ time: 69 }) },
+        boo: { say: 'Back to the board! Did I miss anything?', act: 'jump', mood: 'wow' },
+      },
+      {
+        hold: 3600,
+        console: { point: 'card-break', zoom: 1.5 },
+        caption: 'A scene pauses the round clock ({{P}} starts it again). For a plain break, [[Be right back]] is in the [[Cards]] tool.',
+      },
+    ],
+  },
+  {
     id: 'finish',
-    title: 'Finish & cards',
+    title: 'Finish & finale',
     film: 'That’s a wrap!',
     setup: show({
       phase: 'PLAYING',
       board: board(1, 'done', [0, 1, 3], [9, 8, 7, 6, 5, 4, 2], [R1_RESULT, R2_RESULT]),
       clock: clock(-60_000, false),
+      scores: STANDINGS,
+      // The Awards desk was filled in during the quiz.
+      awards: awards(-1),
     }),
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 1400,
@@ -695,22 +1017,81 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         hold: 5200,
         filmHold: 6200,
         console: { dialog: null, screen: 'results' },
-        show: { phase: 'RESULTS', finale: FINALE, sweep: false },
+        show: { phase: 'RESULTS', finale: FINALE, finaleStep: 0, sweep: false },
         caption: '“That’s a wrap!” Boo says goodbye to a round of applause.',
         boo: { say: 'That’s a wrap, boils and ghouls!', act: 'wave', mood: 'bye' },
       },
       {
-        hold: 1300,
-        console: { point: 'card-break', zoom: 1.3 },
-        caption: 'Stage cards work any time: [[Be right back]] for the cartoon…',
+        hold: 1500,
+        console: { point: 'finale-next', zoom: 1.4 },
+        caption: '[[The finale]] steps through the podium: [[Next]] for 3rd, 2nd and 1st, each with its drumroll.',
+      },
+      { hold: 3000, console: { click: true }, show: { finaleStep: 1 }, events: [ev.finale(1, 'third')] },
+      { hold: 3000, console: { click: true }, show: { finaleStep: 2 }, events: [ev.finale(2, 'second')] },
+      {
+        hold: 4600,
+        filmHold: 5200,
+        console: { click: true },
+        show: { finaleStep: 3 },
+        events: [ev.finale(3, 'first')],
+        boo: { say: 'Hedy wins! I knew it. I totally knew it.', act: 'spin', mood: 'celebrate' },
       },
       {
-        hold: 2600,
-        console: { click: true },
-        show: { card: 'break' },
-        boo: { say: 'Cartoon break! I’ll get the popcorn.', act: 'float', mood: 'think' },
+        hold: 3200,
+        console: { point: 'scores-download', zoom: 1.5 },
+        caption: '[[Download CSV]] or [[Download JSON]] keeps the scores. They never include a hidden answer.',
       },
-      { hold: 1000, console: { point: 'card-prizes' }, caption: '…[[Prize time]] for the winners…' },
+    ],
+  },
+  {
+    id: 'awards',
+    title: 'Awards',
+    film: 'And the winner is…',
+    setup: show({
+      phase: 'RESULTS',
+      board: board(1, 'done', [0, 1, 3], [9, 8, 7, 6, 5, 4, 2], [R1_RESULT, R2_RESULT]),
+      finale: FINALE,
+      finaleStep: 3,
+      scores: STANDINGS,
+      awards: awards(-1),
+    }),
+    screen: 'results',
+    stage: true,
+    preset: true,
+    full: true,
+    beats: [
+      {
+        hold: 3800,
+        console: { screen: 'results', point: 'awards-names', zoom: 1.5 },
+        caption:
+          'During the quiz, fill in the [[Awards]] desk: a name per place, and a photo if you like (paste a Teams screenshot). It stays in your browser.',
+        boo: { say: 'Best costume? Obviously mine. A classic bedsheet.', act: 'point', mood: 'happy' },
+      },
+      { hold: 1300, console: { point: 'awards-start', zoom: 1.5 }, caption: 'Nothing shows on the share until [[Start the ceremony]]…' },
+      { hold: 2800, console: { click: true }, show: { card: 'awards', awards: awards(0) } },
+      {
+        hold: 1300,
+        console: { point: 'awards-next' },
+        caption: '…then [[Next]] for each step: the award, then 3rd, 2nd and 1st, each after a drumroll.',
+      },
+      { hold: 2600, console: { click: true }, show: { awards: awards(1) } },
+      { hold: 3000, console: { click: true }, show: { awards: awards(2) }, cue: 'drumroll' },
+      { hold: 3000, console: { click: true }, show: { awards: awards(3) }, cue: 'drumroll' },
+      {
+        hold: 2400,
+        console: { click: true },
+        show: { awards: { ...awards(3), rolling: true } },
+        cue: 'drumroll',
+        caption: 'Fireworks go up with the last winner…',
+      },
+      {
+        hold: 5200,
+        filmHold: 6000,
+        show: { awards: awards(4) },
+        cue: 'applause',
+        boo: { say: 'Fireworks! Ooh! Aah! Boo!', act: 'spin', mood: 'celebrate' },
+      },
+      { hold: 1300, console: { point: 'card-prizes', zoom: 1.4 }, caption: 'Then [[Prize time]] for the prizes…' },
       {
         hold: 2600,
         console: { click: true },
@@ -729,6 +1110,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     screen: 'console',
     stage: true,
     preset: true,
+    full: true,
     beats: [
       {
         hold: 1300,
@@ -757,11 +1139,11 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       { hold: 1300, console: { click: true, dialog: null } },
       {
         hold: 1200,
-        console: { point: 'tab-fix', zoom: 1.5 },
-        caption: 'Bigger slip? Open [[Fix]] in the drawer.',
+        console: { point: 'tool-fix', zoom: 1.5 },
+        caption: 'Bigger slip? Open the [[Fix]] tool.',
         boo: { say: 'Oops-proof. I like it.', act: 'float', mood: 'happy' },
       },
-      { hold: 1200, console: { click: true, drawer: 'fix' } },
+      { hold: 1200, console: { click: true, tool: 'fix' } },
       {
         hold: 1100,
         console: { point: 'restart-round', zoom: 1.5 },
@@ -777,11 +1159,12 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         caption: 'Every answer goes back under its tile, and an [[Undo]] waits for 12 seconds in case you slipped.',
       },
       {
-        hold: 1300,
+        hold: 1500,
         undo: '',
         stage: false,
+        full: false,
         console: { point: 'stage-window', zoom: 1.6 },
-        caption: 'Closed the stage window? Press [[Stage window]] again, then pick it again in Teams.',
+        caption: 'Closed the stage window? Press [[Stage window]] again, pick it again in Teams, and press {{F}} in it.',
         boo: { say: 'Hey! Who turned off the lights?', act: 'jump', mood: 'startled' },
       },
       { hold: 2200, console: { click: true }, stage: true, boo: { say: 'Phew.', act: 'float', mood: 'happy' } },

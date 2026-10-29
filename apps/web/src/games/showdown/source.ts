@@ -10,6 +10,8 @@
 import { createContext, createElement, useCallback, useContext, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import type { ShowdownPublicState } from '@dascade/shared/games/showdown';
 import { useRoomSelector } from '../../net/hooks.ts';
+import type { AwardsView } from './awards.ts';
+import type { CinemaView } from './cinema.ts';
 import type { ShowFeedStore } from './fx.ts';
 
 /** The slice of the room state the stage reads. */
@@ -39,13 +41,28 @@ export type ShowState = Pick<
   | 'poolSize'
   | 'done'
   | 'seats'
+  // The Join pop-up, the standings and the paced finale.
+  | 'joinAt'
+  | 'scoreJson'
+  | 'finaleStep'
 >;
+
+/**
+ * What the presenter's own browser keeps outside the room (cinema.ts, awards.ts): a demo source can
+ * stand in for it, so the tour's stage plays a pretend video and ceremony, never the presenter's own.
+ */
+export interface ShowExtras {
+  cinema?: CinemaView;
+  awards?: AwardsView;
+}
 
 export interface ShowSource {
   /** Stable functions (they're handed to useSyncExternalStore as they are). */
   subscribe: (listener: () => void) => () => void;
   get: () => ShowState;
   feed: ShowFeedStore;
+  /** The demo's stand-ins for the presenter's browser stores (stable function; undefined = none). */
+  extras?: () => ShowExtras;
 }
 
 const ShowSourceContext = createContext<ShowSource | null>(null);
@@ -104,4 +121,13 @@ function useSourceSelector<R>(
   }, [source, isEqual]);
   // The server snapshot is the source too: a demo needs no room, so it renders the same anywhere.
   return useSyncExternalStore(source ? source.subscribe : NO_SOURCE, getSnapshot, getSnapshot);
+}
+
+const NO_EXTRAS: ShowExtras = {};
+
+/** The demo source's stand-ins for cinema.ts and awards.ts ({} outside a demo: use the real stores). */
+export function useShowExtras(): ShowExtras {
+  const source = useContext(ShowSourceContext);
+  const get = useCallback(() => source?.extras?.() ?? NO_EXTRAS, [source]);
+  return useSyncExternalStore(source ? source.subscribe : NO_SOURCE, get, get);
 }

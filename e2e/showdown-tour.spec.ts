@@ -12,10 +12,13 @@ const CHAPTERS = [
   'Start the show',
   'Right answer',
   'Wrong answer',
+  'Pick who answers',
   'Number 5',
   'Clock & reveal',
   'Next round',
-  'Finish & cards',
+  'Scenes & Cinema',
+  'Finish & finale',
+  'Awards',
   'Safety net',
 ];
 

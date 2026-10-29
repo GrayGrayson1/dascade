@@ -24,8 +24,11 @@ export type LobbyTab = 'setup' | 'settings';
 /** The console's inline two-step panel for the show's one irreversible action (End show / Finish show). */
 export type TourDialog = 'finish' | 'end';
 
-/** The console drawer's tab under the stage preview. */
-export type DrawerTabId = 'picker' | 'sound' | 'cards' | 'fix';
+/**
+ * A tool on the console's Dashboard (every tool open beside the sheet and the rail). The tall ones
+ * share the second tools column: the one the tour is showing stays open there, the rest fold.
+ */
+export type ToolId = 'picker' | 'sound' | 'cards' | 'cinema' | 'awards' | 'fix' | 'scores' | 'names' | 'crew' | 'preflight';
 
 /** Boo's bits in the film: each is a little animation of the narrator (tour.css). */
 export type BooAct = 'float' | 'point' | 'cover' | 'faint' | 'jump' | 'spin' | 'watch' | 'drums' | 'wave' | 'shrug' | 'listen';
@@ -44,8 +47,8 @@ export interface ConsoleBeat {
   zoom?: number;
   /** The End show / Finish show panel on the console (null closes it). */
   dialog?: TourDialog | null;
-  /** The console drawer's open tab (it stays until a beat changes it). */
-  drawer?: DrawerTabId;
+  /** The Dashboard tool the tour is showing (it stays until a beat changes it). */
+  tool?: ToolId;
   /** The special answer is armed, waiting for Take special (stays until a beat changes it). */
   armed?: boolean;
   /** The click is a press-and-hold: the control's ring fills (Restart, End show). */
@@ -82,6 +85,8 @@ export interface TourBeat {
   stage?: boolean;
   /** The event preset is loaded (the lobby mock shows it). */
   preset?: boolean;
+  /** The stage window is full screen (F): no browser bar on the share. */
+  full?: boolean;
   /** The step of the chapter's illustration (the big-picture diagram, the share dialog). */
   step?: number;
   /** A toast on the mock console ('' clears it). */
@@ -103,6 +108,8 @@ export interface TourChapter {
   screen: TourScreen;
   stage: boolean;
   preset: boolean;
+  /** The stage window starts full screen (default: not). */
+  full?: boolean;
   beats: TourBeat[];
 }
 
@@ -157,13 +164,14 @@ export interface TourFrame {
   key: string;
   zoom: number;
   dialog: TourDialog | null;
-  drawer: DrawerTabId;
+  tool: ToolId;
   armed: boolean;
   /** This beat's click is a press-and-hold. */
   held: boolean;
   chat: ChatLine[];
   stage: boolean;
   preset: boolean;
+  full: boolean;
   step: number;
   toast: string;
   undo: string;
@@ -180,12 +188,13 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     key: '',
     zoom: 1,
     dialog: null,
-    drawer: 'picker',
+    tool: 'cinema',
     armed: false,
     held: false,
     chat: [],
     stage: chapter.stage,
     preset: chapter.preset,
+    full: chapter.full ?? false,
     step: 0,
     toast: '',
     undo: '',
@@ -201,7 +210,7 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     if (c?.point !== undefined) frame.point = c.point;
     if (c?.zoom !== undefined) frame.zoom = c.zoom;
     if (c?.dialog !== undefined) frame.dialog = c.dialog;
-    if (c?.drawer !== undefined) frame.drawer = c.drawer;
+    if (c?.tool !== undefined) frame.tool = c.tool;
     if (c?.armed !== undefined) frame.armed = c.armed;
     // A new screen starts with the cursor resting and the camera back out, unless the beat says.
     if (c?.screen && c.point === undefined) frame.point = '';
@@ -209,6 +218,7 @@ export function frameAt(chapter: TourChapter, index: number, film: boolean): Tou
     if (b.chat) frame.chat = [...frame.chat, b.chat];
     if (b.stage !== undefined) frame.stage = b.stage;
     if (b.preset !== undefined) frame.preset = b.preset;
+    if (b.full !== undefined) frame.full = b.full;
     if (b.step !== undefined) frame.step = b.step;
     if (b.toast !== undefined) frame.toast = b.toast;
     if (b.undo !== undefined) frame.undo = b.undo;

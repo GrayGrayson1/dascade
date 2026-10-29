@@ -694,7 +694,9 @@ export function ShowdownPlayerSetup() {
         </p>
         <div className="sdc-setup__tour">
           <TourButton look={look} label="Watch the presenter tour" />
-          <span className="dc-field__hint">An animated walk through the whole show (about 3½ minutes, on practice boards).</span>
+          <span className="dc-field__hint">
+            An animated walk through the whole show on the Dashboard (about 6 minutes, on practice boards).
+          </span>
         </div>
         <div className="sdc-teamsflow">
           <span className="dc-field__label">Run it in a Teams call</span>

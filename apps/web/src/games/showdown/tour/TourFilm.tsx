@@ -207,7 +207,7 @@ export function TourFilm({
                 <span className="film__label">
                   <PixelIcon name="eye" /> What the meeting sees
                 </span>
-                <StageWindow open={frame.stage} look={look} settings={settings} title={DEMO_SETTINGS.title} />
+                <StageWindow open={frame.stage} full={frame.full} look={look} settings={settings} title={DEMO_SETTINGS.title} />
               </section>
               <div className="film__chat">
                 <MeetingChat lines={frame.chat} />

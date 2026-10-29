@@ -32,6 +32,7 @@ import { clipTime, useCinema } from './cinema.ts';
 import { JoinTicket } from './qr.tsx';
 import { awardSteps, fireworksAt, revealedPlaces, useAwards, type AwardPlace } from './awards.ts';
 import { Fireworks } from './fireworks.tsx';
+import { useShowExtras } from './source.ts';
 import type { MotionPrefs } from './state.ts';
 
 const len = (s: string) => Array.from(s).length;
@@ -322,7 +323,9 @@ export function CardScene({
  * gets the cartoon-break card: the video lives only in the presenter's browser.
  */
 export function CinemaScene({ look }: { look: ShowdownLook }) {
-  const cinema = useCinema();
+  const live = useCinema();
+  // The Presenter Tour's pretend video (never the presenter's own clips).
+  const cinema = useShowExtras().cinema ?? live;
   const copy = LOOK_COPY[look].showcase;
   const clip = cinema.clips.find((c) => c.id === cinema.clipId);
   if (clip) {
@@ -381,7 +384,9 @@ export function CinemaScene({ look }: { look: ShowdownLook }) {
  * else the awards live only in the presenter's browser: the "Awards on stage" card.
  */
 export function AwardsScene({ look, motion }: { look: ShowdownLook; motion: MotionPrefs }) {
-  const awards = useAwards();
+  const live = useAwards();
+  // The Presenter Tour's pretend ceremony (never the presenter's own winners).
+  const awards = useShowExtras().awards ?? live;
   const copy = LOOK_COPY[look].showcase;
   const steps = awardSteps(awards.categories);
   const at = Math.min(awards.at, steps.length - 1);

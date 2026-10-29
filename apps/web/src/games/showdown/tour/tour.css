@@ -831,6 +831,228 @@
 .tour-pickertab__row b {
   color: var(--text-0);
 }
+/* ---------- The Dashboard (1400 × 960 before the camera): sheet | rail | two columns of tools ---------- */
+.tour-dash .tour-console__main {
+  grid-template-columns: minmax(0, 1fr) 250px 664px;
+}
+.tour-dash__tools {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+.tour-dash__tools > .sdc-endpanel {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+}
+.tour-dash__col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.tour-dash__tools > .sdc-undotoast {
+  position: absolute;
+  left: auto;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+}
+.tour-mock .sdc-tool__fold {
+  cursor: default;
+}
+.tour-mock .sdc-tool__body {
+  padding: 8px 10px 10px;
+}
+.tour-mock .sdc-scenes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.tour-mock .sdc-scene {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken, #0006);
+  font: 700 12px / 1 var(--font-ui);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+.tour-mock .sdc-scene[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--text-0);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.tour-preview__scene {
+  font-size: 44px;
+  line-height: 1;
+}
+.tour-people {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tour-people li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.tour-people__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-station {
+  margin: 0 0 8px;
+}
+.tour-qrcopy {
+  display: inline-flex;
+  gap: 8px;
+}
+.tour-qr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.tour-qr__code {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(9, 6px);
+  grid-auto-rows: 6px;
+  padding: 5px;
+  border-radius: 4px;
+  background: #fff;
+}
+.tour-qr__code i[data-on] {
+  background: #000;
+}
+.tour-qr__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tour-cinema {
+  display: grid;
+  gap: 8px;
+}
+.tour-cinema__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tour-cinema__clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+}
+.tour-mock .sdc-cinema__frames {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.tour-mock .sdc-cinema__frames .sdc-card {
+  min-height: 34px;
+  justify-content: center;
+}
+.tour-mock .sdc-cinema__seek {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.tour-seek {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.tour-seek i {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  background: var(--accent);
+}
+.tour-mock .sdc-cinema__transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tour-awards {
+  display: grid;
+  gap: 8px;
+}
+.tour-awards__run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.tour-awards__cat {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+.tour-awards__place {
+  display: grid;
+  grid-template-columns: 32px 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.tour-awards__photo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px dashed var(--line-strong, var(--line));
+  color: var(--text-2);
+}
+.tour-awards__rank {
+  font-weight: 800;
+  color: var(--text-1);
+}
+.tour-results__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.tour-results__col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+/* The stage window full screen (F): its browser bar goes, so the share shows only the stage. */
+.tour-window__bar {
+  transition:
+    height 0.35s var(--ease-out, ease),
+    padding 0.35s var(--ease-out, ease);
+}
+.tour-window[data-full] .tour-window__bar {
+  height: 0;
+  padding-block: 0;
+  border-bottom: 0;
+  overflow: hidden;
+}
+
 /* A press-and-hold in the picture: the ring fills (instantly full in stills). */
 .tour-holdring .sdc-hold__arc {
   stroke-dashoffset: 50.27;
@@ -1770,8 +1992,10 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'buttons' 'rail' 'hint';
   }
+  /* Thirteen chapters don't fit one row on a phone: the chips wrap. */
   .tour__rail {
-    grid-auto-columns: minmax(34px, 1fr);
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
   }
   .tour__chiptitle {
     display: none;
