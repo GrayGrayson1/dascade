@@ -27,7 +27,18 @@ import {
 } from '@dascade/shared/games/showdown';
 import { SpecialGlyph } from './Board.tsx';
 import { LOOK_COPY, fill, joinAddress, type ShowcaseCopy } from './look.ts';
-import { finaleView, medalList, medalWords, placeWord, podiumColumns, type FinaleView } from './standings.ts';
+import {
+  finaleView,
+  medalCells,
+  medalKindsHeld,
+  medalLegend,
+  medalWords,
+  placeWord,
+  podiumColumns,
+  pointsLegend,
+  type FinaleView,
+  type LegendItem,
+} from './standings.ts';
 import { clipTime, useCinema } from './cinema.ts';
 import { JoinTicket } from './qr.tsx';
 import { awardSteps, fireworksAt, revealedPlaces, useAwards, type AwardPlace } from './awards.ts';
@@ -654,11 +665,32 @@ function Nums({ text }: { text: string }) {
   );
 }
 
-/** The medal wall: names with their medals (icons and counts), Olympic order as given. */
-export function StarsWall({ stars, max = 8, className }: { stars: readonly ShowdownStar[]; max?: number; className?: string }) {
+/**
+ * The medal wall: names with their medals (icons and counts), Olympic order as given. Each kind anyone
+ * holds gets a column, so the medals line up from row to row (a blank where someone has none). With
+ * `split`, more than four names go in two columns (down the first, then the second).
+ */
+export function StarsWall({
+  stars,
+  max = 8,
+  split = false,
+  className,
+}: {
+  stars: readonly ShowdownStar[];
+  max?: number;
+  split?: boolean;
+  className?: string;
+}) {
   const shown = stars.slice(0, max);
+  const kinds = medalKindsHeld(shown);
+  const columns = split && shown.length > 4;
   return (
-    <ol className={`sd-starwall ${className ?? ''}`} aria-label="Spotlight Stars">
+    <ol
+      className={`sd-starwall ${className ?? ''}`}
+      aria-label="Spotlight Stars"
+      data-split={columns ? 'true' : undefined}
+      style={{ '--kinds': kinds.length, '--rows': Math.ceil(shown.length / 2) } as CSSProperties}
+    >
       {shown.map((star, i) => (
         <li
           key={star.playerId}
@@ -668,9 +700,9 @@ export function StarsWall({ stars, max = 8, className }: { stars: readonly Showd
         >
           <span className="sd-starwall__name">{star.name}</span>
           <span className="sd-starwall__medals" aria-hidden>
-            {medalList(star.medals).map((m) => (
-              <span key={m.kind} className="sd-starwall__medal" data-medal={m.kind} title={m.title}>
-                <span className="sd-starwall__icon">{m.icon}</span>
+            {medalCells(star.medals, kinds).map((m) => (
+              <span key={m.kind} className="sd-starwall__medal" data-medal={m.kind} title={m.count ? m.title : undefined}>
+                {m.count ? <span className="sd-starwall__icon">{m.icon}</span> : null}
                 {m.count > 1 ? <span className="sd-num sd-starwall__count">×{m.count}</span> : null}
               </span>
             ))}
@@ -678,6 +710,37 @@ export function StarsWall({ stars, max = 8, className }: { stars: readonly Showd
         </li>
       ))}
     </ol>
+  );
+}
+
+function LegendLine({ label, items }: { label: string; items: readonly LegendItem[] }) {
+  return (
+    <div className="sd-legend__line">
+      <dt className="sd-legend__label">{label}</dt>
+      {items.map((item) => (
+        <dd key={item.key} className="sd-legend__item" data-key={item.key}>
+          {item.icon ? (
+            <span className="sd-legend__icon" role="img" aria-label={item.title}>
+              {item.icon}
+            </span>
+          ) : null}
+          <span>
+            <Nums text={item.text} />
+          </span>
+        </dd>
+      ))}
+    </div>
+  );
+}
+
+/** The key under the scores: how points add up and what earns each medal (in the columns' order: points, then medals). */
+export function ScoreLegend({ medals, points, gems, copy }: { medals: boolean; points: boolean; gems: boolean; copy: ShowcaseCopy }) {
+  if (!medals && !points) return null;
+  return (
+    <dl className="sd-legend" data-part="showdown-legend">
+      {points ? <LegendLine label={copy.legendPoints} items={pointsLegend(gems)} /> : null}
+      {medals ? <LegendLine label={copy.legendMedals} items={medalLegend()} /> : null}
+    </dl>
   );
 }
 
@@ -707,60 +770,93 @@ function StandingRows({ rows, copy }: { rows: readonly ShowdownScoreRow[]; copy:
   );
 }
 
-/** The Standings card (between rounds): the top five Guessers and, with medals after each round, the Spotlight Stars. */
+/**
+ * The Standings card (between rounds): the top five Guessers and, with medals after each round, the
+ * Spotlight Stars. With both, each gets its own column and heading (points and medals never mix),
+ * under the card's name; a legend below says what earns each medal and how points add up.
+ */
 export function StandingsScene({
   scoreboard,
   look,
   code = '',
   qr = false,
+  gems = false,
 }: {
   scoreboard: ShowdownScoreboard | null;
   look: ShowdownLook;
   /** With `qr`, the medium join ticket beside the standings (never on phones). */
   code?: string;
   qr?: boolean;
+  /** Hidden gems pay double (the legend says so). */
+  gems?: boolean;
 }) {
   const copy = LOOK_COPY[look].showcase;
+  const points = Boolean(scoreboard?.points);
   const top = scoreboard?.points ? scoreboard.top : [];
   const stars = scoreboard && scoreboard.medals === 'round' ? scoreboard.stars : [];
-  const both = Boolean(scoreboard?.points) && stars.length > 0;
+  const both = points && stars.length > 0;
+  const rows = top.length ? (
+    <StandingRows rows={top} copy={copy} />
+  ) : (
+    <p className="sd-scene__tagline sd-standings__empty">{copy.standingsEmpty}</p>
+  );
+  const of =
+    scoreboard?.points && scoreboard.of > top.length ? (
+      <p className="sd-standings__of">
+        <Nums text={fill(copy.standingsOf, { n: scoreboard.of })} />
+      </p>
+    ) : null;
   return (
     <section
       className="sd-scene sd-scene--card sd-scene--standings"
       data-part="showdown-standings"
       data-both={both ? 'true' : undefined}
+      data-medals-only={!points && stars.length ? 'true' : undefined}
       data-ticket={qr && code ? 'medium' : undefined}
       aria-label={copy.standingsTitle}
     >
       <div className="sd-scene__rays" aria-hidden />
       <div className="sd-scene__halo" aria-hidden />
       <div className="sd-scene__lockup sd-scene__lockup--standings">
-        <p className="sd-scene__kicker">
-          <Words text={copy.standingsKicker} />
-        </p>
-        <h2 className="sd-scene__headline sd-standings__title" style={{ '--len': 14 } as CSSProperties}>
-          <Words text={scoreboard?.points ? copy.standingsTitle : copy.stars} />
-        </h2>
-        <div className="sd-standings">
-          {scoreboard?.points ? (
-            top.length ? (
-              <StandingRows rows={top} copy={copy} />
-            ) : (
-              <p className="sd-scene__tagline sd-standings__empty">{copy.standingsEmpty}</p>
-            )
-          ) : null}
-          {stars.length ? (
-            <div className="sd-standings__stars">
-              {both ? <p className="sd-standings__sub">{copy.stars}</p> : null}
-              <StarsWall stars={stars} max={both ? 5 : 8} />
+        {both ? (
+          <h2 className="sd-scene__headline sd-standings__title">
+            <Words text={copy.standingsKicker} />
+          </h2>
+        ) : (
+          <>
+            <p className="sd-scene__kicker">
+              <Words text={copy.standingsKicker} />
+            </p>
+            <h2 className="sd-scene__headline sd-standings__title" style={{ '--len': 14 } as CSSProperties}>
+              <Words text={points ? copy.standingsTitle : copy.stars} />
+            </h2>
+          </>
+        )}
+        {both ? (
+          <div className="sd-standings">
+            <div className="sd-standings__col" data-part="showdown-standings-points">
+              <h3 className="sd-standings__head">
+                <span className="sd-standings__sub">{copy.standingsTitle}</span>
+                <span className="sd-standings__hint">{copy.pointsSub}</span>
+              </h3>
+              {rows}
             </div>
-          ) : null}
-        </div>
-        {scoreboard?.points && scoreboard.of > top.length ? (
-          <p className="sd-standings__of">
-            <Nums text={fill(copy.standingsOf, { n: scoreboard.of })} />
-          </p>
-        ) : null}
+            <div className="sd-standings__col" data-part="showdown-standings-stars">
+              <h3 className="sd-standings__head">
+                <span className="sd-standings__sub">{copy.stars}</span>
+                <span className="sd-standings__hint">{copy.starsSub}</span>
+              </h3>
+              <StarsWall stars={stars} max={5} />
+            </div>
+          </div>
+        ) : (
+          <div className="sd-standings">
+            {points ? rows : null}
+            {stars.length ? <StarsWall stars={stars} max={6} /> : null}
+          </div>
+        )}
+        {of}
+        <ScoreLegend medals={stars.length > 0} points={points} gems={gems} copy={copy} />
       </div>
       {qr && code ? <JoinTicket code={code} look={look} size="medium" /> : null}
     </section>
@@ -785,7 +881,8 @@ function FinaleStars({ stars, show, copy }: { stars: readonly ShowdownStar[]; sh
           <span>{copy.starsSub}</span>
           <Flourish />
         </p>
-        <StarsWall stars={stars} max={8} className="sd-starwall--finale" />
+        <StarsWall stars={stars} max={8} split className="sd-starwall--finale" />
+        <ScoreLegend medals points={false} gems={false} copy={copy} />
       </div>
     </section>
   );

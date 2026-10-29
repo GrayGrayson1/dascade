@@ -2271,14 +2271,18 @@
   font-size: 3.6cqh;
   color: var(--sd-ink);
 }
+/* One column per medal kind anyone holds (--kinds, from StarsWall), so the medals line up row to row. */
 .sd-starwall__medals {
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.8cqw;
+  display: grid;
+  grid-template-columns: repeat(var(--kinds, 1), 2.1em);
+  gap: 0.35em;
   font-size: 3.4cqh;
   line-height: 1;
   white-space: nowrap;
+}
+.sd-starwall__medal {
+  display: inline-flex;
+  align-items: baseline;
 }
 .sd-starwall__count {
   margin-left: 0.15em;
@@ -2310,10 +2314,273 @@
   animation: sd-rise 0.55s calc(0.6s + var(--i, 0) * 0.12s) ease-out both;
 }
 
+/*
+ * The Standings card keeps to the band between the host (bottom left, his bubble beside him) and the
+ * join ticket (bottom right; .sd-scene[data-ticket='medium'] below sets the right side), above the
+ * bubble, so nothing on it sits on anything else.
+ */
+.sd-scene.sd-scene--standings {
+  padding: 0 3cqw 15cqh 21cqw;
+}
+.sd-scene.sd-scene--standings[data-ticket='medium'] {
+  padding-right: 22.6cqw;
+}
+/* Both tiers: the card's name over two columns, each with its own heading (points | medals). */
+.sd-scene--standings[data-both] .sd-scene__lockup {
+  width: 100%;
+  max-width: none;
+  gap: 2cqh;
+}
+.sd-scene--standings[data-both] .sd-standings__title.sd-scene__headline {
+  max-width: none;
+  font-size: calc(5cqh * var(--sd-title-k, 1));
+}
+/* The columns, and the legend's two keys under them (points | medals), share one template. */
+.sd-scene--standings[data-both] :is(.sd-standings, .sd-legend) {
+  width: 100%;
+  grid-auto-flow: row;
+  grid-template-columns: minmax(0, 23fr) minmax(0, 30fr);
+  gap: 2cqw;
+}
+.sd-standings__col {
+  display: grid;
+  align-content: start;
+  gap: 0.9cqh;
+  min-width: 0;
+}
+.sd-standings__head {
+  display: grid;
+  gap: 0.3cqh;
+  margin: 0 0 0.3cqh;
+  font: inherit;
+}
+.sd-standings__head .sd-standings__sub {
+  margin: 0;
+}
+.sd-standings__hint {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 1.9cqh;
+  color: var(--sd-ink-dim);
+}
+.sd-scene--standings[data-both] :is(.sd-standings__row, .sd-starwall__row) {
+  min-width: 0;
+  padding: 0.9cqh 1cqw;
+  column-gap: 0.9cqw;
+}
+.sd-scene--standings[data-both] :is(.sd-standings__name, .sd-starwall__name) {
+  font-size: 2.8cqh;
+}
+.sd-scene--standings[data-both] .sd-standings__rank {
+  min-width: 1.6ch;
+  font-size: 3.2cqh;
+}
+.sd-scene--standings[data-both] .sd-standings__pts {
+  font-size: 2cqh;
+}
+.sd-scene--standings[data-both] .sd-standings__pts .sd-num {
+  font-size: 3cqh;
+}
+.sd-scene--standings[data-both] .sd-starwall__medals {
+  grid-template-columns: repeat(var(--kinds, 1), 1.9em);
+  gap: 0.12em;
+  font-size: 2.5cqh;
+}
+.sd-scene--standings[data-both] .sd-starwall__count {
+  margin-left: 0.05em;
+  font-size: 0.6em;
+}
+.sd-scene--standings[data-both] .sd-standings__of {
+  font-size: 1.9cqh;
+}
+
+/*
+ * The legend under the scores (and the finale's medal wall): what earns each medal, how points add
+ * up. One key per tier, each in its own box; with both tiers they sit under their columns.
+ */
+.sd-legend {
+  display: grid;
+  justify-items: center;
+  align-items: stretch;
+  gap: 0.8cqh;
+  margin: 0.4cqh 0 0;
+  font-family: var(--font-ui);
+  color: var(--sd-ink);
+}
+.sd-legend__line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6cqh 1.4cqw;
+  padding: 1cqh 1.2cqw;
+  border-radius: 1.4cqh;
+  background: color-mix(in srgb, var(--sd-panel) 85%, transparent);
+  border: 0.25cqh solid var(--sd-panel-edge);
+}
+/* Under a column: the label, then the entries two to a row (the long ones get a row to themselves). */
+.sd-scene--standings[data-both] .sd-legend {
+  justify-items: stretch;
+}
+.sd-scene--standings[data-both] .sd-legend__line {
+  display: grid;
+  text-align: left;
+  grid-template-columns: repeat(2, max-content);
+  justify-content: start;
+  align-content: start;
+  gap: 0.5cqh 1.4cqw;
+}
+.sd-scene--standings[data-both] :is(.sd-legend__label, .sd-legend__item[data-key='value'], .sd-legend__item[data-key='ribbon']) {
+  grid-column: 1 / -1;
+}
+.sd-legend__label {
+  font-weight: 900;
+  font-size: 1.8cqh;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sd-gold);
+}
+.sd-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  font-weight: 700;
+  font-size: 2.1cqh;
+  white-space: nowrap;
+}
+.sd-legend__icon {
+  font-size: 1.25em;
+  line-height: 1;
+}
+.sd-stage[data-motion='on'] .sd-legend {
+  animation: sd-rise 0.55s 1.3s ease-out both;
+}
+/* Medals only: a shorter name, so it stays clear of the moon. */
+.sd-scene--standings[data-medals-only] .sd-standings__title.sd-scene__headline {
+  font-size: calc(7.5cqh * var(--sd-title-k, 1));
+}
+/* The finale's medal wall, in the same band; more than four stars go in two columns (down, then across). */
+.sd-scene.sd-scene--stars {
+  padding: 0 8cqw 13cqh 21cqw;
+}
+.sd-starwall[data-split] {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--rows, 4), auto);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2cqw;
+}
+.sd-starwall[data-split] .sd-starwall__row {
+  min-width: 0;
+}
+.sd-starwall[data-split] .sd-starwall__medals {
+  grid-template-columns: repeat(var(--kinds, 1), 1.9em);
+  gap: 0.12em;
+  font-size: 2.6cqh;
+}
+.sd-starwall[data-split] .sd-starwall__count {
+  margin-left: 0.05em;
+  font-size: 0.6em;
+}
+
+/*
+ * Narrow stages (4:3): the columns use the whole width above the host and the ticket; the line under
+ * them and the legend (its keys stacked) keep to the gap between the two.
+ */
+@container sd (aspect-ratio < 1.45) {
+  .sd-scene.sd-scene--standings[data-ticket='medium'] {
+    padding-right: 29cqw;
+  }
+  .sd-scene--standings :is(.sd-standings__row, .sd-starwall__row) {
+    min-width: 0;
+  }
+  .sd-scene.sd-scene--standings[data-both] {
+    place-items: start center;
+    padding: 5cqh 3cqw 0;
+  }
+  /* Over the left two thirds, clear of the moon. */
+  .sd-scene--standings[data-both] .sd-standings__title.sd-scene__headline {
+    justify-self: start;
+    width: 64cqw;
+  }
+  /* One tier: the name and the list over the left two thirds (clear of the moon and the ticket). */
+  .sd-scene.sd-scene--standings:not([data-both]) {
+    place-items: start;
+    padding: 5cqh 3cqw 0;
+  }
+  .sd-scene--standings:not([data-both]) .sd-scene__lockup {
+    width: 64cqw;
+  }
+  .sd-scene--standings:not([data-both]) .sd-scene__kicker {
+    display: none;
+  }
+  .sd-scene--standings:not([data-both]) .sd-standings {
+    width: 100%;
+  }
+  .sd-scene--standings:not([data-both]) .sd-standings__title.sd-scene__headline {
+    font-size: calc(7cqh * var(--sd-title-k, 1));
+  }
+  .sd-scene--standings:not([data-both]) :is(.sd-standings__row, .sd-starwall__row) {
+    padding: 0.8cqh 1.4cqw;
+  }
+  .sd-scene--standings:not([data-both]) :is(.sd-standings__name, .sd-starwall__name) {
+    font-size: 3cqh;
+  }
+  .sd-scene--standings[data-both] .sd-standings {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .sd-scene--standings[data-both] :is(.sd-standings__list, .sd-starwall) {
+    gap: 0.7cqh;
+  }
+  .sd-scene--standings[data-both] :is(.sd-standings__row, .sd-starwall__row) {
+    padding: 0.7cqh 1.2cqw;
+  }
+  .sd-scene--standings[data-both] :is(.sd-standings__name, .sd-starwall__name) {
+    font-size: 2.6cqh;
+  }
+  /* The line under the lists and the legend (its keys stacked): in the gap between host and ticket. */
+  .sd-scene.sd-scene--standings :is(.sd-standings__of, .sd-legend) {
+    justify-self: start;
+    width: 45cqw;
+    margin-left: 18.6cqw;
+  }
+  .sd-scene.sd-scene--standings .sd-legend {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+    gap: 0.8cqh;
+  }
+  .sd-scene.sd-scene--standings .sd-legend__line {
+    display: flex;
+    justify-content: flex-start;
+  }
+  /* The finale's medal wall: its titles over the left two thirds, the wall across the stage, the
+     legend right of the host. */
+  .sd-scene.sd-scene--stars {
+    place-items: start center;
+    padding: 4cqh 3cqw 0;
+  }
+  .sd-scene--stars .sd-scene__lockup {
+    width: 100%;
+    max-width: none;
+  }
+  .sd-scene--stars :is(.sd-scene__kicker, .sd-scene__headline, .sd-scene__tagline) {
+    justify-self: start;
+    width: 64cqw;
+  }
+  .sd-scene--stars .sd-starwall {
+    width: 100%;
+  }
+  .sd-scene--stars .sd-legend {
+    justify-self: start;
+    width: 74cqw;
+    margin-left: 18.6cqw;
+  }
+}
+
 /* ---- The paced finale: the podium (2nd, 1st, 3rd), each place revealed in turn ---- */
 .sd-podium__title.sd-scene__headline,
 .sd-scene--stars .sd-scene__headline {
-  font-size: calc(9cqh * var(--sd-title-k, 1));
+  font-size: calc(7.5cqh * var(--sd-title-k, 1));
 }
 .sd-podium {
   list-style: none;

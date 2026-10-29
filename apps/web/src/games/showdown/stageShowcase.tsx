@@ -255,7 +255,7 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
             pops={pops}
           />
         ) : scene === 'standings' ? (
-          <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr} />
+          <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr} gems={Boolean(settings?.gems)} />
         ) : scene === 'cinema' ? (
           <CinemaScene look={look} />
         ) : scene === 'awards' ? (

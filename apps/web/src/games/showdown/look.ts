@@ -142,6 +142,11 @@ export interface ShowcaseCopy {
   /** The medal wall's name and its sub line. */
   stars: string;
   starsSub: string;
+  /** The Top Guessers' sub line beside the medal wall (both tiers on the Standings card). */
+  pointsSub: string;
+  /** The legend under the scores: its medal and points labels. */
+  legendMedals: string;
+  legendPoints: string;
   /** "pts" after a score. */
   pts: string;
   /** The finale's podium kicker, and the host's lines for the medal ceremony and each place. */
@@ -230,6 +235,9 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
+      pointsSub: 'Points from your Top 10 guesses',
+      legendMedals: 'Medals',
+      legendPoints: 'Points',
       pts: 'pts',
       podium: 'The Top Guessers',
       starsHost: 'A round of applause for our Spotlight Stars!',
@@ -303,6 +311,9 @@ export const LOOK_COPY: Record<ShowdownLook, LookCopy> = {
       standingsOf: '{n} on the board — your rank is on your phone',
       stars: 'Spotlight Stars',
       starsSub: 'Medals from the hot seat',
+      pointsSub: 'Points from your Top 10 guesses',
+      legendMedals: 'Medals',
+      legendPoints: 'Points',
       pts: 'pts',
       podium: 'The Top Guessers',
       starsHost: 'A spooktacular round of applause for our Spotlight Stars!',
