@@ -2316,14 +2316,12 @@
 
 /*
  * The Standings card keeps to the band between the host (bottom left, his bubble beside him) and the
- * join ticket (bottom right; .sd-scene[data-ticket='medium'] below sets the right side), above the
- * bubble, so nothing on it sits on anything else.
+ * join ticket (bottom right), above the bubble, so nothing on it sits on anything else. The band stays
+ * put when there's no ticket (the last round's card): the card never shifts and stays clear of the moon.
  */
-.sd-scene.sd-scene--standings {
-  padding: 0 3cqw 15cqh 21cqw;
-}
+.sd-scene.sd-scene--standings,
 .sd-scene.sd-scene--standings[data-ticket='medium'] {
-  padding-right: 22.6cqw;
+  padding: 0 22.6cqw 15cqh 21cqw;
 }
 /* Both tiers: the card's name over two columns, each with its own heading (points | medals). */
 .sd-scene--standings[data-both] .sd-scene__lockup {
@@ -2488,9 +2486,6 @@
  * them and the legend (its keys stacked) keep to the gap between the two.
  */
 @container sd (aspect-ratio < 1.45) {
-  .sd-scene.sd-scene--standings[data-ticket='medium'] {
-    padding-right: 29cqw;
-  }
   .sd-scene--standings :is(.sd-standings__row, .sd-starwall__row) {
     min-width: 0;
   }
