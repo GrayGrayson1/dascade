@@ -773,20 +773,16 @@ function StandingRows({ rows, copy }: { rows: readonly ShowdownScoreRow[]; copy:
 /**
  * The Standings card (between rounds): the top five Guessers and, with medals after each round, the
  * Spotlight Stars. With both, each gets its own column and heading (points and medals never mix),
- * under the card's name; a legend below says what earns each medal and how points add up.
+ * under the card's name; a legend below says what earns each medal and how points add up. No join
+ * ticket: the presenter shares this card to the meeting (the Join pop-up, J, is there for latecomers).
  */
 export function StandingsScene({
   scoreboard,
   look,
-  code = '',
-  qr = false,
   gems = false,
 }: {
   scoreboard: ShowdownScoreboard | null;
   look: ShowdownLook;
-  /** With `qr`, the medium join ticket beside the standings (never on phones). */
-  code?: string;
-  qr?: boolean;
   /** Hidden gems pay double (the legend says so). */
   gems?: boolean;
 }) {
@@ -812,7 +808,6 @@ export function StandingsScene({
       data-part="showdown-standings"
       data-both={both ? 'true' : undefined}
       data-medals-only={!points && stars.length ? 'true' : undefined}
-      data-ticket={qr && code ? 'medium' : undefined}
       aria-label={copy.standingsTitle}
     >
       <div className="sd-scene__rays" aria-hidden />
@@ -858,7 +853,6 @@ export function StandingsScene({
         {of}
         <ScoreLegend medals={stars.length > 0} points={points} gems={gems} copy={copy} />
       </div>
-      {qr && code ? <JoinTicket code={code} look={look} size="medium" /> : null}
     </section>
   );
 }
