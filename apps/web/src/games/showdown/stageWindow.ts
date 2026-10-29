@@ -24,7 +24,7 @@
  * Full screen (the browser bar off the Teams share): a popup's address bar can't be hidden, but full
  * screen hides everything. F in the stage window toggles it (a key press there is the user gesture
  * the browser asks for: one in the console doesn't carry over), and the window's chrome layer
- * (StageWindowChrome.tsx) has the Full screen button and a hint that hides itself. That layer sits
+ * (StageWindowChrome.tsx) has the Full screen button, invisible until hovered. That layer sits
  * above the Cinema layer (cinema.ts, z-index 8) and below the hold card (z-index 10), so the button
  * is reachable in every scene.
  */
@@ -36,7 +36,7 @@ export interface StageWindowState {
   /** Where the portal renders (null while closed). */
   container: HTMLElement | null;
   /**
-   * The window's chrome layer (the Full screen button and its hint): a sibling of the container, above
+   * The window's chrome layer (the Full screen button): a sibling of the container, above
    * the Cinema layer. Null while closed.
    */
   chrome: HTMLElement | null;

@@ -148,7 +148,7 @@ export function ShowdownView() {
   }, [presenting, stageWin.open, sceneCard, look]);
 
   // The stage, and over it (and over the Cinema layer) the window's own chrome: the Full screen button
-  // and the hint that takes the browser bar off the share (StageWindowChrome.tsx; F is stageWindow.ts).
+  // that takes the browser bar off the share (StageWindowChrome.tsx; F is stageWindow.ts).
   const portal =
     stageWin.container && role.role === 'presenter'
       ? createPortal(

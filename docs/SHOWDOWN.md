@@ -449,10 +449,10 @@ Notes:
   it plays no sound of its own. Full screen hides the popup's title and address bar on the share: F
   in the window toggles it (the key press there is the gesture the browser needs; the console's
   doesn't carry over), and a chrome layer above every scene, the Cinema layer included
-  (`StageWindowChrome.tsx`), has the Full screen button and a hint that shows when the window opens
-  and when the mouse moves, then hides. Other devices use the big-screen link, which joins as a normal
-  connection marked `screen`; until the browser lets it play audio (a first click or tap) it shows
-  "Click or tap here for the show's sound".
+  (`StageWindowChrome.tsx`), has the Full screen button. Nothing pops up over the share: the button
+  stays invisible until you hover its corner or tab to it. Other devices use the big-screen link,
+  which joins as a normal connection marked `screen`; until the browser lets it play audio (a first
+  click or tap) it shows "Click or tap here for the show's sound".
 - **Show feed** (`fx.ts`): one per-device store of the latest event, host line, cue and reactions.
   Every stage on the device animates from it, and sounds play once per device.
 - **Crowd load:** reactions go out in 250 ms batches, and while guesses pour in the presenter's sheet
