@@ -214,7 +214,8 @@ kind a column so the medals line up. A legend under the scores (`ScoreLegend`, b
 and the scoring constants in `standings.ts`) says what earns each medal and how points add up (hidden
 gems only when on); the finale's medal ceremony carries the medal key too, its wall in two columns past
 four names. Everything keeps to the band between the host (and his bubble) and the join ticket, so
-nothing covers anything, on 16:9 and on 4:3 stages. The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
+nothing covers anything, on 16:9 and on 4:3 stages. After the last round nobody's joining: that
+card has no join ticket (the band stays put, so nothing shifts). The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
 public `finaleStep`, a `finale` event per step so every screen plays the cue once) through
 `finaleSteps(finale)`: the wrap-up → the medal ceremony (unless Never) → 3rd → 2nd → 1st (the podium
 is the top three Guessers; ties share a place). Prize time lists the podium and the medal winners.

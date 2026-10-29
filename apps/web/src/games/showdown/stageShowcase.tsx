@@ -155,6 +155,8 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
   const show = settings ? showTitle(settings) : 'DAS Survey Showdown';
 
   const inShow = phase === 'PLAYING' && board !== null;
+  // After the last round nobody's joining: the final standings card has no join ticket.
+  const lastRound = board ? board.round >= board.totalRounds - 1 : false;
   const scene: ShowcaseScene = standings
     ? 'standings'
     : sceneCard === 'cinema'
@@ -255,7 +257,7 @@ export function ShowcaseStage({ look, settings, variant, corner, display: displa
             pops={pops}
           />
         ) : scene === 'standings' ? (
-          <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr} gems={Boolean(settings?.gems)} />
+          <StandingsScene scoreboard={scoreboard} look={look} code={code} qr={qr && !lastRound} gems={Boolean(settings?.gems)} />
         ) : scene === 'cinema' ? (
           <CinemaScene look={look} />
         ) : scene === 'awards' ? (
