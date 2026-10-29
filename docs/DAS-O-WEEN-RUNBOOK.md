@@ -9,9 +9,10 @@ The game is DASCADE's **DAS Survey Showdown** in its **Presenter Showcase** form
 <https://dascade.onrender.com>.
 
 > **Watch the presenter tour** first: <https://dascade.onrender.com/tutorial/showdown> (animated, on
-> practice boards). It's also a click away in the lobby and in the console (**Tour**, in the top bar).
-> Opening it during the show never changes the show. Boo's Backstage Tour video still shows the
-> previous console layout.
+> practice boards, about 6 minutes). It's also a click away in the lobby and in the console (**Presenter
+> tour**, in the top bar). Opening it during the show never changes the show. It walks through the
+> Dashboard: full screen, the join QR, the picker, scenes and Cinema, standings, the finale and the
+> awards. Boo's Backstage Tour video is the same tour with Boo narrating.
 
 ---
 

@@ -221,8 +221,10 @@ the finished turns and the finale step are in the snapshot; older boxes restore 
 
 ## The Presenter Tour
 
-An animated, self-paced walk through running a Presenter Showcase show (about 3½ minutes, ten
-chapters): `/tutorial/showdown`, or **Watch the presenter tour** on the presenter's setup card and
+An animated, self-paced walk through running a Presenter Showcase show on the console's Dashboard
+(about 6 minutes, thirteen chapters: the big picture, getting ready with full screen and the join QR,
+the Dashboard and its Classic switch, right and wrong answers, the picker, #5, the clock with the
+standings, the Join pop-up, scenes and Cinema, the finale, the awards ceremony and the safety net): `/tutorial/showdown`, or **Watch the presenter tour** on the presenter's setup card and
 **Tour** in the showcase console's top bar (a large dialog). The film cut, _Boo's Backstage Tour_, is
 the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1080.
 
@@ -237,8 +239,14 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
   mock console, a meeting-chat line and a caption. `[[Name]]` in a caption is a control's exact name
   (a test checks it against the console), `{{X}}` a key. **Practice content only**: the boards are the
   rehearsal preset's candy and costume lists, never the real show's answers (`secrecy.test.ts`).
+- **The presenter's own stores stay out of it.** Cinema and the awards live in the presenter's browser
+  (`cinema.ts`, `awards.ts`), not the room, so a demo source can also carry stand-ins for them
+  (`ShowSource.extras`, read with `useShowExtras()`): the tour's stage plays a pretend cartoon and
+  ceremony, never the viewer's own clips or winners. The demo show also seats practice guests, draws the
+  hot seat (the real spotlight sweep), raises the Join pop-up and the Standings card, and steps the
+  paced finale.
 - **The player** (`tour/TourPlayer.tsx`): a picture of the console (`tour/MockConsole.tsx`, inert,
-  drawn with the console's own classes) with a cursor, a spotlight and a zooming camera, the stage
+  drawn with the console's own classes, on the Dashboard: the sheet, the rail and two columns of tools) with a cursor, a spotlight and a zooming camera, the stage
   window, the meeting chat, captions with Boo, and a chapter rail. Sound is off until the viewer turns
   it on (this device only). Space plays and pauses, ←/→ change chapters. Under reduced motion or
   effects off nothing plays by itself: each beat is a still to step through.
