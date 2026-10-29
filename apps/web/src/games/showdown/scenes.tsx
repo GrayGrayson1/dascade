@@ -658,20 +658,20 @@ function Nums({ text }: { text: string }) {
 export function StarsWall({ stars, max = 8, className }: { stars: readonly ShowdownStar[]; max?: number; className?: string }) {
   const shown = stars.slice(0, max);
   return (
-    <ol className={`sd-stars ${className ?? ''}`} aria-label="Spotlight Stars">
+    <ol className={`sd-starwall ${className ?? ''}`} aria-label="Spotlight Stars">
       {shown.map((star, i) => (
         <li
           key={star.playerId}
-          className="sd-stars__row"
+          className="sd-starwall__row"
           style={{ '--i': i } as CSSProperties}
           aria-label={`${star.name}: ${medalWords(star.medals)}`}
         >
-          <span className="sd-stars__name">{star.name}</span>
-          <span className="sd-stars__medals" aria-hidden>
+          <span className="sd-starwall__name">{star.name}</span>
+          <span className="sd-starwall__medals" aria-hidden>
             {medalList(star.medals).map((m) => (
-              <span key={m.kind} className="sd-stars__medal" data-medal={m.kind} title={m.title}>
-                <span className="sd-stars__icon">{m.icon}</span>
-                {m.count > 1 ? <span className="sd-num sd-stars__count">×{m.count}</span> : null}
+              <span key={m.kind} className="sd-starwall__medal" data-medal={m.kind} title={m.title}>
+                <span className="sd-starwall__icon">{m.icon}</span>
+                {m.count > 1 ? <span className="sd-num sd-starwall__count">×{m.count}</span> : null}
               </span>
             ))}
           </span>
@@ -785,7 +785,7 @@ function FinaleStars({ stars, show, copy }: { stars: readonly ShowdownStar[]; sh
           <span>{copy.starsSub}</span>
           <Flourish />
         </p>
-        <StarsWall stars={stars} max={8} className="sd-stars--finale" />
+        <StarsWall stars={stars} max={8} className="sd-starwall--finale" />
       </div>
     </section>
   );
