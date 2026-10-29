@@ -135,7 +135,12 @@ Showdown. What differs:
     The chosen clip plays in a frame (Retro TV, Haunted cinema, Gilded portrait) in the stage window,
     as **plain DOM** layered over the stage (`.sd-cinema`), not React: it keeps playing when the
     console loses its room for a moment (the portal unmounts then; `holdStageWindow` leaves a playing
-    video uncovered), and the frame never re-renders while it plays. Its sound joins the one mixer
+    video uncovered), and the frame never re-renders while it plays. Nothing clips the video (no
+    rounded overflow, clip-path or mask on it or its parents: a rounded clip made the Retro TV stutter
+    on a presenter's laptop); the TV's rounded glass is a still overlay (`.sd-cinema__bezel`) over the
+    picture's corners, and the stage under the opaque layer stops rendering (`content-visibility`)
+    while Cinema is up. The tab drives it: Play/Pause, back and forward 10 s, Restart, and a seek bar
+    (drag or click it; arrows ±5 s, Page Up/Down ±10 s, Home/End). Its sound joins the one mixer
     (`mixer.routeMedia` → the master bus; `element.volume` follows the master level where the browser
     refuses). A browser that won't start sound in a window nobody has clicked says so in the console,
     and the next click in the stage window starts it. Every other screen shows the "Cartoon break:
