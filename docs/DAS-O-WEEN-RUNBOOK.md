@@ -57,7 +57,8 @@ new boards). They live in a show file on your computer:
    panel with a hold); put up **Prize time**.
 5. Try **Cinema** on the real work laptop, through the Teams share: drawer → **Cinema** → **Load
    video…**, pick the cartoon file, press `V`, then **Play**. Check the colleague hears it (see the
-   Teams checklist below), then press `B` for the board.
+   Teams checklist below) and sees it play smoothly in the frame you'll use; try the seek bar and the
+   10 s buttons. Then press `B` for the board.
 
 ---
 
@@ -133,7 +134,9 @@ The scene strip above the console's preview switches the stage window; you never
 | **Cards**  |     | Opens the Cards tab: Welcome, Be right back, Standings, Prize time, Thanks | The card                                 |
 
 Leaving the Show while the round clock runs **pauses the clock**; press `P` to start it again. The
-jukebox pauses during Cinema and comes back in the next break.
+jukebox pauses during Cinema and comes back in the next break. The Cinema tab runs the video: **Play**
+/ **Pause**, back and forward **10 s**, **Restart**, and a seek bar (drag it or click it; once you've
+used it, `B` still works).
 
 ### Event cue sheet (60 minutes)
 

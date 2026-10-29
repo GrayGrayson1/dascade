@@ -14,6 +14,12 @@
  * re-renders while the video plays, so Teams spends its bandwidth on the picture. The console drives
  * it through this store; the stage window only shows it.
  *
+ * Smooth on a shared screen: nothing clips the video to a shape. It is a plain rectangle, and the Retro TV's
+ * rounded bezel and glass shading are a still overlay painted over its corners (a rounded clip on a
+ * video costs a masked composite every frame, and the TV stuttered on a presenter's laptop). While the
+ * scene is up, the stage under it (cinema.css) stops rendering: its animations would otherwise
+ * redraw the whole window every frame behind an opaque layer.
+ *
  * Sound (one audio pipeline): the video joins the mixer (mixer.routeMedia → the master bus), so the
  * device's master volume and mute win; where the browser refuses, element.volume follows the master
  * level instead. The show pauses the jukebox while Cinema is up (showAudio.ts).
@@ -207,6 +213,8 @@ function build(doc: Document): Layer {
   video.playsInline = true;
   video.preload = 'auto';
   video.disablePictureInPicture = true;
+  // The TV's bezel and glass, over the picture (the video itself is never clipped).
+  el(doc, 'i', 'sd-cinema__bezel', glass).setAttribute('aria-hidden', 'true');
   const side = el(doc, 'div', 'sd-cinema__side', frame);
   side.setAttribute('aria-hidden', 'true');
   el(doc, 'i', 'sd-cinema__knob', side);
@@ -234,6 +242,9 @@ function wire(video: HTMLVideoElement, root: HTMLElement): void {
     if (mine()) set({ ended: true });
   });
   video.addEventListener('timeupdate', () => {
+    if (mine()) set({ time: video.currentTime });
+  });
+  video.addEventListener('seeked', () => {
     if (mine()) set({ time: video.currentTime });
   });
   const duration = () => {
@@ -362,6 +373,40 @@ export function cinemaRestart(): void {
   l.video.pause();
   l.video.currentTime = 0;
   set({ time: 0, ended: false });
+}
+
+/** How far the console's back and forward buttons jump (seconds). */
+export const CINEMA_SKIP = 10;
+
+/**
+ * Where a seek lands: inside the clip. A clip whose length isn't known yet (some recorded .webm files
+ * learn it only at their end) is only held at its start; the browser stops it at its end.
+ */
+export function seekTarget(seconds: number, duration: number): number {
+  const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  return Number.isFinite(duration) && duration > 0 ? Math.min(duration, t) : t;
+}
+
+/**
+ * Jumps to `seconds` in the chosen clip, playing or paused (it keeps doing what it was doing). For
+ * the console's seek bar: a drag calls it on every move, and the browser keeps only the latest seek.
+ * Paused on its last moment counts as ended, so Play starts it again from the top (playing, the clip
+ * ends there by itself).
+ */
+export function cinemaSeek(seconds: number): void {
+  const l = layer;
+  if (!l || !clipOf(view.clipId) || !l.video.getAttribute('src')) return;
+  const length = l.video.duration;
+  const t = seekTarget(seconds, length);
+  l.video.currentTime = t;
+  set({ time: t, ended: l.video.paused && Number.isFinite(length) && length > 0 && t >= length - 0.05 });
+}
+
+/** Back (negative) or forward by `seconds` from where the video is now. */
+export function cinemaSkip(seconds: number): void {
+  const l = layer;
+  if (!l) return;
+  cinemaSeek(l.video.currentTime + seconds);
 }
 
 // The stage window comes and goes: the layer lives in its page, so it goes with it.

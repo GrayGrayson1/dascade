@@ -3,7 +3,18 @@
  * Game art, in the show's look (--sd-* from [data-look]) and the show's pinned fonts. The frame is
  * still while the video plays (Teams spends its bandwidth on the picture); the only motion is the
  * curtain opening as the scene comes up, and that stops with reduced motion or effects off.
+ *
+ * Smooth playback: nothing clips the video to a shape (no rounded corners on a clipping parent, no
+ * clip-path or mask on it or its parents), so the browser can hand each frame straight to the screen.
+ * The TV's rounded glass is a still overlay (.sd-cinema__bezel) painted over the picture's corners.
  * ===================================================================== */
+
+/* While Cinema is up it covers the whole window (opaque), so the stage under it stops rendering: its
+   bulbs, bats and sweeps would otherwise redraw the window every frame for nothing. It keeps its
+   layout, so the board is back the instant the scene comes down. */
+body:has(> .sd-cinema:not([hidden])) > .sd-window__root {
+  content-visibility: hidden;
+}
 
 .sd-cinema {
   position: fixed;
@@ -53,15 +64,19 @@
   height: 100%;
   aspect-ratio: 4 / 3;
   max-width: 82cqw;
-  overflow: hidden;
   background: #000;
 }
+/* A plain rectangle that fills the glass exactly: never clipped to a shape (see the top of this file). */
 .sd-cinema__video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #000;
+}
+/* The frame's still overlay over the picture (the TV's only): its own layer, painted once. */
+.sd-cinema__bezel {
+  display: none;
 }
 
 .sd-cinema__drape,
@@ -82,10 +97,47 @@
     0 2.6cqh 5cqh #000000a6;
 }
 .sd-cinema[data-frame='tv'] .sd-cinema__glass {
-  border-radius: 5.6cqh / 4.2cqh;
+  --tv-glass: 5.6cqh / 4.2cqh;
+  /* The rounded glass and its dark bezel ring. The rounding shapes only the glass's own paint: the
+     video over it is a plain rectangle, and the bezel overlay below rounds its corners. */
+  border-radius: var(--tv-glass);
   box-shadow:
     0 0 0 1.6cqh #1b120c,
     inset 0 0 5cqh #000000e6;
+}
+.sd-cinema[data-frame='tv'] .sd-cinema__bezel {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform;
+  /* The curved glass over the picture: a soft shade at its edges. */
+  border-radius: var(--tv-glass);
+  box-shadow: inset 0 0 3cqh #00000073;
+}
+/* The picture's square corners, covered with what the rounded glass shows there: the bezel ring and,
+   in the last sliver of each corner, the wooden cabinet (its top shade above, its bottom shade
+   below). Each half keeps to its own corners, and to the glass's rectangle plus a hair (2px), so the
+   picture's antialiased edge never shows through. */
+.sd-cinema[data-frame='tv'] .sd-cinema__bezel::before,
+.sd-cinema[data-frame='tv'] .sd-cinema__bezel::after {
+  content: '' / '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--tv-glass);
+}
+.sd-cinema[data-frame='tv'] .sd-cinema__bezel::before {
+  clip-path: inset(-2px -2px 50%);
+  box-shadow:
+    0 0 0 1.6cqh #1b120c,
+    0 0 0 4cqh #794a2a;
+}
+.sd-cinema[data-frame='tv'] .sd-cinema__bezel::after {
+  clip-path: inset(50% -2px -2px);
+  box-shadow:
+    0 0 0 1.6cqh #1b120c,
+    0 0 0 4cqh #472810;
 }
 .sd-cinema[data-frame='tv'] .sd-cinema__side {
   display: flex;
@@ -240,6 +292,10 @@
 .sd-cinema--mock {
   position: absolute;
   z-index: auto;
+}
+/* The preview has no video: its glass holds the status text instead. */
+.sd-cinema--mock .sd-cinema__glass {
+  overflow: hidden;
 }
 .sd-cinema__mockplay {
   position: absolute;

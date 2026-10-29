@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { CINEMA_MAX_CLIPS, addClips, cinemaView, clipTime, isVideoFile, removeClip, selectClip } from './cinema.ts';
+import {
+  CINEMA_MAX_CLIPS,
+  CINEMA_SKIP,
+  addClips,
+  cinemaSeek,
+  cinemaSkip,
+  cinemaView,
+  clipTime,
+  isVideoFile,
+  removeClip,
+  seekTarget,
+  selectClip,
+} from './cinema.ts';
 
 const video = (name: string, type = 'video/mp4') => new File([new Uint8Array(8)], name, { type });
 
@@ -37,5 +49,24 @@ describe('cinema clips (they stay in this browser)', () => {
     expect(clipTime(432)).toBe('7:12');
     expect(clipTime(Number.NaN)).toBe('0:00');
     expect(clipTime(Number.POSITIVE_INFINITY)).toBe('0:00');
+  });
+
+  it('keeps a seek inside the clip, and only at its start while the length is unknown', () => {
+    expect(seekTarget(42.5, 120)).toBe(42.5);
+    expect(seekTarget(-3, 120)).toBe(0);
+    expect(seekTarget(130, 120)).toBe(120);
+    expect(seekTarget(Number.NaN, 120)).toBe(0);
+    // A recorded .webm learns its length at its end: Infinity (or 0 before the metadata) holds the start only.
+    expect(seekTarget(500, Number.POSITIVE_INFINITY)).toBe(500);
+    expect(seekTarget(-1, Number.POSITIVE_INFINITY)).toBe(0);
+    expect(seekTarget(12, 0)).toBe(12);
+    expect(seekTarget(7 - CINEMA_SKIP, 60)).toBe(0);
+  });
+
+  it('seeks and skips do nothing without a stage window to play in', () => {
+    addClips([video('one.mp4')]);
+    cinemaSeek(30);
+    cinemaSkip(CINEMA_SKIP);
+    expect(cinemaView()).toMatchObject({ time: 0, ended: false, playing: false });
   });
 });
