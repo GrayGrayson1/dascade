@@ -2315,12 +2315,11 @@
 }
 
 /*
- * The Standings card keeps to the band between the host (bottom left, his bubble beside him) and the
- * join ticket (bottom right), above the bubble, so nothing on it sits on anything else. The band stays
- * put when there's no ticket (the last round's card): the card never shifts and stays clear of the moon.
+ * The Standings card (no join ticket) keeps to a band centred on the stage, right of the host (bottom
+ * left, his bubble beside him) and above the bubble, and clear of the moon: nothing on it sits on
+ * anything else.
  */
-.sd-scene.sd-scene--standings,
-.sd-scene.sd-scene--standings[data-ticket='medium'] {
+.sd-scene.sd-scene--standings {
   padding: 0 22.6cqw 15cqh 21cqw;
 }
 /* Both tiers: the card's name over two columns, each with its own heading (points | medals). */
@@ -2482,8 +2481,8 @@
 }
 
 /*
- * Narrow stages (4:3): the columns use the whole width above the host and the ticket; the line under
- * them and the legend (its keys stacked) keep to the gap between the two.
+ * Narrow stages (4:3): the columns use the whole width above the host; the line under them and the
+ * legend (its keys stacked) sit right of him, above his bubble.
  */
 @container sd (aspect-ratio < 1.45) {
   .sd-scene--standings :is(.sd-standings__row, .sd-starwall__row) {
@@ -2498,7 +2497,7 @@
     justify-self: start;
     width: 64cqw;
   }
-  /* One tier: the name and the list over the left two thirds (clear of the moon and the ticket). */
+  /* One tier: the name and the list over the left two thirds (clear of the moon). */
   .sd-scene.sd-scene--standings:not([data-both]) {
     place-items: start;
     padding: 5cqh 3cqw 0;
@@ -2533,7 +2532,7 @@
   .sd-scene--standings[data-both] :is(.sd-standings__name, .sd-starwall__name) {
     font-size: 2.6cqh;
   }
-  /* The line under the lists and the legend (its keys stacked): in the gap between host and ticket. */
+  /* The line under the lists and the legend (its keys stacked): right of the host. */
   .sd-scene.sd-scene--standings :is(.sd-standings__of, .sd-legend) {
     justify-self: start;
     width: 45cqw;
@@ -2825,7 +2824,7 @@
 .sd-scene[data-ticket='big'] .sd-scene__headline {
   max-width: 52cqw;
 }
-/* Medium (between rounds, and the Join pop-up). */
+/* Medium (Be right back, and the Join pop-up). */
 .sd-ticket[data-size='medium'] {
   right: 2.4cqw;
   bottom: 4cqh;

@@ -112,8 +112,8 @@ Showdown. What differs:
     QR is drawn: only on the stage window, the console and big screens, never on phones (the stage's
     display context; `useDisplayInfo`). Black on white, a 4-module quiet zone, no logo, the same in
     every look, with the readable link and the room code under it. A big ticket (about 40 % of the
-    stage's height) on the lobby and the Welcome card; a medium one on Be right back and the Standings;
-    text only during rounds. The **Join pop-up** (`J`, or the Cards tab; `showdown:joinpop {on}`,
+    stage's height) on the lobby and the Welcome card; a medium one on Be right back; none on the
+    Standings card (the presenter shares it to the meeting); text only during rounds. The **Join pop-up** (`J`, or the Cards tab; `showdown:joinpop {on}`,
     presenter only) sets `joinAt`: every stage window and big screen shows the ticket over the board for
     `SHOWDOWN_JOIN_POP_MS` (20 s, by the server's clock), then it slides away. **Copy QR image** (the
     Cards tab and the lobby's Join QR) puts a PNG on the clipboard for the Teams chat (saved as a file
@@ -213,9 +213,9 @@ from your Top 10 guesses | Spotlight Stars: medals from the hot seat); the medal
 kind a column so the medals line up. A legend under the scores (`ScoreLegend`, built from `medalFor`
 and the scoring constants in `standings.ts`) says what earns each medal and how points add up (hidden
 gems only when on); the finale's medal ceremony carries the medal key too, its wall in two columns past
-four names. Everything keeps to the band between the host (and his bubble) and the join ticket, so
-nothing covers anything, on 16:9 and on 4:3 stages. After the last round nobody's joining: that
-card has no join ticket (the band stays put, so nothing shifts). The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
+four names. The card has no join ticket (it's shared to the meeting; the Join pop-up, J, is there
+for latecomers), and everything keeps to a band right of the host and above his bubble, clear of the
+moon, so nothing covers anything, on 16:9 and on 4:3 stages. The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
 public `finaleStep`, a `finale` event per step so every screen plays the cue once) through
 `finaleSteps(finale)`: the wrap-up → the medal ceremony (unless Never) → 3rd → 2nd → 1st (the podium
 is the top three Guessers; ties share a place). Prize time lists the podium and the medal winners.
