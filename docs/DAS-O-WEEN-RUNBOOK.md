@@ -240,7 +240,9 @@ switched off there — **Score the crowd** off runs the show exactly as before).
   🎃 for #5 (the special), and a 🎗️ Brave ribbon for a turn with no find. A medal pins on as the tile
   flips. **Wrong credit** (someone in the chat named it mid-turn)? **Scores** tab → **Remove** next to it.
 - **Between rounds**: when the board is complete, **Show standings** puts the top five (and, with
-  medals after each round, the Spotlight Stars) on the stage. Take it down like any card.
+  medals after each round, the Spotlight Stars) on the stage: points on the left, medals on the
+  right, and a legend underneath that says what each medal and the points mean. Take it down like any
+  card.
 - **The finale**: on the results screen, step through it — the medal ceremony, then 3rd, 2nd, 1st —
   each with its drumroll and applause. Then **Prize time** lists the winners.
 - **Download** the scores any time (**Scores** tab, or the results screen): CSV for a spreadsheet, JSON

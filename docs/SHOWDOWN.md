@@ -208,7 +208,13 @@ Spectators and big screens get nothing private.
 
 **Showtime.** With Standings on, the console offers **Show standings** once a round's board is complete:
 a stage card (`card: 'standings'`) with the top five and, with medals After each round, the Spotlight
-Stars. The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
+Stars. With both, the card's name sits over two columns, each with its heading (Top Guessers: points
+from your Top 10 guesses | Spotlight Stars: medals from the hot seat); the medal wall gives each medal
+kind a column so the medals line up. A legend under the scores (`ScoreLegend`, built from `medalFor`
+and the scoring constants in `standings.ts`) says what earns each medal and how points add up (hidden
+gems only when on); the finale's medal ceremony carries the medal key too, its wall in two columns past
+four names. Everything keeps to the band between the host (and his bubble) and the join ticket, so
+nothing covers anything, on 16:9 and on 4:3 stages. The results screen's **paced finale**: the presenter steps it on (`showdown:finale {step}`,
 public `finaleStep`, a `finale` event per step so every screen plays the cue once) through
 `finaleSteps(finale)`: the wrap-up → the medal ceremony (unless Never) → 3rd → 2nd → 1st (the podium
 is the top three Guessers; ties share a place). Prize time lists the podium and the medal winners.
