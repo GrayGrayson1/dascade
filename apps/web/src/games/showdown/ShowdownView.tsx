@@ -86,6 +86,7 @@ import {
 } from './state.ts';
 import { cinemaScene } from './cinema.ts';
 import { AwardsPanel } from './panels/AwardsPanel.tsx';
+import { StageWindowChrome } from './StageWindowChrome.tsx';
 
 /** The shared lobby with the show's setup panels (the lobby is rendered from here, not the shell). */
 const LOBBY_MODULE: GameClientModule = {
@@ -146,13 +147,24 @@ export function ShowdownView() {
     if (presenting && stageWin.open) cinemaScene(sceneCard === 'cinema', look);
   }, [presenting, stageWin.open, sceneCard, look]);
 
+  // The stage, and over it (and over the Cinema layer) the window's own chrome: the Full screen button
+  // and the hint that takes the browser bar off the share (StageWindowChrome.tsx; F is stageWindow.ts).
   const portal =
     stageWin.container && role.role === 'presenter'
       ? createPortal(
           <GameTheme accent={GAME_CATALOG.showdown.accent} className="sd-window__theme">
-            <Stage look={look} settings={settings} variant="screen" corner={<FullscreenButton />} />
+            <Stage look={look} settings={settings} variant="screen" />
           </GameTheme>,
           stageWin.container,
+        )
+      : null;
+  const windowChrome =
+    stageWin.chrome && role.role === 'presenter'
+      ? createPortal(
+          <GameTheme accent={GAME_CATALOG.showdown.accent} className="sd-window__chrome-theme">
+            <StageWindowChrome host={stageWin.chrome} />
+          </GameTheme>,
+          stageWin.chrome,
         )
       : null;
 
@@ -183,6 +195,7 @@ export function ShowdownView() {
     <>
       {body}
       {portal}
+      {windowChrome}
     </>
   );
 }

@@ -20,13 +20,26 @@
  * event room), holdStageWindow() keeps the window open and puts a calm "We'll be right back" card in
  * it; the window, its document and the portal container stay as they are, so the next ShowdownView to
  * mount portals the stage straight back into the same window — and that clears the card.
+ *
+ * Full screen (the browser bar off the Teams share): a popup's address bar can't be hidden, but full
+ * screen hides everything. F in the stage window toggles it (a key press there is the user gesture
+ * the browser asks for: one in the console doesn't carry over), and the window's chrome layer
+ * (StageWindowChrome.tsx) has the Full screen button and a hint that hides itself. That layer sits
+ * above the Cinema layer (cinema.ts, z-index 8) and below the hold card (z-index 10), so the button
+ * is reachable in every scene.
  */
 import { useSyncExternalStore } from 'react';
 import { SHOW_FONTS } from './display.ts';
+import { shortcutBlockedBy } from './panels/shortcuts.ts';
 
 export interface StageWindowState {
   /** Where the portal renders (null while closed). */
   container: HTMLElement | null;
+  /**
+   * The window's chrome layer (the Full screen button and its hint): a sibling of the container, above
+   * the Cinema layer. Null while closed.
+   */
+  chrome: HTMLElement | null;
   open: boolean;
 }
 
@@ -36,7 +49,7 @@ let doc: Document | null = null;
 let title = '';
 /** Sent the window to a fresh about:blank once (its page couldn't be reached); reset by a build. */
 let renavigated = false;
-let state: StageWindowState = { container: null, open: false };
+let state: StageWindowState = { container: null, chrome: null, open: false };
 const listeners = new Set<() => void>();
 let cleanup: (() => void) | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
@@ -56,6 +69,8 @@ export function stageWindowTitle(showTitle: string): string {
 
 const COPY_ATTR = 'data-sd-copy';
 const SHEETS = 'link[rel="stylesheet"], style';
+/** Where the window's page keeps its F handler (on the document: it outlives the console page that added it). */
+const KEY_HANDLER = '__dascadeStageFullscreenKey';
 
 function copyRootAttributes(target: Document): void {
   const src = document.documentElement;
@@ -108,7 +123,7 @@ function retire(old: HTMLElement, fresh: HTMLElement): void {
   setTimeout(done, 5000);
 }
 
-function prepare(w: Window): HTMLElement {
+function prepare(w: Window): { root: HTMLElement; chrome: HTMLElement } {
   const target = w.document;
   target.title = title;
   if (!target.head.querySelector('base')) {
@@ -129,7 +144,11 @@ function prepare(w: Window): HTMLElement {
   root.className = 'sd-window__root';
   pinShowFonts(root);
   target.body.appendChild(root);
-  return root;
+  const chrome = target.createElement('div');
+  chrome.className = 'sd-window__chrome';
+  pinShowFonts(chrome);
+  target.body.appendChild(chrome);
+  return { root, chrome };
 }
 
 /** The show's fonts on an element (inline: no theme stylesheet copied into the window can override them). */
@@ -176,7 +195,8 @@ function orphan(w: Window): void {
 }
 
 function watch(w: Window): () => void {
-  const sync = mirrorStyles(w.document);
+  const target = w.document;
+  const sync = mirrorStyles(target);
   sync();
   const headObserver = new MutationObserver((records) => {
     // Added and removed sheets show up in the walk; an edited one (a theme's <style>, dev hot reload) is re-copied.
@@ -206,12 +226,39 @@ function watch(w: Window): () => void {
     setTimeout(check, 400);
   };
   w.addEventListener('pagehide', onStageHide);
+  // F toggles full screen. Plain DOM on the window's page, so it works in every scene, over the Cinema
+  // layer and on the hold card too (the React stage comes and goes; this stays while the page does).
+  const onKey = (e: KeyboardEvent) => {
+    if (!isFullscreenKey(e, target)) return;
+    e.preventDefault();
+    toggleFullscreen(target.documentElement);
+  };
+  // One F handler per page: a reloaded console re-attaching to the same window drops the one its
+  // previous page left there (that page is gone, so its cleanup never ran).
+  const keyed = target as Document & { [KEY_HANDLER]?: (e: KeyboardEvent) => void };
+  if (keyed[KEY_HANDLER]) target.removeEventListener('keydown', keyed[KEY_HANDLER]);
+  keyed[KEY_HANDLER] = onKey;
+  target.addEventListener('keydown', onKey);
+  const onFull = () => setStageFullscreen(isWindowFullscreen(w));
+  target.addEventListener('fullscreenchange', onFull);
+  let fullMode: MediaQueryList | null = null;
+  try {
+    fullMode = w.matchMedia('(display-mode: fullscreen)');
+    fullMode.addEventListener('change', onFull);
+  } catch {
+    fullMode = null;
+  }
+  onFull();
   return () => {
     headObserver.disconnect();
     rootObserver.disconnect();
     window.removeEventListener('pagehide', onUnload);
     try {
       w.removeEventListener('pagehide', onStageHide);
+      target.removeEventListener('keydown', onKey);
+      if (keyed[KEY_HANDLER] === onKey) keyed[KEY_HANDLER] = undefined;
+      target.removeEventListener('fullscreenchange', onFull);
+      fullMode?.removeEventListener('change', onFull);
     } catch {
       /* closed or navigated away */
     }
@@ -221,13 +268,13 @@ function watch(w: Window): () => void {
 /** Builds the stage in the window's current page. False when that page can't be reached (yet). */
 function build(w: Window): boolean {
   try {
-    const container = prepare(w);
+    const { root: container, chrome } = prepare(w);
     cleanup?.();
     cleanup = watch(w);
     watchContainer(container);
     doc = w.document;
     renavigated = false;
-    emit({ container, open: true });
+    emit({ container, chrome, open: true });
     return true;
   } catch {
     return false;
@@ -246,7 +293,7 @@ function check(): void {
   }
   if (current && current === doc) return;
   if (current && build(win)) return;
-  if (state.container) emit({ container: null, open: true });
+  if (state.container) emit({ container: null, chrome: null, open: true });
   if (renavigated) return;
   // Whatever page the window ended up on, a fresh about:blank opened from here is ours to build in.
   renavigated = true;
@@ -316,7 +363,8 @@ export function closeStageWindow(closeIt = true): void {
   }
   win = null;
   doc = null;
-  if (state.open) emit({ container: null, open: false });
+  setStageFullscreen(false);
+  if (state.open) emit({ container: null, chrome: null, open: false });
 }
 
 /** The stage window is open (the presenter shares it in the meeting). */
@@ -393,9 +441,62 @@ export function useStageWindow(): StageWindowState {
   );
 }
 
-/** The Fullscreen API is usable here (not on iPhone Safari, where the button is hidden). */
-export function canFullscreen(): boolean {
-  return typeof document !== 'undefined' && document.fullscreenEnabled === true;
+/**
+ * The Fullscreen API is usable in this document (not on iPhone Safari, where the button is hidden).
+ * The stage window passes its own document.
+ */
+export function canFullscreen(target: Document | null = typeof document !== 'undefined' ? document : null): boolean {
+  return target?.fullscreenEnabled === true;
+}
+
+/** F (no modifier, not held down, not typing, no dialog up): the stage window's full-screen key. */
+export function isFullscreenKey(
+  e: { key: string } & Parameters<typeof shortcutBlockedBy>[0],
+  target: Parameters<typeof shortcutBlockedBy>[1],
+): boolean {
+  return (e.key === 'f' || e.key === 'F') && !shortcutBlockedBy(e, target);
+}
+
+/**
+ * The window shows no browser bar: its page is full screen (the button, F), or the browser itself is
+ * (F11, where the browser reports that display mode).
+ */
+export function isWindowFullscreen(w: Pick<Window, 'document' | 'matchMedia'>): boolean {
+  try {
+    if (w.document.fullscreenElement) return true;
+    return w.matchMedia('(display-mode: fullscreen)').matches;
+  } catch {
+    return false;
+  }
+}
+
+let stageFull = false;
+const fullListeners = new Set<() => void>();
+
+function setStageFullscreen(on: boolean): void {
+  if (on === stageFull) return;
+  stageFull = on;
+  for (const l of [...fullListeners]) l();
+}
+
+/** The stage window is full screen right now (no browser bar on the share). False while closed. */
+export function stageWindowFullscreen(): boolean {
+  return stageFull;
+}
+
+/**
+ * Whether the stage window is full screen, for React (the window's chrome; the console can say "press
+ * F in the stage window" until it is).
+ */
+export function useStageFullscreen(): boolean {
+  return useSyncExternalStore(
+    (fn) => {
+      fullListeners.add(fn);
+      return () => fullListeners.delete(fn);
+    },
+    () => stageFull,
+    () => false,
+  );
 }
 
 /** Fullscreen for the document an element lives in (works inside the stage window too). */
