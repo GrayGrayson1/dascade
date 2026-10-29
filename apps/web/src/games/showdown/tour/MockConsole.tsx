@@ -14,18 +14,43 @@ import {
   SHOWDOWN_CARD_INFO,
   SHOWDOWN_CUES,
   SHOWDOWN_CUE_INFO,
+  SHOWDOWN_SCENE_INFO,
+  finaleSteps,
   type ShowdownBoardView,
   type ShowdownCard,
   type ShowdownLook,
 } from '@dascade/shared/games/showdown';
 import { Badge, Button, Kbd, PixelIcon, Spinner, cx, type IconName } from '@dascade/ui';
-import { formatClock, useBoard, useCard, useClock, useFinale, useSweep, type ClockView } from '../state.ts';
+import { serverNow } from '../../../net/hooks.ts';
+import { awardSteps, type AwardCategory, type AwardStep, type AwardsView } from '../awards.ts';
+import { CINEMA_FRAMES, clipTime, type CinemaView } from '../cinema.ts';
+import { finaleStepWords } from '../panels/scores.ts';
+import { useShowExtras, useShowSelector } from '../source.ts';
+import { placeWord } from '../standings.ts';
+import {
+  formatClock,
+  useBoard,
+  useCard,
+  useClock,
+  useFinale,
+  useFinaleStep,
+  usePicker,
+  useSceneCard,
+  useStandingsCard,
+  useSweep,
+  type ClockView,
+} from '../state.ts';
 import { DEMO_CODE, DEMO_ROUNDS, DEMO_SETTINGS, sheetRound } from './script.ts';
-import type { DrawerTabId, LobbyTab, TourDialog, TourFrame } from './timeline.ts';
+import type { LobbyTab, ToolId, TourDialog, TourFrame } from './timeline.ts';
+import '../panels/panels.css';
+import '../panels/CinemaPanel.css';
 
-/** The console's size before the camera scales it (px). */
+/** The lobby's and the results page's size before the camera scales them (px). */
 export const MOCK_W = 1120;
 export const MOCK_H = 820;
+/** The Dashboard console's: wide enough for the sheet, the rail and two columns of tools. */
+export const DASH_W = 1400;
+export const DASH_H = 960;
 
 interface MockProps {
   look: ShowdownLook;
@@ -39,23 +64,27 @@ interface MockProps {
 
 export function MockConsole({ look, frame, landed, pressed, motion }: MockProps) {
   let screen: ReactNode;
-  if (frame.screen === 'lobby') screen = <LobbyScreen look={look} tab={frame.tab} preset={frame.preset} stage={frame.stage} />;
+  if (frame.screen === 'lobby')
+    screen = <LobbyScreen look={look} tab={frame.tab} preset={frame.preset} stage={frame.stage} full={frame.full} />;
   else if (frame.screen === 'results') screen = <ResultsScreen />;
   else screen = <ConsoleScreen look={look} frame={frame} landed={landed} />;
+  const dash = frame.screen === 'console';
   return (
     <Camera
-      w={MOCK_W}
-      h={MOCK_H}
+      w={dash ? DASH_W : MOCK_W}
+      h={dash ? DASH_H : MOCK_H}
       point={frame.point}
       zoom={frame.zoom}
       keyHint={frame.key}
       landed={landed}
       pressed={pressed}
       motion={motion}
-      screen={`${frame.screen}:${frame.tab}:${frame.dialog ?? ''}:${frame.drawer}:${frame.armed}:${frame.undo}`}
+      screen={`${frame.screen}:${frame.tab}:${frame.dialog ?? ''}:${frame.tool}:${frame.armed}:${frame.undo}:${frame.full}`}
     >
       <div className="tour-mock sdc" data-look={look} data-screen={frame.screen}>
         {screen}
+        {/* The console draws its own toasts; the lobby's (Copy QR image) float over it here. */}
+        {frame.screen === 'lobby' && frame.toast ? <div className="tour-toast">{frame.toast}</div> : null}
       </div>
     </Camera>
   );
@@ -199,7 +228,19 @@ export function Camera({
 // The lobby (Your setup / Settings)
 // ---------------------------------------------------------------------------
 
-function LobbyScreen({ look, tab, preset, stage }: { look: ShowdownLook; tab: LobbyTab; preset: boolean; stage: boolean }) {
+function LobbyScreen({
+  look,
+  tab,
+  preset,
+  stage,
+  full,
+}: {
+  look: ShowdownLook;
+  tab: LobbyTab;
+  preset: boolean;
+  stage: boolean;
+  full: boolean;
+}) {
   const card = useCard();
   return (
     <div className="tour-lobby">
@@ -220,7 +261,7 @@ function LobbyScreen({ look, tab, preset, stage }: { look: ShowdownLook; tab: Lo
         <span className="tour-tab">Chat</span>
       </nav>
       <div className="tour-lobby__body">
-        {tab === 'settings' ? <SettingsTab preset={preset} /> : <SetupTab look={look} stage={stage} card={card} />}
+        {tab === 'settings' ? <SettingsTab preset={preset} /> : <SetupTab look={look} stage={stage} full={full} card={card} />}
       </div>
       <footer className="tour-lobby__foot">
         <span className="tour-lobby__who">
@@ -268,7 +309,8 @@ function SettingsTab({ preset }: { preset: boolean }) {
                 ) : null}
               </span>
               <span className="sdc-preset__blurb">
-                Two Top-10 boards with a celebration on #5, a 10-minute clock per round and the Halloween Night look.
+                The show’s settings — Presenter Showcase, the Halloween Night look, a celebration on #5 and a 10-minute clock per round. The
+                boards come from your show file.
               </span>
             </span>
             <Button size="sm" variant={preset ? 'ghost' : 'primary'} data-tour="preset-load">
@@ -291,8 +333,8 @@ function SettingsTab({ preset }: { preset: boolean }) {
         <p className="sdc-presets__status">
           {preset ? (
             <>
-              <PixelIcon name="check" /> DAS-O-Ween 2026 is loaded: <span className="dc-num">2</span> rounds. Check them with Edit your
-              rounds.
+              <PixelIcon name="check" /> DAS-O-Ween 2026’s settings with <span className="dc-num">2</span> rounds from your show file. Check
+              them with Edit your rounds.
             </>
           ) : null}
         </p>
@@ -305,7 +347,7 @@ function SettingsTab({ preset }: { preset: boolean }) {
   );
 }
 
-function SetupTab({ look, stage, card }: { look: ShowdownLook; stage: boolean; card: ShowdownCard | null }) {
+function SetupTab({ look, stage, full, card }: { look: ShowdownLook; stage: boolean; full: boolean; card: ShowdownCard | null }) {
   return (
     <div className="sdc-setup tour-setup">
       <p className="sdc-lead">
@@ -328,7 +370,7 @@ function SetupTab({ look, stage, card }: { look: ShowdownLook; stage: boolean; c
           </li>
         </ol>
         <div className="sd-row sd-row--wrap">
-          <StageWindowMock stage={stage} label="Open stage window" />
+          <StageWindowMock stage={stage} full={full} label="Open stage window" />
           <Button variant="ghost" icon="copy">
             Big-screen link
           </Button>
@@ -341,11 +383,25 @@ function SetupTab({ look, stage, card }: { look: ShowdownLook; stage: boolean; c
         <span className="dc-field__label">Stage cards</span>
         <CardsMock card={card} />
       </div>
+      <div className="sdc-setup__cards">
+        <span className="dc-field__label">Join QR</span>
+        <div>
+          <span className="tour-qrcopy" data-tour="lobby-qr">
+            <Button size="sm" variant="secondary" icon="copy">
+              Copy QR image
+            </Button>
+            <Button size="sm" variant="ghost" icon="copy">
+              Copy link
+            </Button>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
 
-function StageWindowMock({ stage, label, size }: { stage: boolean; label: string; size?: 'sm' }) {
+function StageWindowMock({ stage, full = false, label, size }: { stage: boolean; full?: boolean; label: string; size?: 'sm' }) {
+  // The console's button (consoleParts.tsx): it says so until the stage window is full screen.
   return (
     <Button
       size={size}
@@ -353,7 +409,7 @@ function StageWindowMock({ stage, label, size }: { stage: boolean; label: string
       icon={stage ? 'check' : 'maximize'}
       data-tour={size ? 'stage-window' : 'open-stage'}
     >
-      {stage ? 'Stage window open' : label}
+      {stage ? (full ? 'Stage full screen' : 'Stage open · press F in it') : label}
     </Button>
   );
 }
@@ -394,23 +450,37 @@ function CardsMock({ card, compact = false }: { card: ShowdownCard | null; compa
 }
 
 // ---------------------------------------------------------------------------
-// The showcase console (PRS-01 A: sheet | rail | pinned preview over the drawer)
+// The showcase console: the Dashboard (sheet | rail | every tool open in columns beside them)
 // ---------------------------------------------------------------------------
 
 const STAGE_LABEL: Record<string, string> = { intro: 'Opening', title: 'Title card', live: 'Live', steal: 'Live', done: 'Board complete' };
 
-const DRAWER_TABS: ReadonlyArray<{ id: DrawerTabId; label: string; icon: IconName }> = [
-  { id: 'picker', label: 'Picker', icon: 'dice' },
-  { id: 'sound', label: 'Sound', icon: 'music' },
-  { id: 'cards', label: 'Cards', icon: 'eye' },
-  { id: 'fix', label: 'Fix', icon: 'refresh' },
-];
+/** The Dashboard's tools as the console lists them (consoleShowcase.tsx), with the DAS-O-Ween preset's scoring on. */
+const TOOLS: Readonly<Record<ToolId, { label: string; icon: IconName }>> = {
+  picker: { label: 'Picker', icon: 'dice' },
+  sound: { label: 'Sound', icon: 'music' },
+  cards: { label: 'Cards', icon: 'eye' },
+  cinema: { label: 'Cinema', icon: 'play' },
+  awards: { label: 'Awards', icon: 'trophy' },
+  fix: { label: 'Fix', icon: 'refresh' },
+  scores: { label: 'Scores', icon: 'trophy' },
+  names: { label: 'Names', icon: 'pencil' },
+  crew: { label: 'Crew & log', icon: 'crown' },
+  preflight: { label: 'Preflight', icon: 'check' },
+};
+
+/** The second tools column: the tall tools share it, so the one the tour shows stays open and the rest fold. */
+const SECOND_COLUMN: readonly ToolId[] = ['cards', 'cinema', 'awards', 'fix', 'scores', 'names', 'crew', 'preflight'];
 
 function ConsoleScreen({ look, frame, landed }: { look: ShowdownLook; frame: TourFrame; landed: number }) {
   const board = useBoard();
   const clock = useClock();
   const sweeping = useSweep();
   const card = useCard();
+  const scene = useSceneCard();
+  const standings = useStandingsCard();
+  const extras = useShowExtras();
+  const picker = usePicker();
   if (!board) return null;
   const hidden = board.slots.filter((s) => !s.revealed).length;
   const found = board.slots.filter((s) => s.revealed && !s.late).length;
@@ -421,8 +491,12 @@ function ConsoleScreen({ look, frame, landed }: { look: ShowdownLook; frame: Tou
   const armed = frame.armed && board.stage === 'live' && !board.slots[board.special]?.revealed;
   /** The control being held (its ring fills). */
   const holding = (name: string) => (frame.held && frame.point === name ? 'true' : undefined);
+  // Cards stays open; the tool the tour shows opens under it (Cinema when it shows none of the tall ones).
+  const shown: ToolId = frame.tool === 'awards' || frame.tool === 'fix' ? frame.tool : 'cinema';
+  const open = (id: ToolId) => id === 'cards' || id === shown;
+  const cinemaUp = scene === 'cinema';
   return (
-    <div className="tour-console" data-held={frame.held ? landed : undefined}>
+    <div className="tour-console tour-dash" data-held={frame.held ? landed : undefined}>
       <div className="sdc-private-band">
         <span className="sdc-private-band__text">
           <PixelIcon name="lock" /> <b>PRIVATE</b> — presenter console · share the <b>STAGE</b> window, never this one
@@ -441,16 +515,51 @@ function ConsoleScreen({ look, frame, landed }: { look: ShowdownLook; frame: Tou
         </div>
         <span className="dc-spacer" />
         <SoundMock look={look} />
-        <StageWindowMock stage={frame.stage} label="Stage window" size="sm" />
+        <span className="sdc-bar__group">
+          <span className="sdc-layout" data-tour="layout-switch">
+            <span className="sdc-layout__opt" aria-pressed="true">
+              Dashboard
+            </span>
+            <span className="sdc-layout__opt" aria-pressed="false">
+              Classic
+            </span>
+          </span>
+          <Button size="sm" variant="ghost" icon="help">
+            Presenter tour
+          </Button>
+          <StageWindowMock stage={frame.stage} full={frame.full} label="Stage window" size="sm" />
+        </span>
         <Button size="sm" variant="danger" icon="flag" data-tour="end-show">
           End show
         </Button>
       </header>
-      {card ? (
+      {scene ? (
+        <div className="sdc-cardup">
+          <span aria-hidden>{SHOWDOWN_SCENE_INFO[scene].icon}</span>
+          <span>
+            <b>{SHOWDOWN_SCENE_INFO[scene].title}</b> is on the stage —{' '}
+            {scene === 'awards'
+              ? 'press Next in the Awards tab for each step.'
+              : extras.cinema?.playing
+                ? 'your video is playing.'
+                : 'press Play in the Cinema tab.'}
+          </span>
+          <Button size="sm" variant="secondary">
+            Back to the show <Kbd>B</Kbd>
+          </Button>
+        </div>
+      ) : card ? (
         <div className="sdc-cardup">
           <span aria-hidden>{SHOWDOWN_CARD_INFO[card].icon}</span>
           <span>
-            <b>{SHOWDOWN_CARD_INFO[card].title}</b> is on the stage.
+            <b>{SHOWDOWN_CARD_INFO[card].title}</b> is on the stage — the audience can’t see the board right now.
+          </span>
+        </div>
+      ) : standings ? (
+        <div className="sdc-cardup">
+          <span aria-hidden>🏆</span>
+          <span>
+            <b>The standings</b> are on the stage — the audience can’t see the board right now.
           </span>
         </div>
       ) : null}
@@ -506,39 +615,107 @@ function ConsoleScreen({ look, frame, landed }: { look: ShowdownLook; frame: Tou
               {board.stage === 'intro' ? 'Start round 1' : last ? 'Finish show' : 'Next round'} <Kbd>N</Kbd>
             </Button>
           </div>
-          <PickerMock />
+          <PickerStripMock live={board.stage !== 'intro'} landed={landed} />
         </div>
-        <div className="tour-console__side">
+        <div className="tour-dash__tools">
           {frame.dialog ? <EndPanelMock kind={frame.dialog} board={board} look={look} holding={holding('end-hold')} /> : null}
-          <div className="sdc-side__preview">
-            <div className="tour-preview" aria-hidden>
-              <span className="tour-preview__board">
-                {board.slots.map((s, i) => (
-                  <i key={i} data-on={s.revealed ? 'true' : undefined} />
-                ))}
-              </span>
+          <div className="tour-dash__col">
+            <div className="sdc-side">
+              <SceneStripMock scene={scene ?? (card || standings ? 'cards' : 'show')} />
+              <div className="sdc-side__preview">
+                <div className="tour-preview" aria-hidden data-scene={scene ?? undefined}>
+                  {cinemaUp ? (
+                    <span className="tour-preview__scene">🎬</span>
+                  ) : scene === 'awards' ? (
+                    <span className="tour-preview__scene">🏆</span>
+                  ) : (
+                    <span className="tour-preview__board">
+                      {board.slots.map((s, i) => (
+                        <i key={i} data-on={s.revealed ? 'true' : undefined} />
+                      ))}
+                    </span>
+                  )}
+                </div>
+                <p className="sd-preview__caption">
+                  <PixelIcon name="eye" /> What the audience sees{frame.stage ? ' (live in the stage window)' : ''}
+                </p>
+              </div>
             </div>
-            <p className="sd-preview__caption">
-              <PixelIcon name="eye" /> What the audience sees
-            </p>
+            <ToolMock id="picker" open alert={picker.hotName ? `${picker.hotName} is up` : undefined}>
+              <PickerToolMock />
+            </ToolMock>
+            <ToolMock id="sound" open>
+              <SoundToolMock />
+            </ToolMock>
           </div>
-          <section className="sd-panel sdc-drawer">
-            <div className="sdc-drawer__tabs">
-              {DRAWER_TABS.map((t) => (
-                <span key={t.id} className={cx('sdc-drawer__tab', frame.drawer === t.id && 'is-on')} data-tour={`tab-${t.id}`}>
-                  <PixelIcon name={t.icon} />
-                  <span className="sdc-drawer__label">{t.label}</span>
-                </span>
-              ))}
-            </div>
-            <div className="sdc-drawer__body">
-              <DrawerBodyMock tab={frame.drawer} card={card} holding={holding('restart-round')} />
-            </div>
-          </section>
+          <div className="tour-dash__col">
+            {SECOND_COLUMN.map((id) => (
+              <ToolMock
+                key={id}
+                id={id}
+                open={open(id)}
+                alert={
+                  id === 'cinema' && cinemaUp
+                    ? 'Cinema is on the stage'
+                    : id === 'awards' && scene === 'awards'
+                      ? 'The awards are on the stage'
+                      : undefined
+                }
+              >
+                {id === 'cards' ? (
+                  <CardsToolMock card={card} standings={standings} />
+                ) : id === 'cinema' ? (
+                  <CinemaToolMock cinema={extras.cinema ?? null} up={cinemaUp} />
+                ) : id === 'awards' ? (
+                  <AwardsToolMock awards={extras.awards ?? null} />
+                ) : id === 'fix' ? (
+                  <FixToolMock holding={holding('restart-round')} />
+                ) : null}
+              </ToolMock>
+            ))}
+          </div>
           {frame.undo ? <UndoToastMock label={frame.undo} /> : null}
         </div>
       </div>
       {frame.toast === 'reload' ? <ReloadMock /> : frame.toast ? <div className="tour-toast">{frame.toast}</div> : null}
+    </div>
+  );
+}
+
+/** One Dashboard tool: its title bar (click to fold) over its panel. */
+function ToolMock({ id, open, alert, children }: { id: ToolId; open: boolean; alert?: string; children?: ReactNode }) {
+  const t = TOOLS[id];
+  return (
+    <section className="sd-panel sdc-tool" data-tool={id} data-open={open ? 'true' : undefined}>
+      <h3 className="sdc-tool__head">
+        <span className="sdc-tool__fold" data-tour={`tool-${id}`}>
+          <PixelIcon name={t.icon} />
+          <span className="sdc-tool__name">{t.label}</span>
+          {alert ? <span className="sdc-tool__alert">{alert}</span> : null}
+          <PixelIcon name={open ? 'chevron-up' : 'chevron-down'} className="sdc-tool__chev" />
+        </span>
+      </h3>
+      {open && children ? <div className="sdc-tool__body">{children}</div> : null}
+    </section>
+  );
+}
+
+/** The scene strip over the preview: what the stage window shows. */
+function SceneStripMock({ scene }: { scene: 'show' | 'cinema' | 'awards' | 'cards' }) {
+  return (
+    <div className="sdc-scenes">
+      <span className="sdc-scene" aria-pressed={scene === 'show'} data-tour="scene-show">
+        <PixelIcon name="star" /> Show <Kbd>B</Kbd>
+      </span>
+      <span className="sdc-scene" aria-pressed={scene === 'cinema'} data-tour="scene-cinema">
+        <PixelIcon name="play" /> Cinema <Kbd>V</Kbd>
+      </span>
+      <span className="sdc-scene" aria-pressed={scene === 'awards'} data-tour="scene-awards">
+        <PixelIcon name="trophy" /> Awards
+      </span>
+      <span className="sdc-scene" aria-pressed={scene === 'cards'} data-tour="scene-cards">
+        <PixelIcon name="copy" /> Cards
+      </span>
     </div>
   );
 }
@@ -555,89 +732,306 @@ function HoldRing() {
   );
 }
 
-function PickerMock() {
+/** The rail's picker: Pick someone / Spotlight…, then the name first ("on stage in 2 s"), then Mark done / No answer. */
+function PickerStripMock({ live, landed }: { live: boolean; landed: number }) {
+  const picker = usePicker();
+  const [, tick] = useState(0);
+  const now = serverNow();
+  const heads = Boolean(picker.hotSeat) && picker.landAt > now;
+  // Re-draw when the stage lands on them (heads → answering).
+  useEffect(() => {
+    if (!heads) return;
+    const t = setTimeout(() => tick((n) => n + 1), Math.max(0, picker.landAt - serverNow()) + 30);
+    return () => clearTimeout(t);
+  }, [heads, picker.landAt, landed]);
+  const onSeat = Boolean(picker.hotSeat);
   return (
-    <section className="tour-picker" data-tour="pick">
-      <span className="tour-picker__head">
-        <span>
+    <section className="sdp-strip" data-phase={onSeat ? (heads ? 'heads' : 'answering') : 'ready'} data-tour="pick-strip">
+      <header className="sdp-strip__head">
+        <h3 className="sdp-strip__title">
           <PixelIcon name="users" /> Picker
+        </h3>
+        <span className="sdp-strip__pool">
+          <span className="dc-num">{picker.poolSize}</span> in the pool
         </span>
-        <span>
-          <span className="dc-num">12</span> in the pool
-        </span>
-      </span>
-      <Button variant="primary" block>
-        Pick someone <Kbd>K</Kbd>
-      </Button>
+      </header>
+      {onSeat ? (
+        <>
+          <p className="sdp-hot" data-state={heads ? 'heads' : 'answering'}>
+            <b className="sdp-hot__name">{picker.hotName}</b>{' '}
+            <span className="sdp-hot__line">
+              {heads ? (
+                <>
+                  on stage in <span className="dc-num">{Math.max(1, Math.ceil((picker.landAt - now) / 1000))}</span> s
+                </>
+              ) : (
+                'is answering'
+              )}
+            </span>
+          </p>
+          <div className="sdp-strip__row">
+            <Button variant="success" icon="check" data-tour="pick-done">
+              Mark done <Kbd>D</Kbd>
+            </Button>
+            <Button variant="secondary" data-tour="pick-noanswer">
+              No answer <Kbd>A</Kbd>
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="sdp-strip__row sdp-strip__row--pick">
+          <Button variant="primary" block className="sdp-strip__pick" disabled={!live} data-tour="pick">
+            Pick someone <Kbd>K</Kbd>
+          </Button>
+          <Button variant="secondary" block icon="star" disabled={!live} data-tour="spotlight">
+            Spotlight… <Kbd>F</Kbd>
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
 
-function DrawerBodyMock({ tab, card, holding }: { tab: DrawerTabId; card: ShowdownCard | null; holding: string | undefined }) {
-  if (tab === 'sound')
-    return (
-      <div className="sdc-tab">
-        <div className="sdc-tabsection">
-          <h3 className="sd-panel__title">Sound cues</h3>
-          <div className="sdc-cues">
-            <span className="sdc-cue sdc-cue--big" data-tour="celebrate">
-              <span aria-hidden>🎉</span> Celebrate! <Kbd>C</Kbd>
-            </span>
-            {SHOWDOWN_CUES.filter((c) => c !== 'celebrate').map((c) => (
-              <span key={c} className="sdc-cue">
-                <span aria-hidden>{SHOWDOWN_CUE_INFO[c].icon}</span>
-                {SHOWDOWN_CUE_INFO[c].title}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  if (tab === 'cards')
-    return (
-      <div className="sdc-tab">
-        <div className="sdc-tabsection">
-          <h3 className="sd-panel__title">Stage cards</h3>
-          <CardsMock card={card} compact />
-        </div>
-      </div>
-    );
-  if (tab === 'fix')
-    return (
-      <div className="sdc-tab">
-        <div className="sdc-tabsection sdc-fix">
-          <h3 className="sd-panel__title">Fix a mistake</h3>
-          <div className="sdc-fix__btns">
-            <span className="dc-btn dc-btn--secondary sdc-hold" data-tour="restart-round" data-holding={holding}>
-              <HoldRing /> Restart this round
-            </span>
-            <span className="dc-btn dc-btn--secondary sdc-hold">
-              <HoldRing /> Restart the whole show
-            </span>
-          </div>
-          <p className="sd-muted">Press and hold to restart. Both can be undone.</p>
-        </div>
-        <div className="sd-panel sd-tools tour-tools">
-          <span className="sd-panel__title">
-            <PixelIcon name="crown" /> Presenter tools
-          </span>
-          <Button size="sm" icon="copy" data-tour="presenter-link">
-            Copy presenter link
-          </Button>
-        </div>
-      </div>
-    );
+/** The Picker tool: the pool, the hot seat and everyone, with Spotlight and Exclude. */
+function PickerToolMock() {
+  const picker = usePicker();
+  const guests = useShowSelector((s) => s.players) ?? {};
+  const people = Object.values(guests)
+    .sort((a, b) => a.joinOrder - b.joinOrder)
+    .slice(0, 4);
   return (
     <div className="sdc-tab tour-pickertab">
-      <h3 className="sd-panel__title">
-        <PixelIcon name="users" /> Picker
-      </h3>
       <span className="tour-pickertab__row">
-        <span>Pool</span> <b>12 people · Round 1</b>
+        <span>Mode</span> <b>Fair mode</b>
       </span>
       <span className="tour-pickertab__row">
-        <span>Hot seat</span> <b>Nobody</b>
+        <span>Pool</span>{' '}
+        <b>
+          <span className="dc-num">{picker.poolSize}</span> people · Round 1
+        </b>
       </span>
+      <span className="tour-pickertab__row">
+        <span>Hot seat</span> <b>{picker.hotName || 'Nobody'}</b>
+      </span>
+      <ul className="tour-people">
+        {people.map((p, i) => (
+          <li key={p.id}>
+            <span className="tour-people__name">{p.name}</span>
+            {picker.done[p.id] ? <Badge>Done</Badge> : null}
+            <span className="dc-btn dc-btn--ghost dc-btn--sm">Spotlight</span>
+            <span className="dc-btn dc-btn--secondary dc-btn--sm" data-tour={i === 3 ? 'picker-exclude' : undefined}>
+              Exclude
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The Sound tool: the cues (Celebrate! first) and the sound station. */
+function SoundToolMock() {
+  return (
+    <div className="sdc-tab">
+      <p className="tour-station">
+        <span className="sdc-audio" data-state="ok">
+          <i aria-hidden /> Sound: this console ✓
+        </span>
+      </p>
+      <div className="sdc-cues">
+        <span className="sdc-cue sdc-cue--big" data-tour="celebrate">
+          <span aria-hidden>🎉</span> Celebrate! <Kbd>C</Kbd>
+        </span>
+        {SHOWDOWN_CUES.filter((c) => c !== 'celebrate').map((c) => (
+          <span key={c} className="sdc-cue">
+            <span aria-hidden>{SHOWDOWN_CUE_INFO[c].icon}</span>
+            {SHOWDOWN_CUE_INFO[c].title}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The Cards tool: the stage cards, the join QR (Copy QR image, Copy link, the Join pop-up) and the standings. */
+function CardsToolMock({ card, standings }: { card: ShowdownCard | null; standings: boolean }) {
+  return (
+    <div className="sdc-tab">
+      <CardsMock card={card} compact />
+      <div className="tour-qr">
+        <span className="tour-qr__code" aria-hidden>
+          {QR_DOTS.map((on, i) => (
+            <i key={i} data-on={on ? 'true' : undefined} />
+          ))}
+        </span>
+        <span className="tour-qr__btns">
+          <Button size="sm" variant="secondary" icon="copy" data-tour="qr-copy">
+            Copy QR image
+          </Button>
+          <Button size="sm" variant="ghost" icon="copy" data-tour="link-copy">
+            Copy link
+          </Button>
+          <Button size="sm" variant="secondary" icon="maximize" data-tour="join-pop">
+            Join pop-up <Kbd>J</Kbd>
+          </Button>
+        </span>
+      </div>
+      <Button size="sm" variant={standings ? 'primary' : 'secondary'} icon="trophy" data-tour="standings">
+        {standings ? 'Hide standings' : 'Show standings'}
+      </Button>
+    </div>
+  );
+}
+
+/** A little QR-looking square (a picture: the real one is drawn from the room's join link). */
+const QR_DOTS: readonly boolean[] = Array.from({ length: 81 }, (_, i) => {
+  const x = i % 9;
+  const y = Math.floor(i / 9);
+  const finder = (x < 3 && y < 3) || (x > 5 && y < 3) || (x < 3 && y > 5);
+  return finder || (x * 7 + y * 3 + x * y) % 3 === 0;
+});
+
+/** The Cinema tool: the loaded videos, the frame, and the transport once Cinema is on the stage. */
+function CinemaToolMock({ cinema, up }: { cinema: CinemaView | null; up: boolean }) {
+  const clip = cinema?.clips.find((c) => c.id === cinema.clipId) ?? null;
+  const frame = cinema?.frame ?? 'tv';
+  const time = cinema?.time ?? 0;
+  const total = cinema?.duration ?? 0;
+  return (
+    <div className="sdc-tab sdc-cinema tour-cinema">
+      <div className="tour-cinema__row">
+        <Button size="sm" variant="secondary" icon="plus" data-tour="cinema-load">
+          Load video…
+        </Button>
+        {clip ? (
+          <span className="sdc-cinema__clip is-on tour-cinema__clip">
+            <span className="sdc-cinema__mark" aria-hidden />
+            <span className="sdc-cinema__name">{clip.name}</span>
+            <span className="sdc-cinema__tag">{up && cinema?.playing ? 'On air' : 'Plays next'}</span>
+          </span>
+        ) : (
+          <span className="sd-muted">From this computer: never uploaded.</span>
+        )}
+      </div>
+      <div className="sdc-cinema__frames" data-tour="cinema-frame">
+        {CINEMA_FRAMES.map((f) => (
+          <span key={f.id} className="sdc-card" aria-pressed={frame === f.id}>
+            <span className="sdc-card__title">{f.title}</span>
+          </span>
+        ))}
+      </div>
+      <div className="sdc-cinema__seek" data-tour="cinema-seek">
+        <span className="dc-num sdc-cinema__time">{clipTime(time)}</span>
+        <span className="tour-seek" aria-hidden>
+          <i style={{ transform: `scaleX(${total > 0 ? Math.min(1, time / total) : 0})` }} />
+        </span>
+        <span className="dc-num sdc-cinema__time">{clip ? clipTime(total) : '—'}</span>
+      </div>
+      <div className="sdc-cinema__transport">
+        {up ? (
+          <>
+            <Button size="sm" variant="ghost" icon="arrow-left" data-tour="cinema-back10">
+              <span className="dc-num">10 s</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              icon={cinema?.playing ? 'pause' : 'play'}
+              className="sdc-cinema__main"
+              data-tour="cinema-play"
+            >
+              {cinema?.playing ? 'Pause' : 'Play'}
+            </Button>
+            <Button size="sm" variant="ghost" iconRight="arrow-right" data-tour="cinema-fwd10">
+              <span className="dc-num">10 s</span>
+            </Button>
+            <Button size="sm" variant="ghost" icon="refresh">
+              Restart
+            </Button>
+            <Button size="sm" variant="secondary" icon="arrow-left" data-tour="cinema-back">
+              Back to the show <Kbd>B</Kbd>
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="primary" icon="play" className="sdc-cinema__up" data-tour="cinema-up">
+            Put Cinema on the stage <Kbd>V</Kbd>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The Awards tool: the ceremony's controls over one award's three places (names, photos optional). */
+function AwardsToolMock({ awards }: { awards: AwardsView | null }) {
+  const categories = awards?.categories ?? [];
+  const steps = awardSteps(categories);
+  const at = awards?.at ?? -1;
+  const next = steps[at + 1];
+  const winners = categories.reduce((n, c) => n + c.places.filter((p) => p.name.trim()).length, 0);
+  const first = categories[0];
+  return (
+    <div className="sdc-tab tour-awards">
+      {at >= 0 ? (
+        <span className="tour-awards__run">
+          <Button size="sm" variant="ghost" icon="arrow-left">
+            Back
+          </Button>
+          <Button size="sm" variant="primary" icon={next?.kind === 'place' ? 'trophy' : 'arrow-right'} data-tour="awards-next">
+            {next ? `Next: ${awardStepWords(next, categories)}` : 'That’s the whole ceremony'}
+          </Button>
+        </span>
+      ) : (
+        <span className="tour-awards__run">
+          <span className="sd-muted">
+            Nothing shows on the share until you press Start. <span className="dc-num">{winners}</span> winners ready.
+          </span>
+          <Button size="sm" variant="primary" icon="trophy" data-tour="awards-start">
+            Start the ceremony
+          </Button>
+        </span>
+      )}
+      {first ? (
+        <div className="tour-awards__cat" data-tour="awards-names">
+          <b>{first.title}</b>
+          {first.places.map((p, i) => (
+            <span key={i} className="tour-awards__place">
+              <span className="tour-awards__photo" aria-hidden>
+                {p.photo ? '🖼️' : <PixelIcon name="plus" />}
+              </span>
+              <span className="tour-awards__rank dc-num">{i + 1}</span>
+              <span className="tour-input">{p.name}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The Fix tool: restart the round or the show (press and hold), and the presenter tools. */
+function FixToolMock({ holding }: { holding: string | undefined }) {
+  return (
+    <div className="sdc-tab">
+      <div className="sdc-tabsection sdc-fix">
+        <div className="sdc-fix__btns">
+          <span className="dc-btn dc-btn--secondary sdc-hold" data-tour="restart-round" data-holding={holding}>
+            <HoldRing /> Restart this round
+          </span>
+          <span className="dc-btn dc-btn--secondary sdc-hold">
+            <HoldRing /> Restart the whole show
+          </span>
+        </div>
+        <p className="sd-muted">Press and hold to restart. Both can be undone.</p>
+      </div>
+      <div className="sd-panel sd-tools tour-tools">
+        <span className="sd-panel__title">
+          <PixelIcon name="crown" /> Presenter tools
+        </span>
+        <Button size="sm" icon="copy" data-tour="presenter-link">
+          Copy presenter link
+        </Button>
+      </div>
     </div>
   );
 }
@@ -969,35 +1363,86 @@ function ReloadMock() {
 function ResultsScreen() {
   const card = useCard();
   const finale = useFinale();
+  const step = useFinaleStep();
+  const extras = useShowExtras();
+  const steps = finaleSteps(finale);
+  const at = Math.max(0, Math.min(step, steps.length - 1));
+  const next = steps[at + 1];
   return (
     <div className="tour-results">
-      <section className="sd-panel sdc-afterpanel">
-        <h3 className="sd-panel__title">Stage cards</h3>
-        <p className="sd-muted">For the rest of the event: put up Prize time for the winners, then Thanks.</p>
-        <CardsMock card={card} />
-      </section>
-      <div className="tour-results__row">
-        <Button variant="primary" icon="refresh">
-          Play again
-        </Button>
-        <Button variant="ghost" icon="leave">
-          Back to cabinet
-        </Button>
+      <div className="tour-results__cols">
+        <div className="tour-results__col">
+          {steps.length > 1 ? (
+            <section className="sd-panel sdc-finalectl">
+              <h3 className="sd-panel__title">
+                <PixelIcon name="trophy" /> The finale
+              </h3>
+              <p className="sdc-finalectl__now">
+                On the stage: <b>{finaleStepWords(steps[at]!)}</b> · step <span className="dc-num">{at + 1}</span> of{' '}
+                <span className="dc-num">{steps.length}</span>
+              </p>
+              <div className="sd-row sd-row--wrap">
+                <Button variant="ghost" icon="arrow-left">
+                  Back
+                </Button>
+                <Button variant="primary" icon={next === 'first' ? 'trophy' : 'arrow-right'} data-tour="finale-next">
+                  {next ? `Next: ${finaleStepWords(next)}` : 'That’s the whole finale'}
+                </Button>
+              </div>
+              <div className="sd-row sd-row--wrap" data-tour="scores-download">
+                <Button size="sm" variant="secondary" icon="share">
+                  Download CSV
+                </Button>
+                <Button size="sm" variant="ghost" icon="share">
+                  Download JSON
+                </Button>
+              </div>
+            </section>
+          ) : null}
+          <section className="sd-panel sdc-afterpanel">
+            <h3 className="sd-panel__title" data-tour="results-awards">
+              Awards
+            </h3>
+            <AwardsToolMock awards={extras.awards ?? null} />
+          </section>
+        </div>
+        <div className="tour-results__col">
+          <section className="sd-panel sdc-afterpanel">
+            <h3 className="sd-panel__title">Stage cards</h3>
+            <p className="sd-muted">For the rest of the event: put up Prize time for the winners, then Thanks.</p>
+            <CardsMock card={card} compact />
+          </section>
+          <section className="sd-panel sdc-closing">
+            <p className="sdc-closing__title">That’s a wrap!</p>
+            <p className="sdc-closing__sub">Thanks for playing {DEMO_SETTINGS.title}!</p>
+            <ul className="sdc-closing__rounds">
+              {(finale?.results ?? []).map((r) => (
+                <li key={r.index}>
+                  <span className="sdc-closing__r">Round {r.index + 1}</span>
+                  <span>
+                    The crowd found {r.found} of {r.total}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
       </div>
-      <section className="sd-panel sdc-closing">
-        <p className="sdc-closing__title">That’s a wrap!</p>
-        <p className="sdc-closing__sub">Thanks for playing {DEMO_SETTINGS.title}!</p>
-        <ul className="sdc-closing__rounds">
-          {(finale?.results ?? []).map((r) => (
-            <li key={r.index}>
-              <span className="sdc-closing__r">Round {r.index + 1}</span>
-              <span>
-                The crowd found {r.found} of {r.total}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   );
+}
+
+/** The ceremony's next step in words (as AwardsPanel says it). */
+function awardStepWords(step: AwardStep | undefined, categories: readonly AwardCategory[]): string {
+  if (!step) return '';
+  switch (step.kind) {
+    case 'title':
+      return 'the awards’ title card';
+    case 'category':
+      return categories[step.cat]?.title ?? 'the next award';
+    case 'place':
+      return `${placeWord(step.place)} place · ${categories[step.cat]?.title ?? ''}`;
+    case 'thanks':
+      return 'Thanks for playing';
+  }
 }

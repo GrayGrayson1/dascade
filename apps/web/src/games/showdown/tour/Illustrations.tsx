@@ -19,25 +19,28 @@ import type { ChatLine } from './timeline.ts';
 export function StageBox({ look, settings, className }: { look: ShowdownLook; settings: ShowdownSettings; className?: string }) {
   return (
     <div className={`tour-stagebox ${className ?? ''}`}>
-      <Stage look={look} settings={settings} variant="preview" />
+      {/* Drawn as the stage window draws it (its display profile and the join QR). */}
+      <Stage look={look} settings={settings} variant="preview" display="window" />
     </div>
   );
 }
 
-/** The stage window: a window frame around the stage, or the empty desk when it's closed. */
+/** The stage window: a window frame around the stage, or the empty desk when it's closed. Full screen (F) drops its bar. */
 export function StageWindow({
   open,
   look,
   settings,
   title,
+  full = false,
 }: {
   open: boolean;
   look: ShowdownLook;
   settings: ShowdownSettings;
   title: string;
+  full?: boolean;
 }) {
   return (
-    <div className="tour-window" data-open={open ? 'true' : undefined}>
+    <div className="tour-window" data-open={open ? 'true' : undefined} data-full={open && full ? 'true' : undefined}>
       <div className="tour-window__bar" aria-hidden>
         <i />
         <i />
