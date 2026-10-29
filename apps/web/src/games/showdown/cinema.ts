@@ -14,6 +14,12 @@
  * re-renders while the video plays, so Teams spends its bandwidth on the picture. The console drives
  * it through this store; the stage window only shows it.
  *
+ * Smooth on a shared screen: nothing clips the video to a shape. It is a plain rectangle, and the Retro TV's
+ * rounded bezel and glass shading are a still overlay painted over its corners (a rounded clip on a
+ * video costs a masked composite every frame, and the TV stuttered on a presenter's laptop). While the
+ * scene is up, the stage under it (cinema.css) stops rendering: its animations would otherwise
+ * redraw the whole window every frame behind an opaque layer.
+ *
  * Sound (one audio pipeline): the video joins the mixer (mixer.routeMedia → the master bus), so the
  * device's master volume and mute win; where the browser refuses, element.volume follows the master
  * level instead. The show pauses the jukebox while Cinema is up (showAudio.ts).
@@ -207,6 +213,8 @@ function build(doc: Document): Layer {
   video.playsInline = true;
   video.preload = 'auto';
   video.disablePictureInPicture = true;
+  // The TV's bezel and glass, over the picture (the video itself is never clipped).
+  el(doc, 'i', 'sd-cinema__bezel', glass).setAttribute('aria-hidden', 'true');
   const side = el(doc, 'div', 'sd-cinema__side', frame);
   side.setAttribute('aria-hidden', 'true');
   el(doc, 'i', 'sd-cinema__knob', side);
