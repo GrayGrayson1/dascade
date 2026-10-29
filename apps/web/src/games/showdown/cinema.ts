@@ -244,6 +244,9 @@ function wire(video: HTMLVideoElement, root: HTMLElement): void {
   video.addEventListener('timeupdate', () => {
     if (mine()) set({ time: video.currentTime });
   });
+  video.addEventListener('seeked', () => {
+    if (mine()) set({ time: video.currentTime });
+  });
   const duration = () => {
     if (mine() && Number.isFinite(video.duration)) set({ duration: video.duration });
   };
@@ -370,6 +373,40 @@ export function cinemaRestart(): void {
   l.video.pause();
   l.video.currentTime = 0;
   set({ time: 0, ended: false });
+}
+
+/** How far the console's back and forward buttons jump (seconds). */
+export const CINEMA_SKIP = 10;
+
+/**
+ * Where a seek lands: inside the clip. A clip whose length isn't known yet (some recorded .webm files
+ * learn it only at their end) is only held at its start; the browser stops it at its end.
+ */
+export function seekTarget(seconds: number, duration: number): number {
+  const t = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  return Number.isFinite(duration) && duration > 0 ? Math.min(duration, t) : t;
+}
+
+/**
+ * Jumps to `seconds` in the chosen clip, playing or paused (it keeps doing what it was doing). For
+ * the console's seek bar: a drag calls it on every move, and the browser keeps only the latest seek.
+ * Paused on its last moment counts as ended, so Play starts it again from the top (playing, the clip
+ * ends there by itself).
+ */
+export function cinemaSeek(seconds: number): void {
+  const l = layer;
+  if (!l || !clipOf(view.clipId) || !l.video.getAttribute('src')) return;
+  const length = l.video.duration;
+  const t = seekTarget(seconds, length);
+  l.video.currentTime = t;
+  set({ time: t, ended: l.video.paused && Number.isFinite(length) && length > 0 && t >= length - 0.05 });
+}
+
+/** Back (negative) or forward by `seconds` from where the video is now. */
+export function cinemaSkip(seconds: number): void {
+  const l = layer;
+  if (!l) return;
+  cinemaSeek(l.video.currentTime + seconds);
 }
 
 // The stage window comes and goes: the layer lives in its page, so it goes with it.

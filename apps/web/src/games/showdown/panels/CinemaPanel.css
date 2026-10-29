@@ -1,0 +1,252 @@
+/* =====================================================================
+ * Drawer → Cinema (CinemaPanel.tsx): the presenter's videos, the frame and the transport.
+ * Console chrome in the DASCADE theme's tokens (like .sdc-card and the Awards desk). Laid out for the
+ * tab's own width (a container): one column in the drawer (~350px), two in a wider panel. Nothing in
+ * it may be wider than the tab: long file names ellipsize, rows wrap.
+ * ===================================================================== */
+
+.sdc-cinema {
+  container: sdc-cinema / inline-size;
+  min-width: 0;
+}
+.sdc-cinema__body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.sdc-cinema__body > * {
+  min-width: 0;
+}
+.sdc-cinema .dc-btn {
+  margin: 0;
+}
+
+/* ---------- Videos ---------- */
+.sdc-cinema__load {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+.sdc-cinema__note {
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.sdc-cinema__clips {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sdc-cinema__clip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding-right: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+.sdc-cinema__clip.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-raised));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.sdc-cinema__pick {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.sdc-cinema__clip.is-on .sdc-cinema__pick {
+  color: var(--text-0);
+  font-weight: 700;
+}
+.sdc-cinema__pick:hover {
+  color: var(--text-0);
+}
+.sdc-cinema__pick:has(.sdc-cinema__radio:disabled) {
+  cursor: default;
+}
+.sdc-cinema__pick:has(.sdc-cinema__radio:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+/* The real radio (keyboard, screen readers) under its drawn mark. */
+.sdc-cinema__radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.sdc-cinema__mark {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--surface-sunken);
+}
+.sdc-cinema__clip.is-on .sdc-cinema__mark {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3px, var(--surface-sunken) 3.5px);
+}
+.sdc-cinema__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sdc-cinema__tag {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ---------- Frame: a row of three ---------- */
+.sdc-cinema__frames {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.sdc-cinema__frames .sdc-card {
+  min-height: 44px;
+  padding: 6px 4px;
+  overflow-wrap: break-word;
+}
+
+/* ---------- Playback ---------- */
+.sdc-cinema__run {
+  gap: 8px;
+}
+.sdc-cinema__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--text-0);
+}
+.sdc-cinema__warn svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+.sdc-cinema__now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+.sdc-cinema__state {
+  flex: none;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  font: 700 var(--fs-2xs) / 1 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-1);
+}
+.sdc-cinema__state[data-state='ready'] {
+  border-color: var(--accent);
+  color: var(--text-0);
+}
+.sdc-cinema__state[data-state='playing'] {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 22%, var(--surface-sunken));
+  color: var(--text-0);
+}
+.sdc-cinema__nowname {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The seek bar: time · slider · length. */
+.sdc-cinema__seek {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.sdc-cinema__time {
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+}
+.sdc-cinema__slider {
+  min-width: 0;
+  margin: 0;
+}
+
+/* The transport: back · play/pause · forward · restart · back to the show, in as few rows as fit.
+   Wraps, never scrolls. */
+.sdc-cinema__transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sdc-cinema__transport > .dc-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: 8px;
+}
+.sdc-cinema__transport > .sdc-cinema__main {
+  flex-grow: 2;
+}
+.sdc-cinema__transport > .sdc-cinema__up {
+  flex-basis: 100%;
+}
+
+/* ---------- A wider panel: videos beside the frame and the playback ---------- */
+@container sdc-cinema (min-width: 600px) {
+  .sdc-cinema__body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'videos frame'
+      'videos run';
+    align-items: start;
+    column-gap: 20px;
+  }
+  .sdc-cinema__videos {
+    grid-area: videos;
+  }
+  .sdc-cinema__framepick {
+    grid-area: frame;
+  }
+  .sdc-cinema__run {
+    grid-area: run;
+  }
+}
