@@ -253,6 +253,30 @@
   flex: 1;
   min-height: 0;
 }
+/* The variant's rules (open while the countdown runs). */
+.ck-rules {
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  border: 1px solid var(--line);
+}
+.ck-rules__summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.ck-rules__list {
+  margin: var(--sp-2) 0 0;
+  padding-left: 1.1em;
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+}
 .ck-card .br-card__who {
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 8px;
@@ -302,7 +326,8 @@
     grid-template-areas:
       'status'
       'actions'
-      'moves';
+      'moves'
+      'rules';
   }
   .ck-status {
     grid-area: status;
@@ -312,6 +337,10 @@
   }
   .ck-moves {
     grid-area: moves;
+  }
+  .ck-rules {
+    grid-area: rules;
+    padding: 6px var(--sp-3);
   }
 }
 @media (orientation: landscape) and (max-height: 560px) {
@@ -326,6 +355,9 @@
   .ck-status__hint,
   .ck-side__title {
     display: none;
+  }
+  .ck-rules {
+    padding: 4px var(--sp-2);
   }
   .ck-moves {
     padding: 4px var(--sp-2);
@@ -388,6 +420,13 @@
   font-weight: 600;
   opacity: 1;
   font-size: clamp(8px, 1.7cqi, 12px);
+}
+/* Bigger boards: smaller squares, smaller numbers. */
+.ck-layout[data-size='10'] .br-sq__label {
+  font-size: clamp(7px, 1.35cqi, 11px);
+}
+.ck-layout[data-size='12'] .br-sq__label {
+  font-size: clamp(6px, 1.1cqi, 10px);
 }
 /* A final destination further down a multi-jump (tap it to play the whole chain). */
 .ck .br-sq[data-mark='dest']::after {
@@ -570,30 +609,54 @@
   display: grid;
   gap: var(--sp-4);
 }
-.ck-rules-card {
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  background: var(--glass-light);
+.ck-vicon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
 }
-.ck-rules-card__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 var(--sp-2);
-  font-family: var(--font-pixel);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
+.ck-vicon__board {
+  fill: var(--mat-board-light, #b39a88);
 }
-.ck-rules-card__list {
-  margin: 0;
-  padding-left: 1.1em;
-  display: grid;
-  gap: 4px;
-  font-size: var(--fs-sm);
-  color: var(--text-1);
+.ck-vicon__dark {
+  fill: var(--mat-board-dark, #3b1c2c);
+}
+.ck-vicon__fly {
+  stroke: var(--mat-board-highlight, #ffd23f);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 2 2;
+  opacity: 0.85;
+}
+.ck-vicon__man {
+  stroke-width: 1.2;
+}
+.ck-vicon__man--dark {
+  fill: var(--mat-piece-dark, #2b2438);
+  stroke: #ff5a5f;
+}
+.ck-vicon__man--light {
+  fill: var(--mat-piece-light, #f6ecd9);
+  stroke: #ffc93a;
+}
+.ck-vicon__man--gone {
+  fill: none;
+  stroke-dasharray: 1.6 1.2;
+}
+.ck-vicon__size {
+  font-family: var(--font-num);
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--text-0, #fff);
+  paint-order: stroke;
+  stroke: var(--mat-board-dark, #3b1c2c);
+  stroke-width: 2.5px;
+}
+.ck-vicon__crown {
+  fill: #ffd23f;
+  stroke: #d68a17;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
 }
 
 /* Themed chrome: a light theme turns --text-* dark, so the must-capture ink follows the theme there,
@@ -601,6 +664,6 @@
 :root[data-theme]:not([data-theme='delta-neon']) .ck-status__must {
   color: var(--text-0);
 }
-:root[data-theme]:not([data-theme='delta-neon']) :is(.ck-status.is-my-turn .ck-status__text, .ck-rules-card__title) {
+:root[data-theme]:not([data-theme='delta-neon']) .ck-status.is-my-turn .ck-status__text {
   color: color-mix(in srgb, var(--accent) 60%, var(--text-0));
 }

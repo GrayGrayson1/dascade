@@ -1,4 +1,4 @@
-/** DAS Checkers client module: American checkers on the DAS Boardroom kit. */
+/** DAS Checkers client module: twelve draughts variants (American checkers by default) on the DAS Boardroom kit. */
 import type { GameClientModule } from '../types.ts';
 import { CheckersView } from './CheckersView.tsx';
 import { CheckersSettingsPanel } from './Settings.tsx';

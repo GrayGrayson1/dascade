@@ -109,3 +109,61 @@ test('checkers: a forced double jump completes from its first landing and a man 
   await leaveRoom(light);
   await leaveRoom(dark);
 });
+
+/** Host picks a variant in the lobby, then both players start; returns them as first / second mover. */
+async function setupVariant(page: Page, browser: Browser, contextOptions: Parameters<Browser['newContext']>[0], variant: RegExp) {
+  const code = await createRoom(page, 'checkers', 'Ada');
+  // Phones show the lobby in tabs: the variant picker lives under Settings.
+  const tab = page.getByRole('tab', { name: 'Settings' });
+  if (await tab.isVisible().catch(() => false)) await tab.click();
+  await page.getByRole('radio', { name: variant }).click();
+  await expect(page.getByRole('radio', { name: variant })).toHaveAttribute('aria-checked', 'true');
+  const guest = await joinRoom(browser, code, 'Bo', contextOptions);
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await waitForPhase(guest, 'PLAYING');
+  const first = (await sideOf(page)) === 'first' ? page : guest;
+  const second = first === page ? guest : page;
+  return { first, second };
+}
+
+test('checkers variants: International 10×10 — Light opens, a capture and the forced recapture', async ({ page, browser, isMobile, hasTouch, viewport, userAgent }) => {
+  const { first: light, second: dark } = await setupVariant(page, browser, { isMobile, hasTouch, viewport: viewport ?? undefined, userAgent }, /^International/);
+  const state = await roomState(light);
+  expect(state.variant).toBe('international');
+  expect(state.board).toHaveLength(50);
+  await expect(light.getByRole('group', { name: 'Checkers board, International 10×10, Light at the bottom' })).toBeVisible();
+  await expect(dark.getByRole('group', { name: 'Checkers board, International 10×10, Dark at the bottom' })).toBeVisible();
+  await expect(light.getByTestId('checkers-status')).toHaveText('Your move');
+  await expect(square(light, 32)).toHaveAccessibleName(/Light man, can move/);
+
+  await play(light, [32, 28]);
+  await play(dark, [19, 23]);
+  await play(light, [28, 19]);
+  // Dark must recapture (13x24 or 14x23); the hint names the maximum-capture rule.
+  await expect(dark.getByText(/Capture required — you must take 1 piece, the most you can/)).toBeVisible();
+  await play(dark, [14, 23]);
+  const after = await roomState(dark);
+  expect(after.history.map((h: { notation: string }) => h.notation)).toEqual(['32-28', '19-23', '28x19', '14x23']);
+  expect(after.board[18]).toBe('.');
+  expect(after.board[22]).toBe('d');
+  expect(after.rated).toBe(false);
+
+  await leaveRoom(dark);
+  await leaveRoom(light);
+});
+
+test('checkers variants: Russian — Light first, captures and the rules in the side panel', async ({ page, browser, isMobile, hasTouch, viewport, userAgent }) => {
+  const { first: light, second: dark } = await setupVariant(page, browser, { isMobile, hasTouch, viewport: viewport ?? undefined, userAgent }, /^Russian/);
+  expect((await roomState(light)).variant).toBe('russian');
+  await play(light, [22, 18]);
+  await play(dark, [11, 15]);
+  await play(light, [18, 11]);
+  await play(dark, [7, 16]);
+  expect((await roomState(light)).history.map((h: { notation: string }) => h.notation)).toEqual(['22-18', '11-15', '18x11', '7x16']);
+  await light.getByText('How to play Russian').click();
+  await expect(light.getByText(/Kings fly/)).toBeVisible();
+
+  await leaveRoom(dark);
+  await leaveRoom(light);
+});

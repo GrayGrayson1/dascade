@@ -31,6 +31,23 @@ export function destinationsFor(moves: readonly CheckersMove[], path: readonly n
   return [...new Set(movesWithPrefix(moves, path).map(moveTo))].sort((a, b) => a - b);
 }
 
+/**
+ * The piece jumped on the hop from the end of `path` to `next` (0 for a step). Read from the legal
+ * moves, so it also finds the piece a flying king takes from a distance.
+ */
+export function jumpedOnHop(moves: readonly CheckersMove[], path: readonly number[], next: number): number {
+  if (path.length === 0) return 0;
+  const m = movesWithPrefix(moves, [...path, next]).find((x) => x.captures.length > 0);
+  return m?.captures[path.length - 1] ?? 0;
+}
+
+/** Pieces already jumped by the hops of a partial path. */
+export function jumpedAlong(moves: readonly CheckersMove[], path: readonly number[]): number[] {
+  if (path.length < 2) return [];
+  const m = movesWithPrefix(moves, path).find((x) => x.captures.length > 0);
+  return m ? m.captures.slice(0, path.length - 1) : [];
+}
+
 /** Resolves a click on `square` given the current partial `path`. */
 export function clickSquare(moves: readonly CheckersMove[], path: readonly number[], square: number): SelectionResult {
   const movable = movablePieces(moves);

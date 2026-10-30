@@ -1,10 +1,11 @@
 /**
- * DAS Checkers board — a checkers adapter over the Boardroom kit's <SquareBoard>.
+ * DAS Checkers board — a checkers adapter over the Boardroom kit's <SquareBoard>, for 8×8, 10×10
+ * and 12×12 boards.
  *
- * Mapping: the kit's (file, rank) is seen from the FIRST side (Dark) — rank 0 is Dark's back row.
- * Standard numbering puts Dark's back row (1–4) at the top of the diagram, so
- * diagram row = rank and diagram column = 7 − file. Square ids are the numbers "1"…"32";
- * light (unplayable) squares get ids like "x03".
+ * Mapping: the kit's (file, rank) is seen from Dark — rank 0 is Dark's back row. Standard numbering
+ * puts Dark's back row (1, 2, …) at the top of the diagram, so diagram row = rank and diagram
+ * column = size − 1 − file; `flipped` (Light at the bottom) shows the diagram the right way up.
+ * Square ids are the numbers "1"…"32" / "50" / "72"; light (unplayable) squares get ids like "x0-3".
  *
  * Input: the kit reports taps/drags; this adapter keeps the partial path of a multi-jump. After an
  * intermediate landing the piece shows as a ghost there with the jumped piece marked, and the next
@@ -12,35 +13,57 @@
  * chain can be tapped directly. The server validates every submitted path.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { cellAt, isKing, jumpedSquare, pieceColor, rcToSquare, type CheckersMove } from '@dascade/game-core/checkers';
+import { cellAt, geometryFor, isKing, pieceColor, rcSquare, type BoardGeometry, type CheckersMove } from '@dascade/game-core/checkers';
 import { cx } from '@dascade/ui';
 import { SquareBoard, type BoardAnimation, type TargetKind } from '../_boardroom/index.ts';
 import { PieceArt } from './Piece.tsx';
-import { clickSquare, destinationsFor, movablePieces, targetsFor } from './selection.ts';
+import { clickSquare, destinationsFor, jumpedAlong, jumpedOnHop, movablePieces, targetsFor } from './selection.ts';
 
 /** Kit hop timing (SquareBoard animates 150 ms + 110 ms per hop). */
 export function hopDurationMs(pathLength: number): number {
   return 150 + 110 * Math.max(1, pathLength - 1);
 }
 
-const squareId = (file: number, rank: number): string => {
-  const sq = rcToSquare(rank, 7 - file);
-  return sq ? String(sq) : `x${file}${rank}`;
-};
-const isDark = (file: number, rank: number): boolean => rcToSquare(rank, 7 - file) !== 0;
-const toSq = (id: string | null | undefined): number => {
-  const n = Number(id);
-  return Number.isInteger(n) && n >= 1 && n <= 32 ? n : 0;
-};
+/** Square ids, colours and id → number for one board size (stable functions per size). */
+interface BoardMap {
+  geo: BoardGeometry;
+  squareId: (file: number, rank: number) => string;
+  isDark: (file: number, rank: number) => boolean;
+  toSq: (id: string | null | undefined) => number;
+}
+const maps = new Map<number, BoardMap>();
+function boardMap(size: number): BoardMap {
+  let map = maps.get(size);
+  if (!map) {
+    const geo = geometryFor(size);
+    const at = (file: number, rank: number) => rcSquare(geo, rank, size - 1 - file);
+    map = {
+      geo,
+      squareId: (file, rank) => {
+        const sq = at(file, rank);
+        return sq ? String(sq) : `x${file}-${rank}`;
+      },
+      isDark: (file, rank) => at(file, rank) !== 0,
+      toSq: (id) => {
+        const n = Number(id);
+        return Number.isInteger(n) && n >= 1 && n <= geo.squares ? n : 0;
+      },
+    };
+    maps.set(size, map);
+  }
+  return map;
+}
 
 export interface CheckersBoardProps {
+  /** Board edge: 8, 10 or 12 (the board string has size² / 2 squares). */
+  size: number;
   board: string;
   ply: number;
   lastPath: readonly number[];
   lastCaptures: readonly number[];
   /** The last move crowned a man (glint on its landing square). */
   lastCrowned: boolean;
-  /** Dark (first side) at the bottom unless flipped. */
+  /** Dark at the bottom unless flipped (Light at the bottom). */
   flipped: boolean;
   /** Legal moves the viewer may play now (empty when it isn't their turn). */
   moves: readonly CheckersMove[];
@@ -56,7 +79,8 @@ export interface CheckersBoardProps {
 }
 
 export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardProps) {
-  const { board, ply, lastPath, lastCaptures, lastCrowned, flipped, moves, mustCapture, onMove, onIllegal, reducedMotion, showNumbers, label, className } = props;
+  const { size, board, ply, lastPath, lastCaptures, lastCrowned, flipped, moves, mustCapture, onMove, onIllegal, reducedMotion, showNumbers, label, className } = props;
+  const { geo, squareId, isDark, toSq } = boardMap(size);
   const [path, setPath] = useState<number[]>([]);
   const interactive = moves.length > 0;
 
@@ -76,7 +100,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
   const targets = useMemo(() => {
     const out: Record<string, TargetKind> = {};
     if (end === undefined) return out;
-    for (const t of targetsFor(moves, path)) out[String(t)] = jumpedSquare(end, t) ? 'capture' : 'move';
+    for (const t of targetsFor(moves, path)) out[String(t)] = jumpedOnHop(moves, path, t) ? 'capture' : 'move';
     return out;
   }, [moves, path, end]);
 
@@ -85,15 +109,12 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
     if (interactive && mustCapture && path.length === 0) for (const sq of movable) out[String(sq)] = 'must';
     if (end !== undefined) {
       for (const t of targetsFor(moves, path)) {
-        const j = jumpedSquare(end, t);
+        const j = jumpedOnHop(moves, path, t);
         if (j) out[String(j)] = 'threat';
       }
       for (const d of destinationsFor(moves, path)) if (!(String(d) in targets)) out[String(d)] = 'dest';
     }
-    for (let i = 0; i + 1 < path.length; i++) {
-      const j = jumpedSquare(path[i]!, path[i + 1]!);
-      if (j) out[String(j)] = 'jumped';
-    }
+    for (const j of jumpedAlong(moves, path)) out[String(j)] = 'jumped';
     if (path.length > 1) out[String(path[0])] = 'origin';
     return out;
   }, [interactive, mustCapture, movable, moves, path, end, targets]);
@@ -101,7 +122,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
   const pieces = useMemo(() => {
     const out: Record<string, ReactNode> = {};
     const to = lastPath[lastPath.length - 1];
-    for (let sq = 1; sq <= 32; sq++) {
+    for (let sq = 1; sq <= geo.squares; sq++) {
       const cell = cellAt(board, sq);
       const color = pieceColor(cell);
       if (!color) continue;
@@ -132,7 +153,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
       if (color) out[String(end)] = <CheckersPiece color={color} king={isKing(cell)} ghost />;
     }
     return out;
-  }, [board, lastPath, lastCaptures, lastCrowned, prevBoard, path, end, marks]);
+  }, [geo.squares, board, lastPath, lastCaptures, lastCrowned, prevBoard, path, end, marks]);
 
   const animation = useMemo<BoardAnimation | null>(
     () => (lastPath.length >= 2 ? { key: ply, paths: [lastPath.map(String)] } : null),
@@ -142,7 +163,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
   const canPick = useCallback((id: string) => {
     const sq = toSq(id);
     return movable.has(sq) || (path.length > 1 && sq === end);
-  }, [movable, path.length, end]);
+  }, [toSq, movable, path.length, end]);
 
   const apply = useCallback(
     (result: ReturnType<typeof clickSquare>, fallback: number[] | null) => {
@@ -169,7 +190,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
       if (movable.has(sq)) return setPath([sq]);
       // Tapping the ghost on the current landing keeps the chain.
     },
-    [movable],
+    [toSq, movable],
   );
 
   const onBoardMove = useCallback(
@@ -184,7 +205,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
       if (via === 'drag' && (result.kind === 'clear' || result.kind === 'none')) onIllegal?.();
       apply(result, via === 'drag' ? base : null);
     },
-    [path, movable, moves, apply, onIllegal],
+    [toSq, path, movable, moves, apply, onIllegal],
   );
 
   const onSquareClick = useCallback(
@@ -194,7 +215,7 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
       const result = clickSquare(moves, path, sq);
       if (result.kind === 'move') apply(result, null);
     },
-    [path, moves, apply],
+    [toSq, path, moves, apply],
   );
 
   const squareName = useCallback(
@@ -210,14 +231,16 @@ export const CheckersBoard = memo(function CheckersBoard(props: CheckersBoardPro
       if (marks[id] === 'jumped' || marks[id] === 'threat') parts.push('can be captured');
       return parts.join(', ');
     },
-    [board, path, interactive, movable, mustCapture, targets, marks],
+    [toSq, board, path, interactive, movable, mustCapture, targets, marks],
   );
 
-  const squareLabel = useCallback((id: string) => (showNumbers && toSq(id) ? id : null), [showNumbers]);
+  const squareLabel = useCallback((id: string) => (showNumbers && toSq(id) ? id : null), [toSq, showNumbers]);
 
   return (
     <SquareBoard
       className={cx('ck-board', className)}
+      files={size}
+      ranks={size}
       squareId={squareId}
       isDark={isDark}
       playable={isDark}
