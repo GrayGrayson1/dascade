@@ -462,3 +462,217 @@ svg[data-piece] {
 :root[data-theme]:not([data-theme='delta-neon']) .ch-status[data-tone='accent'] {
   box-shadow: inset 3px 0 0 var(--accent);
 }
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Variants                                                                                        */
+/* Marks on the board are game information (the hill, the finish rank, an explosion), so their     */
+/* colours stay fixed in every theme; the lobby icons draw on the theme's board materials.          */
+/* ---------------------------------------------------------------------------------------------- */
+.ch {
+  --ch-hill: #ffd23f;
+  --ch-goal: #3ee08f;
+  --ch-boom: #ff7a2f;
+}
+
+/* King of the Hill: the four centre squares. */
+.ch .br-sq[data-mark~='hill'] {
+  background-image: linear-gradient(color-mix(in srgb, var(--ch-hill) 24%, transparent), color-mix(in srgb, var(--ch-hill) 24%, transparent));
+  box-shadow: inset 0 0 0 max(2px, 0.4cqi) color-mix(in srgb, var(--ch-hill) 80%, transparent);
+}
+/* Racing Kings: a chequered finish line on the 8th rank. */
+.ch .br-sq[data-mark~='goal'] {
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--ch-goal) 30%, transparent) 0 25%, transparent 0 50%);
+  background-size: 50% 50%;
+}
+/* Antichess: the pieces that must capture. */
+.ch .br-sq[data-mark~='must'] {
+  box-shadow: inset 0 0 0 max(2px, 0.4cqi) color-mix(in srgb, var(--red) 80%, transparent);
+}
+/* Atomic: a flash, then a scorch mark where the explosion cleared the board. */
+.ch .br-sq[data-mark~='boom'] {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ch-boom) 42%, transparent) 0 28%, transparent 72%);
+  animation: ch-boom 720ms ease-out both;
+}
+@keyframes ch-boom {
+  0% {
+    box-shadow: inset 0 0 0 999px color-mix(in srgb, #fff3c4 85%, transparent);
+  }
+  35% {
+    box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--ch-boom) 70%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 999px transparent;
+  }
+}
+.ch--still .br-sq[data-mark~='boom'],
+:root[data-fx='off'] .ch .br-sq[data-mark~='boom'] {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch .br-sq[data-mark~='boom'] {
+    animation: none;
+  }
+}
+
+/* Player-card extras: Three-Check counters, Crazyhouse pockets. */
+.ch-card-extra {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ch-checks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ch-checks__pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--red) 70%, var(--text-2));
+}
+.ch-checks__pip[data-on] {
+  background: var(--red);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--red) 60%, transparent);
+}
+.ch-checks__n {
+  margin-left: 4px;
+  font-family: var(--font-num);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.ch-pocket {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 22px;
+}
+.ch-pocket__empty {
+  font-size: var(--fs-2xs);
+  color: var(--text-3);
+}
+.ch-pocket__piece {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.ch-pocket__piece svg {
+  width: 22px;
+  height: 22px;
+}
+button.ch-pocket__piece {
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--light) 5%, transparent);
+}
+button.ch-pocket__piece svg {
+  width: 28px;
+  height: 28px;
+}
+button.ch-pocket__piece:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+button.ch-pocket__piece[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.ch--short button.ch-pocket__piece {
+  width: 28px;
+  height: 28px;
+}
+.ch--short button.ch-pocket__piece svg {
+  width: 22px;
+  height: 22px;
+}
+button.ch-pocket__piece:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ch-pocket__n {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  color: var(--text-0);
+  text-align: center;
+}
+
+/* Lobby picker icons: a 4×4 board tile with the variant's sign. */
+.ch-vicon {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.ch-vicon > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ch-vicon__light {
+  fill: var(--mat-board-light, #d9c9a8);
+}
+.ch-vicon__dark {
+  fill: var(--mat-board-dark, #7d6149);
+}
+.ch-vicon__piece {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+}
+.ch-vicon__mark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ch-vicon__hill {
+  fill: color-mix(in srgb, #ffd23f 50%, transparent);
+  stroke: #ffd23f;
+  stroke-width: 1.5;
+}
+.ch-vicon__flag-bg {
+  fill: #1b1b22;
+}
+.ch-vicon__flag {
+  fill: #f4f1ea;
+}
+.ch-vicon__boom {
+  fill: #ff8a3d;
+  stroke: #ffd23f;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.ch-vicon__pawns circle {
+  fill: #f6f1e7;
+  stroke: #2a1d14;
+  stroke-width: 1;
+}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createRoom, dropConnection, joinRoom, leaveRoom, roomState, startGame, waitForPhase } from './helpers';
 
 const square = (page: Page, sq: string) => page.locator(`[data-sq="${sq}"]`);
@@ -173,4 +173,71 @@ test('DAS Chess: a take-back cancels the queued premove (it never fires in a pos
   await expect(page.locator('[data-premove]')).toHaveCount(0);
   await leaveRoom(guest);
   await leaveRoom(page);
+});
+
+// ---------------------------------------------------------------------------
+// Variants
+// ---------------------------------------------------------------------------
+
+/** Host White, variant picked in the lobby picker, guest joined, game started. */
+async function variantGame(page: Page, browser: Browser, variant: RegExp) {
+  const code = await createRoom(page, 'chess', 'Hostess');
+  const settingsTab = page.getByRole('tab', { name: 'Settings' });
+  if (await settingsTab.isVisible().catch(() => false)) await settingsTab.click();
+  await page.getByRole('radio', { name: 'Host White' }).click();
+  await page.getByRole('radio', { name: variant }).click();
+  await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).sides).toBe('host_first');
+  const guest = await joinRoom(browser, code, 'Guest');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await waitForPhase(guest, 'PLAYING');
+  return guest;
+}
+
+/** Click a move on the board and wait for the server to take it. */
+async function clickMove(page: Page, from: string, to: string) {
+  const ply = (await roomState(page)).ply;
+  await square(page, from).click();
+  await square(page, to).click();
+  await expect.poll(async () => (await roomState(page)).ply).toBe(ply + 1);
+}
+
+test('DAS Chess variants: King of the Hill — the king walks to the centre and wins', async ({ page, browser }) => {
+  const guest = await variantGame(page, browser, /King of the Hill/);
+  expect((await roomState(page)).variant).toBe('kingofthehill');
+  await expect(page.locator('[data-sq="d4"]')).toHaveAttribute('data-mark', /hill/);
+  await clickMove(page, 'e2', 'e3');
+  await clickMove(guest, 'e7', 'e6');
+  await clickMove(page, 'e1', 'e2');
+  await clickMove(guest, 'e8', 'e7');
+  await clickMove(page, 'e2', 'd3');
+  await clickMove(guest, 'e7', 'd6');
+  await clickMove(page, 'd3', 'd4');
+  await waitForPhase(page, 'RESULTS');
+  const done = await roomState(page);
+  expect(done.result).toMatchObject({ winner: 'first', reason: 'hill' });
+  expect(done.rated).toBe(false);
+  expect(done.pgn).toContain('[Variant "King of the Hill"]');
+  await expect(page.locator('.br-result')).toContainText('king reached the hill');
+});
+
+test('DAS Chess variants: Crazyhouse — a captured pawn is dropped from the pocket', async ({ page, browser }) => {
+  const guest = await variantGame(page, browser, /Crazyhouse/);
+  await clickMove(page, 'e2', 'e4');
+  await clickMove(guest, 'd7', 'd5');
+  await clickMove(page, 'e4', 'd5');
+  await clickMove(guest, 'd8', 'd5');
+  // White's pocket holds the pawn taken on d5: pick it, then tap e4.
+  const pawn = page.getByRole('button', { name: /Drop a pawn/ });
+  await expect(pawn).toBeVisible();
+  await pawn.click();
+  await expect(pawn).toHaveAttribute('aria-pressed', 'true');
+  await expect(square(page, 'e4')).toHaveAttribute('data-target', 'move');
+  await expect(square(page, 'e1')).not.toHaveAttribute('data-target', /./);
+  await square(page, 'e4').click();
+  await expect.poll(async () => (await roomState(page)).ply).toBe(5);
+  const s = await roomState(guest);
+  expect(s.moves.at(-1)).toMatchObject({ san: 'P@e4', drop: 'p', to: 'e4' });
+  await expect(guest.getByRole('button', { name: 'e4, white pawn' })).toBeVisible();
+  await expect(page.getByTestId('pocket-w')).toContainText('Pocket empty');
 });
