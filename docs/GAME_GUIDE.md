@@ -242,11 +242,11 @@ Kits are shared by design: extend them additively (new optional props or hooks, 
 
   Trivia (`rooms/trivia`, `games/trivia`) is the reference integration, and `test/party-kit.test.ts` (fixture `test/fixtures/PartyKitRoom.ts`) exercises every feature.
 
-### Boardroom kit (two-player board games: chess, checkers)
+### Boardroom kit (two-player board games: chess, checkers, tic-tac-toe)
 - **Shared** `@dascade/shared/games/boardroom`:
   - Settings: spread `BOARD_SETTINGS_SHAPE` / `DEFAULT_BOARD_SETTINGS` into your settings: `timeControl` (0 = untimed, presets `CLOCK_PRESETS`), `sides` (`random` / `host_first` / `host_second`), `rated` and `allowUndo`.
   - Public state extends `BoardRoomView`: `seats[2]` with rating and away deadline, `turn`, `ply`, `clock`, `offers`, `result`, `rated`, `undoAllowed`, and the idle-rule timestamps.
-  - Sides are generic: `'first'` moves first (White in chess, Dark in checkers).
+  - Sides are generic: `'first'` moves first (White in chess, Dark in checkers, X in tic-tac-toe).
 - **Server** `rooms/boardroom/BoardGameRoom.ts`:
   - Implement `sideName(side)` and `onBoardSetup()` (start position).
   - Register your move handler in `onBoardCreated()` as `const side = this.guardTurn(p, this.msg('move'), ply)` → validate with your engine → apply → `this.completeTurn(side)` → `this.finish({ winner: 'first' | 'second' | 'draw', reason })` when the rules end the game.
@@ -264,6 +264,7 @@ Kits are shared by design: extend them additively (new optional props or hooks, 
   - `SquareBoard`: a controlled board with coordinates, drag-and-click moves, legal-target dots, last-move paths, check and premove highlights, flip, multi-hop animation and a roving-tabindex keyboard. Every square is a `button[data-sq]`.
   - `PlayerCard`, `BoardClock` (driven by rAF with no re-renders), `MoveList`, `BoardActionBar`, `ResultBanner`.
   - `BoardSettingsFields` (read-only in tournaments), `useBoardroom`, `boardSounds` / `useBoardEventSounds`.
+  - Games without a DASCADE rating (tic-tac-toe) pass `ratings={false}` to `BoardSettingsFields` and `ResultBanner` and `showRating={false}` to `PlayerCard`; boards that read the same both ways leave out `BoardActionBar`'s `onFlip`.
   - Board colours are CSS vars on `.br-board` (`--br-light`, `--br-dark`, …).
 
 ### Classics kit (DAScade Classics: paddle, snake, bricks, asteroids, memory, blocks)

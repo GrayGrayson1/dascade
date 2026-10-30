@@ -33,6 +33,7 @@ const GAME_DIRS = [
   'quest',
   'chess',
   'checkers',
+  'tictactoe',
   'ships',
   'trivia',
   'deception',
@@ -353,7 +354,7 @@ test.describe('cabinets, pickers and title screens', () => {
   test('direct links and refreshes work', async ({ page }) => {
     await page.goto('/cabinet/boardroom');
     await expect(page.getByRole('heading', { name: 'DAS Boardroom', level: 1 })).toBeVisible();
-    await expect(page.locator('.cp__list').getByRole('link')).toHaveCount(3);
+    await expect(page.locator('.cp__list').getByRole('link')).toHaveCount(4);
     await expect(page.getByRole('link', { name: 'Tournament Center' })).toBeVisible();
     await page.reload();
     await expect(page.getByRole('heading', { name: 'DAS Boardroom', level: 1 })).toBeVisible();

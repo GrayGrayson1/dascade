@@ -13,7 +13,8 @@ import type { Boardroom } from './useBoardroom.ts';
 export interface BoardActionBarProps<S extends BoardRoomView> {
   room: Boardroom<S, unknown>;
   sideLabel: (side: BoardSide) => string;
-  onFlip: () => void;
+  /** Flip the board (omit for boards that read the same both ways, e.g. tic-tac-toe). */
+  onFlip?: () => void;
   /** Extra buttons (Copy PGN…). */
   extra?: ReactNode;
   /** Icon-only buttons (phones). */
@@ -170,7 +171,7 @@ export function BoardActionBar<S extends BoardRoomView>({
         <span className="br-actions__spacer" />
         <span className="br-actions__tools">
           {extra}
-          {iconTools && !compact ? (
+          {!onFlip ? null : iconTools && !compact ? (
             <IconButton icon="refresh" label="Flip board" size="sm" onClick={onFlip} />
           ) : (
             btn({ icon: 'refresh', label: 'Flip board', onClick: onFlip })

@@ -1,6 +1,7 @@
 /**
  * DAS Boardroom scenes: a four-move checkmate, a checkers multi-jump to the
- * crown, and a hidden-fleet sonar duel.
+ * crown, a tic-tac-toe fork (then a glimpse of Ultimate's nine boards), and a
+ * hidden-fleet sonar duel.
  */
 import {
   banner,
@@ -12,6 +13,7 @@ import {
   easeInOut,
   frame,
   hash,
+  line,
   rect,
   sparkle,
   sprite,
@@ -384,5 +386,240 @@ export const ships: Scene = {
       drawTextC(ctx, `${hits}`, px + pw / 2, gy + gw - 6, '#ffd23f');
     }
     if (sunk && f.hud) banner(ctx, 'SUNK!', W, gy + gw * 0.5, blinkOn(f, tt) ? '#ffd23f' : '#ffffff', '#021018', W >= 110 ? 2 : 1);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Tic-tac-toe — X sets up a fork and wins down the left column, then the board
+// wipes away to a glimpse of Ultimate: nine small boards, the "send" rule and a
+// small board won.
+// ---------------------------------------------------------------------------
+const TTT_X = '#ff4f81';
+const TTT_O = '#38bdf8';
+const TTT_X_SHADE = '#5a1830';
+const TTT_O_SHADE = '#0c3a52';
+const TTT_BG = '#140818';
+const TTT_C = 11.2;
+/** Cells 0–8, row by row. X: centre, corner, the fork at 6 (threats 0-3-6 and 2-4-6), then 3. */
+const TTT_GAME = [4, 1, 0, 8, 6, 2, 3] as const;
+const TTT_WIN = [0, 3, 6] as const;
+const TTT_MOVE0 = 1.0;
+const TTT_GAP = 0.6;
+const TTT_DRAW = 0.28;
+const TTT_STRIKE = TTT_MOVE0 + (TTT_GAME.length - 1) * TTT_GAP + TTT_DRAW + 0.2;
+const TTT_STRIKE_DUR = 0.32;
+/** The Classic board wipes away and the Ultimate glimpse begins. */
+const TTT_WIPE = 7.2;
+const TTT_ULT = 7.6;
+/** Ultimate: a mid-game position (9 small boards × 9 cells); board 0 won by X, board 8 by O. */
+const ULT_START = ['xo..x.o.x', '..ox.....', '.x....o..', 'o...x....', '.o..x...o', '...o...x.', 'x.......o', '..x.o....', 'x.x...ooo'];
+const ULT_WON_START = 'x.......o';
+/** [board, cell] — each move sends the opponent to the board matching its cell. */
+const ULT_MOVES: ReadonlyArray<readonly [number, number]> = [
+  [4, 2], // X → O must play board 2
+  [2, 4], // O → back to board 4
+  [4, 3], // X threatens 3-4-5 and 2-4-6 → board 3
+  [3, 8], // O → board 8 is decided: X may play anywhere
+  [4, 6], // X wins board 4 on the 2-4-6 diagonal → board 6
+  [6, 4], // O → board 4 is decided: anywhere again
+];
+const ULT_MOVE0 = 8.0;
+const ULT_GAP = 0.34;
+const ULT_WIN_MOVE = 4;
+const ULT_WIPE = 10.9;
+
+/** A partial circle from 12 o'clock, `k` of the way round, with a square brush. */
+function arc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, k: number, color: string, size = 1): void {
+  if (k <= 0) return;
+  ctx.fillStyle = color;
+  const steps = Math.max(16, Math.ceil(r * 8));
+  const n = Math.round(steps * clamp(k, 0, 1));
+  const off = Math.floor(size / 2);
+  for (let i = 0; i <= n; i++) {
+    const a = -Math.PI / 2 + (i / steps) * Math.PI * 2;
+    ctx.fillRect(Math.round(cx + Math.cos(a) * r) - off, Math.round(cy + Math.sin(a) * r) - off, size, size);
+  }
+}
+
+/** An X or O filling a `size` box at (x, y), drawn `k` of the way in (X: two strokes; O: a sweep). */
+function tttMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  mark: 'x' | 'o',
+  k: number,
+  brush: number,
+  shadow = true,
+  ink = mark === 'x' ? TTT_X : TTT_O,
+): void {
+  const pad = size * 0.24;
+  const x0 = x + pad;
+  const y0 = y + pad;
+  const x1 = x + size - pad - 1;
+  const y1 = y + size - pad - 1;
+  const shade = mark === 'x' ? TTT_X_SHADE : TTT_O_SHADE;
+  const passes: Array<[number, string]> =
+    shadow && brush >= 2
+      ? [
+          [1, shade],
+          [0, ink],
+        ]
+      : [[0, ink]];
+  for (const [d, color] of passes) {
+    if (mark === 'x') {
+      const a = clamp(k * 2, 0, 1);
+      const b = clamp(k * 2 - 1, 0, 1);
+      if (a > 0) line(ctx, x0 + d, y0 + d, x0 + (x1 - x0) * a + d, y0 + (y1 - y0) * a + d, color, brush);
+      if (b > 0) line(ctx, x1 + d, y0 + d, x1 - (x1 - x0) * b + d, y0 + (y1 - y0) * b + d, color, brush);
+    } else {
+      arc(ctx, x + size / 2 - 0.5 + d, y + size / 2 - 0.5 + d, (x1 - x0) / 2, k, color, brush);
+    }
+  }
+}
+
+function tttBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  rect(ctx, 0, 0, W, H, TTT_BG);
+  for (let y = 2; y < H; y += 5) for (let x = 2; x < W; x += 5) rect(ctx, x, y, 1, 1, '#22102c');
+}
+
+function tttWipe(ctx: CanvasRenderingContext2D, W: number, H: number, k: number): void {
+  if (k <= 0) return;
+  const h = Math.round(H * clamp(k, 0, 1));
+  rect(ctx, 0, 0, W, h, TTT_BG);
+  if (k < 1) rect(ctx, 0, h, W, 1, '#c9b6ff');
+}
+
+function drawClassic(f: AttractFrame, tt: number): void {
+  const { ctx, W, H } = f;
+  const lift = Math.round(f.top * 0.6);
+  const gs = Math.max(18, Math.floor(Math.min(W * 0.84, (H - lift) * 0.86) / 3) * 3);
+  const cell = gs / 3;
+  const panel = W - gs >= 34;
+  const bx = panel ? Math.round((W - gs - 18) / 2) : Math.round((W - gs) / 2);
+  const by = lift + Math.round((H - lift - gs) / 2);
+  const brush = Math.max(1, Math.round(cell / 9));
+  const lw = Math.max(1, Math.round(cell / 14));
+  const strikeK = clamp((tt - TTT_STRIKE) / TTT_STRIKE_DUR, 0, 1);
+  const won = strikeK >= 1;
+
+  // the winning cells glow once the line is struck
+  if (won && blinkOn(f, tt, 3))
+    for (const c of TTT_WIN)
+      rect(ctx, bx + (c % 3) * cell + lw, by + Math.floor(c / 3) * cell + lw, cell - lw * 2, cell - lw * 2, '#2a1236');
+  // the grid draws itself in, one stroke after another
+  for (let i = 0; i < 4; i++) {
+    const k = easeInOut(clamp((tt - 0.15 - i * 0.14) / 0.26, 0, 1));
+    if (k <= 0) continue;
+    const at = Math.round((i % 2 ? 2 : 1) * cell - lw / 2);
+    const len = gs * k;
+    if (i < 2) rect(ctx, bx + at, by, lw, len, '#c9b6ff');
+    else rect(ctx, bx, by + at, len, lw, '#c9b6ff');
+  }
+  // the moves, X first
+  TTT_GAME.forEach((c, i) => {
+    const k = clamp((tt - TTT_MOVE0 - i * TTT_GAP) / TTT_DRAW, 0, 1);
+    if (k <= 0) return;
+    tttMark(ctx, bx + (c % 3) * cell, by + Math.floor(c / 3) * cell, cell, i % 2 ? 'o' : 'x', k, brush);
+  });
+  // whose turn: two plates beside the board, the side to move lit
+  if (panel) {
+    const moves = TTT_GAME.filter((_, i) => tt >= TTT_MOVE0 + i * TTT_GAP).length;
+    const px = bx + gs + 6;
+    const pw = Math.min(14, W - px - 3);
+    (['x', 'o'] as const).forEach((m, i) => {
+      const y = by + (i ? gs - pw : 0);
+      const on = !won && tt >= TTT_MOVE0 - 0.4 && moves % 2 === i;
+      rect(ctx, px, y, pw, pw, on ? (m === 'x' ? TTT_X : TTT_O) : '#1d0f26');
+      frame(ctx, px, y, pw, pw, m === 'x' ? TTT_X : TTT_O);
+      tttMark(ctx, px + 1, y + 1, pw - 2, m, 1, 1, false, on ? TTT_BG : undefined);
+    });
+    if (won) rect(ctx, px, by + Math.round(gs / 2) - 1, pw, 2, '#ffd23f');
+  }
+  // the strike through 0-3-6
+  if (strikeK > 0) {
+    const sx = bx + cell / 2 - 0.5;
+    const y0 = by + cell * 0.18;
+    const y1 = by + gs - cell * 0.18;
+    line(ctx, sx + 1, y0 + 1, sx + 1, y0 + 1 + (y1 - y0) * easeInOut(strikeK), '#5a4410', brush + 1);
+    line(ctx, sx, y0, sx, y0 + (y1 - y0) * easeInOut(strikeK), '#ffd23f', brush + 1);
+  }
+  if (won && tt < TTT_WIPE) {
+    if (f.hud) banner(ctx, 'X WINS!', W, by + gs * 0.5, blinkOn(f, tt) ? '#ffd23f' : '#ffffff', TTT_BG, W >= 120 ? 2 : 1);
+    for (let i = 0; i < 5; i++) sparkle(ctx, bx + hash(i + 11) * 0.5 * gs, by + hash(i + 17) * gs, tt * 3 + i * 0.41, '#fff3b0');
+  }
+}
+
+function drawUltimate(f: AttractFrame, tt: number): void {
+  const { ctx, W, H } = f;
+  const lift = Math.round(f.top * 0.6);
+  const cs = Math.max(3, Math.floor(Math.min(W * 0.88, (H - lift) * 0.88) / 9.6));
+  const gap = Math.max(1, Math.round(cs * 0.3));
+  const bw = cs * 3;
+  const total = bw * 3 + gap * 2;
+  const ox = Math.round((W - total) / 2);
+  const oy = lift + Math.round((H - lift - total) / 2);
+  const appear = clamp((tt - TTT_ULT) / 0.3, 0, 1);
+  const played = ULT_MOVES.filter((_, i) => tt >= ULT_MOVE0 + i * ULT_GAP).length;
+  const won = ULT_WON_START.split('');
+  if (played > ULT_WIN_MOVE) won[ULT_MOVES[ULT_WIN_MOVE]![0]] = 'x';
+  // the board the side to move is sent to (-1 = any open board); the glimpse opens with X sent to the centre
+  let active = 4;
+  if (played > 0) {
+    const target = ULT_MOVES[played - 1]![1];
+    active = won[target] === '.' ? target : -1;
+  }
+  const done = played >= ULT_MOVES.length;
+  const brush = Math.max(1, Math.round(cs / 8));
+  for (let b = 0; b < 9; b++) {
+    const k = clamp(appear * 1.6 - b * 0.07, 0, 1);
+    if (k <= 0) continue;
+    const x = ox + (b % 3) * (bw + gap);
+    const y = oy + Math.floor(b / 3) * (bw + gap);
+    const owner = won[b];
+    rect(ctx, x, y, bw, bw, owner === 'x' ? '#33102a' : owner === 'o' ? '#0b2638' : '#1c0d24');
+    for (let i = 1; i < 3; i++) {
+      rect(ctx, x + i * cs, y + 1, 1, bw - 2, '#3b2350');
+      rect(ctx, x + 1, y + i * cs, bw - 2, 1, '#3b2350');
+    }
+    for (let c = 0; c < 9; c++) {
+      const fromMove = ULT_MOVES.findIndex(([mb, mc]) => mb === b && mc === c);
+      const mark = fromMove >= 0 ? (fromMove < played ? (fromMove % 2 ? 'o' : 'x') : '.') : ULT_START[b]![c]!;
+      if (mark === '.') continue;
+      const mk = fromMove >= 0 ? clamp((tt - ULT_MOVE0 - fromMove * ULT_GAP) / 0.18, 0, 1) : 1;
+      const cx = x + (c % 3) * cs;
+      const cy = y + Math.floor(c / 3) * cs;
+      if (cs >= 6) tttMark(ctx, cx, cy, cs, mark as 'x' | 'o', mk, 1, false);
+      else rect(ctx, cx + 1, cy + 1, cs - 2, cs - 2, mark === 'x' ? TTT_X : TTT_O);
+    }
+    // a decided board carries one big mark
+    if (owner === 'x' || owner === 'o') {
+      const big = b === ULT_MOVES[ULT_WIN_MOVE]![0] ? clamp((tt - ULT_MOVE0 - ULT_WIN_MOVE * ULT_GAP - 0.15) / 0.3, 0, 1) : 1;
+      tttMark(ctx, x, y, bw, owner, big, Math.max(1, brush + 1), false);
+    }
+    const lit = active === b || (active < 0 && owner === '.');
+    if (!done && lit && blinkOn(f, tt, 4)) frame(ctx, x - 1, y - 1, bw + 2, bw + 2, '#ffd23f');
+  }
+  // once the centre board's big X has landed, over the top row so it stays in view
+  if (done && f.hud && tt > ULT_MOVE0 + (ULT_MOVES.length - 1) * ULT_GAP + 0.25 && tt < ULT_WIPE) {
+    banner(ctx, 'ULTIMATE', W, oy + bw * 0.5, blinkOn(f, tt) ? '#ffd23f' : '#ffffff', TTT_BG, W >= 120 ? 2 : 1);
+  }
+}
+
+export const tictactoe: Scene = {
+  label: 'TIC-TAC-TOE',
+  length: TTT_C,
+  still: 6.0,
+  draw(f: AttractFrame) {
+    const { ctx, W, H } = f;
+    const tt = cyc(f.t, TTT_C);
+    tttBackdrop(ctx, W, H);
+    if (tt < TTT_ULT) {
+      drawClassic(f, tt);
+      tttWipe(ctx, W, H, (tt - TTT_WIPE) / (TTT_ULT - TTT_WIPE));
+    } else {
+      drawUltimate(f, tt);
+      tttWipe(ctx, W, H, (tt - ULT_WIPE) / (TTT_C - ULT_WIPE));
+    }
   },
 };

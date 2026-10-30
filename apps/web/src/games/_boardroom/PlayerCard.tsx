@@ -16,6 +16,8 @@ export interface PlayerCardProps {
   connected?: boolean;
   /** Show the rating change (after a rated game). */
   showDelta?: boolean;
+  /** Games without a DASCADE rating (tic-tac-toe) hide the rating tag. Default true. */
+  showRating?: boolean;
   /** Captured material / counts. */
   captured?: ReactNode;
   /** Usually a <BoardClock>. */
@@ -65,6 +67,7 @@ export function PlayerCard({
   isYou,
   connected = true,
   showDelta,
+  showRating = true,
   captured,
   clock,
   position = 'bottom',
@@ -92,7 +95,7 @@ export function PlayerCard({
         </div>
         <div className="br-card__meta">
           <span className="br-card__side">{sideLabel}</span>
-          {seat?.playerId ? <RatingTag seat={seat} showDelta={showDelta} /> : null}
+          {seat?.playerId && showRating ? <RatingTag seat={seat} showDelta={showDelta} /> : null}
           {seat && seat.awayDeadline > 0 && !connected ? <AwayTimer deadline={seat.awayDeadline} /> : null}
           {active ? (
             <span className="br-card__turn">

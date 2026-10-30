@@ -19,6 +19,7 @@ export const GAME_IDS = [
   // DAS Boardroom
   'chess',
   'checkers',
+  'tictactoe',
   'ships',
   // DAStravaganza
   'trivia',
@@ -428,6 +429,38 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     prefersLandscape: false,
     tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 2, 3, 5], maxField: 64, draws: true, sides: true },
     rated: true,
+    reconnectGraceSeconds: 120,
+  },
+  tictactoe: {
+    id: 'tictactoe',
+    title: 'DAS Tic-Tac-Toe',
+    marquee: 'DAS TIC-TAC-TOE',
+    tagline: 'Classic noughts and crosses, plus Ultimate, Gomoku and ten more twists.',
+    description:
+      'The classic 3×3 game, plus twelve variants: Ultimate, Gomoku, Big Board, Misère, Vanishing, Wild, Numbers, Gravity, Nesting, Notakto, a 3D cube and Order & Chaos. Server-checked moves, optional clocks, spectators and rematches.',
+    category: 'strategy',
+    cabinet: 'boardroom',
+    accent: { primary: '#ff4f81', secondary: '#38bdf8', deep: '#140818' },
+    capacity: {
+      minPlayers: 2,
+      defaultMaxPlayers: 2,
+      maxPlayersLimit: 2,
+      maxRoomSize: 40,
+      supportsSpectators: true,
+      lateJoinAsPlayer: false,
+      supportsSolo: false,
+    },
+    controls: ['Click or tap a square to place your mark', 'Arrow keys move around the board · Enter places', 'The host picks one of 13 variants in the lobby'],
+    howToPlay: [
+      'X moves first. Take turns marking an empty square.',
+      'Three in a row — across, down or diagonal — wins. A full board is a draw.',
+      'The host can pick a variant in the lobby: Ultimate, Gomoku, Gravity, Vanishing and more. Each one explains its rules before you start.',
+      'Rematches swap who goes first.',
+    ],
+    virtualChips: false,
+    prefersLandscape: false,
+    // Not rated: perfect play draws Classic. Tournaments run best-of series; sides swap every game.
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: true },
     reconnectGraceSeconds: 120,
   },
   ships: {
@@ -863,7 +896,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     marquee: 'TOURNAMENTS',
     tagline: 'Brackets, Swiss and round robins for any head-to-head game.',
     description:
-      'Run a tournament for chess, checkers, ships, putt and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
+      'Run a tournament for chess, checkers, tic-tac-toe, ships, putt and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
     category: 'meta',
     cabinet: null,
     accent: { primary: '#ffd23f', secondary: '#22d3ee', deep: '#1a1405' },
