@@ -10,6 +10,7 @@
  */
 import type { GameId } from './catalog.ts';
 import { CLOCK_PRESETS } from './games/boardroom.ts';
+import { CHECKERS_VARIANTS, CHECKERS_VARIANT_INFO } from './games/checkers.ts';
 import { TTT_VARIANTS, TTT_VARIANT_INFO } from './games/tictactoe.ts';
 
 export interface TournamentGameSettingOption {
@@ -37,7 +38,16 @@ const timeControl = (defaultId: string): TournamentGameSettingField => ({
 
 export const TOURNAMENT_GAME_SETTINGS: Partial<Record<GameId, TournamentGameSettingField[]>> = {
   chess: [timeControl('5+0')],
-  checkers: [timeControl('5+0')],
+  checkers: [
+    {
+      key: 'variant',
+      label: 'Variant',
+      help: 'Every game of every match is played in this variant. Only American checkers is rated.',
+      options: CHECKERS_VARIANTS.map((id) => ({ id, label: CHECKERS_VARIANT_INFO[id].title, value: id })),
+      defaultId: 'american',
+    },
+    timeControl('5+0'),
+  ],
   tictactoe: [
     {
       key: 'variant',
