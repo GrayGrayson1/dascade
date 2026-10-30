@@ -159,12 +159,13 @@ export function isRatedChessVariant(variant: ChessVariant): boolean {
   return variant === 'standard';
 }
 
-export const ChessSettingsSchema = z.object({ ...BOARD_SETTINGS_SHAPE });
+export const ChessSettingsSchema = z.object({ ...BOARD_SETTINGS_SHAPE, variant: z.enum(CHESS_VARIANTS).default('standard') });
 export type ChessSettings = z.infer<typeof ChessSettingsSchema>;
 
 export const DEFAULT_CHESS_SETTINGS: ChessSettings = {
   ...DEFAULT_BOARD_SETTINGS,
   timeControl: { baseMinutes: 10, incrementSeconds: 5 },
+  variant: 'standard',
 };
 
 export const CHESS_MSG = {
@@ -180,14 +181,26 @@ export const CHESS_MSG = {
 
 const SquareSchema = z.string().regex(/^[a-h][1-8]$/);
 
-export const ChessMoveSchema = z.object({
-  from: SquareSchema,
-  to: SquareSchema,
-  /** Required for promotions, rejected otherwise. */
-  promotion: z.enum(['q', 'r', 'b', 'n']).optional(),
-  /** The public `ply` the client moved at; stale or duplicate moves are refused. */
-  ply: z.number().int().min(0).max(100_000),
-});
+/**
+ * A move: `from` → `to`, or (Crazyhouse) a `drop` of a pocket piece on `to`. Exactly one of `from`
+ * and `drop` is present. Castling: move the king two squares or onto its own rook (Chess960: onto
+ * the rook). The engine decides legality — a king promotion only exists in Antichess, a drop only
+ * in Crazyhouse.
+ */
+export const ChessMoveSchema = z
+  .object({
+    from: SquareSchema.optional(),
+    to: SquareSchema,
+    /** Required for promotions, rejected otherwise ('k': Antichess only). */
+    promotion: z.enum(['q', 'r', 'b', 'n', 'k']).optional(),
+    /** Crazyhouse: the pocket piece dropped on `to`. */
+    drop: z.enum(['p', 'n', 'b', 'r', 'q']).optional(),
+    /** The public `ply` the client moved at; stale or duplicate moves are refused. */
+    ply: z.number().int().min(0).max(100_000),
+  })
+  .strict()
+  .refine((m) => (m.from === undefined) !== (m.drop === undefined), { message: 'Give either from or drop.' })
+  .refine((m) => m.drop === undefined || m.promotion === undefined, { message: 'A drop has no promotion.' });
 export type ChessMovePayload = z.infer<typeof ChessMoveSchema>;
 
 export type ChessColor = 'w' | 'b';
@@ -205,6 +218,10 @@ export interface ChessMoveView {
   /** '' | 'k' | 'q'. */
   castle: string;
   enPassant: boolean;
+  /** Crazyhouse: the piece type dropped ('' for a normal move). */
+  drop: string;
+  /** Atomic: squares cleared by the explosion of a capture, space-separated ('' if none). */
+  exploded: string;
   check: boolean;
   mate: boolean;
   /** Mover's remaining clock after the move (ms, increment included; 0 when untimed). */
@@ -212,7 +229,12 @@ export interface ChessMoveView {
 }
 
 export interface ChessPublicState extends BoardRoomView {
-  /** Current position (FEN). The server's chess.js instance is the source of truth. */
+  /** The variant of the current game (follows the lobby setting until the game starts). */
+  variant: string;
+  /**
+   * Current position (FEN; variant FENs carry Crazyhouse pockets "[…]" and Three-Check counts
+   * "3+3"). The server's engine is the source of truth.
+   */
   fen: string;
   startFen: string;
   moves: ChessMoveView[];

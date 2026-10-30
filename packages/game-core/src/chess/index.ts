@@ -670,6 +670,8 @@ export interface GamePgnInfo {
   /** Add [%clk] comments. */
   timed: boolean;
   startFen?: string;
+  /** PGN Variant tag value ("Chess960", "Crazyhouse", …); omitted for Standard. */
+  variant?: string;
 }
 
 /** PGN Termination tag value for a board result reason. */
@@ -695,6 +697,7 @@ export function buildGamePgn(info: GamePgnInfo): string {
       ['UTCTime', time],
       ['TimeControl', info.timeControl],
       ['Termination', pgnTermination(info.reason)],
+      ...(info.variant ? ([['Variant', info.variant]] as Array<[string, string]>) : []),
     ],
     sans: info.moves.map((m) => m.san),
     clocksMs: info.timed ? info.moves.map((m) => m.clockMs ?? null) : undefined,
