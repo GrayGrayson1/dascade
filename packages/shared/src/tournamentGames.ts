@@ -11,6 +11,7 @@
 import type { GameId } from './catalog.ts';
 import { CLOCK_PRESETS } from './games/boardroom.ts';
 import { CHECKERS_VARIANTS, CHECKERS_VARIANT_INFO } from './games/checkers.ts';
+import { CHESS_VARIANTS, CHESS_VARIANT_INFO } from './games/chess.ts';
 import { TTT_VARIANTS, TTT_VARIANT_INFO } from './games/tictactoe.ts';
 
 export interface TournamentGameSettingOption {
@@ -37,7 +38,16 @@ const timeControl = (defaultId: string): TournamentGameSettingField => ({
 });
 
 export const TOURNAMENT_GAME_SETTINGS: Partial<Record<GameId, TournamentGameSettingField[]>> = {
-  chess: [timeControl('5+0')],
+  chess: [
+    {
+      key: 'variant',
+      label: 'Variant',
+      help: 'Every game of every match is played in this variant (Chess960 draws a new start position each game). Only standard chess is rated.',
+      options: CHESS_VARIANTS.map((id) => ({ id, label: CHESS_VARIANT_INFO[id].title, value: id })),
+      defaultId: 'standard',
+    },
+    timeControl('5+0'),
+  ],
   checkers: [
     {
       key: 'variant',
