@@ -117,9 +117,9 @@ export const CABINETS: Record<CabinetId, CabinetDef> = {
     title: 'DAS Boardroom',
     marquee: 'DAS BOARDROOM',
     family: 'Strategy & Board Games',
-    tagline: 'Chess, checkers, tic-tac-toe and a hidden-fleet duel. Tournament ready.',
+    tagline: 'Chess, checkers, tic-tac-toe, Four in a Row and a hidden-fleet duel. Tournament ready.',
     description:
-      'The executive strategy lounge: real-time chess with clocks, American checkers, thirteen kinds of tic-tac-toe and DAS Ships, an original hidden-fleet duel. Every board runs in the Tournament Center.',
+      'The executive strategy lounge: real-time chess with clocks and eight variants, checkers in twelve rule sets from American to 12×12 Canadian, thirteen kinds of tic-tac-toe, Four in a Row and DAS Ships, an original hidden-fleet duel. Every board runs in the Tournament Center.',
     accent: { primary: '#e8c07d', secondary: '#38bdf8', deep: '#141008' },
     games: [
       g('chess'),

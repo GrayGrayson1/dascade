@@ -5,7 +5,9 @@ game plus twelve variants. The host picks the **variant** in the lobby. A game k
 and rematches replay it with sides swapped. Spectators, optional clocks, take-backs, draw offers, rematches and
 Tournament Center matches all come from the kit.
 
-It lives in the DAS Boardroom cabinet (`/cabinet/boardroom`, or straight to `/play/tictactoe`).
+It lives in the DAS Boardroom cabinet (`/cabinet/boardroom`, or straight to `/play/tictactoe`). Four in a Row (the
+`gravity` variant) also has its own tile there: `/play/fourinarow` redirects to `/play/tictactoe?table=gravity`, and a
+room created from that title screen starts on Four in a Row (the cabinet entry carries `settings: { variant: 'gravity' }`).
 
 | Piece                                                       | Path                                                                                                             |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -36,7 +38,7 @@ In Wild and Notakto the sides are just **First** and **Second**.
 | **Vanishing** (`vanishing`)      | 3×3   | Each player keeps at most three marks: placing a fourth erases your oldest one (it glows before it goes). Three in a row wins. The same position three times is a draw.                                                                                                                                                                     |
 | **Wild** (`wild`)                | 3×3   | Mark any empty square with your choice of X or O. Complete three of the same mark in a row (either mark) and you win. A full board is a draw.                                                                                                                                                                                               |
 | **Numbers** (`numbers`)          | 3×3   | Odds play 1, 3, 5, 7, 9 and move first; Evens play 2, 4, 6, 8. Each number can be used once. Complete any full line that adds up to exactly 15, with anyone's numbers, to win. A full board with no 15 is a draw.                                                                                                                           |
-| **Gravity** (`gravity`)          | 7 × 6 | Pick a column: your mark falls to the lowest empty square. Four in a row wins. A full board is a draw.                                                                                                                                                                                                                                      |
+| **Four in a Row** (`gravity`)    | 7 × 6 | Pink and Blue drop discs: pick a column and your disc falls to the lowest empty slot. Four in a row wins. A full rack is a draw. Drawn as a disc rack (each disc embossed with its X or O); keys 1–7 pick a column.                                                                                                                         |
 | **Nesting** (`nesting`)          | 3×3   | Each player has six pieces: two small, two medium and two large. Place a piece from your hand or move one of yours already on the board. A piece may cover any smaller piece, yours or your opponent's. Three of your **visible** pieces in a row wins. Uncover your opponent's line and they win. The same position three times is a draw. |
 | **Order & Chaos** (`orderchaos`) | 6×6   | Both players may place an X or an O on any empty square; Order moves first. Order wins as soon as five of the same mark line up, whoever placed them. Chaos wins if the board fills up without such a line. There are no draws.                                                                                                             |
 
@@ -72,7 +74,7 @@ The lobby card and the in-game help both read it, so change rules text there and
 - **One message**, `tictactoe:move` (`TttMoveSchema`, strict):
   `{ cell, ply, mark?, num?, size?, from? }`. Every variant sends `cell`. Wild and Order & Chaos add
   `mark` (`'x'` / `'o'`), Numbers adds `num`, and Nesting adds `size` (a piece from the hand) or `from` (a piece
-  already on the board). Gravity accepts any cell of the column and lands the mark at the bottom. `ply` is the
+  already on the board). Four in a Row (`gravity`) accepts any cell of the column and lands the disc at the bottom. `ply` is the
   ply the client saw: the kit's `guardTurn` ignores stale and duplicate moves. The server resolves every move
   with the engine (`resolveMove` / `playMove`), and the client uses the same engine only for hints.
 - **Notation** (`cellName`): a column letter and a row counted from the bottom, like chess (`b2` is the centre
