@@ -1,6 +1,6 @@
 # DASCADE — repository guide
 
-DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 26 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
+DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 27 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
 
 ## Commands
 - `pnpm install` — install (Node ≥ 22.12, pnpm via corepack)

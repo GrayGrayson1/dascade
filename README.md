@@ -1,6 +1,6 @@
 # DASCADE — Delta Alpha Sierra Arcade
 
-A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **26 games**, plus a **Tournament Center** for brackets and Swiss events, **twelve themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
+A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **11 cabinets** holding **27 games**, plus a **Tournament Center** for brackets and Swiss events, **twelve themes** and a global **jukebox** with an optional synchronized Room DJ. No account needed: create a room and share its 5-letter code.
 
 > All casino-style games use meaningless **virtual chips**. There is no real-money wagering, purchasing, deposits or cash-out of any kind.
 
@@ -16,6 +16,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | Roulette · Slots · High/Low (`dasino`) | 1–30 | One casino-floor room with three tables: European roulette, an original slot machine and high/low dice |
 | **DAS Boardroom** | DAS Chess (`chess`) | 2 | Full rules via chess.js, server clocks, premoves, PGN, DASCADE rating |
 | | DAS Checkers (`checkers`) | 2 | American checkers: forced captures, multi-jumps, kings, clocks, rating |
+| | DAS Tic-Tac-Toe (`tictactoe`) | 2 | Classic 3×3 plus twelve variants: Ultimate, Gomoku, Gravity, Nesting, a 3D cube, Order & Chaos and more ([docs/TICTACTOE.md](docs/TICTACTOE.md)) |
 | | DAS Ships (`ships`) | 2 | Original hidden-fleet duel (classic, hot-streak and salvo modes) |
 | **DAStravaganza** | DAStravaganza Trivia (`trivia`) | 1–30 | Game-show trivia: five question types, teams, custom packs, final wager |
 | | DASception (`deception`) | 4–20 | Social deduction: loyal Sysops against hidden Glitches, with special roles |
@@ -86,7 +87,7 @@ Games read materials with an exact fallback (`var(--mat-board-light, <original c
 | Game | Formats | Series (best of) | Field |
 |---|---|---|---|
 | Chess, Checkers | single elim, double elim, round robin, Swiss | 1, 2, 3, 5 | up to 64 |
-| Ships, Pixel Paddle, Neon Snake, Memory Matrix | same | 1, 3, 5 | up to 64 |
+| Tic-Tac-Toe, Ships, Pixel Paddle, Neon Snake, Memory Matrix | same | 1, 3, 5 | up to 64 |
 | DAS Putt | same | 1, 3 | up to 32 |
 
 - **Lifecycle:** draft, registration, optional check-in, seeding (random, manual or by DASCADE rating), live rounds, then champion. Double elimination has an optional grand-final reset. Swiss pairs players on the same score and avoids rematches. Round robin uses Berger tables. Byes are handled automatically.
@@ -355,7 +356,7 @@ A **variant** (like the DASino tables) is just another `games[]` entry with the 
 1. Add `tournament: { formats, bestOf, maxField, draws, sides }` to its catalog entry. The wizard, config validation (`TournamentConfigSchema`) and the kiosk derive the game list from the catalog.
 2. In the room, read `this.tournamentMatch`. When it is set, give seats and first move by `participants[].side` in **every** game of the series (sides swap between games), and use fixed tournament rules and no casual-only features such as take-backs or rematch votes. The base room already locks the room to the two ticket holders, refuses lobby controls, starts games automatically and drives the series.
 3. Call `this.reportOutcome({ placements, … })` at **every** ending: win, draw, resign, timeout, forfeit and abandonment. The bracket advances only on reported outcomes, and duplicates are ignored.
-4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for time controls.
+4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for time controls (tic-tac-toe also lets the organizer pick the variant).
 5. Test it with a real kiosk (`apps/game-server/test/tournament-helpers.ts`; see `tournament-chess.test.ts`).
 
 To make a head-to-head game **rated**, also set `rated: true` in the catalog. Tournament games are then always rated, and casual rooms can opt in by overriding `ratedOptIn()` (the boardroom kit does this with a lobby toggle).
