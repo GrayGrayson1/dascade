@@ -104,10 +104,10 @@ export interface GameDriver {
 }
 
 // ---------------------------------------------------------------------------
-// Boardroom games (chess, checkers): resign / draw by agreement
+// Boardroom games (chess, checkers, tic-tac-toe): resign / draw by agreement
 // ---------------------------------------------------------------------------
 
-function boardDriver(gameId: 'chess' | 'checkers'): GameDriver {
+function boardDriver(gameId: 'chess' | 'checkers' | 'tictactoe'): GameDriver {
   return {
     gameId,
     sided: true,
@@ -411,6 +411,7 @@ const memoryDriver: GameDriver = {
 export const DRIVERS: Record<string, GameDriver> = {
   chess: boardDriver('chess'),
   checkers: boardDriver('checkers'),
+  tictactoe: boardDriver('tictactoe'),
   ships: shipsDriver,
   putt: puttDriver,
   paddle: paddleDriver,

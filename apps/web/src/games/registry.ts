@@ -14,6 +14,7 @@ export const GAME_MODULES: Record<GameId, () => Promise<{ default: GameClientMod
   quest: () => import('./quest/index.tsx'),
   chess: () => import('./chess/index.tsx'),
   checkers: () => import('./checkers/index.tsx'),
+  tictactoe: () => import('./tictactoe/index.tsx'),
   ships: () => import('./ships/index.tsx'),
   trivia: () => import('./trivia/index.tsx'),
   deception: () => import('./deception/index.tsx'),
