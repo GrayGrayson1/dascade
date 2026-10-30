@@ -153,15 +153,24 @@ export interface BoardSettingsFieldsProps {
   sideLabels: readonly [string, string];
   /** Whether the game supports take-backs (hide the toggle otherwise). */
   undo?: boolean;
+  /** Whether the game keeps a DASCADE rating (tic-tac-toe doesn't: no Rated toggle). Default true. */
+  ratings?: boolean;
 }
 
-export function BoardSettingsFields({ settings: raw, canEdit: hostCanEdit, update, sideLabels, undo = true }: BoardSettingsFieldsProps) {
+export function BoardSettingsFields({
+  settings: raw,
+  canEdit: hostCanEdit,
+  update,
+  sideLabels,
+  undo = true,
+  ratings = true,
+}: BoardSettingsFieldsProps) {
   const s: BoardSettings = { ...DEFAULT_BOARD_SETTINGS, ...raw };
   // Tournament Center match rooms: the organizer fixed the format; games are always rated, never take-backs.
   const tournament = Boolean(useRoomSelector((st) => st.tournamentJson));
   const canEdit = hostCanEdit && !tournament;
-  const rated = s.rated || tournament;
-  const allowUndo = s.allowUndo && !rated;
+  const rated = ratings && (s.rated || tournament);
+  const allowUndo = s.allowUndo && !rated && !tournament;
   const sideOptions: Array<{ value: SideMode; label: string }> = [
     { value: 'random', label: 'Random' },
     { value: 'host_first', label: `Host ${sideLabels[0]}` },
@@ -171,7 +180,8 @@ export function BoardSettingsFields({ settings: raw, canEdit: hostCanEdit, updat
     <div className="br-settings">
       {tournament ? (
         <p className="br-settings__locked" role="note">
-          <PixelIcon name="lock" /> Tournament match — settings are fixed by the organizer · rated (internal DASCADE rating) · no take-backs
+          <PixelIcon name="lock" /> Tournament match — settings are fixed by the organizer ·{' '}
+          {ratings ? 'rated (internal DASCADE rating) · ' : ''}no take-backs
         </p>
       ) : null}
       <div className="dc-field">
@@ -195,16 +205,18 @@ export function BoardSettingsFields({ settings: raw, canEdit: hostCanEdit, updat
         <div className="dc-field__hint">{`${sideLabels[0]} moves first. Rematches swap sides.`}</div>
       </div>
       <div className="br-settings__toggles">
-        <Toggle
-          checked={rated}
-          disabled={!canEdit}
-          onChange={(rated) => update({ rated })}
-          label={
-            <span>
-              Rated game <span className="br-settings__hint">changes both players’ DASCADE rating (internal, not FIDE)</span>
-            </span>
-          }
-        />
+        {ratings ? (
+          <Toggle
+            checked={rated}
+            disabled={!canEdit}
+            onChange={(rated) => update({ rated })}
+            label={
+              <span>
+                Rated game <span className="br-settings__hint">changes both players’ DASCADE rating (internal, not FIDE)</span>
+              </span>
+            }
+          />
+        ) : null}
         {undo ? (
           <Toggle
             checked={allowUndo}

@@ -17,6 +17,8 @@ export interface ResultBannerProps<S extends BoardRoomView> {
   extra?: ReactNode;
   /** Small boards (phones): side-by-side players, icon-only secondary actions. */
   compact?: boolean;
+  /** Games without a DASCADE rating (tic-tac-toe) drop the rated/casual note. Default true. */
+  ratings?: boolean;
   className?: string;
 }
 
@@ -25,7 +27,7 @@ function scoreText(winner: string, side: BoardSide): string {
   return winner === side ? '1' : '0';
 }
 
-export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch, extra, compact, className }: ResultBannerProps<S>) {
+export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch, extra, compact, ratings = true, className }: ResultBannerProps<S>) {
   const { state, mySide, game, tournament, offer } = room;
   const [collapsed, setCollapsed] = useState(false);
   const titleId = useId();
@@ -62,7 +64,7 @@ export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch,
         <span className="br-result__eyebrow">
           {tournament
             ? `${tournament.roundLabel} · Game ${tournament.gameNumber} of ${tournament.bestOf}`
-            : `Game over${state.gameNumber > 1 ? ` · Game ${state.gameNumber}` : ''}${compact ? (state.rated ? ' · Rated' : ' · Casual') : ''}`}
+            : `Game over${state.gameNumber > 1 ? ` · Game ${state.gameNumber}` : ''}${compact && ratings ? (state.rated ? ' · Rated' : ' · Casual') : ''}`}
         </span>
         <h2 id={titleId} className="br-result__title">
           {tone === 'win' ? <PixelIcon name="trophy" /> : null}
@@ -100,7 +102,7 @@ export function ResultBanner<S extends BoardRoomView>({ room, sideLabel, swatch,
           );
         })}
       </ul>
-      {compact ? null : state.rated ? (
+      {compact || !ratings ? null : state.rated ? (
         <p className="br-result__note">Rated game · DASCADE rating (internal, not FIDE)</p>
       ) : (
         <p className="br-result__note">Casual game · ratings unchanged</p>
