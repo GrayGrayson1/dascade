@@ -9,7 +9,9 @@
  * Roulette" and Back returns to that cabinet's picker; single-game cabinets go
  * back to the arcade floor (centred on the cabinet). DASino tables arrive as
  * ?table=roulette|slots|dice: the title shows the table, and the requested
- * table is carried into the room (consumed once by the DASino client).
+ * table is carried into the room (consumed once by the DASino client). An entry
+ * with lobby settings (Four in a Row = ?table=gravity on tic-tac-toe) creates
+ * its room with them.
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -80,16 +82,21 @@ export function CabinetEntry() {
   const inPicker = !!cabinet && cabinet.games.length > 1;
   const title = entry?.variant ? entry.title : game.title;
   const tagline = entry?.variant ? entry.blurb : game.tagline;
-  const description = entry?.variant
-    ? `${TABLE_COPY[entry.variant] ?? entry.blurb} One shared balance across the DASino floor — every chip is virtual.`
-    : game.description;
+  const description =
+    entry?.description ??
+    (entry?.variant
+      ? `${TABLE_COPY[entry.variant] ?? entry.blurb} One shared balance across the DASino floor — every chip is virtual.`
+      : game.description);
   const badges = gameBadges(game);
 
   const create = async (solo: boolean) => {
     if (busy !== null || !commitProfileName()) return;
     setBusy(solo ? 'solo' : 'create');
     sfx('coin');
-    const roomCode = await session.createRoom(gameId, solo ? { solo: true } : {});
+    const roomCode = await session.createRoom(gameId, {
+      ...(solo ? { solo: true } : {}),
+      ...(entry?.settings ? { settings: { ...entry.settings } } : {}),
+    });
     setBusy(null);
     if (roomCode) {
       requestVariant(roomCode, gameId, variant);

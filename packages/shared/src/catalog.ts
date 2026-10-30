@@ -437,7 +437,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     marquee: 'DAS TIC-TAC-TOE',
     tagline: 'Classic noughts and crosses, plus Ultimate, Gomoku and ten more twists.',
     description:
-      'The classic 3×3 game, plus twelve variants: Ultimate, Gomoku, Big Board, Misère, Vanishing, Wild, Numbers, Gravity, Nesting, Notakto, a 3D cube and Order & Chaos. Server-checked moves, optional clocks, spectators and rematches.',
+      'The classic 3×3 game, plus twelve variants: Ultimate, Gomoku, Big Board, Misère, Vanishing, Wild, Numbers, Four in a Row, Nesting, Notakto, a 3D cube and Order & Chaos. Server-checked moves, optional clocks, spectators and rematches.',
     category: 'strategy',
     cabinet: 'boardroom',
     accent: { primary: '#ff4f81', secondary: '#38bdf8', deep: '#140818' },
@@ -454,7 +454,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     howToPlay: [
       'X moves first. Take turns marking an empty square.',
       'Three in a row — across, down or diagonal — wins. A full board is a draw.',
-      'The host can pick a variant in the lobby: Ultimate, Gomoku, Gravity, Vanishing and more. Each one explains its rules before you start.',
+      'The host can pick a variant in the lobby: Ultimate, Gomoku, Four in a Row, Vanishing and more. Each one explains its rules before you start.',
       'Rematches swap who goes first.',
     ],
     virtualChips: false,

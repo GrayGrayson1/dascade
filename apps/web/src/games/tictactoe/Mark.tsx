@@ -1,12 +1,12 @@
 /**
  * DAS Tic-Tac-Toe marks: hand-drawn X and O strokes (SVG, drawn in when they appear), the Numbers
- * digits, Nesting's three piece sizes and the side swatches for player cards. Colours come from
+ * digits, Nesting's three piece sizes, Four in a Row's discs and the side swatches for player cards. Colours come from
  * --tt-* custom properties in tictactoe.css; X and O keep their colours in every theme (they mean
  * the players), Notakto's shared X uses the ink colour.
  */
 import { memo } from 'react';
 import type { BoardSide } from '@dascade/shared/games/boardroom';
-import { TTT_SIZE_LABEL, type TttMark, type TttSize, type TttVariant } from '@dascade/shared/games/tictactoe';
+import { TTT_SIZE_LABEL, TTT_VARIANT_INFO, type TttMark, type TttSize, type TttVariant } from '@dascade/shared/games/tictactoe';
 import { markOf, topOf } from '@dascade/game-core/tictactoe';
 import { cx } from '@dascade/ui';
 
@@ -39,6 +39,20 @@ export const Piece = memo(function Piece({ owner, size, className }: { owner: Tt
   );
 });
 
+/** Four in a Row: a disc in its player's colour, embossed with the player's mark (colour is never the only cue). */
+export const Disc = memo(function Disc({ mark, className }: { mark: TttMark; className?: string }) {
+  return (
+    <span className={cx('tt-disc', `tt-disc--${mark}`, className)} aria-hidden>
+      <Glyph mark={mark} />
+    </span>
+  );
+});
+
+/** Four in a Row: "Pink disc" / "Blue disc". */
+function discName(mark: string): string {
+  return `${TTT_VARIANT_INFO.gravity.sides[mark === 'o' ? 1 : 0]} disc`;
+}
+
 /** Nesting: the pieces under the visible one, smallest last. */
 function covered(stack: string): Array<{ owner: TttMark; size: TttSize }> {
   const out: Array<{ owner: TttMark; size: TttSize }> = [];
@@ -70,6 +84,7 @@ export function CellContent({ variant, token }: { variant: TttVariant; token: st
       </>
     );
   }
+  if (variant === 'gravity') return <Disc mark={token as TttMark} />;
   return <Glyph mark={token as TttMark} ink={variant === 'notakto'} />;
 }
 
@@ -77,6 +92,7 @@ export function CellContent({ variant, token }: { variant: TttVariant; token: st
 export function describeToken(variant: TttVariant, token: string): string {
   if (!token) return 'empty';
   if (variant === 'numbers') return token;
+  if (variant === 'gravity') return discName(token);
   if (variant === 'nesting') {
     const top = topOf(token);
     if (!top) return 'empty';
@@ -107,7 +123,7 @@ export function SideSwatch({ variant, side, className }: { variant: TttVariant; 
   }
   return (
     <span className={cx('tt-swatch', className)}>
-      <Glyph mark={markOf(variant, side)} />
+      {variant === 'gravity' ? <Disc mark={markOf(variant, side)} /> : <Glyph mark={markOf(variant, side)} />}
     </span>
   );
 }

@@ -6,7 +6,7 @@
  *
  * Moves show optimistically (the engine previews them) until the server's state catches up, and
  * roll back if the server refuses. Keys: arrows + Enter on the board; 1–9 play the squares of a
- * 3×3 board; X / O pick the mark, S / M / L the Nesting piece, a digit the Numbers number.
+ * 3×3 board (1–7 the columns of Four in a Row); X / O pick the mark, S / M / L the Nesting piece, a digit the Numbers number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { otherSide, timeControlLabel, type BoardSide } from '@dascade/shared/games/boardroom';
@@ -215,6 +215,8 @@ export function TicTacToeView() {
         setSel({ size: (key === 's' ? 1 : key === 'm' ? 2 : 3) as TttSize, explicit: true });
       else if (choice === 'num' && /^[1-9]$/.test(key)) setSel({ num: Number(key) });
       else if (KEYPAD.has(variant) && /^[1-9]$/.test(key)) onCell(Number(key) - 1);
+      // Four in a Row: 1–7 drop into the columns (any square of a column plays it).
+      else if (variant === 'gravity' && /^[1-7]$/.test(key)) onCell(Number(key) - 1);
       else return;
       e.preventDefault();
     };
@@ -354,6 +356,7 @@ export function TicTacToeView() {
     }
     if (variant === 'orderchaos') hints.push('Order needs five of one mark in a row. Chaos needs a full board without one.');
     if (variant === 'misere') hints.push('Avoid three in a row — making one loses.');
+    if (variant === 'gravity' && myTurn) hints.push('Tap a column (or press 1–7) to drop your disc.');
     if ((variant === 'vanishing' || variant === 'nesting') && state.repetitions >= 2)
       hints.push('Position repeated — a third time is a draw.');
     if ((variant === 'vanishing' || variant === 'nesting') && TTT_MOVE_LIMIT - ply <= 20)

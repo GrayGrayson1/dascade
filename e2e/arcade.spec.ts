@@ -354,7 +354,7 @@ test.describe('cabinets, pickers and title screens', () => {
   test('direct links and refreshes work', async ({ page }) => {
     await page.goto('/cabinet/boardroom');
     await expect(page.getByRole('heading', { name: 'DAS Boardroom', level: 1 })).toBeVisible();
-    await expect(page.locator('.cp__list').getByRole('link')).toHaveCount(4);
+    await expect(page.locator('.cp__list').getByRole('link')).toHaveCount(5);
     await expect(page.getByRole('link', { name: 'Tournament Center' })).toBeVisible();
     await page.reload();
     await expect(page.getByRole('heading', { name: 'DAS Boardroom', level: 1 })).toBeVisible();
@@ -368,6 +368,11 @@ test.describe('cabinets, pickers and title screens', () => {
     await expect(page.getByRole('heading', { name: 'DAS Chess', level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(/DAS Boardroom/);
     await expect(page.getByRole('button', { name: /Tournament Center/ })).toBeVisible();
+
+    await page.goto('/play/fourinarow');
+    await expect(page).toHaveURL(/\/play\/tictactoe\?table=gravity$/);
+    await expect(page.getByRole('heading', { name: 'Four in a Row', level: 1 })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(/DAS Boardroom/);
 
     await page.goto('/play/roulette');
     await expect(page).toHaveURL(/\/play\/dasino\?table=roulette$/);

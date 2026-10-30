@@ -131,6 +131,7 @@ function Grid({ variant, base, cols, rows, board, strikes, win, hover, focus, on
             aria-label={spoken}
             aria-disabled={!board.interactive || (!board.clickable.has(cell) && !board.selectable.has(cell)) || undefined}
             aria-pressed={board.selected === cell ? true : undefined}
+            style={variant === 'gravity' ? ({ '--row': Math.floor((cell - base) / cols) } as CSSProperties) : undefined}
             tabIndex={focus === cell ? 0 : -1}
             onFocus={() => onFocus(cell)}
             onPointerEnter={() => onHover(cell)}
