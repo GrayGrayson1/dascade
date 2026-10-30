@@ -529,6 +529,12 @@ function SideArt({ cabinet, pat }: { cabinet: CabinetDef; pat: string }) {
             <ellipse cy="4" rx="21" ry="6" fill="none" stroke="#ff8a94" strokeWidth="1.4" />
             <path d="M-12 2L-12 -8L-6 -2L0 -10L6 -2L12 -8L12 2Z" fill={P} />
           </g>
+          {/* a tic-tac-toe grid, X to win */}
+          <g transform="translate(36 352)" strokeLinecap="round" fill="none">
+            <path d="M9.3 0V28M18.7 0V28M0 9.3H28M0 18.7H28" stroke={P} strokeWidth="1.6" />
+            <path d="M2 2L7.3 7.3M7.3 2L2 7.3M11.3 11.3L16.7 16.7M16.7 11.3L11.3 16.7" stroke="#ff4f81" strokeWidth="2" />
+            <circle cx="23.3" cy="4.7" r="2.9" stroke="#38bdf8" strokeWidth="1.8" />
+          </g>
           {/* a tiny sonar grid with a hidden fleet */}
           <g transform="translate(18 392)">
             <rect width="64" height="64" fill="#03202e" stroke="#38bdf8" strokeWidth="1.2" />
