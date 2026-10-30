@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fromFen, initialPosition, legalMoves, moveNotation } from '@dascade/game-core/checkers';
-import { clickSquare, destinationsFor, movablePieces, targetsFor } from './selection.ts';
+import { checkersEngine, fromFen, geometryFor, initialPosition, legalMoves, moveNotation, rcSquare } from '@dascade/game-core/checkers';
+import { clickSquare, destinationsFor, jumpedAlong, jumpedOnHop, movablePieces, targetsFor } from './selection.ts';
 
 const movesOf = (fen?: string) => legalMoves(fen ? fromFen(fen) : initialPosition());
 
@@ -59,5 +59,27 @@ describe('checkers move input', () => {
     const moves = movesOf('B:W18,32:B1,15');
     expect([...movablePieces(moves)]).toEqual([15]);
     expect(clickSquare(moves, [], 1)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('jumped pieces', () => {
+  it('finds the piece a man jumps and the pieces behind a partial chain', () => {
+    const moves = movesOf('B:W10,19:B6');
+    expect(jumpedOnHop(moves, [6], 15)).toBe(10);
+    expect(jumpedAlong(moves, [6, 15])).toEqual([10]);
+    expect(jumpedAlong(moves, [6])).toEqual([]);
+    expect(jumpedOnHop(movesOf(), [11], 15)).toBe(0);
+  });
+
+  it('finds the piece a flying king takes from a distance (10×10)', () => {
+    const geo = geometryFor(10);
+    const at = (r: number, c: number) => rcSquare(geo, r, c);
+    const cells = Array.from({ length: 50 }, () => '.');
+    cells[at(9, 0) - 1] = 'L';
+    cells[at(5, 4) - 1] = 'd';
+    cells[at(0, 1) - 1] = 'd';
+    const moves = checkersEngine('international').legalMoves({ board: cells.join(''), turn: 'light' });
+    expect(targetsFor(moves, [at(9, 0)]).sort((a, b) => a - b)).toEqual([at(0, 9), at(1, 8), at(2, 7), at(3, 6), at(4, 5)].sort((a, b) => a - b));
+    expect(jumpedOnHop(moves, [at(9, 0)], at(2, 7))).toBe(at(5, 4));
   });
 });

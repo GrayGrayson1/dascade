@@ -3,11 +3,15 @@
  *  - wide (desktop, tablet landscape): cards above/below the board, side panel with moves + actions;
  *  - stack (phones/tablets in portrait): card · board (full width) · card · move strip · actions;
  *  - short (phones in landscape): board fills the height on the left, everything else on the right.
+ *
+ * Variants add their own bits: the variant badge and goal hint, King of the Hill's centre and Racing
+ * Kings' finish rank on the board, Atomic explosions, Three-Check counters and Crazyhouse pockets on
+ * the player cards, the king in Antichess's promotion picker. Only Standard shows ratings.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { otherSide, timeControlLabel, clockCategory, type BoardSide } from '@dascade/shared/games/boardroom';
-import type { ChessPublicState, ChessSettings } from '@dascade/shared/games/chess';
-import { materialBalance, sideColor, squareAt, type PieceType } from '@dascade/game-core/chess';
+import { CHESS_VARIANT_INFO, type ChessPublicState, type ChessSettings, type ChessVariant } from '@dascade/shared/games/chess';
+import { sideColor, squareAt, type ChessGameApi, type PieceType } from '@dascade/game-core/chess';
 import { Badge, Button, IconButton, PixelIcon, cx } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
 import { useSettings } from '../../net/hooks.ts';
@@ -30,6 +34,7 @@ import { PromotionPicker } from './Promotion.tsx';
 import { RulesModal } from './Rules.tsx';
 import { copyText, currentPgn, downloadText } from './pgn.ts';
 import { useChessBoard, type ChessBoardController } from './useChessBoard.ts';
+import { CheckPips, Pocket, boardMarks, variantGoal, variantTitle } from './variants.tsx';
 
 type Layout = 'wide' | 'stack' | 'short';
 
@@ -66,8 +71,11 @@ export function ChessView() {
   return <ChessGameView room={room} onFlip={() => setFlipped((f) => !f)} />;
 }
 
-function Captured({ fen, color }: { fen: string; color: PieceColor }) {
-  const bal = materialBalance(fen);
+/** Variants where a material count means nothing (Antichess: less is better; Horde: 36 pawns). */
+const NO_MATERIAL: ReadonlySet<ChessVariant> = new Set(['antichess', 'horde', 'crazyhouse']);
+
+function Captured({ game, color }: { game: ChessGameApi; color: PieceColor }) {
+  const bal = game.material();
   const up = bal[color];
   const score = color === 'w' ? bal.score : -bal.score;
   const theirs: PieceColor = color === 'w' ? 'b' : 'w';
@@ -115,7 +123,21 @@ function StatusLine({
     tone = state.inCheck ? 'warn' : mine ? 'accent' : 'muted';
   } else text = '';
   const hints: string[] = [];
+  const variant = ctl.variant;
   if (room.tournament?.decider === 'armageddon' && !state.result.over) hints.push('Armageddon decider: a draw counts as a win for Black.');
+  if (variant !== 'standard' && state.phase === 'COUNTDOWN') hints.push(...CHESS_VARIANT_INFO[variant].rules);
+  else if (variant !== 'standard' && live && ctl.review === null) {
+    const goal = variantGoal(variant);
+    const mine = mySide === state.turn;
+    if (variant === 'antichess' && mine && ctl.game.mustCapture()) hints.push('You must capture.');
+    else if (variant === 'crazyhouse' && mine && ctl.drop)
+      hints.push('Tap a highlighted square to drop the piece, or tap it in your pocket again to put it back.');
+    else if (variant === 'racingkings' && state.turn === 'second' && ctl.game.kingSquare('w')?.endsWith('8'))
+      hints.push('White reached the 8th rank: Black has one move to get there too and draw.');
+    else if (variant === 'threecheck')
+      hints.push(`Checks given — White ${ctl.game.checksGiven('w')}/3 · Black ${ctl.game.checksGiven('b')}/3`);
+    else if (goal && (variant !== 'crazyhouse' || mine)) hints.push(goal);
+  }
   if (live && ctl.review === null) {
     if (state.repetition === 2) hints.push('This position has occurred twice — a third time is an automatic draw.');
     if (state.halfmoveClock >= 80)
@@ -194,6 +216,8 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
         onFlip();
       } else if (e.key === 'Escape' && c.premove) {
         c.cancelPremove();
+      } else if (e.key === 'Escape' && c.drop) {
+        c.pickDrop?.(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -221,6 +245,13 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
     return out;
   }, [ctl.game]);
 
+  const myTurn = live && mySide !== null && state.turn === mySide && ctl.review === null;
+  const must = useMemo(
+    () => (ctl.variant === 'antichess' && myTurn && ctl.game.mustCapture() ? [...new Set(ctl.game.legalMoves().map((m) => m.from))] : []),
+    [ctl.variant, ctl.game, myTurn],
+  );
+  const marks = useMemo(() => boardMarks(ctl.variant, ctl.exploded, must), [ctl.variant, ctl.exploded, must]);
+
   const squareName = useCallback(
     (sq: string) => {
       const p = ctl.game.piece(sq);
@@ -231,6 +262,33 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
 
   const topSide = otherSide(bottomSide);
   const players = state.players;
+  const variant = ctl.variant;
+  const rated = variant === 'standard';
+  const swatch = (side: BoardSide) => <ChessPiece kind={variant === 'horde' && side === 'first' ? 'p' : 'k'} color={sideColor(side)} />;
+  const cardExtra = (side: BoardSide) => {
+    const color = sideColor(side);
+    if (variant === 'crazyhouse') {
+      const mine = mySide === side;
+      return (
+        <Pocket
+          pocket={ctl.game.pocket(color)}
+          color={color}
+          selected={mine ? ctl.drop : null}
+          onPick={mine ? (ctl.pickDrop ?? undefined) : undefined}
+        />
+      );
+    }
+    const material = NO_MATERIAL.has(variant) ? null : <Captured game={ctl.game} color={color} />;
+    if (variant === 'threecheck') {
+      return (
+        <span className="ch-card-extra">
+          <CheckPips given={ctl.game.checksGiven(color)} />
+          {material}
+        </span>
+      );
+    }
+    return material ?? <span className="ch-captured ch-captured--empty" aria-hidden />;
+  };
   const card = (side: BoardSide, position: 'top' | 'bottom', compact: boolean) => {
     const seat = room.seat(side);
     const player = seat?.playerId ? players[seat.playerId] : undefined;
@@ -239,12 +297,13 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
         key={side}
         seat={seat}
         sideLabel={SIDE_LABEL(side)}
-        swatch={<ChessPiece kind="k" color={sideColor(side)} />}
+        swatch={swatch(side)}
         active={live && state.turn === side}
         isYou={mySide === side}
         connected={seat?.playerId ? Boolean(player?.connected) : true}
         showDelta={state.result.over && state.rated}
-        captured={<Captured fen={ctl.fen} color={sideColor(side)} />}
+        showRating={rated}
+        captured={cardExtra(side)}
         clock={<BoardClock clock={state.clock} side={side} owner={SIDE_LABEL(side)} size={compact ? 'md' : 'lg'} />}
         position={position}
         compact={compact}
@@ -259,7 +318,10 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
     window.setTimeout(() => setCopied('idle'), 1800);
   };
   const downloadPgn = () =>
-    downloadText(`dascade-chess-${state.code}-game${state.gameNumber}.pgn`, currentPgn(state, settings, state.startedAt || Date.now()));
+    downloadText(
+      `dascade-${variant === 'standard' ? 'chess' : variant}-${state.code}-game${state.gameNumber}.pgn`,
+      currentPgn(state, settings, state.startedAt || Date.now()),
+    );
   const pgnButtons = (
     <Button
       size="sm"
@@ -316,24 +378,29 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
             lastMove={ctl.lastMove}
             check={ctl.check}
             premove={ctl.premove ? [ctl.premove.from, ctl.premove.to] : undefined}
+            marks={marks}
             squareName={squareName}
             interactive={ctl.interactive}
             canPick={ctl.canPick}
             onSelect={ctl.onSelect}
             onMove={ctl.onMove}
+            onSquareClick={ctl.onSquareClick}
             animation={ctl.animation}
             reducedMotion={reducedMotion}
-            label="Chess board"
+            label={variant === 'standard' ? 'Chess board' : `${variantTitle(variant)} board`}
           />
         ) : null}
-        {ctl.promotion && mySide ? <PromotionPicker color={sideColor(mySide)} onChoose={ctl.choosePromotion} /> : null}
+        {ctl.promotion && mySide ? (
+          <PromotionPicker color={sideColor(mySide)} onChoose={ctl.choosePromotion} choices={ctl.game.promotionChoices()} />
+        ) : null}
         {state.result.over ? (
           <div className="ch-result-layer">
             <ResultBanner
               room={room}
               sideLabel={SIDE_LABEL}
-              swatch={(side) => <ChessPiece kind="k" color={sideColor(side)} />}
+              swatch={swatch}
               compact={size < 520}
+              ratings={rated}
               extra={
                 size < 520 ? (
                   <>
@@ -390,13 +457,20 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
         <ChessPiece kind="n" color="w" className="ch-head__icon" /> DAS Chess
       </span>
       <span className="ch-head__tags">
+        {variant !== 'standard' ? (
+          <Badge color="var(--accent-2)" icon="star">
+            {variantTitle(variant)}
+          </Badge>
+        ) : null}
         <Badge color="var(--accent)" icon="clock">
           {timeControlLabel(settings.timeControl ?? { baseMinutes: 0, incrementSeconds: 0 })}
           {state.clock.enabled ? ` · ${clockCategory(settings.timeControl)}` : ''}
         </Badge>
-        <Badge color={state.rated ? 'var(--yellow)' : 'var(--text-2)'} icon={state.rated ? 'trophy' : undefined}>
-          {state.rated ? 'Rated' : 'Casual'}
-        </Badge>
+        {rated || state.rated ? (
+          <Badge color={state.rated ? 'var(--yellow)' : 'var(--text-2)'} icon={state.rated ? 'trophy' : undefined}>
+            {state.rated ? 'Rated' : 'Casual'}
+          </Badge>
+        ) : null}
         {!mySide ? (
           <Badge color="var(--purple)" icon="eye">
             Spectating
@@ -407,7 +481,11 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
   );
 
   return (
-    <GameStage gameId="chess" className={cx('ch', `ch--${layout}`)} style={{ '--ch-board': `${size}px` } as CSSProperties}>
+    <GameStage
+      gameId="chess"
+      className={cx('ch', `ch--${layout}`, reducedMotion && 'ch--still')}
+      style={{ '--ch-board': `${size}px` } as CSSProperties}
+    >
       {layout === 'wide' ? (
         <div className="ch-layout" ref={layoutRef}>
           <div className="ch-main">
@@ -446,7 +524,7 @@ function ChessGameView({ room, onFlip }: { room: Boardroom<ChessPublicState, Che
           </aside>
         </div>
       )}
-      <RulesModal open={rules} onClose={() => setRules(false)} />
+      <RulesModal open={rules} onClose={() => setRules(false)} variant={variant} />
     </GameStage>
   );
 }

@@ -13,7 +13,7 @@ import { cabinetForGame, type CabinetId, type GameAccent, type GameId } from '@d
 import { drawStatic, rect, textWidth, drawTextC, type AttractFrame, type Scene } from './attractKit.ts';
 import { blackjack, bingo, circuit, dasketch, holdem, quest, slots, wheel } from './scenes/originals.ts';
 import { highlow, roulette } from './scenes/casino.ts';
-import { checkers, chess, ships, tictactoe } from './scenes/boardroom.ts';
+import { checkers, chess, fourinarow, ships, tictactoe } from './scenes/boardroom.ts';
 import { deception, masterpiece, survey, trivia, words } from './scenes/party.ts';
 import { putt, tanks } from './scenes/sports.ts';
 import { asteroids, blocks, bricks, memory, paddle, snake } from './scenes/classics.ts';
@@ -37,6 +37,7 @@ export const SCENES = {
   chess,
   checkers,
   tictactoe,
+  fourinarow,
   ships,
   trivia,
   deception,
@@ -62,7 +63,7 @@ export const CABINET_PLAYLISTS: Record<CabinetId, readonly SceneId[]> = {
   bingo: ['bingo'],
   wheel: ['wheel'],
   dasino: ['slots', 'holdem', 'roulette', 'blackjack', 'highlow'],
-  boardroom: ['chess', 'ships', 'checkers', 'tictactoe'],
+  boardroom: ['chess', 'ships', 'checkers', 'tictactoe', 'fourinarow'],
   stravaganza: ['trivia', 'deception', 'words', 'masterpiece', 'survey', 'showdown'],
   putt: ['putt'],
   tanks: ['tanks'],
@@ -79,6 +80,7 @@ export function scenesForGame(gameId: GameId, variant?: string | null): readonly
     const table = variant ? DASINO_TABLE_SCENES[variant] : undefined;
     return table ? [table] : ['roulette', 'slots', 'highlow'];
   }
+  if (gameId === 'tictactoe' && variant === 'gravity') return ['fourinarow'];
   if (gameId === 'tournament') return ['chess', 'putt', 'snake'];
   if (gameId in SCENES) return [gameId as SceneId];
   // A game without its own scene yet borrows its cabinet's playlist (never another cabinet's art).

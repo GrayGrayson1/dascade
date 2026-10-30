@@ -20,7 +20,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 
 ## Kits (build on them; extend additively, don't copy)
 - Party (DAStravaganza): `rooms/party/PartyRoom.ts`, `games/_party/`, `@dascade/shared/party`, `@dascade/game-core/party`.
-- Boardroom (chess, checkers): `rooms/boardroom/BoardGameRoom.ts`, `games/_boardroom/`, `@dascade/shared/games/boardroom`.
+- Boardroom (chess, checkers, tic-tac-toe; each with a variant picker): `rooms/boardroom/BoardGameRoom.ts`, `games/_boardroom/`, `@dascade/shared/games/boardroom`.
 - Classics: `rooms/classics/{ClassicsRoom,VerifiedClassicsRoom}.ts`, `games/_classics/`, `@dascade/shared/games/classics`, `@dascade/game-core/classics/shared`.
 - If you override a lifecycle hook a kit room implements, call `super` first.
 

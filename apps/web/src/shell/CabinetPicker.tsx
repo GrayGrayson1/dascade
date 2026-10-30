@@ -75,8 +75,8 @@ function entryAccent(entry: CabinetGame): GameAccent {
 }
 
 function entryDescription(entry: CabinetGame): string {
-  // DASino tables share one catalog entry; their own blurb is the precise description.
-  return entry.variant ? entry.blurb : GAME_CATALOG[entry.gameId].description;
+  // Sub-modes (DASino tables, Four in a Row) share their game's catalog entry; their own copy is the precise description.
+  return entry.description ?? (entry.variant ? entry.blurb : GAME_CATALOG[entry.gameId].description);
 }
 
 function useIsDesktop(): boolean {

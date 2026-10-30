@@ -1,7 +1,7 @@
 /**
  * DAS Boardroom scenes: a four-move checkmate, a checkers multi-jump to the
- * crown, a tic-tac-toe fork (then a glimpse of Ultimate's nine boards), and a
- * hidden-fleet sonar duel.
+ * crown, a tic-tac-toe fork (then a glimpse of Ultimate's nine boards), Four in
+ * a Row's discs dropping into a diagonal win, and a hidden-fleet sonar duel.
  */
 import {
   banner,
@@ -621,5 +621,107 @@ export const tictactoe: Scene = {
       drawUltimate(f, tt);
       tttWipe(ctx, W, H, (tt - ULT_WIPE) / (TTT_C - ULT_WIPE));
     }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Four in a Row — discs drop into a 7 × 6 rack until Pink lines up a diagonal.
+// ---------------------------------------------------------------------------
+const C4_BG = '#0c0a1e';
+const C4_RACK = '#2b2378';
+const C4_RACK_EDGE = '#4a3fb8';
+const C4_HOLE = '#100c26';
+const C4_C = 10.8;
+/** Columns played, Pink first; the 13th disc completes Pink's diagonal d1–e2–f3–g4. */
+const C4_GAME = [3, 3, 4, 2, 5, 6, 4, 5, 5, 4, 6, 6, 6] as const;
+const C4_MOVE0 = 0.8;
+const C4_GAP = 0.55;
+const C4_FALL = 0.3;
+const C4_STRIKE = C4_MOVE0 + (C4_GAME.length - 1) * C4_GAP + C4_FALL + 0.15;
+const C4_WIPE = 10.1;
+
+/** Landing row (0 = top) of each disc in C4_GAME. */
+const C4_ROWS: readonly number[] = (() => {
+  const height = [0, 0, 0, 0, 0, 0, 0];
+  return C4_GAME.map((c) => 5 - height[c]!++);
+})();
+const C4_WIN: ReadonlyArray<readonly [number, number]> = [
+  [3, 5],
+  [4, 4],
+  [5, 3],
+  [6, 2],
+];
+
+function c4Disc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, pink: boolean): void {
+  disc(ctx, cx, cy + Math.max(1, Math.round(r / 5)), r, pink ? TTT_X_SHADE : TTT_O_SHADE);
+  disc(ctx, cx, cy, r, pink ? TTT_X : TTT_O);
+  if (r >= 4) disc(ctx, cx - r * 0.35, cy - r * 0.35, Math.max(1, r * 0.22), '#ffffff');
+}
+
+export const fourinarow: Scene = {
+  label: '4 IN A ROW',
+  length: C4_C,
+  still: 9.0,
+  draw(f: AttractFrame) {
+    const { ctx, W, H } = f;
+    const tt = cyc(f.t, C4_C);
+    rect(ctx, 0, 0, W, H, C4_BG);
+    for (let y = 3; y < H; y += 6) for (let x = 3; x < W; x += 6) rect(ctx, x, y, 1, 1, '#17123a');
+    const lift = Math.round(f.top * 0.6);
+    // a hover row above the rack for the disc about to drop
+    const cell = Math.max(4, Math.floor(Math.min((W * 0.9) / 7, ((H - lift) * 0.9) / 7)));
+    const rw = cell * 7;
+    const rh = cell * 6;
+    const rx = Math.round((W - rw) / 2);
+    const ry = lift + Math.round((H - lift - rh - cell) / 2) + cell;
+    const r = Math.max(1, Math.round(cell * 0.38));
+    const played = C4_GAME.filter((_, i) => tt >= C4_MOVE0 + i * C4_GAP).length;
+    const strikeK = clamp((tt - C4_STRIKE) / 0.35, 0, 1);
+    const won = strikeK >= 1;
+
+    // the disc waiting above its column, then falling
+    C4_GAME.forEach((col, i) => {
+      const t0 = C4_MOVE0 + i * C4_GAP;
+      const k = clamp((tt - t0) / C4_FALL, 0, 1);
+      if (tt < t0 - 0.3 || k >= 1) return;
+      const cx = rx + col * cell + cell / 2;
+      const top = ry - cell / 2;
+      const bottom = ry + C4_ROWS[i]! * cell + cell / 2;
+      c4Disc(ctx, cx, top + (bottom - top) * k * k, r, i % 2 === 0);
+    });
+    // the rack, with the slots that are still empty showing through
+    rect(ctx, rx - 2, ry - 2, rw + 4, rh + 4, C4_RACK_EDGE);
+    rect(ctx, rx, ry, rw, rh, C4_RACK);
+    rect(ctx, rx - 3, ry + rh + 2, 3, Math.max(2, Math.round(cell / 2)), C4_RACK_EDGE);
+    rect(ctx, rx + rw, ry + rh + 2, 3, Math.max(2, Math.round(cell / 2)), C4_RACK_EDGE);
+    for (let row = 0; row < 6; row++)
+      for (let col = 0; col < 7; col++) disc(ctx, rx + col * cell + cell / 2, ry + row * cell + cell / 2, r, C4_HOLE);
+    // landed discs
+    for (let i = 0; i < played; i++) {
+      if (tt < C4_MOVE0 + i * C4_GAP + C4_FALL) continue;
+      const lit = won && C4_WIN.some(([c, w]) => c === C4_GAME[i] && w === C4_ROWS[i]);
+      const cx = rx + C4_GAME[i]! * cell + cell / 2;
+      const cy = ry + C4_ROWS[i]! * cell + cell / 2;
+      if (lit && blinkOn(f, tt, 3)) disc(ctx, cx, cy, r + 1, '#ffd23f');
+      c4Disc(ctx, cx, cy, r, i % 2 === 0);
+    }
+    // the strike along the diagonal
+    if (strikeK > 0) {
+      const [c0, r0] = C4_WIN[0]!;
+      const [c1, r1] = C4_WIN[3]!;
+      const x0 = rx + c0 * cell + cell / 2;
+      const y0 = ry + r0 * cell + cell / 2;
+      const x1 = rx + c1 * cell + cell / 2;
+      const y1 = ry + r1 * cell + cell / 2;
+      const k = easeInOut(strikeK);
+      const brush = Math.max(1, Math.round(cell / 7));
+      line(ctx, x0 + 1, y0 + 1, x0 + 1 + (x1 - x0) * k, y0 + 1 + (y1 - y0) * k, '#5a4410', brush + 1);
+      line(ctx, x0, y0, x0 + (x1 - x0) * k, y0 + (y1 - y0) * k, '#ffd23f', brush + 1);
+    }
+    if (won && tt < C4_WIPE) {
+      if (f.hud) banner(ctx, 'PINK WINS!', W, ry + rh * 0.35, blinkOn(f, tt) ? '#ffd23f' : '#ffffff', C4_BG, W >= 120 ? 2 : 1);
+      for (let i = 0; i < 5; i++) sparkle(ctx, rx + hash(i + 23) * rw, ry + hash(i + 29) * rh, tt * 3 + i * 0.37, '#fff3b0');
+    }
+    tttWipe(ctx, W, H, (tt - C4_WIPE) / (C4_C - C4_WIPE));
   },
 };

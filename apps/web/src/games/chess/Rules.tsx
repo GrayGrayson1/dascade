@@ -1,10 +1,22 @@
-/** DAS Chess — in-game rules & controls reference (also explains the draw policy and clocks). */
+/** DAS Chess — in-game rules & controls reference (the variant's own rules first; draw policy, clocks). */
+import { CHESS_VARIANT_INFO, type ChessVariant } from '@dascade/shared/games/chess';
 import { Modal } from '@dascade/ui';
 
-export function RulesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function RulesModal({ open, onClose, variant = 'standard' }: { open: boolean; onClose: () => void; variant?: ChessVariant }) {
+  const info = CHESS_VARIANT_INFO[variant];
   return (
-    <Modal open={open} onClose={onClose} title="How DAS Chess works" wide>
+    <Modal open={open} onClose={onClose} title={variant === 'standard' ? 'How DAS Chess works' : `How ${info.title} works`} wide>
       <div className="ch-rules">
+        {variant === 'standard' ? null : (
+          <section>
+            <h3>{info.title}</h3>
+            <ul>
+              {info.rules.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section>
           <h3>Moving</h3>
           <ul>
@@ -48,6 +60,7 @@ export function RulesModal({ open, onClose }: { open: boolean; onClose: () => vo
               Rated games change your DASCADE rating — an internal Elo-style rating, not FIDE. A “?” marks a provisional rating (fewer than
               10 games).
             </li>
+            <li>Only Standard chess is rated. Chess960 and the other variants are always casual, in tournaments too.</li>
             <li>
               Casual, unrated games may allow take-backs if the host enabled them; your opponent must accept each request. Never in rated or
               tournament games.

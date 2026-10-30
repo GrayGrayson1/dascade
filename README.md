@@ -14,9 +14,10 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | **DASino** | Texas Hold'em (`holdem`) | 2–10 | No-limit hold'em with side pots, timers and spectators |
 | | Blackjack (`blackjack`) | 1–7 | Simultaneous decisions, splits, doubles, insurance, surrender |
 | | Roulette · Slots · High/Low (`dasino`) | 1–30 | One casino-floor room with three tables: European roulette, an original slot machine and high/low dice |
-| **DAS Boardroom** | DAS Chess (`chess`) | 2 | Full rules via chess.js, server clocks, premoves, PGN, DASCADE rating |
-| | DAS Checkers (`checkers`) | 2 | American checkers: forced captures, multi-jumps, kings, clocks, rating |
-| | DAS Tic-Tac-Toe (`tictactoe`) | 2 | Classic 3×3 plus twelve variants: Ultimate, Gomoku, Gravity, Nesting, a 3D cube, Order & Chaos and more ([docs/TICTACTOE.md](docs/TICTACTOE.md)) |
+| **DAS Boardroom** | DAS Chess (`chess`) | 2 | Full rules via chess.js, server clocks, premoves, PGN, DASCADE rating, plus eight variants: Chess960, King of the Hill, Three-Check, Racing Kings, Antichess, Atomic, Horde, Crazyhouse ([docs/CHESS_VARIANTS.md](docs/CHESS_VARIANTS.md)) |
+| | DAS Checkers (`checkers`) | 2 | American checkers (forced captures, multi-jumps, kings, clocks, rating) plus eleven variants: Russian, Pool, Brazilian, Italian, Spanish, Czech, International 10×10, Canadian 12×12, Giveaway, Antidraughts, Breakthrough ([docs/CHECKERS_VARIANTS.md](docs/CHECKERS_VARIANTS.md)) |
+| | DAS Tic-Tac-Toe (`tictactoe`) | 2 | Classic 3×3 plus twelve variants: Ultimate, Gomoku, Four in a Row, Nesting, a 3D cube, Order & Chaos and more ([docs/TICTACTOE.md](docs/TICTACTOE.md)) |
+| | Four in a Row (`tictactoe`, `/play/fourinarow`) | 2 | Its own tile for tic-tac-toe's drop-disc variant: a 7 × 6 rack, four in a row wins |
 | | DAS Ships (`ships`) | 2 | Original hidden-fleet duel (classic, hot-streak and salvo modes) |
 | **DAStravaganza** | DAStravaganza Trivia (`trivia`) | 1–30 | Game-show trivia: five question types, teams, custom packs, final wager |
 | | DASception (`deception`) | 4–20 | Social deduction: loyal Sysops against hidden Glitches, with special roles |
@@ -96,7 +97,7 @@ Games read materials with an exact fallback (`var(--mat-board-light, <original c
 - Brackets render as a tree on desktop and as a round strip on phones. Round robin shows a crosstable and Swiss shows standings with explained tiebreaks.
 - Public tournaments are listed at `GET /api/tournaments`. Unlisted ones are joined by code.
 
-Chess and checkers keep an internal **DASCADE rating** (Elo-style, provisional for the first 10 games). It is not a FIDE or any other federation's rating. Tournament games of rated games are always rated. Casual rooms can opt in with the lobby's **Rated** toggle. Ratings and per-game stats appear under **Profile → Stats**.
+Chess and checkers keep an internal **DASCADE rating** (Elo-style, provisional for the first 10 games). Only standard chess and American checkers are rated; their variants are always casual, in tournaments too. It is not a FIDE or any other federation's rating. Tournament games of rated games are always rated. Casual rooms can opt in with the lobby's **Rated** toggle. Ratings and per-game stats appear under **Profile → Stats**.
 
 ## Quick start
 
@@ -356,7 +357,7 @@ A **variant** (like the DASino tables) is just another `games[]` entry with the 
 1. Add `tournament: { formats, bestOf, maxField, draws, sides }` to its catalog entry. The wizard, config validation (`TournamentConfigSchema`) and the kiosk derive the game list from the catalog.
 2. In the room, read `this.tournamentMatch`. When it is set, give seats and first move by `participants[].side` in **every** game of the series (sides swap between games), and use fixed tournament rules and no casual-only features such as take-backs or rematch votes. The base room already locks the room to the two ticket holders, refuses lobby controls, starts games automatically and drives the series.
 3. Call `this.reportOutcome({ placements, … })` at **every** ending: win, draw, resign, timeout, forfeit and abandonment. The bracket advances only on reported outcomes, and duplicates are ignored.
-4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for time controls (tic-tac-toe also lets the organizer pick the variant).
+4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for the variant and time control (tic-tac-toe likewise).
 5. Test it with a real kiosk (`apps/game-server/test/tournament-helpers.ts`; see `tournament-chess.test.ts`).
 
 To make a head-to-head game **rated**, also set `rated: true` in the catalog. Tournament games are then always rated, and casual rooms can opt in by overriding `ratedOptIn()` (the boardroom kit does this with a lobby toggle).

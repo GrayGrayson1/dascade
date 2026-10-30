@@ -8,12 +8,22 @@
  *  - premove destinations (geometry only, validated again when the premove is played);
  *  - material balance, PGN export with headers and %clk comments.
  * Pure and isomorphic (server + browser). No randomness.
+ *
+ * Variants: Standard is this chess.js wrapper; every other variant runs on DASCADE's own engine
+ * (./variantRules.ts, ./variantGame.ts). Both implement {@link ChessGameApi}; use
+ * {@link createChessGame} to get the right one for a variant.
  */
 import { Chess, type Move, type Square } from 'chess.js';
+import type { ChessVariant } from '@dascade/shared/games/chess';
+import { VariantChessGame } from './variantGame.ts';
 
 export type ChessColor = 'w' | 'b';
 export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
+/** A promotion choice in any variant (a king only in Antichess). */
+export type PromotionChoice = PromotionPiece | 'k';
+/** Pieces that can be dropped from a Crazyhouse pocket. */
+export type DropPiece = 'p' | 'n' | 'b' | 'r' | 'q';
 export type ChessSquare = Square;
 
 export const PROMOTION_PIECES: readonly PromotionPiece[] = ['q', 'r', 'b', 'n'];
@@ -21,7 +31,20 @@ export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0
 export const FILES = 'abcdefgh';
 export const PIECE_VALUES: Record<PieceType, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
-export type ChessEndReason = 'checkmate' | 'stalemate' | 'insufficient' | 'repetition' | 'fifty_moves';
+export type ChessEndReason =
+  | 'checkmate'
+  | 'stalemate'
+  | 'insufficient'
+  | 'repetition'
+  | 'fifty_moves'
+  // Variant goals:
+  | 'hill'
+  | 'three_checks'
+  | 'race'
+  | 'explosion'
+  | 'no_pieces'
+  | 'no_moves'
+  | 'horde_captured';
 
 export interface ChessEnd {
   /** null = draw. */
@@ -30,9 +53,12 @@ export interface ChessEnd {
 }
 
 export interface MoveInput {
-  from: string;
+  /** Origin square (absent for a Crazyhouse drop). */
+  from?: string;
   to: string;
   promotion?: string;
+  /** Crazyhouse: the pocket piece to drop on `to`. */
+  drop?: string;
 }
 
 export interface ChessMoveRecord {
@@ -45,13 +71,19 @@ export interface ChessMoveRecord {
   piece: PieceType;
   /** Captured piece type ('' if none). */
   captured: PieceType | '';
-  promotion: PromotionPiece | '';
+  promotion: PromotionChoice | '';
   /** '' | 'k' (O-O) | 'q' (O-O-O). */
   castle: '' | 'k' | 'q';
   enPassant: boolean;
   check: boolean;
   mate: boolean;
   fenAfter: string;
+  /** Crazyhouse: the piece dropped (absent for normal moves). */
+  drop?: DropPiece;
+  /** Atomic: squares emptied by the explosion. */
+  exploded?: ChessSquare[];
+  /** Castling: the rook's origin and destination. */
+  rook?: [ChessSquare, ChessSquare];
 }
 
 export interface LegalMove {
@@ -59,8 +91,54 @@ export interface LegalMove {
   to: ChessSquare;
   san: string;
   capture: boolean;
-  promotion: PromotionPiece | '';
+  promotion: PromotionChoice | '';
   castle: '' | 'k' | 'q';
+}
+
+export type ChessPocket = Record<DropPiece, number>;
+
+/**
+ * The game API shared by Standard (chess.js) and the variant engine: the room and the client only
+ * talk to this. Squares are algebraic ("e4"); FENs are the variant's FEN.
+ */
+export interface ChessGameApi {
+  readonly variant: ChessVariant;
+  readonly startFen: string;
+  readonly fen: string;
+  readonly turn: ChessColor;
+  readonly history: readonly ChessMoveRecord[];
+  readonly ply: number;
+  inCheck(): boolean;
+  kingSquare(color?: ChessColor): ChessSquare | null;
+  piece(square: string): { type: PieceType; color: ChessColor } | null;
+  legalMoves(from?: string): LegalMove[];
+  legalTargets(from: string): ChessSquare[];
+  isPromotion(from: string, to: string): boolean;
+  /** Pieces a pawn may promote to, in picker order. */
+  promotionChoices(): readonly PromotionChoice[];
+  isLegal(input: MoveInput): boolean;
+  move(input: MoveInput): ChessMoveRecord | null;
+  undo(): ChessMoveRecord | null;
+  repetitionCount(): number;
+  halfmoveClock(): number;
+  status(): ChessEnd | null;
+  canMate(color: ChessColor): boolean;
+  material(): MaterialBalance;
+  /** Crazyhouse pocket of `color` (all zero elsewhere). */
+  pocket(color: ChessColor): ChessPocket;
+  /** Squares the side to move may drop `piece` on (Crazyhouse; empty elsewhere). */
+  dropTargets(piece: DropPiece): ChessSquare[];
+  /** Three-Check: checks `color` has given (0 elsewhere). */
+  checksGiven(color: ChessColor): number;
+  /** Antichess: the side to move has a capture, so it must capture. */
+  mustCapture(): boolean;
+}
+
+const EMPTY_POCKET: ChessPocket = { p: 0, n: 0, b: 0, r: 0, q: 0 };
+
+/** The game engine for a variant: chess.js for Standard, the variant engine for the rest. Throws on an invalid FEN. */
+export function createChessGame(variant: ChessVariant, fen?: string): ChessGameApi {
+  return variant === 'standard' ? new ChessGame(fen) : new VariantChessGame(variant, fen);
 }
 
 const SQUARE_RE = /^[a-h][1-8]$/;
@@ -127,7 +205,8 @@ function toRecord(m: Move): ChessMoveRecord {
 }
 
 /** A chess game: current position plus full history (repetition counts need the history). */
-export class ChessGame {
+export class ChessGame implements ChessGameApi {
+  readonly variant = 'standard' as const;
   private readonly chess: Chess;
   private readonly records: ChessMoveRecord[] = [];
   private readonly positions = new Map<string, number>();
@@ -263,15 +342,36 @@ export class ChessGame {
     return materialBalance(this.chess.fen());
   }
 
+  promotionChoices(): readonly PromotionChoice[] {
+    return PROMOTION_PIECES;
+  }
+
+  pocket(): ChessPocket {
+    return { ...EMPTY_POCKET };
+  }
+
+  dropTargets(): ChessSquare[] {
+    return [];
+  }
+
+  checksGiven(): number {
+    return 0;
+  }
+
+  mustCapture(): boolean {
+    return false;
+  }
+
   private check(input: MoveInput): { from: ChessSquare; to: ChessSquare; promotion?: PromotionPiece } | null {
-    if (!isSquare(input.from) || !isSquare(input.to)) return null;
+    if (input.drop !== undefined || input.from === undefined || !isSquare(input.from) || !isSquare(input.to)) return null;
     const promo = input.promotion ? input.promotion.toLowerCase() : '';
     if (promo && !isPromotionPiece(promo)) return null;
     const candidates = this.legalMoves(input.from).filter((m) => m.to === input.to);
     if (candidates.length === 0) return null;
     const needsPromotion = candidates.some((m) => m.promotion !== '');
     if (needsPromotion !== Boolean(promo)) return null;
-    return promo ? { from: input.from, to: input.to, promotion: promo as PromotionPiece } : { from: input.from, to: input.to };
+    const from: ChessSquare = input.from;
+    return promo ? { from, to: input.to, promotion: promo as PromotionPiece } : { from, to: input.to };
   }
 
   private bump(fen: string, delta: number): void {
@@ -570,6 +670,8 @@ export interface GamePgnInfo {
   /** Add [%clk] comments. */
   timed: boolean;
   startFen?: string;
+  /** PGN Variant tag value ("Chess960", "Crazyhouse", …); omitted for Standard. */
+  variant?: string;
 }
 
 /** PGN Termination tag value for a board result reason. */
@@ -595,6 +697,7 @@ export function buildGamePgn(info: GamePgnInfo): string {
       ['UTCTime', time],
       ['TimeControl', info.timeControl],
       ['Termination', pgnTermination(info.reason)],
+      ...(info.variant ? ([['Variant', info.variant]] as Array<[string, string]>) : []),
     ],
     sans: info.moves.map((m) => m.san),
     clocksMs: info.timed ? info.moves.map((m) => m.clockMs ?? null) : undefined,
@@ -602,3 +705,12 @@ export function buildGamePgn(info: GamePgnInfo): string {
     startFen: info.startFen,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Variant engine
+// ---------------------------------------------------------------------------
+
+export { VariantChessGame, HILL, moveInputFromUci } from './variantGame.ts';
+export { CHESS960_STANDARD_ID, chess960BackRank, chess960Fen, variantStartFen } from './variantRules.ts';
+/** The variant move generator itself (positions, perft, FEN) — for tests and tools. */
+export * as variantEngine from './variantRules.ts';

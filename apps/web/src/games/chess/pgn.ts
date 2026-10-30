@@ -1,14 +1,16 @@
 /** DAS Chess — client PGN export (same builder the server uses for the final record). */
 import { timeControlPgn, type BoardSide } from '@dascade/shared/games/boardroom';
-import type { ChessPublicState, ChessSettings } from '@dascade/shared/games/chess';
+import { CHESS_VARIANT_INFO, type ChessPublicState, type ChessSettings } from '@dascade/shared/games/chess';
 import { buildGamePgn, pgnResultFor, sideColor } from '@dascade/game-core/chess';
 import { parseTournament } from '../_boardroom/index.ts';
+import { variantOf } from './variants.tsx';
 
 /** The server's final PGN once the game is over, otherwise a live PGN of the game so far. */
 export function currentPgn(state: ChessPublicState, settings: ChessSettings, startedAt: number): string {
   if (state.result.over && state.pgn) return state.pgn;
   const t = parseTournament(state.tournamentJson);
   const winner = state.result.winner as BoardSide | 'draw' | '';
+  const variant = variantOf(state);
   return buildGamePgn({
     event: t ? `DASCADE — ${t.tournamentName}` : 'DASCADE',
     site: `DASCADE room ${state.code}`,
@@ -21,6 +23,8 @@ export function currentPgn(state: ChessPublicState, settings: ChessSettings, sta
     reason: state.result.reason,
     moves: state.moves.map((m) => ({ san: m.san, clockMs: m.clockMs })),
     timed: state.clock.enabled,
+    variant: variant === 'standard' ? undefined : CHESS_VARIANT_INFO[variant].title,
+    startFen: variant === 'chess960' ? state.startFen : undefined,
   });
 }
 

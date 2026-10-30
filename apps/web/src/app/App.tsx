@@ -100,6 +100,7 @@ export function App() {
             <Route path="/play/poker" element={<Navigate to="/play/holdem" replace />} />
             <Route path="/play/texas-holdem" element={<Navigate to="/play/holdem" replace />} />
             <Route path="/play/roulette" element={<Navigate to="/play/dasino?table=roulette" replace />} />
+            <Route path="/play/fourinarow" element={<Navigate to="/play/tictactoe?table=gravity" replace />} />
             <Route path="/play/slots" element={<Navigate to="/play/dasino?table=slots" replace />} />
             <Route path="/play/highlow" element={<Navigate to="/play/dasino?table=dice" replace />} />
             <Route path="/play/dice" element={<Navigate to="/play/dasino?table=dice" replace />} />

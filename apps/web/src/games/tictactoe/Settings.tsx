@@ -3,7 +3,6 @@
  * with a small drawing of its board), the chosen variant's rules, and the Boardroom kit fields
  * (clock, sides, take-backs; no rating). Tournament match rooms show it all read-only.
  */
-import type { CSSProperties } from 'react';
 import {
   DEFAULT_TICTACTOE_SETTINGS,
   TTT_FAMILIES,
@@ -12,9 +11,8 @@ import {
   type TicTacToeSettings,
   type TttVariant,
 } from '@dascade/shared/games/tictactoe';
-import { PixelIcon, cx, handleRovingKeys, rovingTabIndex } from '@dascade/ui';
 import { useRoomSelector } from '../../net/hooks.ts';
-import { BoardSettingsFields } from '../_boardroom/index.ts';
+import { BoardSettingsFields, VariantPicker, VariantRulesCard } from '../_boardroom/index.ts';
 import type { SettingsPanelProps } from '../types.ts';
 
 /** A tiny drawing of the variant's board for the picker. */
@@ -64,67 +62,19 @@ export function VariantIcon({ variant }: { variant: TttVariant }) {
 export function TicTacToeSettingsPanel({ settings: raw, canEdit: hostCanEdit, update }: SettingsPanelProps<TicTacToeSettings>) {
   const s: TicTacToeSettings = { ...DEFAULT_TICTACTOE_SETTINGS, ...raw };
   const tournament = Boolean(useRoomSelector((st) => st.tournamentJson));
-  const canEdit = hostCanEdit && !tournament;
   const info = TTT_VARIANT_INFO[s.variant];
 
   return (
     <div className="tt-settings">
-      <div className="dc-field">
-        <span className="dc-field__label" id="tt-variant-label">
-          Variant
-        </span>
-        {TTT_FAMILIES.map((family) => {
-          const ids = TTT_VARIANTS.filter((id) => TTT_VARIANT_INFO[id].family === family.id);
-          return (
-            <div key={family.id} className="tt-variants__group">
-              <span className="tt-variants__family">{family.label}</span>
-              <div
-                className="tt-variants"
-                role="radiogroup"
-                aria-label={`${family.label} variants`}
-                onKeyDown={(e) => handleRovingKeys(e, 'radio')}
-              >
-                {ids.map((id, i) => {
-                  const v = TTT_VARIANT_INFO[id];
-                  const on = s.variant === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      tabIndex={rovingTabIndex(on, i, ids.includes(s.variant))}
-                      className={cx('tt-variant', on && 'is-on', id === 'classic' && 'tt-variant--feature')}
-                      disabled={!canEdit}
-                      data-variant={id}
-                      onClick={() => update({ variant: id })}
-                      style={{ '--i': i } as CSSProperties}
-                    >
-                      <VariantIcon variant={id} />
-                      <span className="tt-variant__text">
-                        <span className="tt-variant__title">{v.title}</span>
-                        <span className="tt-variant__tag">{v.tagline}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <section className="tt-rules-card" aria-labelledby="tt-rules-title">
-        <h3 id="tt-rules-title" className="tt-rules-card__title">
-          <PixelIcon name="info" /> {info.title} rules
-        </h3>
-        <ul className="tt-rules-card__list">
-          {info.rules.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      </section>
-
+      <VariantPicker
+        value={s.variant}
+        options={TTT_VARIANTS.map((id) => ({ ...TTT_VARIANT_INFO[id], icon: <VariantIcon variant={id} /> }))}
+        families={TTT_FAMILIES}
+        canEdit={hostCanEdit && !tournament}
+        onChange={(variant) => update({ variant })}
+        feature="classic"
+      />
+      <VariantRulesCard title={info.title} rules={info.rules} />
       <BoardSettingsFields settings={s} canEdit={hostCanEdit} update={update} sideLabels={info.sides} ratings={false} />
     </div>
   );

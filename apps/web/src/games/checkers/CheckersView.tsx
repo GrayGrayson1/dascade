@@ -1,7 +1,7 @@
 /**
- * DAS Checkers game screen: player cards with clocks around the board, a side panel with the turn
- * status (incl. "Capture required"), draw-rule hints, move list and actions, and the kit's result
- * card over the board when the game ends.
+ * DAS Checkers game screen (every variant): player cards with clocks around the board, a side panel
+ * with the turn status (incl. "Capture required" in the variant's terms), draw-rule hints, the move
+ * list, the variant's rules and actions, and the kit's result card over the board when the game ends.
  *
  * Moves are sent as paths; the board shows them optimistically until the server's state (which is
  * authoritative) catches up, and rolls back if the server refuses.
@@ -11,12 +11,17 @@ import { otherSide, timeControlLabel, type BoardSide } from '@dascade/shared/gam
 import {
   CHECKERS_COLOR_LABEL,
   CHECKERS_MSG,
+  CHECKERS_VARIANT_INFO,
   checkersColorOf,
+  checkersSideLabels,
+  isCheckersVariant,
+  isRatedCheckersVariant,
   type CheckersMoveEvent,
   type CheckersPublicState,
   type CheckersSettings,
+  type CheckersVariant,
 } from '@dascade/shared/games/checkers';
-import { applyMove, FORTY_MOVE_PLIES, hasCapture, legalMoves, material, type CheckersMove, type Color } from '@dascade/game-core/checkers';
+import { checkersEngine, drawCountdown, isKing, material, type CheckersEngine, type CheckersMove, type Color } from '@dascade/game-core/checkers';
 import { Badge, PixelIcon, cx } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
 import { session, useRoomMessage } from '../../net/hooks.ts';
@@ -37,9 +42,24 @@ import { CheckersBoard } from './CheckersBoard.tsx';
 import { PieceSwatch } from './Piece.tsx';
 import { checkersSounds } from './sounds.ts';
 
-const sideLabel = (side: BoardSide) => CHECKERS_COLOR_LABEL[checkersColorOf(side)];
-const swatch = (side: BoardSide) => <PieceSwatch tone={checkersColorOf(side)} />;
-const SIDE_LABELS = ['Dark', 'Light'] as const;
+/** "Capture required" in the variant's terms (`most` = pieces the legal captures take). */
+function captureHint(engine: CheckersEngine, board: string, moves: readonly CheckersMove[], mine: boolean): string {
+  const most = moves.reduce((n, m) => Math.max(n, m.captures.length), 0);
+  const take = `take ${most} ${most === 1 ? 'piece' : 'pieces'}`;
+  switch (engine.rules.capture) {
+    case 'max':
+      return mine ? `Capture required — you must ${take}, the most you can` : 'Capture required — the most pieces';
+    case 'spanish':
+      return mine ? `Capture required — ${take}, then the most kings` : 'Capture required — the most pieces, then kings';
+    case 'italian':
+      return mine ? `Capture required — the strongest capture (${most})` : 'Capture required — the strongest capture';
+    case 'czech':
+      if (moves.some((m) => isKing(board[m.path[0]! - 1]))) return 'Capture required — a king must capture';
+      return mine ? 'Capture required — jumps are mandatory' : 'Capture required';
+    default:
+      return mine ? 'Capture required — jumps are mandatory' : 'Capture required';
+  }
+}
 
 function useMedia(query: string): boolean {
   const [match, setMatch] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
@@ -71,8 +91,14 @@ export function CheckersView() {
   const [pending, setPending] = useState<Pending | null>(null);
 
   const state = room?.state;
+  const variant: CheckersVariant = isCheckersVariant(state?.variant) ? state.variant : 'american';
+  const info = CHECKERS_VARIANT_INFO[variant];
+  const engine = checkersEngine(variant);
+  const sideLabel = useCallback((side: BoardSide) => CHECKERS_COLOR_LABEL[checkersColorOf(side, variant)], [variant]);
+  const swatch = useCallback((side: BoardSide) => <PieceSwatch tone={checkersColorOf(side, variant)} />, [variant]);
   const board = state?.board ?? '';
-  const turnColor: Color = checkersColorOf((state?.turn as BoardSide | undefined) ?? 'first');
+  const ready = board.length === engine.geometry.squares;
+  const turnColor: Color = checkersColorOf((state?.turn as BoardSide | undefined) ?? 'first', variant);
   const ply = state?.ply ?? 0;
 
   // The server's position is authoritative: drop the optimistic move once it has moved on.
@@ -90,19 +116,19 @@ export function CheckersView() {
     return () => window.clearTimeout(id);
   }, [pending]);
 
-  const legal = useMemo(() => (board.length === 32 ? legalMoves({ board, turn: turnColor }) : []), [board, turnColor]);
-  const mustCapture = useMemo(() => board.length === 32 && hasCapture({ board, turn: turnColor }), [board, turnColor]);
+  const legal = useMemo(() => (ready ? engine.legalMoves({ board, turn: turnColor }) : []), [ready, engine, board, turnColor]);
+  const mustCapture = legal.some((m) => m.captures.length > 0);
 
   const myTurn = Boolean(room?.myTurn) && state?.phase === 'PLAYING';
   const moves = myTurn && !livePending ? legal : [];
 
   const onMove = useCallback(
     (move: CheckersMove) => {
-      if (!state || board.length !== 32) return;
-      setPending({ ply: state.ply, move, board: applyMove({ board, turn: turnColor }, move).board });
+      if (!state || !ready) return;
+      setPending({ ply: state.ply, move, board: engine.applyMove({ board, turn: turnColor }, move).board });
       session.send(CHECKERS_MSG.move, { path: move.path, ply: state.ply });
     },
-    [state, board, turnColor],
+    [state, ready, engine, board, turnColor],
   );
 
   // Sounds: moves (with capture clacks + crown arpeggio), game end, low time.
@@ -139,8 +165,8 @@ export function CheckersView() {
   const counting = state.phase === 'COUNTDOWN';
 
   const captured = (side: BoardSide) => {
-    const opponent = checkersColorOf(otherSide(side));
-    const n = Math.max(0, 12 - material(shownBoard, opponent).total);
+    const opponent = checkersColorOf(otherSide(side), variant);
+    const n = Math.max(0, info.pieces - material(shownBoard, opponent).total);
     return n > 0 ? (
       <span className="ck-captured" aria-label={`${n} captured`}>
         <PieceSwatch tone={opponent} className="ck-captured__swatch" />
@@ -148,7 +174,8 @@ export function CheckersView() {
       </span>
     ) : null;
   };
-  const kings = (side: BoardSide) => material(shownBoard, checkersColorOf(side)).kings;
+  const kings = (side: BoardSide) => material(shownBoard, checkersColorOf(side, variant)).kings;
+  const rated = isRatedCheckersVariant(variant);
 
   const card = (side: BoardSide, position: 'top' | 'bottom') => {
     const seat = room.seat(side);
@@ -161,6 +188,7 @@ export function CheckersView() {
         active={playing && !over && state.turn === side}
         isYou={mySide === side}
         connected={seat?.playerId ? Boolean(player?.connected) : true}
+        showRating={rated}
         showDelta={over}
         captured={captured(side)}
         clock={<BoardClock clock={state.clock} side={side} owner={sideLabel(side)} size={narrow ? 'md' : 'lg'} />}
@@ -181,7 +209,16 @@ export function CheckersView() {
         : mySide
           ? `Waiting for ${room.seat(otherSide(mySide))?.name || sideLabel(otherSide(mySide))}`
           : `${toMove} to move`;
-  const movesToDraw = Math.ceil((FORTY_MOVE_PLIES - state.quietPlies) / 2);
+  const countdown = ready ? drawCountdown(variant, board, state.quietPlies, state.endgamePlies ?? 0) : null;
+  const drawHint =
+    !countdown || over || !playing
+      ? null
+      : countdown.kind === 'endgame'
+        ? { left: countdown.movesLeft, why: `${countdown.label[0]!.toUpperCase()}${countdown.label.slice(1)}` }
+        : countdown.movesLeft <= countdown.limit / 2
+          ? { left: countdown.movesLeft, why: 'unless a man moves or a piece is captured' }
+          : null;
+  const sideLabels = checkersSideLabels(variant);
 
   return (
     <GameStage
@@ -189,29 +226,30 @@ export function CheckersView() {
       className={cx('ck', narrow && 'ck--narrow')}
       style={{ '--ck-glow': fx === 'off' ? 0 : fx === 'low' ? 0.5 : 1 } as CSSProperties}
     >
-      <div className="ck-layout">
+      <div className="ck-layout" data-variant={variant} data-size={info.size}>
         <div className="ck-slot ck-slot--top">{card(top, 'top')}</div>
         <div className="ck-board-wrap">
           <CheckersBoard
+            size={info.size}
             board={shownBoard}
             ply={shownPly}
             lastPath={lastPath}
             lastCaptures={lastCaptures}
             lastCrowned={lastCrowned}
-            flipped={bottom === 'second'}
+            flipped={checkersColorOf(bottom, variant) === 'light'}
             moves={moves}
             mustCapture={mustCapture && playing && !over}
             onMove={onMove}
             onIllegal={boardSounds.illegal}
             reducedMotion={reducedMotion}
             showNumbers
-            label={`Checkers board, ${sideLabel(bottom)} at the bottom`}
+            label={`Checkers board, ${variant === 'american' ? '' : `${info.title} ${info.size}×${info.size}, `}${sideLabel(bottom)} at the bottom`}
             className={cx(over && 'is-over')}
           />
         </div>
         {over ? (
           <div className="ck-result">
-            <ResultBanner room={room} sideLabel={sideLabel} swatch={swatch} compact={phone} />
+            <ResultBanner room={room} sideLabel={sideLabel} swatch={swatch} compact={phone} ratings={rated} />
           </div>
         ) : null}
         <div className="ck-slot ck-slot--bottom">{card(bottom, 'bottom')}</div>
@@ -226,18 +264,23 @@ export function CheckersView() {
             </div>
             {!over && playing && mustCapture ? (
               <p className="ck-status__must" role="status">
-                <PixelIcon name="warning" /> Capture required{myTurn ? ' — jumps are mandatory' : ` for ${toMove}`}
+                <PixelIcon name="warning" /> {captureHint(engine, board, legal, myTurn)}
+                {myTurn ? '' : ` for ${toMove}`}
               </p>
             ) : null}
-            {!over && playing && state.quietPlies >= 40 ? (
+            {drawHint ? (
               <p className="ck-status__hint">
-                Draw in <b className="br-num">{movesToDraw}</b> {movesToDraw === 1 ? 'move' : 'moves'} unless a man moves or a piece is captured
+                Draw in <b className="br-num">{drawHint.left}</b> {drawHint.left === 1 ? 'move' : 'moves'} — {drawHint.why}
               </p>
             ) : null}
             {!over && playing && state.repetitions >= 2 ? <p className="ck-status__hint">Position repeated — a third time is a draw</p> : null}
             <div className="ck-status__meta">
+              <Badge color="var(--accent-2)" className="ck-variant-badge">
+                {info.title}
+                {info.size !== 8 ? ` · ${info.size}×${info.size}` : ''}
+              </Badge>
               <Badge color="var(--accent)">{timeControlLabel({ baseMinutes: state.clock.enabled ? Math.round(state.clock.baseMs / 60_000) : 0, incrementSeconds: Math.round(state.clock.incrementMs / 1000) })}</Badge>
-              <Badge color={state.rated ? 'var(--accent-2)' : 'var(--text-2)'}>{state.rated ? 'Rated' : 'Casual'}</Badge>
+              {rated || state.rated ? <Badge color={state.rated ? 'var(--accent-2)' : 'var(--text-2)'}>{state.rated ? 'Rated' : 'Casual'}</Badge> : null}
               {room.tournament ? (
                 <Badge color="var(--accent-2)">
                   {room.tournament.roundLabel} · Game {room.tournament.gameNumber}/{room.tournament.bestOf}
@@ -250,8 +293,19 @@ export function CheckersView() {
 
           <section className="ck-moves" aria-label="Move history">
             <h2 className="ck-side__title">Moves</h2>
-            <MoveList moves={history} sideLabels={SIDE_LABELS} layout={narrow ? 'strip' : 'table'} emptyText="Dark moves first." label="Move history" />
+            <MoveList moves={history} sideLabels={sideLabels} layout={narrow ? 'strip' : 'table'} emptyText={`${sideLabels[0]} moves first.`} label="Move history" />
           </section>
+
+          <details className="ck-rules" open={counting || undefined}>
+            <summary className="ck-rules__summary">
+              <PixelIcon name="info" /> How to play {info.title}
+            </summary>
+            <ul className="ck-rules__list">
+              {info.rules.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </details>
 
           <BoardActionBar room={room} sideLabel={sideLabel} onFlip={() => setFlipped((f) => !f)} compact={narrow} className="ck-actions" />
         </aside>

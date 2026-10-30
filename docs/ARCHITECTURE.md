@@ -73,7 +73,7 @@ Game families share server and client toolkits. Build on them, and extend a kit 
 | Kit | Server | Client | Pure / shared | Used by |
 |---|---|---|---|---|
 | **Party** | `rooms/party/PartyRoom.ts`: stage machine with host pause/skip, answer and vote boxes, "who answered" seats, private mailbox, teams, score reveal, `finishParty()` | `games/_party/`: stage layout, timers, answer grids, vote grid, leaderboards, podium, rules drawer | `@dascade/shared/party`, `@dascade/game-core/party` | trivia, deception, masterpiece, words, survey |
-| **Boardroom** | `rooms/boardroom/BoardGameRoom.ts`: sides, server clock (`clock.ts`), resign, draw offers, take-backs, rematch, untimed idle rule, abandonment, `finish()` | `games/_boardroom/`: `SquareBoard`, player cards, clocks, move list, action bar, result banner, settings | `@dascade/shared/games/boardroom` | chess, checkers, tictactoe |
+| **Boardroom** | `rooms/boardroom/BoardGameRoom.ts`: sides, server clock (`clock.ts`), resign, draw offers, take-backs, rematch, untimed idle rule, abandonment, `finish()` | `games/_boardroom/`: `SquareBoard`, player cards, clocks, move list, action bar, result banner, settings, variant picker | `@dascade/shared/games/boardroom` | chess, checkers, tictactoe |
 | **Classics** | `rooms/classics/ClassicsRoom.ts` (standings, instant solo, match flow, outcomes, high scores) + `VerifiedClassicsRoom.ts` (input-log replay) | `games/_classics/`: `ClassicsShell`, cards, HUD, input and touch controls, fixed loop, canvas helpers, `useVerifiedFlow` | `@dascade/shared/games/classics`, `@dascade/game-core/classics/shared` | paddle, snake, bricks, asteroids, memory, blocks |
 
 DAS Ships uses its own room (`ShipsRoom` extends `BaseGameRoom`).

@@ -22,10 +22,16 @@ async function openSettings(page: Page): Promise<void> {
   if (await tab.isVisible().catch(() => false)) await tab.click();
 }
 
-async function setup(page: Page, browser: Browser, contextOptions: Parameters<Browser['newContext']>[0], variant?: RegExp) {
-  const code = await createRoom(page, 'tictactoe', 'Ada');
+async function setup(
+  page: Page,
+  browser: Browser,
+  contextOptions: Parameters<Browser['newContext']>[0],
+  variant?: RegExp,
+  entry: { gameId: string; hostFirst: string } = { gameId: 'tictactoe', hostFirst: 'Host X' },
+) {
+  const code = await createRoom(page, entry.gameId, 'Ada');
   await openSettings(page);
-  await page.getByRole('radio', { name: 'Host X' }).click();
+  await page.getByRole('radio', { name: entry.hostFirst }).click();
   await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).sides).toBe('host_first');
   if (variant) await page.getByRole('radio', { name: variant }).click();
   const guest = await joinRoom(browser, code, 'Bo', contextOptions);
@@ -107,7 +113,7 @@ test('tic-tac-toe: Ultimate sends you to the matching board', async ({ page, bro
   await leaveRoom(x);
 });
 
-test('tic-tac-toe: Gravity drops a mark to the bottom of its column', async ({
+test('Four in a Row: its own tile opens tic-tac-toe on the rack, discs drop to the bottom, keys 1–7 pick a column', async ({
   page,
   browser,
   isMobile,
@@ -115,14 +121,28 @@ test('tic-tac-toe: Gravity drops a mark to the bottom of its column', async ({
   viewport,
   userAgent,
 }) => {
-  const { x, o } = await setup(page, browser, { isMobile, hasTouch, viewport: viewport ?? undefined, userAgent }, /^Gravity/);
-  expect((await roomState(x)).cells).toHaveLength(42);
+  // /play/fourinarow is the Boardroom tile (tic-tac-toe's 'gravity' variant); the room starts on it.
+  const { x, o } = await setup(page, browser, { isMobile, hasTouch, viewport: viewport ?? undefined, userAgent }, undefined, {
+    gameId: 'fourinarow',
+    hostFirst: 'Host Pink',
+  });
+  const start = await roomState(x);
+  expect(start.variant).toBe('gravity');
+  expect(start.cells).toHaveLength(42);
+  await expect(x.getByRole('group', { name: 'Four in a Row board' }).first()).toBeVisible();
+
   await play(x, 3);
   const after = await roomState(x);
   expect(after.cells[38]).toBe('x');
   expect(after.lastCell).toBe(38);
   expect(after.history[0].notation).toBe('d1');
-  await expect(o.getByRole('button', { name: 'd1, X' })).toBeVisible();
+  await expect(o.getByRole('button', { name: 'd1, Pink disc' })).toBeVisible();
+
+  // Blue drops into column 5 from the keyboard: it lands on e1.
+  await expect.poll(async () => (await roomState(o)).turn).toBe('second');
+  await o.keyboard.press('5');
+  await expect.poll(async () => (await roomState(o)).cells[39]).toBe('o');
+  await expect(x.getByRole('button', { name: 'e1, Blue disc' })).toBeVisible();
 
   await leaveRoom(o);
   await leaveRoom(x);

@@ -9,5 +9,6 @@ export { MoveList, type MoveListProps } from './MoveList.tsx';
 export { BoardActionBar, type BoardActionBarProps } from './ActionBar.tsx';
 export { ResultBanner, type ResultBannerProps } from './ResultBanner.tsx';
 export { BoardSettingsFields, TimeControlPicker, type BoardSettingsFieldsProps, type TimeControlPickerProps } from './Settings.tsx';
+export { VariantPicker, VariantRulesCard, type BoardVariantOption, type VariantPickerProps } from './VariantPicker.tsx';
 export { useBoardroom, parseTournament, type Boardroom } from './useBoardroom.ts';
 export { boardSounds, useBoardEventSounds, type BoardEventHandlers } from './sounds.ts';

@@ -37,6 +37,10 @@ export interface CabinetGame {
   title: string;
   /** One line shown in the cabinet picker. */
   blurb: string;
+  /** Longer copy for the picker and the title screen (default: the blurb for a sub-mode, else the catalog description). */
+  description?: string;
+  /** Lobby settings a room created from this entry starts with (e.g. Four in a Row = tic-tac-toe's 'gravity' variant). */
+  settings?: Readonly<Record<string, unknown>>;
 }
 
 export interface CabinetDef {
@@ -113,11 +117,22 @@ export const CABINETS: Record<CabinetId, CabinetDef> = {
     title: 'DAS Boardroom',
     marquee: 'DAS BOARDROOM',
     family: 'Strategy & Board Games',
-    tagline: 'Chess, checkers, tic-tac-toe and a hidden-fleet duel. Tournament ready.',
+    tagline: 'Chess, checkers, tic-tac-toe, Four in a Row and a hidden-fleet duel. Tournament ready.',
     description:
-      'The executive strategy lounge: real-time chess with clocks, American checkers, thirteen kinds of tic-tac-toe and DAS Ships, an original hidden-fleet duel. Every board runs in the Tournament Center.',
+      'The executive strategy lounge: real-time chess with clocks and eight variants, checkers in twelve rule sets from American to 12×12 Canadian, thirteen kinds of tic-tac-toe, Four in a Row and DAS Ships, an original hidden-fleet duel. Every board runs in the Tournament Center.',
     accent: { primary: '#e8c07d', secondary: '#38bdf8', deep: '#141008' },
-    games: [g('chess'), g('checkers'), g('tictactoe'), g('ships')],
+    games: [
+      g('chess'),
+      g('checkers'),
+      g('tictactoe'),
+      {
+        ...g('tictactoe', 'Drop discs down the columns. Line up four to win.', 'fourinarow', 'Four in a Row', 'gravity'),
+        description:
+          'The classic drop-disc duel on a 7 × 6 rack: take turns dropping a disc into a column and line up four across, down or diagonally before your opponent does. Two players, spectators welcome.',
+        settings: { variant: 'gravity' },
+      },
+      g('ships'),
+    ],
   },
   stravaganza: {
     id: 'stravaganza',
