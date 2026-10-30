@@ -190,7 +190,6 @@ export const CHECKERS_VARIANT_INFO: Record<CheckersVariant, CheckersVariantInfo>
       'A man reaching the far row is crowned and the move ends there.',
       'Jumped pieces stay on the board until the move ends and can’t be jumped twice.',
       'Draws: threefold repetition, 20 moves each without a capture or a man move, or three or more kings against a lone king that isn’t caught in 13 moves.',
-      'Played on the international board orientation — a mirror image of the traditional Spanish board, so every line plays the same.',
     ],
   },
   czech: {
