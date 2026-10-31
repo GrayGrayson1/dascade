@@ -13,7 +13,7 @@ import { cabinetForGame, type CabinetId, type GameAccent, type GameId } from '@d
 import { drawStatic, rect, textWidth, drawTextC, type AttractFrame, type Scene } from './attractKit.ts';
 import { blackjack, bingo, circuit, dasketch, holdem, quest, slots, wheel } from './scenes/originals.ts';
 import { highlow, roulette } from './scenes/casino.ts';
-import { checkers, chess, fourinarow, ships, tictactoe } from './scenes/boardroom.ts';
+import { checkers, chess, fourinarow, reversi, ships, tictactoe } from './scenes/boardroom.ts';
 import { deception, masterpiece, survey, trivia, words } from './scenes/party.ts';
 import { putt, tanks } from './scenes/sports.ts';
 import { asteroids, blocks, bricks, memory, paddle, snake } from './scenes/classics.ts';
@@ -38,6 +38,7 @@ export const SCENES = {
   checkers,
   tictactoe,
   fourinarow,
+  reversi,
   ships,
   trivia,
   deception,
@@ -63,7 +64,7 @@ export const CABINET_PLAYLISTS: Record<CabinetId, readonly SceneId[]> = {
   bingo: ['bingo'],
   wheel: ['wheel'],
   dasino: ['slots', 'holdem', 'roulette', 'blackjack', 'highlow'],
-  boardroom: ['chess', 'ships', 'checkers', 'tictactoe', 'fourinarow'],
+  boardroom: ['chess', 'ships', 'checkers', 'reversi', 'tictactoe', 'fourinarow'],
   stravaganza: ['trivia', 'deception', 'words', 'masterpiece', 'survey', 'showdown'],
   putt: ['putt'],
   tanks: ['tanks'],
