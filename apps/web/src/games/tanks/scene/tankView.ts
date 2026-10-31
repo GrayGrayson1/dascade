@@ -1,13 +1,14 @@
 /**
  * Tank display objects: pixel-art hull (tinted per player), a rotating barrel, a neon
- * under-glow, a wind flag on the antenna, name + hit-point bar, the active-turn chevron
- * and a smoking wreck when destroyed.
+ * under-glow, a wind flag on the antenna, name + hit-point bar (with the shield on top), the
+ * active-turn chevron, the volley lock-in badge, a shield bubble per kind, a parachute canopy
+ * while floating down, a dimmed "buried" look under the earth, and a smoking wreck when destroyed.
  */
 import Phaser from 'phaser';
 import { TANK_GEOM, TEAM_NAMES } from '@dascade/shared/games/tanks';
 import { restHeight, type Terrain } from '@dascade/game-core/tanks';
 import type { DisplayTank } from '../model/presenter.ts';
-import { DISPLAY_FONT, NUM_FONT, TEAM_TINT, hexToInt, shade } from '../art/themes.ts';
+import { DISPLAY_FONT, NUM_FONT, SHIELD_TINT, TEAM_TINT, hexToInt, shade } from '../art/themes.ts';
 
 const S = 3; // texels per world unit
 const W = 34;
@@ -125,6 +126,9 @@ export interface TankRenderInfo {
   worldH: number;
   terrain: Terrain;
   teams: boolean;
+  /** Volley mode: show the lock-in badge (shot locked this volley). */
+  locked: boolean;
+  fxOff: boolean;
 }
 
 export class TankView {
@@ -139,7 +143,12 @@ export class TankView {
   private readonly hpText: Phaser.GameObjects.Text;
   private readonly bar: Phaser.GameObjects.Graphics;
   private readonly chevron: Phaser.GameObjects.Image;
+  private readonly badge: Phaser.GameObjects.Image;
+  private readonly shieldG: Phaser.GameObjects.Graphics;
+  private readonly chuteG: Phaser.GameObjects.Graphics;
+  private readonly tag: Phaser.GameObjects.Text;
   private keys: string[] = [];
+  private lastShield = -1;
   private look = '';
   private wrecked = false;
   private lastHp = -1;
@@ -151,25 +160,85 @@ export class TankView {
   constructor(scene: Phaser.Scene, layer: Phaser.GameObjects.Layer, t: DisplayTank, depth: number, dpr: number) {
     this.scene = scene;
     this.id = t.id;
-    this.glow = scene.add.image(0, 0, 'tk-glow').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.3).setDepth(depth - 0.5);
+    this.glow = scene.add
+      .image(0, 0, 'tk-glow')
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.3)
+      .setDepth(depth - 0.5);
     this.barrel = scene.add.image(0, 0, 'tk-px').setOrigin(0.08, 0.5).setDepth(depth);
-    this.hull = scene.add.image(0, 0, 'tk-px').setOrigin(0.5, 1).setDepth(depth + 0.1);
+    this.hull = scene.add
+      .image(0, 0, 'tk-px')
+      .setOrigin(0.5, 1)
+      .setDepth(depth + 0.1);
     this.flag = scene.add.graphics().setDepth(depth + 0.05);
     this.name = scene.add
-      .text(0, 0, t.name, { fontFamily: DISPLAY_FONT, fontSize: '13px', color: '#f8f6ff', stroke: '#07050f', strokeThickness: 4, resolution: dpr * 2 })
+      .text(0, 0, t.name, {
+        fontFamily: DISPLAY_FONT,
+        fontSize: '13px',
+        color: '#f8f6ff',
+        stroke: '#07050f',
+        strokeThickness: 4,
+        resolution: dpr * 2,
+      })
       .setOrigin(0.5, 1);
     this.hpText = scene.add
-      .text(0, 0, '', { fontFamily: NUM_FONT, fontSize: '10px', fontStyle: '700', color: '#f8f6ff', stroke: '#07050f', strokeThickness: 3, resolution: dpr * 2 })
+      .text(0, 0, '', {
+        fontFamily: NUM_FONT,
+        fontSize: '10px',
+        fontStyle: '700',
+        color: '#f8f6ff',
+        stroke: '#07050f',
+        strokeThickness: 3,
+        resolution: dpr * 2,
+      })
       .setOrigin(0, 0.5);
     this.bar = scene.add.graphics();
     this.label = scene.add.container(0, 0, [this.bar, this.name, this.hpText]).setDepth(depth + 5);
-    this.chevron = scene.add.image(0, 0, 'tk-chevron').setOrigin(0.5, 1).setDepth(depth + 5).setVisible(false);
-    for (const o of [this.glow, this.barrel, this.hull, this.flag, this.label, this.chevron]) layer.add(o);
+    this.chevron = scene.add
+      .image(0, 0, 'tk-chevron')
+      .setOrigin(0.5, 1)
+      .setDepth(depth + 5)
+      .setVisible(false);
+    this.badge = scene.add
+      .image(0, 0, 'tk-check')
+      .setOrigin(0.5, 1)
+      .setDepth(depth + 5)
+      .setVisible(false);
+    this.shieldG = scene.add
+      .graphics()
+      .setDepth(depth + 0.3)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.chuteG = scene.add.graphics().setDepth(depth + 0.2);
+    this.tag = scene.add
+      .text(0, 0, 'BURIED', {
+        fontFamily: DISPLAY_FONT,
+        fontSize: '10px',
+        color: '#ffd9a6',
+        stroke: '#07050f',
+        strokeThickness: 4,
+        resolution: dpr * 2,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(depth + 5)
+      .setVisible(false);
+    for (const o of [
+      this.glow,
+      this.barrel,
+      this.hull,
+      this.flag,
+      this.label,
+      this.chevron,
+      this.badge,
+      this.shieldG,
+      this.chuteG,
+      this.tag,
+    ])
+      layer.add(o);
     this.applyLook(t, false);
   }
 
   private applyLook(t: DisplayTank, wreck: boolean): void {
-    const accent = t.team >= 0 ? TEAM_TINT[t.team] ?? '#ffffff' : shade(t.color, -0.4);
+    const accent = t.team >= 0 ? (TEAM_TINT[t.team] ?? '#ffffff') : shade(t.color, -0.4);
     const key = `${t.color}|${accent}|${wreck ? 1 : 0}`;
     if (key === this.look) return;
     const old = this.keys;
@@ -194,6 +263,10 @@ export class TankView {
     for (const o of [this.hull, this.barrel, this.glow, this.flag, this.label]) o.setVisible(visible);
     if (!visible) {
       this.chevron.setVisible(false);
+      this.badge.setVisible(false);
+      this.tag.setVisible(false);
+      this.shieldG.clear();
+      this.chuteG.clear();
       return;
     }
     const px = t.x;
@@ -209,17 +282,27 @@ export class TankView {
     this.barrel.setPosition(pivotX, pivotY).setRotation((-t.angle * Math.PI) / 180);
     this.barrel.setVisible(!wreck);
     const flash = info.now - t.hitAt < 140;
+    const buried = t.buried && !wreck;
     if (flash) this.hull.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    else if (buried) this.hull.setTint(0x8a7560).setTintMode(Phaser.TintModes.MULTIPLY);
     else this.hull.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
+    // Buried: seen through the earth (dim); warping: a brief shimmer.
+    const warping = info.now - t.warpAt < 650;
+    const shimmer = warping && !info.reducedMotion ? 0.55 + 0.45 * Math.sin(info.now / 40) : 1;
+    this.hull.setAlpha((buried ? 0.42 : 1) * shimmer);
+    this.barrel.setAlpha((buried ? 0.42 : 1) * shimmer);
     this.glow
       .setPosition(px, py - 4)
       .setDisplaySize(64, 34)
-      .setAlpha(wreck ? 0 : info.active ? 0.55 + 0.15 * Math.sin(info.now / 220) : 0.28);
+      .setAlpha(wreck || buried ? 0 : info.active ? 0.55 + (info.reducedMotion ? 0 : 0.15 * Math.sin(info.now / 220)) : 0.28);
+
+    this.drawShield(t, info, px, py);
+    this.drawChute(t, px, py);
 
     // Wind flag on the antenna.
     const f = this.flag;
     f.clear();
-    if (!wreck) {
+    if (!wreck && !buried) {
       const ax = px - 8;
       const ay = py - 17;
       f.lineStyle(0.8, 0xd3cdf0, 0.8);
@@ -248,9 +331,11 @@ export class TankView {
     if (this.hpShown < 0) this.hpShown = t.hp;
     this.hpShown += (t.hp - this.hpShown) * 0.2;
     if (Math.abs(this.hpShown - t.hp) < 0.3) this.hpShown = t.hp;
-    if (this.hpShown !== this.lastHp || t.maxHp !== this.lastMax) {
+    const shieldFrac = t.shieldKind && t.shield > 0 ? Math.max(0, Math.min(1, t.shield / Math.max(1, t.shieldMax || t.shield))) : 0;
+    if (this.hpShown !== this.lastHp || t.maxHp !== this.lastMax || shieldFrac !== this.lastShield) {
       this.lastHp = this.hpShown;
       this.lastMax = t.maxHp;
+      this.lastShield = shieldFrac;
       const g = this.bar;
       g.clear();
       const bw = 42;
@@ -262,21 +347,108 @@ export class TankView {
       g.fillRect(-bw / 2, 0, bw, 4);
       g.fillStyle(color, 1);
       g.fillRect(-bw / 2, 0, bw * k, 4);
+      // The shield rides on top of the armor bar.
+      if (shieldFrac > 0) {
+        g.fillStyle(0x07050f, 0.85);
+        g.fillRect(-bw / 2 - 1, -4, bw + 2, 4);
+        g.fillStyle(t.shieldKind ? SHIELD_TINT[t.shieldKind] : 0x5ef0ff, 1);
+        g.fillRect(-bw / 2, -3, bw * shieldFrac, 2);
+      }
       this.hpText.setText(wreck ? 'KO' : String(Math.max(0, Math.round(t.hp))));
       this.hpText.setPosition(bw / 2 + 5, 2);
     }
     this.name.setPosition(0, -3);
     this.label.setAlpha(wreck ? 0.5 : 1);
 
-    // Active chevron.
-    if (info.active && !wreck) {
+    // Active chevron (or the volley lock-in badge in its place).
+    const markY = py - 46 * Math.min(1.4, Math.max(0.8, ls));
+    if (info.locked && !wreck) {
+      this.chevron.setVisible(false);
+      this.badge
+        .setVisible(true)
+        .setPosition(px, markY)
+        .setScale(ls * 0.75);
+    } else if (info.active && !wreck) {
+      this.badge.setVisible(false);
       const bob = info.reducedMotion ? 0 : Math.sin(info.now / 180) * 3;
       this.chevron
         .setVisible(true)
-        .setPosition(px, py - (46 + bob) * Math.min(1.4, Math.max(0.8, ls)))
+        .setPosition(px, markY - bob * Math.min(1.4, Math.max(0.8, ls)))
         .setScale(ls * 0.8)
         .setTint(info.me ? 0xffd23f : hexToInt(t.color));
-    } else this.chevron.setVisible(false);
+    } else {
+      this.chevron.setVisible(false);
+      this.badge.setVisible(false);
+    }
+    this.tag
+      .setVisible(buried)
+      .setPosition(px, py + 4)
+      .setScale(ls * 0.9);
+  }
+
+  /** Translucent bubble per shield kind; ripples when hit; the deflector's rim slowly turns. */
+  private drawShield(t: DisplayTank, info: TankRenderInfo, px: number, py: number): void {
+    const g = this.shieldG;
+    g.clear();
+    if (!t.alive || !t.shieldKind || t.shield <= 0) return;
+    const tint = SHIELD_TINT[t.shieldKind];
+    const frac = Math.max(0.15, Math.min(1, t.shield / Math.max(1, t.shieldMax || t.shield)));
+    const cy = py - TANK_GEOM.hitCenter;
+    const r = TANK_GEOM.shieldRadius;
+    const since = info.now - t.shieldHitAt;
+    const hit = t.shieldHitAt > 0 && since < 420 ? 1 - since / 420 : 0;
+    const pulse = info.reducedMotion ? 0 : 0.04 * Math.sin(info.now / 300 + t.slot);
+    g.fillStyle(tint, 0.07 + 0.08 * frac + pulse + hit * 0.18);
+    g.fillCircle(px, cy, r);
+    g.lineStyle(1.6, tint, 0.35 + 0.4 * frac + hit * 0.25);
+    if (t.shieldKind === 'deflector') {
+      // Segmented rim that turns (still under reduced motion).
+      const spin = info.reducedMotion ? 0 : info.now / 900;
+      const segs = 10;
+      for (let i = 0; i < segs; i++) {
+        const a0 = spin + (i / segs) * Math.PI * 2;
+        g.beginPath();
+        g.arc(px, cy, r, a0, a0 + (Math.PI * 2) / segs - 0.18);
+        g.strokePath();
+      }
+    } else {
+      g.strokeCircle(px, cy, r);
+      if (t.shieldKind === 'heavyshield') {
+        g.lineStyle(1, tint, 0.3 + 0.3 * frac);
+        g.strokeCircle(px, cy, r - 3);
+      }
+    }
+    if (hit > 0) {
+      g.lineStyle(2.5, 0xffffff, hit * 0.7);
+      g.strokeCircle(px, cy, r + (1 - hit) * 9);
+    }
+  }
+
+  /** Parachute canopy and lines while a parachute fall plays. */
+  private drawChute(t: DisplayTank, px: number, py: number): void {
+    const g = this.chuteG;
+    g.clear();
+    if (!t.anim?.chute) return;
+    const top = py - 52;
+    const half = 21;
+    const color = hexToInt(t.color);
+    g.lineStyle(0.8, 0xd3cdf0, 0.85);
+    g.lineBetween(px - half + 2, top + 2, px - 10, py - 12);
+    g.lineBetween(px + half - 2, top + 2, px + 10, py - 12);
+    g.lineBetween(px, top - 6, px, py - 18);
+    // Striped dome: tank colour and white.
+    const stripes = 6;
+    for (let i = 0; i < stripes; i++) {
+      const a0 = Math.PI + (i / stripes) * Math.PI;
+      const a1 = Math.PI + ((i + 1) / stripes) * Math.PI;
+      g.fillStyle(i % 2 === 0 ? color : 0xf8f6ff, 0.95);
+      g.slice(px, top + 4, half, a0, a1, false);
+      g.fillPath();
+    }
+    g.lineStyle(1, 0x07050f, 0.6);
+    g.beginPath();
+    g.arc(px, top + 4, half, Math.PI, Math.PI * 2);
+    g.strokePath();
   }
 
   private labelText(t: DisplayTank, info: TankRenderInfo): string {
@@ -286,7 +458,19 @@ export class TankView {
   }
 
   destroy(): void {
-    for (const o of [this.glow, this.barrel, this.hull, this.flag, this.label, this.chevron]) o.destroy();
+    for (const o of [
+      this.glow,
+      this.barrel,
+      this.hull,
+      this.flag,
+      this.label,
+      this.chevron,
+      this.badge,
+      this.shieldG,
+      this.chuteG,
+      this.tag,
+    ])
+      o.destroy();
     for (const k of this.keys) release(this.scene, k);
     this.keys = [];
   }
