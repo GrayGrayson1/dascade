@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createSeededRng } from '@dascade/shared';
 import { TANK_GEOM, TANKS_WORLD, WEAPON_IDS, type ShotEvent, type ShotScript, type WeaponId } from '@dascade/shared/games/tanks';
 import { dcos, dsin } from './trig.ts';
-import { cloneTerrain, createTerrain, generateTerrain, restHeight, type Terrain } from './terrain.ts';
+import { cloneTerrain, createTerrain, generateTerrain, isBuried, restHeight, type Terrain } from './terrain.ts';
 import { launchState, previewArc, resolveShot, type ShotRules, type SimTank, type SimWorld } from './sim.ts';
 import { PHYS, WEAPON_SPECS, WRECK_BLAST, blastDamage, fallDamage, fallDurationMs } from './weapons.ts';
 
 const FFA: ShotRules = { teams: false, friendlyFire: true };
 
 function tankAt(terrain: Terrain, id: string, x: number, team = -1, hp = 100): SimTank {
-  return { id, team, x, y: restHeight(terrain, x), hp, alive: true };
+  return { id, team, x, y: restHeight(terrain, x), hp, alive: true, shield: 0, shieldKind: '', chutes: 0 };
 }
 
 function flat(height = 200, width: number = TANKS_WORLD.width): Terrain {
@@ -29,11 +29,19 @@ function analyticLanding(t: { x: number; y: number }, angle: number, power: numb
   return x0 + c * v * time;
 }
 
+const total = (r: Record<string, number>) => Object.values(r).reduce((n, v) => n + v, 0);
 const booms = (s: ShotScript) => s.events.filter((e): e is Extract<ShotEvent, { k: 'boom' }> => e.k === 'boom');
 const dmgTo = (s: ShotScript, id: string) =>
   s.events.filter((e): e is Extract<ShotEvent, { k: 'dmg' }> => e.k === 'dmg' && e.id === id).reduce((n, e) => n + e.amount, 0);
 
-function shoot(world: SimWorld, shooterId: string, angle: number, power: number, weapon: WeaponId = 'shell', rules: ShotRules = FFA): ShotScript {
+function shoot(
+  world: SimWorld,
+  shooterId: string,
+  angle: number,
+  power: number,
+  weapon: WeaponId = 'shell',
+  rules: ShotRules = FFA,
+): ShotScript {
   return resolveShot(world, { shooterId, angle, power, weapon }, rules, { seq: 1, turnId: 1 });
 }
 
@@ -47,7 +55,7 @@ describe('weapon maths', () => {
     expect(blastDamage(b, inner + b.radius * 0.75, TANK_GEOM.hitRadius)).toBe(Math.round(b.damage / 4));
     expect(blastDamage(b, inner + b.radius, TANK_GEOM.hitRadius)).toBe(0);
     expect(blastDamage(b, 500, TANK_GEOM.hitRadius)).toBe(0);
-    expect(blastDamage(WEAPON_SPECS.dirt.blast, 0, TANK_GEOM.hitRadius)).toBe(0);
+    expect(blastDamage(WEAPON_SPECS.dirtball.blast, 0, TANK_GEOM.hitRadius)).toBe(0);
     // Monotonic.
     let prev = Infinity;
     for (let d = 0; d < 80; d++) {
@@ -87,7 +95,7 @@ describe('ballistics', () => {
     ] as const) {
       const terrain = flat(200);
       const shooter = tankAt(terrain, 'a', angle > 90 ? 1400 : 200);
-      const world: SimWorld = { terrain, tanks: [shooter], wind: 0 };
+      const world: SimWorld = { terrain, tanks: [shooter], wind: 0, walls: 'open', gravity: 1 };
       const expected = analyticLanding(shooter, angle, power, 200);
       const s = shoot(world, 'a', angle, power);
       const hit = booms(s)[0]!;
@@ -102,7 +110,7 @@ describe('ballistics', () => {
     const a = tankAt(terrain, 'a', 200);
     const x = Math.round(analyticLanding(a, 45, 60, 200));
     const b = tankAt(terrain, 'b', x);
-    const s = shoot({ terrain, tanks: [a, b], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a, b], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     const hit = booms(s)[0]!;
     expect(hit.direct).toBe('b');
     const blast = s.events.filter((e) => e.k === 'dmg' && e.id === 'b' && e.src === 'blast');
@@ -110,7 +118,7 @@ describe('ballistics', () => {
     expect(blast[0]!.k === 'dmg' && blast[0]!.amount).toBe(WEAPON_SPECS.shell.blast.damage);
     // The crater under it may drop it a little too.
     expect(b.hp).toBe(100 - dmgTo(s, 'b'));
-    expect(s.damage).toBe(dmgTo(s, 'b'));
+    expect(total(s.damage)).toBe(dmgTo(s, 'b'));
     expect(dmgTo(s, 'a')).toBe(0);
   });
 
@@ -120,9 +128,13 @@ describe('ballistics', () => {
     const land = analyticLanding(a, 45, 60, 200);
     const near = tankAt(terrain, 'near', land + 30);
     const far = tankAt(terrain, 'far', land + 75);
-    const s = shoot({ terrain, tanks: [a, near, far], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a, near, far], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     const boom = booms(s)[0]!;
-    const expectNear = blastDamage(WEAPON_SPECS.shell.blast, Math.hypot(near.x - boom.x, 200 + TANK_GEOM.hitCenter - boom.y), TANK_GEOM.hitRadius);
+    const expectNear = blastDamage(
+      WEAPON_SPECS.shell.blast,
+      Math.hypot(near.x - boom.x, 200 + TANK_GEOM.hitCenter - boom.y),
+      TANK_GEOM.hitRadius,
+    );
     expect(expectNear).toBeGreaterThan(0);
     expect(dmgTo(s, 'near')).toBe(expectNear);
     expect(dmgTo(s, 'far')).toBe(0);
@@ -132,7 +144,7 @@ describe('ballistics', () => {
     const land = (wind: number) => {
       const terrain = flat(200);
       const a = tankAt(terrain, 'a', 300);
-      return booms(shoot({ terrain, tanks: [a], wind }, 'a', 55, 60))[0]!.x;
+      return booms(shoot({ terrain, tanks: [a], wind, walls: 'open', gravity: 1 }, 'a', 55, 60))[0]!.x;
     };
     const calm = land(0);
     expect(land(10)).toBeGreaterThan(calm + 40);
@@ -145,7 +157,7 @@ describe('ballistics', () => {
       const run = (wind: number) => {
         const terrain = flat(200);
         const a = tankAt(terrain, 'a', 300);
-        return booms(shoot({ terrain, tanks: [a], wind }, 'a', 55, 60, weapon))[0]!.x;
+        return booms(shoot({ terrain, tanks: [a], wind, walls: 'open', gravity: 1 }, 'a', 55, 60, weapon))[0]!.x;
       };
       return run(12) - run(0);
     };
@@ -156,7 +168,7 @@ describe('ballistics', () => {
     const terrain = flat(200);
     const a = tankAt(terrain, 'a', 200);
     const before = cloneTerrain(terrain);
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     const x = Math.floor(booms(s)[0]!.x);
     expect(terrain.h[x]).toBeLessThan(200 - WEAPON_SPECS.shell.blast.radius * 0.8);
     for (let i = 0; i < terrain.width; i++) {
@@ -167,7 +179,7 @@ describe('ballistics', () => {
   it('shells leaving the side of the world vanish without exploding', () => {
     const terrain = flat(100);
     const a = tankAt(terrain, 'a', 1500);
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 20, 100);
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 20, 100);
     expect(s.projectiles[0]!.end).toBe('out');
     expect(booms(s)).toHaveLength(0);
     expect(a.hp).toBe(100);
@@ -176,29 +188,29 @@ describe('ballistics', () => {
   it("the shooter's own shell can't hit it on the way out, but can on the way back", () => {
     const terrain = flat(200);
     const a = tankAt(terrain, 'a', 800);
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 90, 40);
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 90, 40);
     const boom = booms(s)[0]!;
     expect(boom.direct).toBe('a');
     expect(a.hp).toBe(100 - WEAPON_SPECS.shell.blast.damage);
-    expect(s.damage).toBe(0);
+    expect(total(s.damage)).toBe(0);
   });
 
   it('records samples at 60 Hz ending exactly at the impact', () => {
     const terrain = flat(200);
     const a = tankAt(terrain, 'a', 200);
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     const p = s.projectiles[0]!;
     const n = p.pts.length / 2;
     const flightMs = p.t1 - p.t0;
     expect(Math.abs(n - 2 - flightMs / (1000 / 60))).toBeLessThanOrEqual(1);
     expect(p.pts[p.pts.length - 2]).toBeCloseTo(booms(s)[0]!.x, 0);
-    expect(s.origin[0]).toBeCloseTo(p.pts[0]!, 0);
+    expect(s.launches[0]!.origin[0]).toBeCloseTo(p.pts[0]!, 0);
   });
 
   it('keeps events sorted and the duration covers them', () => {
     const terrain = generateTerrain(createSeededRng('sorted'), 'hills');
     const tanks = [300, 700, 1100].map((x, i) => tankAt(terrain, `t${i}`, x));
-    const s = shoot({ terrain, tanks, wind: 4 }, 't0', 50, 70, 'cluster');
+    const s = shoot({ terrain, tanks, wind: 4, walls: 'open', gravity: 1 }, 't0', 50, 70, 'cluster');
     for (let i = 1; i < s.events.length; i++) expect(s.events[i]!.t).toBeGreaterThanOrEqual(s.events[i - 1]!.t);
     const last = s.events[s.events.length - 1]!;
     expect(s.durationMs).toBeGreaterThan(last.t);
@@ -222,7 +234,13 @@ describe('tanks falling and dying', () => {
     let found: number | null = null;
     for (let power = 20; power <= 100 && found === null; power++) {
       const terrain = cloneTerrain(base);
-      const probe: SimWorld = { terrain, tanks: [tankAt(terrain, 'a', shooterX), tankAt(terrain, 'b', 1000)], wind: 0 };
+      const probe: SimWorld = {
+        terrain,
+        tanks: [tankAt(terrain, 'a', shooterX), tankAt(terrain, 'b', 1000)],
+        wind: 0,
+        walls: 'open',
+        gravity: 1,
+      };
       const b = booms(resolveShot(probe, { shooterId: 'a', angle: 135, power, weapon: 'heavy' }, FFA))[0];
       if (b && !b.direct && b.x > 1012 && b.x < 1050) found = power;
     }
@@ -230,7 +248,11 @@ describe('tanks falling and dying', () => {
     const terrain = cloneTerrain(base);
     const target = tankAt(terrain, 'b', 1000);
     expect(target.y).toBe(330);
-    const s = resolveShot({ terrain, tanks: [tankAt(terrain, 'a', shooterX), target], wind: 0 }, { shooterId: 'a', angle: 135, power: found!, weapon: 'heavy' }, FFA);
+    const s = resolveShot(
+      { terrain, tanks: [tankAt(terrain, 'a', shooterX), target], wind: 0, walls: 'open', gravity: 1 },
+      { shooterId: 'a', angle: 135, power: found!, weapon: 'heavy' },
+      FFA,
+    );
     const fall = s.events.find((e) => e.k === 'move' && e.id === 'b');
     expect(fall).toBeTruthy();
     if (fall?.k === 'move') {
@@ -249,11 +271,11 @@ describe('tanks falling and dying', () => {
     const a = tankAt(terrain, 'a', 200);
     const x = Math.round(analyticLanding(a, 45, 60, 200));
     const b = tankAt(terrain, 'b', x, -1, 20);
-    const s = shoot({ terrain, tanks: [a, b], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a, b], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     expect(b.alive).toBe(false);
     expect(b.hp).toBe(0);
-    expect(s.kills).toEqual(['b']);
-    expect(s.damage).toBe(20);
+    expect(s.kills.map((k) => k.id)).toEqual(['b']);
+    expect(total(s.damage)).toBe(20);
     const death = s.events.find((e) => e.k === 'death')!;
     const wreck = booms(s).find((e) => e.w === 'wreck')!;
     expect(wreck).toBeTruthy();
@@ -269,14 +291,14 @@ describe('tanks falling and dying', () => {
     const b = tankAt(terrain, 'b', x, -1, 10);
     // Outside the shell's blast, inside b's wreck blast.
     const c = tankAt(terrain, 'c', x + 36, -1, 1);
-    const s = shoot({ terrain, tanks: [a, b, c], wind: 0 }, 'a', 45, 60);
+    const s = shoot({ terrain, tanks: [a, b, c], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60);
     expect(b.alive).toBe(false);
     expect(c.alive).toBe(false);
     const wrecks = booms(s).filter((e) => e.w === 'wreck');
     expect(wrecks).toHaveLength(2);
     const cDmg = s.events.find((e) => e.k === 'dmg' && e.id === 'c')!;
     expect(cDmg.t).toBe(wrecks[0]!.t);
-    expect(s.kills.sort()).toEqual(['b', 'c']);
+    expect(s.kills.map((k) => k.id).sort()).toEqual(['b', 'c']);
   });
 });
 
@@ -290,7 +312,7 @@ describe('weapons', () => {
   it('heavy shells blast a wider, deeper crater than standard shells', () => {
     const run = (weapon: WeaponId) => {
       const { terrain, a } = setup();
-      const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 45, 60, weapon);
+      const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, weapon);
       const x = Math.floor(booms(s)[0]!.x);
       let width = 0;
       for (let i = 0; i < terrain.width; i++) if (terrain.h[i]! < 199.9) width++;
@@ -304,7 +326,7 @@ describe('weapons', () => {
 
   it('cluster shots split into five bomblets at the apex', () => {
     const { terrain, a } = setup();
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 60, 70, 'cluster');
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 60, 70, 'cluster');
     const split = s.events.find((e) => e.k === 'split')!;
     expect(split).toBeTruthy();
     const main = s.projectiles[0]!;
@@ -324,7 +346,7 @@ describe('weapons', () => {
     const terrain = flat(200);
     for (let i = 300; i < 340; i++) terrain.h[i] = 600;
     const a = tankAt(terrain, 'a', 200);
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 40, 80, 'cluster');
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 40, 80, 'cluster');
     expect(s.projectiles[0]!.end).toBe('boom');
     expect(s.events.some((e) => e.k === 'split')).toBe(false);
     expect(s.projectiles.filter((p) => p.kind === 'bomblet')).toHaveLength(5);
@@ -336,7 +358,7 @@ describe('weapons', () => {
     const x = Math.round(analyticLanding(a, 45, 60, 200));
     const b = tankAt(terrain, 'b', x);
     const before = cloneTerrain(terrain);
-    const s = shoot({ terrain, tanks: [a, b], wind: 0 }, 'a', 45, 60, 'airburst');
+    const s = shoot({ terrain, tanks: [a, b], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'airburst');
     const boom = booms(s)[0]!;
     expect(boom.terrain).toBe('none');
     expect(boom.y).toBeGreaterThan(200 + 10);
@@ -346,7 +368,7 @@ describe('weapons', () => {
 
   it('airbursts fuse above open ground when nothing is near', () => {
     const { terrain, a } = setup();
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 45, 60, 'airburst');
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'airburst');
     const boom = booms(s)[0]!;
     expect(boom.y - 200).toBeLessThanOrEqual(WEAPON_SPECS.airburst.airburst!.fuseHeight + 1);
     expect(boom.y - 200).toBeGreaterThan(WEAPON_SPECS.airburst.airburst!.fuseHeight - 8);
@@ -357,9 +379,9 @@ describe('weapons', () => {
     const shell = (() => {
       const t2 = flat(200);
       const a2 = tankAt(t2, 'a', 200);
-      return shoot({ terrain: t2, tanks: [a2], wind: 0 }, 'a', 45, 60, 'shell');
+      return shoot({ terrain: t2, tanks: [a2], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'shell');
     })();
-    const s = shoot({ terrain, tanks: [a], wind: 0 }, 'a', 45, 60, 'driller');
+    const s = shoot({ terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'driller');
     expect(s.projectiles[0]!.end).toBe('drill');
     const bore = s.events.find((e) => e.k === 'bore')!;
     expect(bore).toBeTruthy();
@@ -376,7 +398,7 @@ describe('weapons', () => {
     const b = tankAt(terrain, 'b', 720);
     let hit = false;
     for (let power = 30; power <= 70 && !hit; power++) {
-      const w = { terrain: cloneTerrain(terrain), tanks: [{ ...a }, { ...b }], wind: 0 };
+      const w: SimWorld = { terrain: cloneTerrain(terrain), tanks: [{ ...a }, { ...b }], wind: 0, walls: 'open', gravity: 1 };
       const s = resolveShot(w, { shooterId: 'a', angle: 20, power, weapon: 'driller' }, FFA);
       if (s.events.some((e) => e.k === 'bore') && dmgTo(s, 'b') > 0) hit = true;
     }
@@ -387,12 +409,26 @@ describe('weapons', () => {
     const { terrain, a } = setup();
     const x = Math.round(analyticLanding(a, 45, 60, 200));
     const b = tankAt(terrain, 'b', x + 20);
-    const s = shoot({ terrain, tanks: [a, b], wind: 0 }, 'a', 45, 60, 'dirt');
+    const s = shoot({ terrain, tanks: [a, b], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'dirtball');
     const boom = booms(s)[0]!;
     expect(boom.terrain).toBe('dirt');
     expect(terrain.h[Math.floor(boom.x)]).toBeGreaterThan(240);
     expect(b.hp).toBe(100);
-    expect(b.y).toBeGreaterThan(210);
+    // Earth over its centre: buried where it stood (no lift, no damage).
+    expect(b.y).toBe(200);
+    expect(isBuried(terrain, b.x, b.y)).toBe(true);
+    expect(s.events.some((e) => e.k === 'move' && e.id === 'b')).toBe(false);
+  });
+
+  it('earth piled under only the edge of the tracks lifts a tank on top of it', () => {
+    const { terrain, a } = setup();
+    const x = Math.round(analyticLanding(a, 45, 60, 200));
+    // A small clod landing beside the hull: the tank rides up, not buried.
+    const b = tankAt(terrain, 'b', x + 34);
+    const s = shoot({ terrain, tanks: [a, b], wind: 0, walls: 'open', gravity: 1 }, 'a', 45, 60, 'dirtclod');
+    expect(b.hp).toBe(100);
+    expect(isBuried(terrain, b.x, b.y)).toBe(false);
+    expect(b.y).toBe(restHeight(terrain, b.x));
     const lift = s.events.find((e) => e.k === 'move' && e.id === 'b');
     expect(lift?.k === 'move' && lift.y1 > lift.y0).toBe(true);
   });
@@ -403,13 +439,20 @@ describe('weapons', () => {
         const terrain = generateTerrain(createSeededRng(`${weapon}${seed}`), 'hills');
         const tanks = [250, 800, 1350].map((x, i) => tankAt(terrain, `t${i}`, x));
         const rng = createSeededRng(seed);
-        const s = shoot({ terrain, tanks, wind: rng.int(21) - 10 }, 't0', 20 + rng.int(70), 30 + rng.int(70), weapon);
-        expect(s.projectiles.every((p) => p.end !== 'fizzle')).toBe(true);
-        expect(s.durationMs).toBeLessThanOrEqual(20_000);
+        const s = shoot(
+          { terrain, tanks, wind: rng.int(21) - 10, walls: 'open', gravity: 1 },
+          't0',
+          20 + rng.int(70),
+          30 + rng.int(70),
+          weapon,
+        );
+        // Only harmless shots end quietly (a tracer lands, a warp can miss).
+        expect(s.projectiles.every((p) => p.end !== 'fizzle' || weapon === 'tracer' || weapon === 'warp')).toBe(true);
+        expect(s.durationMs).toBeLessThanOrEqual(24_000);
         for (const t of tanks) {
           expect(t.hp).toBeGreaterThanOrEqual(0);
           expect(t.alive).toBe(t.hp > 0);
-          if (t.alive) expect(t.y).toBe(restHeight(terrain, t.x));
+          if (t.alive) expect(t.y === restHeight(terrain, t.x) || isBuried(terrain, t.x, t.y)).toBe(true);
         }
       }
     }
@@ -423,7 +466,11 @@ describe('teams and friendly fire', () => {
     const x = Math.round(analyticLanding(a, 45, 60, 200));
     const mate = tankAt(terrain, 'mate', x, 0);
     const foe = tankAt(terrain, 'foe', x + 40, 1);
-    const s = resolveShot({ terrain, tanks: [a, mate, foe], wind: 0 }, { shooterId: 'a', angle: 45, power: 60, weapon: 'heavy' }, { teams: true, friendlyFire });
+    const s = resolveShot(
+      { terrain, tanks: [a, mate, foe], wind: 0, walls: 'open', gravity: 1 },
+      { shooterId: 'a', angle: 45, power: 60, weapon: 'heavy' },
+      { teams: true, friendlyFire },
+    );
     return { s, mate, foe };
   };
 
@@ -431,19 +478,23 @@ describe('teams and friendly fire', () => {
     const { s, mate, foe } = layout(false);
     expect(mate.hp).toBe(100);
     expect(foe.hp).toBeLessThan(100);
-    expect(s.damage).toBe(100 - foe.hp);
+    expect(total(s.damage)).toBe(100 - foe.hp);
   });
 
   it('with friendly fire on, teammates are hurt (and not counted as enemy damage)', () => {
     const { s, mate, foe } = layout(true);
     expect(mate.hp).toBeLessThan(100);
-    expect(s.damage).toBe(100 - foe.hp);
+    expect(total(s.damage)).toBe(100 - foe.hp);
   });
 
   it('shooters always take their own splash damage', () => {
     const terrain = flat(200);
     const a = tankAt(terrain, 'a', 800, 0);
-    resolveShot({ terrain, tanks: [a], wind: 0 }, { shooterId: 'a', angle: 0, power: 5, weapon: 'shell' }, { teams: true, friendlyFire: false });
+    resolveShot(
+      { terrain, tanks: [a], wind: 0, walls: 'open', gravity: 1 },
+      { shooterId: 'a', angle: 0, power: 5, weapon: 'shell' },
+      { teams: true, friendlyFire: false },
+    );
     expect(a.hp).toBeLessThan(100);
   });
 });
@@ -453,7 +504,7 @@ describe('determinism', () => {
     const make = () => {
       const terrain = generateTerrain(createSeededRng('det'), 'mesa');
       const tanks = [200, 600, 1000, 1400].map((x, i) => tankAt(terrain, `t${i}`, x, i % 2));
-      return { terrain, tanks, wind: 7 } as SimWorld;
+      return { terrain, tanks, wind: 7, walls: 'open', gravity: 1 } as SimWorld;
     };
     for (const weapon of WEAPON_IDS) {
       const w1 = make();
@@ -470,14 +521,18 @@ describe('determinism', () => {
       const rng = createSeededRng('playout');
       const terrain = generateTerrain(rng, 'hills');
       const tanks = [150, 450, 750, 1050, 1350].map((x, i) => tankAt(terrain, `t${i}`, x));
-      const world: SimWorld = { terrain, tanks, wind: 0 };
+      const world: SimWorld = { terrain, tanks, wind: 0, walls: 'open', gravity: 1 };
       const log: string[] = [];
       for (let i = 0; i < 60; i++) {
         const alive = tanks.filter((t) => t.alive);
         if (alive.length < 2) break;
         const shooter = alive[i % alive.length]!;
         world.wind = rng.int(21) - 10;
-        const s = resolveShot(world, { shooterId: shooter.id, angle: rng.int(181), power: 5 + rng.int(96), weapon: WEAPON_IDS[rng.int(WEAPON_IDS.length)]! }, FFA);
+        const s = resolveShot(
+          world,
+          { shooterId: shooter.id, angle: rng.int(181), power: 5 + rng.int(96), weapon: WEAPON_IDS[rng.int(WEAPON_IDS.length)]! },
+          FFA,
+        );
         log.push(`${s.events.length}:${s.durationMs}:${tanks.map((t) => `${t.x},${t.y},${t.hp}`).join('|')}`);
       }
       return { log, h: Array.from(terrain.h) };
@@ -491,18 +546,25 @@ describe('determinism', () => {
 
 describe('client replay', () => {
   it('replaying the script terrain events on the pre-shot terrain reproduces the server terrain exactly', async () => {
-    const { addDirt, carveCapsule, carveCircle } = await import('./terrain.ts');
+    const { addDirt, applyPatch, carveCapsule, carveCircle } = await import('./terrain.ts');
     for (const weapon of WEAPON_IDS) {
       for (let seed = 0; seed < 6; seed++) {
         const terrain = generateTerrain(createSeededRng(`replay-${weapon}-${seed}`), 'hills');
         const before = cloneTerrain(terrain);
         const tanks = [300, 700, 1100, 1400].map((x, i) => tankAt(terrain, `t${i}`, x, -1, 30));
         const rng = createSeededRng(seed);
-        const s = shoot({ terrain, tanks, wind: rng.int(21) - 10 }, 't1', 30 + rng.int(120), 40 + rng.int(60), weapon);
+        const s = shoot(
+          { terrain, tanks, wind: rng.int(21) - 10, walls: 'open', gravity: 1 },
+          't1',
+          30 + rng.int(120),
+          40 + rng.int(60),
+          weapon,
+        );
         for (const e of s.events) {
           if (e.k === 'boom' && e.terrain === 'crater') carveCircle(before, e.x, e.y, e.r);
           else if (e.k === 'boom' && e.terrain === 'dirt') addDirt(before, e.x, e.y, e.r);
           else if (e.k === 'bore') carveCapsule(before, e.x0, e.y0, e.x1, e.y1, e.r);
+          else if (e.k === 'patch') applyPatch(before, e.x0, e.h);
         }
         expect(Array.from(before.h)).toEqual(Array.from(terrain.h));
       }

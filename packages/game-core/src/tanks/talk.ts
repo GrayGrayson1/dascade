@@ -1,0 +1,127 @@
+/**
+ * Talking tanks: the speech bubbles a tank says as it fires or goes up in smoke. The server
+ * picks the lines (so everyone sees the same bubble) with the battle's Rng.
+ */
+import type { Rng } from '@dascade/shared';
+import type { TalkLevel } from '@dascade/shared/games/tanks';
+
+export const FIRE_LINES: readonly string[] = [
+  'Incoming!',
+  'Special delivery!',
+  'Duck!',
+  'Fire in the hole!',
+  'Say cheese!',
+  'This one’s got your name on it.',
+  'Catch!',
+  'Knock knock.',
+  'Here comes the boom.',
+  'Hold my turret.',
+  'Physics, do your thing.',
+  'I calculated this. Roughly.',
+  'Wind? What wind?',
+  'Trust the arc.',
+  'Going up!',
+  'Air mail!',
+  'Pew pew.',
+  'For the Wi-Fi!',
+  'Watch this.',
+  'Nothing personal.',
+  'Okay, a little personal.',
+  'Bet you didn’t see that coming.',
+  'Gift for you!',
+  'Ready or not!',
+  'Sorry about your lawn.',
+  'Let’s rearrange the landscape.',
+  'You look like you need a crater.',
+  'Express shipping!',
+  'Bombs away!',
+  'Take that!',
+  'Aim small, miss small.',
+  'Flinch now.',
+  'Mind the gap.',
+  'Anyone order a hole?',
+  'Dodge this.',
+  'Calling my shot.',
+  'Rise and shine!',
+  'One for the highlight reel.',
+  'Here goes nothing.',
+  'Fingers crossed. Treads crossed.',
+  'Feeling lucky.',
+  'Math is on my side.',
+  'Boom goes the dynamite.',
+  'Thank me later.',
+  'This is going to leave a mark.',
+  'Coming in hot!',
+  'Smile for the camera!',
+  'I’ve been saving this one.',
+  'Housewarming present!',
+  'Terraforming in progress.',
+  'Excuse the noise.',
+  'Hope you brought a helmet.',
+  'Return to sender!',
+  'Ever seen a shell up close?',
+  'Have a nice flight!',
+  'Courtesy call.',
+  'Do I smell victory?',
+  'You’re in my spot.',
+  'Lunch is on me.',
+  'All according to plan.',
+];
+
+export const DEATH_LINES: readonly string[] = [
+  'I regret nothing!',
+  'Tell my turret I loved it.',
+  'Not like this!',
+  'Worth it.',
+  'Ow.',
+  'I’ll be back. Probably.',
+  'Rebooting…',
+  'That was my favorite tread.',
+  'Lag!',
+  'Was that the wind?',
+  'I meant to do that.',
+  'Remember me fondly.',
+  'Oh, come on!',
+  'Totally fine. Everything’s fine.',
+  'Someone call a mechanic.',
+  'At least the view was nice.',
+  'Avenge me!',
+  'Should’ve bought a shield.',
+  'Bad luck. Bad aim. Bad day.',
+  'I blame gravity.',
+  'Ctrl+Z! Ctrl+Z!',
+  'Game over, man.',
+  'Who put that hill there?',
+  'Scrap metal, here I come.',
+  'Clear my calendar.',
+  'Fine. I didn’t want to win anyway.',
+  'That’s going in my report.',
+  'Out of warranty.',
+  'Smoke break. Forever.',
+  'I was winning on paper!',
+  'Tread lightly, they said.',
+  'My insurance won’t cover this.',
+  'Goodbye, cruel battlefield.',
+  'Well played. Mostly.',
+  'Nooooo!',
+  'Next round’s on me.',
+  'You got lucky!',
+  'I saw my whole service record flash before my eyes.',
+  'Oof.',
+  'See you in the shop.',
+];
+
+/** Chance of a bubble per level. */
+const CHANCE: Record<TalkLevel, { fire: number; death: number }> = {
+  off: { fire: 0, death: 0 },
+  some: { fire: 0.22, death: 0.5 },
+  lots: { fire: 0.6, death: 0.9 },
+};
+
+/** A line for a tank that just fired or died — or null when it keeps quiet. */
+export function pickQuip(kind: 'fire' | 'death', level: TalkLevel, rng: Rng): string | null {
+  const chance = CHANCE[level][kind];
+  if (chance <= 0 || rng.next() >= chance) return null;
+  const lines = kind === 'fire' ? FIRE_LINES : DEATH_LINES;
+  return lines[rng.int(lines.length)]!;
+}

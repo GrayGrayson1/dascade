@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeededRng, type Rng } from '@dascade/shared';
-import { TANKS_WORLD, TANK_GEOM, WEAPON_IDS, type ShotScript } from '@dascade/shared/games/tanks';
+import { TANKS_WORLD, TANK_GEOM, WEAPON_IDS, emptyAmmo, emptyItems, type Ammo, type ShotScript } from '@dascade/shared/games/tanks';
 import {
   abandon,
   assignTeams,
@@ -20,7 +20,7 @@ import {
   type BattleConfig,
   type BattleEntrant,
 } from './battle.ts';
-import { createTerrain, restHeight } from './terrain.ts';
+import { createTerrain, isBuried, restHeight } from './terrain.ts';
 
 const CONFIG: BattleConfig = {
   mode: 'ffa',
@@ -28,14 +28,33 @@ const CONFIG: BattleConfig = {
   windMax: 10,
   fuelPerTurn: 60,
   armor: 100,
-  arsenal: 'standard',
   maxRounds: 15,
   friendlyFire: false,
   theme: 'dusk',
+  turnMode: 'turns',
+  walls: 'open',
+  gravity: 'normal',
+  talk: 'off',
+  order: 'shuffle',
 };
 
+/** The old "standard arsenal": a few of each special. */
+function loadout(): Ammo {
+  return { ...emptyAmmo(), heavy: 2, cluster: 2, airburst: 2, driller: 2, dirtball: 3 };
+}
+
+const crew = (id: string, team: number, extra: Partial<BattleEntrant> = {}): BattleEntrant => ({
+  id,
+  name: id,
+  color: '#fff',
+  team,
+  ammo: loadout(),
+  items: emptyItems(),
+  ...extra,
+});
+
 const entrants = (n: number, teams = false): BattleEntrant[] =>
-  Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}`, color: '#ffffff', team: teams ? i % 2 : -1 }));
+  Array.from({ length: n }, (_, i) => ({ ...crew(`p${i}`, teams ? i % 2 : -1), name: `P${i}`, color: '#ffffff' }));
 
 function battle(n = 3, over: Partial<BattleConfig> = {}, seed: string | number = 'b', teams = false): { b: Battle; rng: Rng } {
   const rng = createSeededRng(seed);
@@ -71,7 +90,7 @@ describe('battle setup', () => {
         expect(t.alive).toBe(true);
         expect(t.ammo.shell).toBe(-1);
         expect(t.ammo.heavy).toBe(2);
-        expect(t.ammo.dirt).toBe(3);
+        expect(t.ammo.dirtball).toBe(3);
       }
       expect(b.tanks.map((t) => t.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     }
@@ -95,12 +114,19 @@ describe('battle setup', () => {
     }
   });
 
-  it('honours armor, arsenal and "random" terrain', () => {
-    const { b } = battle(2, { armor: 200, arsenal: 'shells', style: 'random' });
+  it('honours armor and "random" terrain and walls', () => {
+    const { b } = battle(2, { armor: 200, style: 'random', walls: 'random' });
     expect(b.tanks[0]!.hp).toBe(200);
     expect(b.tanks[0]!.maxHp).toBe(200);
-    expect(b.tanks[0]!.ammo.heavy).toBe(0);
-    expect(['hills', 'mesa', 'valley', 'peaks']).toContain(b.style);
+    expect(['hills', 'mesa', 'valley', 'peaks', 'dunes', 'canyon', 'cliffs', 'islands']).toContain(b.style);
+    expect(['open', 'wrap', 'bounce', 'concrete']).toContain(b.walls);
+  });
+
+  it('tanks spend from (and share) their crew’s inventory', () => {
+    const list = entrants(2);
+    const { b } = { b: createBattle(createSeededRng(3), list, CONFIG) };
+    expect(tankById(b, 'p0')!.ammo).toBe(list[0]!.ammo);
+    expect(tankById(b, 'p0')!.items).toBe(list[0]!.items);
   });
 
   it('a tournament "first" entrant takes the first turn', () => {
@@ -166,12 +192,7 @@ describe('turn order', () => {
 
   it('teams alternate and rotate through their members (uneven teams too)', () => {
     const rng = createSeededRng('teams');
-    const list: BattleEntrant[] = [
-      { id: 'a1', name: 'a1', color: '#fff', team: 0 },
-      { id: 'a2', name: 'a2', color: '#fff', team: 0 },
-      { id: 'a3', name: 'a3', color: '#fff', team: 0 },
-      { id: 'b1', name: 'b1', color: '#fff', team: 1 },
-    ];
+    const list: BattleEntrant[] = [crew('a1', 0), crew('a2', 0), crew('a3', 0), crew('b1', 1)];
     const b = createBattle(rng, list, { ...CONFIG, mode: 'teams' });
     const seq = Array.from({ length: 8 }, () => turn(b, rng));
     const teamOf = (id: string) => (id.startsWith('a') ? 0 : 1);
@@ -183,11 +204,7 @@ describe('turn order', () => {
 
   it('teams prefer present members: an absent teammate never burns the team turn', () => {
     const rng = createSeededRng('presence');
-    const list: BattleEntrant[] = [
-      { id: 'a1', name: 'a1', color: '#fff', team: 0 },
-      { id: 'a2', name: 'a2', color: '#fff', team: 0 },
-      { id: 'b1', name: 'b1', color: '#fff', team: 1 },
-    ];
+    const list: BattleEntrant[] = [crew('a1', 0), crew('a2', 0), crew('b1', 1)];
     const b = createBattle(rng, list, { ...CONFIG, mode: 'teams' });
     const present = (id: string) => id !== 'a2';
     const seq: string[] = [];
@@ -200,7 +217,9 @@ describe('turn order', () => {
     expect(seq.filter((id) => id === 'a1')).toHaveLength(4);
     expect(upcoming(b, 4, present)).not.toContain('a2');
     // Nobody on a side present: that side still gets its turn (the room skips it quickly).
-    const ids = [nextTurn(b, rng, (id) => id === 'b1'), nextTurn(b, rng, (id) => id === 'b1')].map((r) => (r.kind === 'turn' ? r.activeId : ''));
+    const ids = [nextTurn(b, rng, (id) => id === 'b1'), nextTurn(b, rng, (id) => id === 'b1')].map((r) =>
+      r.kind === 'turn' ? r.activeId : '',
+    );
     expect(ids.some((id) => id.startsWith('a'))).toBe(true);
     // Without a predicate the rotation is unchanged (everyone counts as present).
     const plain = createBattle(createSeededRng('presence'), list, { ...CONFIG, mode: 'teams' });
@@ -362,7 +381,7 @@ describe('results', () => {
       const snapshot = structuredClone({ h: Array.from(b.terrain.h), tanks: b.tanks.map((t) => ({ ...t })) });
       b.activeId = 'p1';
       const r = fire(b, 'p1', 45, power, 'shell');
-      if (typeof r === 'object' && r.kills.includes('p2')) {
+      if (typeof r === 'object' && r.kills.some((k) => k.id === 'p2')) {
         script = r;
         break;
       }
@@ -395,7 +414,12 @@ describe('results', () => {
     expect(r.reason).toBe('team_win');
     expect(r.winnerTeam).toBe(0);
     expect(r.placements).toHaveLength(2);
-    expect(r.placements[0]!.sort()).toEqual(b.tanks.filter((t) => t.team === 0).map((t) => t.id).sort());
+    expect(r.placements[0]!.sort()).toEqual(
+      b.tanks
+        .filter((t) => t.team === 0)
+        .map((t) => t.id)
+        .sort(),
+    );
     expect(r.placements[1]!.sort()).toEqual(foes.map((t) => t.id).sort());
   });
 
@@ -474,7 +498,8 @@ describe('seeded full-match playouts', () => {
         style: 'random',
         maxRounds: 12,
         friendlyFire: seed % 2 === 0,
-        arsenal: seed % 4 === 0 ? 'plenty' : 'standard',
+        walls: 'random',
+        gravity: seed % 5 === 0 ? 'low' : 'normal',
       });
       let turns = 0;
       while (!b.result && turns < 500) {
@@ -494,7 +519,7 @@ describe('seeded full-match playouts', () => {
         expect(typeof s).toBe('object');
         for (const x of b.tanks) {
           expect(x.hp).toBeGreaterThanOrEqual(0);
-          if (x.alive) expect(x.y).toBe(restHeight(b.terrain, x.x));
+          if (x.alive) expect(x.y === restHeight(b.terrain, x.x) || isBuried(b.terrain, x.x, x.y)).toBe(true);
           if (!x.gone) expect(x.alive).toBe(x.hp > 0);
         }
         let lo = Infinity;
