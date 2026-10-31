@@ -1,6 +1,6 @@
 # DASCADE — repository guide
 
-DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 27 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
+DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets, 28 games, a Tournament Center, 12 themes and a global jukebox (with optional Room DJ). This repo is a pnpm monorepo: React/Vite client, Colyseus authoritative server, pure game engines and a design system.
 
 ## Commands
 - `pnpm install` — install (Node ≥ 22.12, pnpm via corepack)
@@ -20,7 +20,7 @@ DASCADE (Delta Alpha Sierra Arcade) is a multiplayer browser arcade: 11 cabinets
 
 ## Kits (build on them; extend additively, don't copy)
 - Party (DAStravaganza): `rooms/party/PartyRoom.ts`, `games/_party/`, `@dascade/shared/party`, `@dascade/game-core/party`.
-- Boardroom (chess, checkers, tic-tac-toe; each with a variant picker): `rooms/boardroom/BoardGameRoom.ts`, `games/_boardroom/`, `@dascade/shared/games/boardroom`.
+- Boardroom (chess, checkers, tic-tac-toe, Reversi; each with a variant picker): `rooms/boardroom/BoardGameRoom.ts`, `games/_boardroom/`, `@dascade/shared/games/boardroom`.
 - Classics: `rooms/classics/{ClassicsRoom,VerifiedClassicsRoom}.ts`, `games/_classics/`, `@dascade/shared/games/classics`, `@dascade/game-core/classics/shared`.
 - If you override a lifecycle hook a kit room implements, call `super` first.
 
