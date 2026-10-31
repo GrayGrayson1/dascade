@@ -1,7 +1,7 @@
 /**
  * Tournament Center × EVERY tournament-capable game, end to end with the real game rooms.
  *
- * For each game in the catalog with `tournament` (chess, checkers, tic-tac-toe, ships, putt, paddle,
+ * For each game in the catalog with `tournament` (chess, checkers, tic-tac-toe, Reversi, ships, putt, paddle,
  * snake, memory) a 4-player best-of-3 single-elimination bracket runs through server-created match rooms:
  * tickets seat the participants (outsiders only spectate), games auto-start, sided games put the
  * 'first' participant on the first-mover side and swap sides every game, series progress (draws and
