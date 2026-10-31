@@ -242,14 +242,15 @@ Kits are shared by design: extend them additively (new optional props or hooks, 
 
   Trivia (`rooms/trivia`, `games/trivia`) is the reference integration, and `test/party-kit.test.ts` (fixture `test/fixtures/PartyKitRoom.ts`) exercises every feature.
 
-### Boardroom kit (two-player board games: chess, checkers, tic-tac-toe)
+### Boardroom kit (two-player board games: chess, checkers, tic-tac-toe, Reversi)
 - **Shared** `@dascade/shared/games/boardroom`:
   - Settings: spread `BOARD_SETTINGS_SHAPE` / `DEFAULT_BOARD_SETTINGS` into your settings: `timeControl` (0 = untimed, presets `CLOCK_PRESETS`), `sides` (`random` / `host_first` / `host_second`), `rated` and `allowUndo`.
   - Public state extends `BoardRoomView`: `seats[2]` with rating and away deadline, `turn`, `ply`, `clock`, `offers`, `result`, `rated`, `undoAllowed`, and the idle-rule timestamps.
-  - Sides are generic: `'first'` moves first (White in chess, X in tic-tac-toe; in checkers Dark for American, Giveaway and Pool, Light for the other variants).
+  - Sides are generic: `'first'` moves first (White in chess, X in tic-tac-toe, Black in Reversi; in checkers Dark for American, Giveaway and Pool, Light for the other variants).
 - **Server** `rooms/boardroom/BoardGameRoom.ts`:
   - Implement `sideName(side)` and `onBoardSetup()` (start position).
   - Register your move handler in `onBoardCreated()` as `const side = this.guardTurn(p, this.msg('move'), ply)` → validate with your engine → apply → `this.completeTurn(side)` → `this.finish({ winner: 'first' | 'second' | 'draw', reason })` when the rules end the game.
+  - A rule that skips a player (Reversi: no legal move) completes their turn with `this.completeTurn(side, true)`: it counts as a ply, but not as one of the side's own moves, and offers stand.
   - Optional: `supportsUndo` + `takeBack(plies)`, `canWinOnTime` (e.g. mating material), `resultDetails`, `onBoardEnd`, `onBoardReset`.
   - Kit messages `<id>:resign`, `<id>:draw`, `<id>:undo`, `<id>:rematch`, `<id>:claim` (and the server's `<id>:boardEvent`) are handled for you.
   - The kit owns:
@@ -265,7 +266,7 @@ Kits are shared by design: extend them additively (new optional props or hooks, 
   - `PlayerCard`, `BoardClock` (driven by rAF with no re-renders), `MoveList`, `BoardActionBar`, `ResultBanner`.
   - `BoardSettingsFields` (read-only in tournaments), `useBoardroom`, `boardSounds` / `useBoardEventSounds`.
   - Games without a DASCADE rating (tic-tac-toe) pass `ratings={false}` to `BoardSettingsFields` and `ResultBanner` and `showRating={false}` to `PlayerCard`; boards that read the same both ways leave out `BoardActionBar`'s `onFlip`.
-  - Games with variants (chess, checkers, tic-tac-toe) put a `variant` in their settings, show `VariantPicker` (grouped radio cards) and `VariantRulesCard` in the lobby, and lock the variant at `onBoardSetup`. Only the default variant of a rated game is rated: the room overrides `isRatedMatch()` (`super.isRatedMatch() && variant === default`) and the client passes `ratings` / `showRating` only for it.
+  - Games with variants (chess, checkers, tic-tac-toe, Reversi) put a `variant` in their settings, show `VariantPicker` (grouped radio cards) and `VariantRulesCard` in the lobby, and lock the variant at `onBoardSetup`. Only the default variant of a rated game is rated: the room overrides `isRatedMatch()` (`super.isRatedMatch() && variant === default`) and the client passes `ratings` / `showRating` only for it.
   - Board colours are CSS vars on `.br-board` (`--br-light`, `--br-dark`, …).
 
 ### Classics kit (DAScade Classics: paddle, snake, bricks, asteroids, memory, blocks)

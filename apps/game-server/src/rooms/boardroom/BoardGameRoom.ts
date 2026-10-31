@@ -200,14 +200,19 @@ export abstract class BoardGameRoom<S extends BoardRoomState, Settings extends B
     return side;
   }
 
-  /** Call after applying a legal turn for `mover`: clocks, offers, ply and turn advance. */
-  protected completeTurn(mover: BoardSide): void {
+  /**
+   * Call after applying a legal turn for `mover`: clocks, offers, ply and turn advance.
+   * `skipped`: the rules skipped `mover`'s turn (it had no move, e.g. Reversi) — it still counts as
+   * a ply, but not as one of the side's own moves, and offers stand (the side declined nothing).
+   */
+  protected completeTurn(mover: BoardSide, skipped = false): void {
     this.boardClock.switchAfterMove(mover);
-    this.ownMoves[mover]++;
+    if (!skipped) this.ownMoves[mover]++;
     this.state.ply++;
     this.position++;
     this.state.turn = otherSide(mover);
     this.beginTurn();
+    if (skipped) return;
     const offers = this.state.offers;
     // Moving instead of answering declines the opponent's draw offer; your own offer stands.
     if (offers.drawBy && offers.drawBy !== mover) {

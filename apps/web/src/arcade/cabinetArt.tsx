@@ -535,6 +535,15 @@ function SideArt({ cabinet, pat }: { cabinet: CabinetDef; pat: string }) {
             <path d="M2 2L7.3 7.3M7.3 2L2 7.3M11.3 11.3L16.7 16.7M16.7 11.3L11.3 16.7" stroke="#ff4f81" strokeWidth="2" />
             <circle cx="23.3" cy="4.7" r="2.9" stroke="#38bdf8" strokeWidth="1.8" />
           </g>
+          {/* a Reversi centre, one disc mid-flip */}
+          <g transform="translate(6 352)">
+            <rect width="26" height="26" rx="1.5" fill="#0f6e4a" stroke={P} strokeWidth="1.2" />
+            <path d="M13 0V26M0 13H26" stroke="#03261a" strokeWidth="1" />
+            <circle cx="6.5" cy="6.5" r="4.6" fill="#f7f5ee" />
+            <circle cx="19.5" cy="6.5" r="4.6" fill="#17151f" stroke="#565170" strokeWidth=".6" />
+            <circle cx="6.5" cy="19.5" r="4.6" fill="#17151f" stroke="#565170" strokeWidth=".6" />
+            <ellipse cx="19.5" cy="19.5" rx="1.6" ry="4.6" fill="#f7f5ee" stroke="#17151f" strokeWidth=".6" />
+          </g>
           {/* a tiny sonar grid with a hidden fleet */}
           <g transform="translate(18 392)">
             <rect width="64" height="64" fill="#03202e" stroke="#38bdf8" strokeWidth="1.2" />

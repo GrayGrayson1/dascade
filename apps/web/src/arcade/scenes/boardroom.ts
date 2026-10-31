@@ -1,7 +1,8 @@
 /**
  * DAS Boardroom scenes: a four-move checkmate, a checkers multi-jump to the
  * crown, a tic-tac-toe fork (then a glimpse of Ultimate's nine boards), Four in
- * a Row's discs dropping into a diagonal win, and a hidden-fleet sonar duel.
+ * a Row's discs dropping into a diagonal win, a Reversi move that flips six
+ * discs at once, and a hidden-fleet sonar duel.
  */
 import {
   banner,
@@ -723,5 +724,147 @@ export const fourinarow: Scene = {
       for (let i = 0; i < 5; i++) sparkle(ctx, rx + hash(i + 23) * rw, ry + hash(i + 29) * rh, tt * 3 + i * 0.37, '#fff3b0');
     }
     tttWipe(ctx, W, H, (tt - C4_WIPE) / (C4_C - C4_WIPE));
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Reversi — a quiet opening, then one Black disc outflanks six in four directions.
+// ---------------------------------------------------------------------------
+const RV_BG = '#04140d';
+const RV_FELT = '#0f6e4a';
+const RV_FELT_2 = '#0c6141';
+const RV_LINE = '#03261a';
+const RV_RAIL = '#052417';
+const RV_RAIL_EDGE = '#34d399';
+const RV_BLACK = '#17151f';
+const RV_BLACK_SHINE = '#565170';
+const RV_WHITE = '#f7f5ee';
+const RV_WHITE_SHADE = '#c9c4b6';
+const RV_C = 10.4;
+/** [cell, discs it flips] — cells row by row from a1; Black moves first. The last move flips six. */
+const RV_GAME: ReadonlyArray<readonly [number, readonly number[]]> = [
+  [19, [27]],
+  [34, [35]],
+  [43, [35]],
+  [20, [27, 28]],
+  [25, [34]],
+  [11, [19]],
+  [13, [20, 27]],
+  [26, [27]],
+  [2, [11]],
+  [21, [20]],
+  [29, [20, 21, 26, 27, 28, 36]],
+];
+const RV_START: ReadonlyArray<readonly [number, 'b' | 'w']> = [
+  [27, 'w'],
+  [28, 'b'],
+  [35, 'b'],
+  [36, 'w'],
+];
+const RV_MOVE0 = 0.7;
+const RV_GAP = 0.48;
+/** The big move waits a beat. */
+const RV_BIG_AT = RV_MOVE0 + (RV_GAME.length - 1) * RV_GAP + 0.55;
+const RV_FLIP = 0.26;
+const RV_STEP = 0.08;
+const RV_WIPE = 9.7;
+
+const rvMoveAt = (i: number) => (i === RV_GAME.length - 1 ? RV_BIG_AT : RV_MOVE0 + i * RV_GAP);
+
+/** A disc seen edge-on by `squash` (1 = face up, 0 = edge-on) — the flip's half-turn. */
+function rvDisc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, black: boolean, squash = 1): void {
+  const top = black ? RV_BLACK : RV_WHITE;
+  if (squash >= 0.98) {
+    disc(ctx, cx, cy + 1, r, 'rgba(0,0,0,0.45)');
+    disc(ctx, cx, cy, r, black ? '#05040a' : RV_WHITE_SHADE);
+    disc(ctx, cx, cy, Math.max(1, r - 1), top);
+    if (r >= 3) rect(ctx, Math.round(cx - r / 2), Math.round(cy - r / 2), 1, 1, black ? RV_BLACK_SHINE : '#ffffff');
+    return;
+  }
+  ctx.fillStyle = top;
+  const x = Math.round(cx);
+  const y = Math.round(cy);
+  const rr = Math.max(0, r);
+  for (let dy = -Math.floor(rr); dy <= Math.floor(rr); dy++) {
+    const dx = Math.floor(Math.sqrt(rr * rr - dy * dy) * Math.max(0.08, squash) + 0.35);
+    ctx.fillRect(x - dx, y + dy, dx * 2 + 1, 1);
+  }
+}
+
+export const reversi: Scene = {
+  label: 'REVERSI',
+  length: RV_C,
+  still: 8.6,
+  draw(f: AttractFrame) {
+    const { ctx, W, H } = f;
+    const tt = cyc(f.t, RV_C);
+    rect(ctx, 0, 0, W, H, RV_BG);
+    for (let y = 2; y < H; y += 5) for (let x = 2; x < W; x += 5) rect(ctx, x, y, 1, 1, '#082419');
+    const lift = Math.round(f.top * 0.6);
+    const sq = Math.max(4, Math.floor(Math.min(W * 0.88, (H - lift) * 0.88) / 8));
+    const bw = sq * 8;
+    const bx = Math.round((W - bw) / 2);
+    const by = lift + Math.round((H - lift - bw) / 2);
+    rect(ctx, bx - 3, by - 3, bw + 6, bw + 6, RV_RAIL);
+    frame(ctx, bx - 2, by - 2, bw + 4, bw + 4, RV_RAIL_EDGE);
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) rect(ctx, bx + c * sq, by + r * sq, sq, sq, (r + c) % 2 ? RV_FELT : RV_FELT_2);
+    for (let i = 1; i < 8; i++) {
+      rect(ctx, bx + i * sq, by, 1, bw, RV_LINE);
+      rect(ctx, bx, by + i * sq, bw, 1, RV_LINE);
+    }
+    for (const [c, r] of [
+      [2, 2],
+      [6, 2],
+      [2, 6],
+      [6, 6],
+    ] as const)
+      rect(ctx, bx + c * sq - 1, by + r * sq - 1, 3, 3, RV_LINE);
+
+    // Replay the game up to now: who owns each square, and the flips still turning over.
+    const owner = new Map<number, boolean>(RV_START.map(([cell, d]) => [cell, d === 'b']));
+    const turning = new Map<number, { k: number; black: boolean }>();
+    let last = -1;
+    RV_GAME.forEach(([cell, flips], i) => {
+      const at = rvMoveAt(i);
+      if (tt < at) return;
+      const black = i % 2 === 0;
+      owner.set(cell, black);
+      last = cell;
+      for (const fc of flips) {
+        const steps = Math.max(Math.abs(Math.floor(fc / 8) - Math.floor(cell / 8)), Math.abs((fc % 8) - (cell % 8)));
+        const k = clamp((tt - at - 0.1 - (steps - 1) * RV_STEP) / RV_FLIP, 0, 1);
+        if (k >= 1) owner.set(fc, black);
+        else if (k > 0) turning.set(fc, { k, black });
+      }
+    });
+    const R = Math.max(1.5, sq * 0.4);
+    if (last >= 0) rect(ctx, bx + (last % 8) * sq + 1, by + Math.floor(last / 8) * sq + 1, sq - 1, sq - 1, '#2f8a5c');
+    for (const [cell, black] of owner) {
+      const cx = bx + (cell % 8) * sq + sq / 2 - 0.5;
+      const cy = by + Math.floor(cell / 8) * sq + sq / 2 - 0.5;
+      const turn = turning.get(cell);
+      if (!turn) {
+        rvDisc(ctx, cx, cy, R, black);
+        continue;
+      }
+      // First half: the old face narrows to its edge; second half: the new face opens up.
+      const half = turn.k < 0.5;
+      const hop = Math.round(Math.sin(turn.k * Math.PI) * sq * 0.18);
+      rvDisc(ctx, cx, cy - hop, R, half ? !turn.black : turn.black, Math.abs(1 - turn.k * 2));
+    }
+
+    const big = RV_BIG_AT + 0.1 + 2 * RV_STEP + RV_FLIP;
+    if (tt > big && tt < RV_WIPE) {
+      const cx = bx + (29 % 8) * sq + sq / 2;
+      const cy = by + Math.floor(29 / 8) * sq + sq / 2;
+      if (blinkOn(f, tt, 3)) frame(ctx, Math.round(cx - sq / 2), Math.round(cy - sq / 2), sq, sq, '#ffd23f');
+      if (f.hud) banner(ctx, 'OUTFLANKED!', W, by + bw * 0.78, blinkOn(f, tt) ? '#ffd23f' : '#ffffff', RV_BG, W >= 140 ? 2 : 1);
+      for (let i = 0; i < 6; i++) sparkle(ctx, cx + (hash(i + 41) - 0.5) * sq * 4, cy + (hash(i + 47) - 0.5) * sq * 3, tt * 3 + i * 0.37, '#fff3b0');
+    }
+    if (tt > RV_WIPE) {
+      const h = Math.round(H * clamp((tt - RV_WIPE) / (RV_C - RV_WIPE), 0, 1));
+      rect(ctx, 0, 0, W, h, RV_BG);
+      if (h < H) rect(ctx, 0, h, W, 1, RV_RAIL_EDGE);
+    }
   },
 };

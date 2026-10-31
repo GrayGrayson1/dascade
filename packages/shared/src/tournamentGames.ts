@@ -12,6 +12,7 @@ import type { GameId } from './catalog.ts';
 import { CLOCK_PRESETS } from './games/boardroom.ts';
 import { CHECKERS_VARIANTS, CHECKERS_VARIANT_INFO } from './games/checkers.ts';
 import { CHESS_VARIANTS, CHESS_VARIANT_INFO } from './games/chess.ts';
+import { REVERSI_VARIANTS, REVERSI_VARIANT_INFO } from './games/reversi.ts';
 import { TTT_VARIANTS, TTT_VARIANT_INFO } from './games/tictactoe.ts';
 
 export interface TournamentGameSettingOption {
@@ -67,6 +68,16 @@ export const TOURNAMENT_GAME_SETTINGS: Partial<Record<GameId, TournamentGameSett
       defaultId: 'classic',
     },
     timeControl('3+0'),
+  ],
+  reversi: [
+    {
+      key: 'variant',
+      label: 'Variant',
+      help: 'Every game of every match is played in this variant (Blockers and Random Start draw a new setup each game). Only Classic is rated.',
+      options: REVERSI_VARIANTS.map((id) => ({ id, label: REVERSI_VARIANT_INFO[id].title, value: id })),
+      defaultId: 'classic',
+    },
+    timeControl('5+0'),
   ],
 };
 

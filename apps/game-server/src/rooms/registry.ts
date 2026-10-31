@@ -18,6 +18,7 @@ export const ROOM_LOADERS: Record<GameId, () => Promise<AnyGameRoom>> = {
   chess: async () => (await import('./chess/ChessRoom.ts')).ChessRoom,
   checkers: async () => (await import('./checkers/CheckersRoom.ts')).CheckersRoom,
   tictactoe: async () => (await import('./tictactoe/TicTacToeRoom.ts')).TicTacToeRoom,
+  reversi: async () => (await import('./reversi/ReversiRoom.ts')).ReversiRoom,
   ships: async () => (await import('./ships/ShipsRoom.ts')).ShipsRoom,
   trivia: async () => (await import('./trivia/TriviaRoom.ts')).TriviaRoom,
   deception: async () => (await import('./deception/DeceptionRoom.ts')).DeceptionRoom,

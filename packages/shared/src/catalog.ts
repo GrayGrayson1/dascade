@@ -20,6 +20,7 @@ export const GAME_IDS = [
   'chess',
   'checkers',
   'tictactoe',
+  'reversi',
   'ships',
   // DAStravaganza
   'trivia',
@@ -463,6 +464,38 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     prefersLandscape: false,
     // Not rated: perfect play draws Classic. Tournaments run best-of series; sides swap every game.
     tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: true },
+    reconnectGraceSeconds: 120,
+  },
+  reversi: {
+    id: 'reversi',
+    title: 'DAS Reversi',
+    marquee: 'DAS REVERSI',
+    tagline: 'Outflank and flip: classic 8×8 Reversi with a DASCADE rating, plus nine variants.',
+    description:
+      'The disc-flipping duel: trap a line of your opponent’s discs to turn them your colour, and own the board when it fills. Classic 8×8 games are rated; nine variants change the board or the goal: Original 1880s rules, Parallel Start, Mini 6×6, Grand 10×10, Octagon, Wraparound, Anti, Blockers and Random Start. Server-checked moves, clocks, spectators and rematches.',
+    category: 'strategy',
+    cabinet: 'boardroom',
+    accent: { primary: '#34d399', secondary: '#f5f5f5', deep: '#04140d' },
+    capacity: {
+      minPlayers: 2,
+      defaultMaxPlayers: 2,
+      maxPlayersLimit: 2,
+      maxRoomSize: 40,
+      supportsSpectators: true,
+      lateJoinAsPlayer: false,
+      supportsSolo: false,
+    },
+    controls: ['Click or tap a marked square to place a disc', 'Arrow keys move around the board · Enter places', 'The host picks one of 10 variants in the lobby'],
+    howToPlay: [
+      'Black moves first. Place a disc so it traps a line of your opponent’s discs between it and one of yours.',
+      'Every trapped disc flips to your colour. No move? Your turn is skipped.',
+      'When neither player can move, the most discs wins. Corners can never be flipped.',
+      'The host can pick a variant in the lobby (Mini 6×6, Grand 10×10, Anti, Wraparound and more); each one shows its rules before you start. Only Classic games are rated.',
+    ],
+    virtualChips: false,
+    prefersLandscape: false,
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 2, 3, 5], maxField: 64, draws: true, sides: true },
+    rated: true,
     reconnectGraceSeconds: 120,
   },
   ships: {
