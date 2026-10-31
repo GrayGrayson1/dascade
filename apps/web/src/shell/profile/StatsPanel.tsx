@@ -95,7 +95,9 @@ export function StatsPanel() {
           DASCADE ratings
         </h3>
         {ratings.length === 0 ? (
-          <p className="dc-muted ps-empty">No rated games yet. Tournament matches (and rated rooms) of chess and checkers count.</p>
+          <p className="dc-muted ps-empty">
+            No rated games yet. Tournament matches (and rated rooms) of chess, checkers and Reversi count.
+          </p>
         ) : (
           <ul className="ps-ratings">
             {ratings.map((r) => (
