@@ -1,5 +1,5 @@
 /* =====================================================================
- * DAS Tanks — battlefield HUD, gunner deck, banners, results, lobby.
+ * DAS Tanks — battlefield HUD, gunner deck, armory, splashes, results, lobby.
  * Neon artillery: orange (--accent) + yellow (--accent-2) on deep glass.
  * Game-art colours (terrain, sky) live in art/themes.ts.
  * ===================================================================== */
@@ -558,6 +558,12 @@
   gap: 12px;
   padding: 10px 12px;
 }
+.tk-deck:has(> .tk-items) {
+  grid-template-areas:
+    'items items items items items'
+    'drive weapon angle power fire';
+  row-gap: 8px;
+}
 .tk-deck[data-turn='mine'] {
   border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
   box-shadow:
@@ -704,17 +710,65 @@
   color: var(--accent-2);
   font-weight: 700;
 }
+.tk-weapon__current {
+  position: relative;
+}
+/* How many different weapons are in stock (a hint that the tray holds more). */
+.tk-weapon__count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a0a02;
+  background: var(--accent-2);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-2) 60%, transparent);
+}
 
 .tk-tray {
   position: absolute;
   z-index: 5;
   bottom: calc(100% + 10px);
   left: 0;
-  width: min(420px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+.tk-tray__group {
+  display: grid;
+  gap: 4px;
+}
+.tk-tray__cat {
+  margin: 0;
+  padding: 0 2px;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.tk-tray__items {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
-  padding: 8px;
+}
+.tk-tray__empty {
+  margin: 0;
+  padding: 4px 2px;
+  font-size: 12px;
+  color: var(--text-2);
 }
 .tk-tray__item {
   display: grid;
@@ -1047,9 +1101,23 @@
 }
 
 /* Narrow portrait phones: two-row deck. */
+/* The rotate hint would sit on top of the shop. */
+.tk-stage:has([data-part='shop']) .tk-rotate {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .tk-hud-top {
     right: calc(56px + var(--safe-right));
+  }
+  /* Long names (CPU personas) truncate instead of running under the wind gauge. */
+  .tk-turn__text {
+    min-width: 0;
+  }
+  .tk-turn__who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .tk-hud {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1092,6 +1160,15 @@
       'drive drive weapon weapon fire fire';
     gap: 8px;
     padding: 8px;
+  }
+  .tk-deck:has(> .tk-items) {
+    grid-template-areas:
+      'items items items items items items'
+      'angle angle angle power power power'
+      'drive drive weapon weapon fire fire';
+  }
+  .tk-battle:has(.tk-items) .tk-roster {
+    bottom: calc(244px + var(--safe-bottom));
   }
   .tk-drive {
     justify-content: space-between;
@@ -1218,7 +1295,9 @@
   background: color-mix(in srgb, var(--accent-2) 12%, transparent);
 }
 .tk-standings tr.is-me td {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 40%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 40%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .tk-standings__place {
   font-family: var(--font-num);
@@ -1256,10 +1335,12 @@
 }
 @media (max-width: 560px) {
   .tk-standings th:nth-child(5),
-  .tk-standings td:nth-child(5) {
+  .tk-standings td:nth-child(5),
+  .tk-standings th:nth-child(6),
+  .tk-standings td:nth-child(6) {
     display: none;
   }
-  /* KOs is the last visible column here: round its row end like the desktop "Hits" cell. */
+  /* Wins is the last visible column here: round its row end like the desktop "Damage" cell. */
   .tk-standings td:nth-child(4) {
     border-radius: 0 8px 8px 0;
   }
@@ -1453,4 +1534,1151 @@
   font-size: 12px;
   line-height: 1.8;
   color: var(--text-2);
+}
+
+/* =====================================================================
+ * Scorched: volley card, credits, roster extras, items, armory, splashes.
+ * ===================================================================== */
+
+/* ---------- Volley card ---------- */
+.tk-turn--volley {
+  --tank: var(--accent-2);
+}
+.tk-locks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0 1px;
+}
+.tk-locks i {
+  display: block;
+  width: 10px;
+  height: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.tk-locks i[data-on='true'] {
+  background: var(--green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--green) 70%, transparent);
+}
+
+/* ---------- Credits chip (top, between the wind and the menu) ---------- */
+.tk-credits {
+  justify-self: end;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.tk-credits__coin {
+  align-self: center;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a0a02;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, var(--yellow) 55%, #c98a00);
+}
+.tk-credits b {
+  font-size: 18px;
+  color: var(--accent-2);
+}
+.tk-credits small {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* ---------- Roster extras ---------- */
+@media (min-width: 641px) and (min-height: 521px) {
+  .tk-roster:not(.is-collapsed) {
+    width: 260px;
+  }
+}
+/* Phones: the credits live in the shop and the roster; the top row stays for the turn and wind. */
+@media (max-width: 640px) {
+  .tk-credits {
+    display: none;
+  }
+}
+.tk-roster__score {
+  margin-left: auto;
+  padding-left: 4px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2) !important;
+}
+.tk-tag {
+  flex: none;
+  font-family: var(--font-pixel);
+  font-size: 8.5px !important;
+  letter-spacing: 0.08em;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.tk-tag--buried {
+  color: #1a0a02 !important;
+  background: var(--mat-ground, #b8742f);
+}
+.tk-hpbar {
+  position: relative;
+}
+/* Shield strength rides on top of the armor bar. */
+.tk-hpbar s {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  height: 100%;
+  text-decoration: none;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--cyan) 85%, transparent) 0 4px,
+    color-mix(in srgb, var(--cyan) 55%, transparent) 4px 6px
+  );
+  box-shadow: 0 0 6px color-mix(in srgb, var(--cyan) 70%, transparent);
+  transition: width var(--dur-3) var(--ease-out);
+}
+.tk-lock {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.06);
+}
+.tk-lock[data-on='true'] {
+  color: #04140b;
+  background: var(--green);
+}
+
+/* Blocked-action note next to the key hints. */
+.tk-blocked {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-0);
+  background: color-mix(in srgb, var(--red) 30%, rgba(8, 6, 16, 0.85));
+  border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
+  animation: tk-fade 1.8s linear both;
+  pointer-events: none !important;
+}
+
+/* ---------- Items row (deck) ---------- */
+.tk-items {
+  grid-area: items;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tk-items__art {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.tk-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 12%, transparent), rgba(255, 255, 255, 0.02));
+  color: var(--text-0);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.tk-item:hover:not([data-blocked='true']) {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 22%, transparent);
+}
+.tk-item:active:not([data-blocked='true']) {
+  transform: translateY(1px) scale(0.97);
+}
+.tk-item[data-blocked='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tk-item__name {
+  font-size: 12px;
+  font-weight: 700;
+}
+.tk-item__n,
+.tk-chutes b {
+  font-family: var(--font-num);
+  font-size: 12px;
+  color: var(--accent-2);
+}
+.tk-chutes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--line-strong);
+}
+.tk-shieldmeter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 5px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, transparent);
+}
+.tk-shieldmeter__bar {
+  display: block;
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.tk-shieldmeter__bar i {
+  display: block;
+  height: 100%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  transition: width var(--dur-3) var(--ease-out);
+}
+.tk-shieldmeter b {
+  font-size: 12px;
+  color: var(--cyan);
+}
+.tk-items__note {
+  font-size: 12px;
+  color: var(--yellow);
+}
+.tk-buried {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--text-0);
+  background: color-mix(in srgb, var(--mat-ground, #8b5a2b) 35%, rgba(8, 6, 16, 0.6));
+  border: 1px solid color-mix(in srgb, var(--orange) 55%, transparent);
+}
+.tk-buried > .dc-icon {
+  color: var(--orange);
+}
+.tk-buried b {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+.tk-buried__dig {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
+  color: var(--text-0);
+  font-weight: 700;
+  cursor: pointer;
+}
+.tk-buried__dig:hover {
+  background: color-mix(in srgb, var(--accent-2) 30%, transparent);
+}
+
+/* Volley: LOCK IN is cyan-gold, LOCKED is green. */
+.tk-fire[data-volley='true']:not(:disabled) {
+  background: linear-gradient(180deg, #fff3b0, #ffd23f 45%, #22d3ee);
+}
+.tk-fire[data-volley='true'][data-state='firing'] {
+  color: #04140b;
+  background: linear-gradient(180deg, rgba(45, 227, 143, 0.55), rgba(45, 227, 143, 0.25));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 70%, transparent);
+}
+.tk-fire[data-volley='true'][data-state='firing'] .tk-fire__label {
+  color: var(--green);
+}
+
+/* ---------- Shared chips + panels ---------- */
+.tk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tk-chip--hot {
+  color: #1a0a02;
+  background: var(--accent-2);
+  border-color: transparent;
+}
+.tk-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.tk-panel__title {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.tk-panel__lede,
+.tk-panel__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-1);
+}
+.tk-panel__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--yellow);
+}
+
+/* ---------- Armory (shop) ---------- */
+.tk-shop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-hud) + 4);
+  display: flex;
+  justify-content: center;
+  padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  background: radial-gradient(circle at 50% 20%, rgba(40, 14, 4, 0.35), rgba(5, 4, 11, 0.72));
+  color: var(--text-0);
+  animation: tk-shop-in var(--dur-3) var(--ease-out) both;
+}
+@keyframes tk-shop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+:root[data-reduced-motion='true'] .tk-shop {
+  animation: none;
+}
+.tk-shop__frame {
+  width: min(1240px, 100%);
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.tk-shop__head {
+  margin-right: calc(48px + var(--safe-right));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 10px 14px;
+}
+.tk-shop__heading {
+  flex: 1 1 260px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.tk-shop__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+.tk-shop__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+.tk-shop__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tk-shop__clock {
+  flex: none;
+}
+.tk-shop__wallet {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  line-height: 1;
+}
+.tk-shop__wallet-label {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.tk-shop__credits {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
+  color: var(--accent-2);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent-2) 55%, transparent);
+}
+.tk-shop__wallet small {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.tk-shop__wallet--watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-1);
+}
+.tk-shop__body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 10px;
+}
+.tk-shop__store {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+.tk-shop__tabs {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tk-shop__tabcount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+  color: #1a0a02;
+  background: var(--accent-2);
+}
+.tk-shop__grid {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 2px;
+}
+.tk-shop__side {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.tk-shop__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 8px 10px 8px 14px;
+}
+.tk-shop__readycount {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.tk-shop__readycount b {
+  font-family: var(--font-num);
+  color: var(--text-0);
+}
+
+.tk-card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-areas:
+    'art text'
+    'meta meta'
+    'actions actions';
+  gap: 8px 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+.tk-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.tk-card.is-owned {
+  border-color: color-mix(in srgb, var(--accent-2) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 18%, transparent);
+}
+.tk-card__art {
+  grid-area: art;
+  width: 40px;
+  height: 40px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.tk-card__text {
+  grid-area: text;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.tk-card__name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.tk-card__blurb {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.tk-card__meta {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.tk-card__bundle {
+  font-family: var(--font-num);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.tk-card__price {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-num);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-2);
+}
+.tk-card__owned {
+  margin-left: auto;
+  font-family: var(--font-num);
+  color: var(--text-2);
+}
+.tk-card.is-owned .tk-card__owned {
+  color: var(--green);
+}
+.tk-card__actions {
+  grid-area: actions;
+  display: flex;
+  gap: 6px;
+}
+.tk-buy,
+.tk-sell {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    filter var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.tk-buy {
+  border: 0;
+  color: #1a0a02;
+  background: linear-gradient(180deg, #ffd23f, #ff8a3d);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+.tk-buy:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.tk-buy:active:not(:disabled),
+.tk-sell:active {
+  transform: translateY(1px) scale(0.98);
+}
+.tk-buy:disabled {
+  cursor: not-allowed;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tk-sell {
+  flex: 0 1 auto;
+  border: 1px solid var(--line-strong);
+  color: var(--text-1);
+  background: transparent;
+}
+.tk-sell:hover {
+  color: var(--text-0);
+  border-color: color-mix(in srgb, var(--red) 60%, transparent);
+}
+.tk-card__why {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  font-size: 11px;
+  color: var(--text-2);
+  text-align: center;
+}
+.tk-card[data-reason='credits'] .tk-card__why {
+  color: color-mix(in srgb, var(--red) 70%, var(--text-1));
+}
+
+.tk-ready {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 10px;
+  min-width: 200px;
+  min-height: 56px;
+  padding: 6px 20px 6px 16px;
+  border: 0;
+  border-radius: 14px;
+  color: #1a0a02;
+  background: linear-gradient(180deg, #ffd23f, #ff8a3d 60%, #ff5a1f);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.25),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.22),
+    0 0 26px color-mix(in srgb, var(--accent) 60%, transparent);
+  cursor: pointer;
+  text-align: left;
+}
+.tk-ready > .dc-icon {
+  grid-row: span 2;
+}
+.tk-ready__label {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tk-ready small {
+  font-size: 11px;
+  font-weight: 600;
+}
+.tk-ready[aria-pressed='true'] {
+  color: #04140b;
+  background: linear-gradient(180deg, #8ef5c2, var(--green));
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.3),
+    0 0 26px color-mix(in srgb, var(--green) 55%, transparent);
+}
+.tk-ready:hover {
+  filter: brightness(1.06);
+}
+.tk-ready:focus-visible,
+.tk-buy:focus-visible,
+.tk-sell:focus-visible,
+.tk-item:focus-visible,
+.tk-buried__dig:focus-visible {
+  outline: 2px solid var(--focus, var(--accent-2));
+  outline-offset: 2px;
+}
+
+/* Payout + match standings */
+.tk-payout {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.tk-payout li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--text-1);
+}
+.tk-payout li b {
+  color: var(--green);
+}
+.tk-payout li[data-neg='true'] b {
+  color: var(--red);
+}
+.tk-payout__total {
+  margin-top: 4px;
+  padding-top: 6px !important;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+  color: var(--text-0) !important;
+}
+.tk-payout__total b {
+  font-size: 16px;
+  color: var(--accent-2) !important;
+}
+.tk-teamscore {
+  display: flex;
+  gap: 8px;
+}
+.tk-teamscore span {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--team, var(--text-0));
+  background: color-mix(in srgb, var(--team, var(--text-2)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--team, var(--text-2)) 40%, transparent);
+}
+.tk-teamscore b {
+  font-size: 18px;
+  color: var(--text-0);
+}
+.tk-teamscore--big {
+  width: min(420px, 100%);
+  margin-top: 4px;
+}
+.tk-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.tk-board__row {
+  display: grid;
+  grid-template-columns: 20px 12px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.tk-board__row.is-me {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.tk-board__place {
+  font-weight: 700;
+  color: var(--text-2);
+  text-align: center;
+}
+.tk-board__row:first-child .tk-board__place {
+  color: var(--yellow);
+}
+.tk-board__chip {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+.tk-board__name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.tk-board__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.tk-board__name small {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-2);
+}
+.tk-board__team {
+  flex: none;
+}
+.tk-board__score {
+  font-weight: 700;
+}
+.tk-board__score small {
+  font-weight: 400;
+  color: var(--text-2);
+}
+.tk-board__ready {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.06);
+}
+.tk-board__ready[data-on='true'] {
+  color: #04140b;
+  background: var(--green);
+}
+
+/* Shop on narrow screens: one column that scrolls as a page, sticky header and Ready. */
+@media (max-width: 900px) {
+  .tk-shop {
+    display: block;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .tk-shop__frame {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    grid-template-rows: auto auto auto;
+    gap: 8px;
+    padding: 0 8px;
+  }
+  /* Rows take their full content height here (the desktop layout lets them shrink and scroll inside). */
+  .tk-shop__body,
+  .tk-shop__store,
+  .tk-shop__grid,
+  .tk-shop__side {
+    min-height: auto;
+  }
+  .tk-shop__head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 calc(-8px) 0;
+    padding: calc(8px + var(--safe-top)) calc(56px + var(--safe-right)) 8px calc(12px + var(--safe-left));
+    border-radius: 0 0 12px 12px;
+    gap: 6px 12px;
+  }
+  .tk-shop__heading {
+    flex-basis: 100%;
+  }
+  .tk-shop__wallet {
+    margin-left: auto;
+  }
+  .tk-shop__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tk-shop__store {
+    grid-template-rows: auto auto;
+  }
+  .tk-shop__grid {
+    overflow: visible;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  }
+  .tk-shop__side {
+    overflow: visible;
+  }
+  .tk-shop__foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0 -8px;
+    padding: 8px calc(10px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(12px + var(--safe-left));
+    border-radius: 12px 12px 0 0;
+    justify-content: space-between;
+  }
+  .tk-ready {
+    min-width: 0;
+    flex: 1;
+    max-width: 280px;
+  }
+}
+@media (max-width: 420px) {
+  .tk-shop__title {
+    font-size: 21px;
+  }
+  .tk-shop__credits {
+    font-size: 26px;
+  }
+  .tk-ready__label {
+    font-size: 20px;
+  }
+  .tk-shop__readycount {
+    font-size: 12px;
+  }
+}
+
+/* ---------- Battle intro ---------- */
+.tk-intro {
+  position: fixed;
+  z-index: calc(var(--z-hud) + 2);
+  left: 50%;
+  top: 38%;
+  width: min(92vw, 720px);
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  pointer-events: none;
+  animation: tk-intro-in 2.8s var(--ease-out) both;
+}
+.tk-intro__kicker {
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.tk-intro__title {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 9vw, 110px);
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+  color: var(--text-0);
+  text-shadow:
+    0 0 34px color-mix(in srgb, var(--accent) 85%, transparent),
+    0 5px 0 rgba(0, 0, 0, 0.6);
+}
+.tk-intro__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.tk-intro__chips .tk-chip {
+  background: rgba(8, 6, 16, 0.75);
+}
+.tk-intro__chips .tk-chip--hot {
+  background: var(--accent-2);
+}
+.tk-intro__hint {
+  font-size: 13px;
+  color: var(--text-1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+@keyframes tk-intro-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.25);
+    filter: blur(6px);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.98);
+    filter: none;
+  }
+  20% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.tk-intro.is-still {
+  animation: tk-fade 2.8s linear both;
+}
+
+/* ---------- Battle over ---------- */
+.tk-over-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-hud) + 2);
+  display: grid;
+  place-items: center;
+  padding: calc(70px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
+  pointer-events: none;
+}
+.tk-over {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-color: color-mix(in srgb, var(--win, var(--accent-2)) 55%, transparent);
+  pointer-events: auto;
+  animation: tk-over-in var(--dur-4, 420ms) var(--ease-out) both;
+}
+@keyframes tk-over-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tk-over.is-still {
+  animation: none;
+}
+.tk-over__head {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.tk-over__kicker {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.tk-over__title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 400;
+  color: var(--text-0);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--win, var(--accent-2)) 60%, transparent);
+}
+.tk-over__title .dc-icon {
+  color: var(--win, var(--accent-2));
+}
+.tk-over.is-mine .tk-over__title {
+  color: var(--accent-2);
+}
+.tk-over__sub {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.tk-over__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.tk-over__row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: rgba(255, 255, 255, 0.035);
+}
+.tk-over__row.is-winner {
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+}
+.tk-over__row.is-me {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.tk-over__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.tk-over__pts {
+  color: var(--text-1);
+}
+.tk-over__cr {
+  min-width: 70px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--accent-2);
+}
+.tk-over__next {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.tk-standings__score {
+  font-weight: 700;
+  color: var(--accent-2);
+}
+
+/* ---------- Lobby: settings sections + field manual ---------- */
+.tk-settings__section {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.tk-settings__section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.tk-settings__title {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+.tk-manual__steps {
+  margin: 0 0 6px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-1);
+}
+.tk-manual__tabs {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Reduced motion: no entrance motion on the new splashes and panels. */
+:root[data-reduced-motion='true'] .tk-intro {
+  animation: tk-fade 2.8s linear both;
+}
+:root[data-reduced-motion='true'] .tk-over,
+:root[data-reduced-motion='true'] .tk-blocked {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-shop,
+  .tk-over {
+    animation: none;
+  }
+  .tk-intro {
+    animation: tk-fade 2.8s linear both;
+  }
 }

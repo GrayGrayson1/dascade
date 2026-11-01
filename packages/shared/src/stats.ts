@@ -89,6 +89,9 @@ export const STAT_EXTRA_LABELS: Record<string, string> = {
   hits: 'Hits',
   shotsFired: 'Shots fired',
   shotsHit: 'Hits',
+  // DAS Tanks (also damage, kills, shots, hits)
+  battlesWon: 'Battles won',
+  bestMatchScore: 'Best match score',
   maxHitStreak: 'Best hit streak',
   // DASketch
   correctGuesses: 'Words guessed',

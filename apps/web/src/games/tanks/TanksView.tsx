@@ -1,7 +1,8 @@
 /**
- * DAS Tanks game view: the Phaser battlefield, HUD and gunner deck. The presenter
- * (playback) and aim controller live for the lifetime of this component; the Phaser game
- * is rebuilt only when graphics settings change. Drag anywhere on the battlefield to aim.
+ * DAS Tanks game view: the Phaser battlefield, HUD and gunner deck, plus the armory between
+ * battles and the battle intro / battle-over splashes. The presenter (playback) and aim
+ * controller live for the lifetime of this component; the Phaser game is rebuilt only when
+ * graphics settings change. Drag anywhere on the battlefield to aim.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
 import { TANK_GEOM, type TanksPublicState } from '@dascade/shared/games/tanks';
@@ -18,6 +19,8 @@ import { TanksContext, useTanks, type TanksControllers } from './context.ts';
 import { Hud, OverviewToggle } from './hud/Hud.tsx';
 import { Controls } from './hud/Controls.tsx';
 import { Results } from './Results.tsx';
+import { Shop } from './shop/Shop.tsx';
+import { Intermission } from './shop/Intermission.tsx';
 import { tankSfx } from './audio.ts';
 
 declare global {
@@ -45,6 +48,7 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
   const [presenter] = useState(() => new BattlePresenter());
   const [aim] = useState(() => new AimController());
   const [overview, setOverview] = useState(false);
+  const [note, setNote] = useState<{ key: number; text: string } | null>(null);
   const fx = useApp((s) => s.settings.fx);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
   const [ready, setReady] = useState(false);
@@ -53,12 +57,15 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
   const hudTop = useRef<HTMLElement | null>(null);
   const deck = useRef<HTMLElement | null>(null);
   const hasBattle = useRoomSelector((s: TanksPublicState) => Boolean(s.battle?.terrain));
+  const stage = useRoomSelector((s: TanksPublicState) => s.battle?.stage ?? 'idle');
+  const shopping = stage === 'shop' && !dimmed;
 
   useEffect(() => {
     presenter.localAim = () => aim.live();
     presenter.start();
     aim.start();
     aim.onFire = () => tankSfx.aimTick();
+    aim.onBlocked = (why) => setNote({ key: performance.now(), text: why });
     const unbind = bindKeyboard(aim);
     return () => {
       unbind();
@@ -88,7 +95,9 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !fontsReady || !hasBattle) return;
-    const mobile = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 560;
+    const mobile =
+      (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ||
+      Math.min(window.innerWidth, window.innerHeight) < 560;
     const bg = createBattleGame(el, { presenter, fx, reducedMotion, mobile, onReady: () => setReady(true) });
     gameRef.current = bg;
     measure();
@@ -109,6 +118,12 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
   useEffect(() => {
     if (gameRef.current) gameRef.current.scene.overview = overview;
   }, [overview, ready]);
+
+  useEffect(() => {
+    if (!note) return;
+    const id = setTimeout(() => setNote(null), 1800);
+    return () => clearTimeout(id);
+  }, [note]);
 
   // Re-measure the insets whenever the HUD / deck resize (orientation, deck state).
   const observe = useMemo(() => {
@@ -148,7 +163,7 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
     aim.setPower(power);
   };
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (dimmed || !aim.getSnapshot().inBattle) return;
+    if (dimmed || shopping || !aim.getSnapshot().inBattle || aim.getSnapshot().locked) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     dragging.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -170,7 +185,12 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
 
   return (
     <TanksContext.Provider value={controllers}>
-      <div className="tk-battle" data-part="battlefield" data-dimmed={dimmed ? 'true' : undefined}>
+      <div
+        className="tk-battle"
+        data-part="battlefield"
+        data-dimmed={dimmed || shopping ? 'true' : undefined}
+        data-stage={stage ?? undefined}
+      >
         <div
           className="tk-canvas"
           data-part="terrain"
@@ -181,7 +201,7 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
           onPointerCancel={onPointerUp}
           data-aimable={!spectating ? 'true' : undefined}
         />
-        {!dimmed ? (
+        {!dimmed && !shopping ? (
           <>
             <div className="tk-hud-top" data-part="hud-top" ref={topRef}>
               <Hud />
@@ -190,11 +210,18 @@ function Battlefield({ dimmed }: { dimmed: boolean }) {
               <div className="tk-hud-bottom__tools">
                 <OverviewToggle />
                 <KeyHints />
+                {note ? (
+                  <span className="tk-blocked" role="status" key={note.key}>
+                    {note.text}
+                  </span>
+                ) : null}
               </div>
               <Controls deckRef={deckRef} />
             </div>
+            <Intermission />
           </>
         ) : null}
+        {shopping ? <Shop /> : null}
         {!ready ? (
           <div className="tk-loading" role="status" aria-live="polite">
             <span className="dc-pixel">Rolling out the battlefield</span>
@@ -214,7 +241,7 @@ function KeyHints() {
   const a = useSyncExternalStore(aim.subscribe, aim.getSnapshot, aim.getSnapshot);
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   if (!a.inBattle) return null;
-  if (coarse) return <span className="tk-hints tk-hints--touch">Drag the battlefield to aim · tap FIRE</span>;
+  if (coarse) return <span className="tk-hints tk-hints--touch">Drag the battlefield to aim · tap {a.volley ? 'LOCK IN' : 'FIRE'}</span>;
   return (
     <span className="tk-hints" aria-hidden>
       <span>
@@ -233,7 +260,12 @@ function KeyHints() {
         <kbd>Tab</kbd> weapon
       </span>
       <span>
-        <kbd>Space</kbd> fire
+        <kbd>Space</kbd> {a.volley ? 'lock in' : 'fire'}
+      </span>
+      <span>
+        <kbd>S</kbd>
+        <kbd>B</kbd>
+        <kbd>F</kbd> shield · battery · fuel
       </span>
     </span>
   );

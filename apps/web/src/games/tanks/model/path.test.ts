@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { SHOT_SAMPLE_MS } from '@dascade/shared/games/tanks';
-import { createTerrain, resolveShot, restHeight } from '@dascade/game-core/tanks';
 import { pathAt } from './path.ts';
 
 describe('pathAt (client playback of server shot paths)', () => {
@@ -22,23 +21,35 @@ describe('pathAt (client playback of server shot paths)', () => {
     expect(pathAt([1, 1, 1, 1], 0, 0)).toMatchObject({ x: 1, y: 1 });
   });
 
-  it('follows a real server path to its impact', () => {
-    const terrain = createTerrain(1600, 900, 200);
-    const tank = { id: 'a', team: -1, x: 200, y: restHeight(terrain, 200), hp: 100, alive: true };
-    const s = resolveShot({ terrain, tanks: [tank], wind: 3 }, { shooterId: 'a', angle: 50, power: 60, weapon: 'shell' }, { teams: false, friendlyFire: true });
-    const p = s.projectiles[0]!;
-    const total = p.t1 - p.t0;
-    const boom = s.events.find((e) => e.k === 'boom')!;
-    const end = pathAt(p.pts, total, total);
-    expect(boom.k === 'boom' && Math.abs(end.x - boom.x)).toBeLessThan(0.2);
+  it('follows a sampled ballistic arc to its impact', () => {
+    // A shell sampled every SHOT_SAMPLE_MS like the server does, ending exactly where it lands.
+    const g = 280;
+    const vx = 300;
+    const vy = 420;
+    const pts: number[] = [];
+    const dt = SHOT_SAMPLE_MS / 1000;
+    let t = 0;
+    for (; ; t += dt) {
+      const y = vy * t - (g * t * t) / 2;
+      if (t > 0 && y < 0) break;
+      pts.push(vx * t, y);
+    }
+    const tLand = (2 * vy) / g;
+    pts.push(vx * tLand, 0);
+    const total = tLand * 1000;
+    const end = pathAt(pts, total, total);
+    expect(end.x).toBeCloseTo(vx * tLand, 6);
+    expect(end.y).toBeCloseTo(0, 6);
     // Heading points down at impact.
-    expect(pathAt(p.pts, total - 1, total).dy).toBeLessThan(0);
-    // Monotonic in x for a rightward shot.
+    expect(pathAt(pts, total - 1, total).dy).toBeLessThan(0);
+    // Monotonic in x for a rightward shot, and on the parabola (within a sample's chord error).
     let prev = -Infinity;
-    for (let t = 0; t <= total; t += 7) {
-      const q = pathAt(p.pts, t, total);
+    for (let ms = 0; ms <= total; ms += 7) {
+      const q = pathAt(pts, ms, total);
       expect(q.x).toBeGreaterThanOrEqual(prev - 1e-9);
       prev = q.x;
+      const s = q.x / vx;
+      expect(Math.abs(q.y - (vy * s - (g * s * s) / 2))).toBeLessThan(1);
     }
   });
 });

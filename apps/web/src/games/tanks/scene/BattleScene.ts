@@ -1,19 +1,21 @@
 /**
  * BattleScene — renders whatever the BattlePresenter says the battlefield looks like this
  * frame. Two cameras: the background camera draws the parallax sky in screen pixels; the
- * world camera draws terrain, tanks, projectiles and effects, and follows the action.
+ * world camera draws terrain, tanks, projectiles, fires and effects, and follows the action.
  * It never touches the network.
  */
 import Phaser from 'phaser';
-import type { BattleTheme, TanksPublicState } from '@dascade/shared/games/tanks';
-import { previewArc, type Terrain } from '@dascade/game-core/tanks';
+import type { BattleTheme, ConcreteWallMode, TanksPublicState } from '@dascade/shared/games/tanks';
+import { heightAt, previewArc, type Terrain } from '@dascade/game-core/tanks';
 import { getStateSnapshot } from '../../../net/session.ts';
-import type { BattleFrame, BattlePresenter, FxEvent } from '../model/presenter.ts';
+import type { BattleFrame, BattlePresenter, DisplayTank, FxEvent, LiveProjectile } from '../model/presenter.ts';
 import { readThemeTokens, subscribeThemeTokens, type ThemeEffects } from '@dascade/ui';
-import { DISPLAY_FONT, THEMES, TEAM_TINT, WEAPON_TINT, hexToInt, type ThemePalette } from '../art/themes.ts';
+import { CONFETTI_TINTS, DISPLAY_FONT, THEMES, TEAM_TINT, WEAPON_TINT, hexToInt, type ThemePalette } from '../art/themes.ts';
 import { materialsSignature, themedPalette, voidColor, type Materials } from '../art/themeAdapter.ts';
 import { tankSfx } from '../audio.ts';
 import { Effects } from './fx.ts';
+import { FireRenderer } from './fire.ts';
+import { QuipBubbles } from './bubbles.ts';
 import { Sky } from './sky.ts';
 import { TerrainLayer } from './terrainLayer.ts';
 import { TankView } from './tankView.ts';
@@ -30,7 +32,45 @@ export interface SceneOptions {
   onDegrade?: () => void;
 }
 
-const DEPTH = { terrain: 10, tanks: 20, projectiles: 40, fx: 50, overlay: 90 } as const;
+const DEPTH = { terrain: 10, fire: 16, tanks: 20, projectiles: 40, fx: 50, bubbles: 80, overlay: 90 } as const;
+
+/** Projectile sprite per kind: texture, core size (world units), glow size. */
+interface ShellLook {
+  tex: string;
+  size: number;
+  glow: number;
+  spin: boolean;
+}
+
+function shellLook(kind: LiveProjectile['kind']): ShellLook {
+  switch (kind) {
+    case 'roller':
+    case 'heavyroller':
+    case 'rolling':
+      return { tex: 'tk-ball', size: kind === 'heavyroller' ? 11 : 8, glow: 22, spin: true };
+    case 'dirtclod':
+    case 'dirtball':
+    case 'tonofdirt':
+    case 'mudslide':
+      return { tex: 'tk-clod', size: kind === 'tonofdirt' ? 12 : kind === 'dirtball' ? 9 : 7, glow: 14, spin: true };
+    case 'nuke':
+      return { tex: 'tk-shell', size: 10, glow: 44, spin: false };
+    case 'mininuke':
+      return { tex: 'tk-shell', size: 8, glow: 36, spin: false };
+    case 'meteor':
+      return { tex: 'tk-shell', size: 10, glow: 52, spin: false };
+    case 'bomblet':
+    case 'confetti':
+      return { tex: 'tk-shell', size: 4, glow: 18, spin: false };
+    case 'tracer':
+      return { tex: 'tk-dot', size: 4, glow: 14, spin: false };
+    case 'warhead':
+    case 'heavy':
+      return { tex: 'tk-shell', size: 7, glow: 30, spin: false };
+    default:
+      return { tex: 'tk-shell', size: 6, glow: 30, spin: false };
+  }
+}
 
 export class BattleScene extends Phaser.Scene {
   private readonly opts: SceneOptions;
@@ -42,6 +82,8 @@ export class BattleScene extends Phaser.Scene {
   private terrainLayer: TerrainLayer | null = null;
   private terrainRef: Terrain | null = null;
   private fx: Effects | null = null;
+  private fires: FireRenderer | null = null;
+  private bubbles: QuipBubbles | null = null;
   private theme: ThemePalette = THEMES.dusk;
   /** Local DASCADE theme materials (presentation only; never synchronized). */
   private mats: Materials = {};
@@ -51,9 +93,14 @@ export class BattleScene extends Phaser.Scene {
   private themeRecheck: ReturnType<typeof setTimeout> | null = null;
   private unsubTheme: (() => void) | null = null;
   private readonly tanks = new Map<string, TankView>();
-  private readonly shells = new Map<number, { core: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image }>();
+  private readonly shells = new Map<
+    number,
+    { core: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; look: ShellLook; lastX: number; spin: number }
+  >();
   private overlay!: Phaser.GameObjects.Graphics;
   private edges!: Phaser.GameObjects.Graphics;
+  private edgeFx!: Phaser.GameObjects.Graphics;
+  private walls: ConcreteWallMode | null = null;
   private ready = false;
   private lastNow = 0;
   private camX = 800;
@@ -61,7 +108,7 @@ export class BattleScene extends Phaser.Scene {
   private zoom = 0.8;
   private camInit = false;
   private maxTerrain = 500;
-  private celebrated = false;
+  private celebrated = '';
   private lastX = new Map<string, number>();
   dpr = 1;
   viewW = 1280;
@@ -117,7 +164,11 @@ export class BattleScene extends Phaser.Scene {
     this.worldCam.ignore(this.bgLayer);
     this.overlay = this.add.graphics().setDepth(DEPTH.overlay);
     this.edges = this.add.graphics().setDepth(DEPTH.terrain + 2);
-    this.worldLayer.add([this.overlay, this.edges]);
+    this.edgeFx = this.add
+      .graphics()
+      .setDepth(DEPTH.terrain + 3)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.worldLayer.add([this.overlay, this.edges, this.edgeFx]);
   }
 
   /** Reads the local theme's terrain materials (scoped to the game stage). Returns true when they changed. */
@@ -145,7 +196,7 @@ export class BattleScene extends Phaser.Scene {
     this.sky = this.makeSky();
     this.terrainLayer?.restyle(this.theme);
     this.fx?.setPalette(this.theme);
-    if (this.terrainRef) this.drawEdges(this.terrainRef);
+    if (this.terrainRef) this.drawEdges(this.terrainRef, this.walls ?? 'open');
   }
 
   private makeSky(): Sky {
@@ -183,17 +234,33 @@ export class BattleScene extends Phaser.Scene {
       this.opts.presenter.takeDirty();
       this.fx?.destroy();
       this.fx = new Effects(this, this.worldLayer, this.theme, frame.terrain.height, this.quality(), DEPTH.fx);
+      this.fires?.destroy();
+      this.fires = new FireRenderer(this, this.worldLayer, frame.terrain.height, this.quality(), DEPTH.fire);
+      this.bubbles?.destroy();
+      this.bubbles = new QuipBubbles(this, this.worldLayer, DEPTH.bubbles, this.dpr);
       for (const v of this.tanks.values()) v.destroy();
       this.tanks.clear();
-      this.celebrated = false;
+      for (const s of this.shells.values()) {
+        s.core.destroy();
+        s.glow.destroy();
+      }
+      this.shells.clear();
+      this.celebrated = '';
       this.camInit = false;
-      this.drawEdges(frame.terrain);
+      this.walls = frame.walls;
+      this.drawEdges(frame.terrain, frame.walls);
+    } else if (this.walls !== frame.walls) {
+      this.walls = frame.walls;
+      this.drawEdges(frame.terrain, frame.walls);
     }
   }
 
-  private drawEdges(t: Terrain): void {
-    // Beyond the field: the ground continues as a dark shelf behind a neon boundary fence
-    // (shells that cross it are lost).
+  /**
+   * Beyond the field the ground continues as a dark shelf. The boundary itself shows this
+   * battle's wall rule: open = a neon fence (shells are lost), wrap = a shimmering portal,
+   * bounce = springy rubber posts, concrete = solid walls (shells burst on them).
+   */
+  private drawEdges(t: Terrain, walls: ConcreteWallMode): void {
     const g = this.edges;
     g.clear();
     const H = t.height;
@@ -212,17 +279,88 @@ export class BattleScene extends Phaser.Scene {
       g.fillRect(x0, H - h + 6, 2400, h + 800);
       g.lineStyle(2, glow, 0.35);
       g.lineBetween(dir < 0 ? x - 2400 : x, H - h, dir < 0 ? x : x + 2400, H - h);
-      // Boundary fence.
-      for (let y = 0; y < 300; y += 14) {
-        const a = 0.55 * (1 - y / 300);
-        g.lineStyle(3, glow, a);
-        g.lineBetween(x, H - h - y, x, H - h - y - 8);
+      switch (walls) {
+        case 'concrete': {
+          // A tall slab with block seams, standing on the field edge.
+          const w = 14;
+          const wx = dir < 0 ? x - w : x;
+          g.fillStyle(0x5a5870, 1);
+          g.fillRect(wx, -400, w, H - h + 400);
+          g.fillStyle(0x7d7a96, 1);
+          g.fillRect(dir < 0 ? x - 3 : x, -400, 3, H - h + 400);
+          g.lineStyle(1, 0x2c2a3a, 0.9);
+          for (let y = H - h - 18, row = 0; y > -400; y -= 18, row++) {
+            g.lineBetween(wx, y, wx + w, y);
+            const sx = wx + (row % 2 === 0 ? w * 0.5 : w * 0.25);
+            g.lineBetween(sx, y, sx, y + 18);
+          }
+          break;
+        }
+        case 'bounce': {
+          // Rubber bumper posts with a spring coil.
+          const px = dir < 0 ? x - 5 : x + 5;
+          for (let k = 0; k < 4; k++) {
+            const y = H - h - 30 - k * 95;
+            g.fillStyle(0x2de38f, 0.95);
+            g.fillRoundedRect(px - 5, y - 40, 10, 40, 5);
+            g.lineStyle(2, 0xa7ffd9, 0.9);
+            g.beginPath();
+            for (let s = 0; s <= 8; s++) {
+              const yy = y + s * 6;
+              const xx = px + (s % 2 === 0 ? -5 : 5);
+              if (s === 0) g.moveTo(xx, yy);
+              else g.lineTo(xx, yy);
+            }
+            g.strokePath();
+          }
+          break;
+        }
+        case 'wrap': {
+          // Portal frame (the shimmer animates in edgeFx).
+          g.lineStyle(3, 0x7cf5ff, 0.6);
+          g.lineBetween(x, H - h, x, H - h - 520);
+          g.fillStyle(0x7cf5ff, 0.9);
+          g.fillRect(x - 4, H - h - 6, 8, 6);
+          break;
+        }
+        case 'open':
+        default: {
+          // Boundary fence.
+          for (let y = 0; y < 300; y += 14) {
+            const a = 0.55 * (1 - y / 300);
+            g.lineStyle(3, glow, a);
+            g.lineBetween(x, H - h - y, x, H - h - y - 8);
+          }
+          g.fillStyle(glow, 0.9);
+          g.fillRect(x - 3, H - h - 6, 6, 6);
+          break;
+        }
       }
-      g.fillStyle(glow, 0.9);
-      g.fillRect(x - 3, H - h - 6, 6, 6);
     }
     g.fillStyle(hexToInt(voidColor(this.theme, this.matSig !== '')), 1);
     g.fillRect(-2400, H, t.width + 4800, 900);
+  }
+
+  /** Animated parts of the walls (wrap-around portal shimmer). */
+  private drawEdgeFx(t: Terrain, walls: ConcreteWallMode, now: number): void {
+    const g = this.edgeFx;
+    g.clear();
+    if (walls !== 'wrap') return;
+    const H = t.height;
+    const still = this.opts.reducedMotion;
+    for (const [x, h] of [
+      [0, t.h[0]!],
+      [t.width, t.h[t.width - 1]!],
+    ] as const) {
+      for (let y = 0; y < 520; y += 16) {
+        const phase = still ? 0.5 : 0.5 + 0.5 * Math.sin(now / 240 - y / 40);
+        const a = (1 - y / 520) * (0.15 + 0.35 * phase);
+        g.lineStyle(10, 0x7cf5ff, a * 0.35);
+        g.lineBetween(x, H - h - y, x, H - h - y - 10);
+        g.lineStyle(2, 0xd8fdff, a);
+        g.lineBetween(x, H - h - y, x, H - h - y - 10);
+      }
+    }
   }
 
   override update(_time: number, deltaMs: number): void {
@@ -240,7 +378,7 @@ export class BattleScene extends Phaser.Scene {
 
     const dirty = this.opts.presenter.takeDirty();
     if (dirty) terrainLayer.invalidate(dirty.x0, dirty.x1);
-    for (const e of this.opts.presenter.takeFx()) this.handleFx(e, fx, terrainLayer);
+    for (const e of this.opts.presenter.takeFx()) this.handleFx(e, fx, terrainLayer, frame.terrain, now);
     terrainLayer.flush();
     this.maxTerrain = 0;
     for (let i = 0; i < W; i += 8) if (frame.terrain.h[i]! > this.maxTerrain) this.maxTerrain = frame.terrain.h[i]!;
@@ -248,29 +386,38 @@ export class BattleScene extends Phaser.Scene {
     this.updateCamera(frame, dt);
     const labelScale = Math.max(0.75, Math.min(2.4, 1 / Math.max(0.3, this.zoom)));
     const teams = getStateSnapshot<TanksPublicState>()?.battle.mode === 'teams';
+    const volleyAim = frame.turnMode === 'volley' && frame.stage === 'aim' && !frame.playing;
 
     // Tanks.
     const seen = new Set<string>();
+    const byId = new Map<string, DisplayTank>();
     for (const t of frame.tanks) {
       seen.add(t.id);
+      byId.set(t.id, t);
       let view = this.tanks.get(t.id);
       if (!view) {
         view = new TankView(this, this.worldLayer, t, DEPTH.tanks + t.slot * 0.01, this.dpr);
         this.tanks.set(t.id, view);
       }
+      const active =
+        frame.turnMode === 'volley'
+          ? volleyAim && !t.locked && t.alive && t.id === frame.myId
+          : frame.activeId === t.id && (frame.stage === 'aim' || frame.playing);
       view.update(t, {
         now,
         labelScale,
-        active: frame.activeId === t.id && (frame.stage === 'aim' || frame.playing),
+        active,
         me: frame.myId === t.id,
         wind: frame.wind,
         reducedMotion: this.opts.reducedMotion,
         worldH: H,
         terrain: frame.terrain,
         teams,
+        locked: volleyAim && t.locked && t.alive,
+        fxOff: this.opts.fx === 'off',
       });
       const px = this.lastX.get(t.id);
-      if (px !== undefined && Math.abs(px - t.x) > 0.05 && t.alive) {
+      if (px !== undefined && Math.abs(px - t.x) > 0.05 && Math.abs(px - t.x) < 40 && t.alive) {
         fx.drive(t.x, t.y, Math.sign(t.x - px));
         if (t.id === frame.myId) tankSfx.drive();
       }
@@ -286,21 +433,46 @@ export class BattleScene extends Phaser.Scene {
 
     // Projectiles.
     const live = new Set<number>();
+    let rolling = false;
     for (const p of frame.projectiles) {
       live.add(p.id);
+      if (p.kind === 'rolling') rolling = true;
       let s = this.shells.get(p.id);
       if (!s) {
-        const tint = WEAPON_TINT[p.kind] ?? 0xffffff;
+        const look = shellLook(p.kind);
+        const tint = p.kind === 'confetti' ? CONFETTI_TINTS[p.id % CONFETTI_TINTS.length]! : (WEAPON_TINT[p.kind] ?? 0xffffff);
+        const core = this.add
+          .image(0, 0, look.tex)
+          .setDisplaySize(look.size, look.size)
+          .setDepth(DEPTH.projectiles + 1);
+        if (look.tex !== 'tk-shell' || p.kind === 'confetti') core.setTint(tint);
         s = {
-          glow: this.add.image(0, 0, 'tk-glow').setBlendMode(Phaser.BlendModes.ADD).setTint(tint).setDisplaySize(30, 30).setDepth(DEPTH.projectiles),
-          core: this.add.image(0, 0, 'tk-shell').setDisplaySize(p.kind === 'bomblet' ? 4 : 6, p.kind === 'bomblet' ? 4 : 6).setDepth(DEPTH.projectiles + 1),
+          glow: this.add
+            .image(0, 0, 'tk-glow')
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setTint(tint)
+            .setDisplaySize(look.glow, look.glow)
+            .setDepth(DEPTH.projectiles)
+            .setAlpha(p.kind === 'tracer' ? 0.5 : 1),
+          core,
+          look,
+          lastX: p.x,
+          spin: 0,
         };
         this.worldLayer.add([s.glow, s.core]);
         this.shells.set(p.id, s);
+        if (p.kind === 'meteor') tankSfx.meteor();
       }
-      const ang = Math.atan2(-p.dy, p.dx);
-      s.core.setPosition(p.x, H - p.y).setRotation(ang);
+      if (s.look.spin) {
+        // Rolls: spin by distance travelled.
+        s.spin += (p.x - s.lastX) / Math.max(2, s.look.size / 2);
+        s.lastX = p.x;
+        s.core.setPosition(p.x, H - p.y - (p.kind === 'rolling' ? s.look.size / 2 - 1 : 0)).setRotation(s.spin);
+      } else {
+        s.core.setPosition(p.x, H - p.y).setRotation(Math.atan2(-p.dy, p.dx));
+      }
       s.glow.setPosition(p.x, H - p.y);
+      if (p.kind === 'meteor' && !this.opts.reducedMotion) s.glow.setAlpha(0.8 + 0.2 * Math.sin(now / 50 + p.id));
     }
     for (const [id, s] of this.shells) {
       if (!live.has(id)) {
@@ -309,29 +481,47 @@ export class BattleScene extends Phaser.Scene {
         this.shells.delete(id);
       }
     }
+    if (rolling) tankSfx.roll();
     fx.update(now, frame.projectiles, labelScale);
+    this.fires!.update(now, frame.fires, frame.terrain, fx);
+    const labelLift = 27 * Math.min(1.4, Math.max(0.8, labelScale));
+    this.bubbles!.update(now, frame.quips, byId, (t) => H - t.y - labelLift - 16 * labelScale, labelScale);
+    this.drawEdgeFx(frame.terrain, frame.walls, now);
 
     this.drawOverlay(frame, labelScale, now);
 
-    // Victory fireworks over the winners.
-    if (frame.over && !this.celebrated) {
-      this.celebrated = true;
-      const s = getStateSnapshot<TanksPublicState>();
-      const winners = (s?.battle.winners ?? '').split(',').filter(Boolean);
-      const w = frame.tanks.find((t) => winners.includes(t.id));
-      if (w) fx.celebrateAt(w.x, w.y, s?.battle.winnerTeam !== undefined && s.battle.winnerTeam >= 0 ? hexToInt(TEAM_TINT[s.battle.winnerTeam] ?? '#ffd23f') : hexToInt(w.color), this.opts.reducedMotion ? 3000 : 6000);
+    // Battle / match winner fireworks.
+    const s = getStateSnapshot<TanksPublicState>();
+    const won = frame.stage === 'battle_over' || frame.over;
+    const key = won ? `${frame.battleSerial}:${frame.stage}` : '';
+    if (won && this.celebrated !== key && s?.battle.winners) {
+      this.celebrated = key;
+      const winners = s.battle.winners.split(',').filter(Boolean);
+      const w = frame.tanks.find((t) => winners.includes(t.id) && t.alive) ?? frame.tanks.find((t) => winners.includes(t.id));
+      if (w)
+        fx.celebrateAt(
+          w.x,
+          w.y,
+          s.battle.winnerTeam >= 0 ? hexToInt(TEAM_TINT[s.battle.winnerTeam] ?? '#ffd23f') : hexToInt(w.color),
+          this.opts.reducedMotion ? 3000 : 6000,
+        );
     }
-    if (!frame.over) this.celebrated = false;
+    if (!won) this.celebrated = '';
 
     const bgCam = this.cameras.main;
-    this.sky!.update(now, dt / 1000, {
-      w: bgCam.width,
-      h: bgCam.height,
-      camX: this.camX,
-      zoom: this.zoom * this.dpr,
-      screenY: (wy: number) => (H - wy - this.camTop) * this.zoom * this.dpr,
-      worldWidth: W,
-    }, frame.wind);
+    this.sky!.update(
+      now,
+      dt / 1000,
+      {
+        w: bgCam.width,
+        h: bgCam.height,
+        camX: this.camX,
+        zoom: this.zoom * this.dpr,
+        screenY: (wy: number) => (H - wy - this.camTop) * this.zoom * this.dpr,
+        worldWidth: W,
+      },
+      frame.wind,
+    );
 
     if (!this.ready) {
       this.ready = true;
@@ -340,44 +530,111 @@ export class BattleScene extends Phaser.Scene {
     this.watchPerformance(dt, now);
   }
 
-  private handleFx(e: FxEvent, fx: Effects, terrain: TerrainLayer): void {
-    const shakeOk = !this.opts.reducedMotion && this.opts.fx !== 'off';
+  private shake(ms: number, intensity: number): void {
+    if (this.opts.reducedMotion || this.opts.fx === 'off') return;
+    this.worldCam.shake(ms, intensity);
+  }
+
+  /** A full-screen flash (nukes, lightning) — never under reduced motion or with effects off. */
+  private screenFlash(ms: number, rgb: [number, number, number]): void {
+    if (this.opts.reducedMotion || this.opts.fx === 'off') return;
+    this.worldCam.flash(ms, rgb[0], rgb[1], rgb[2], false);
+  }
+
+  private handleFx(e: FxEvent, fx: Effects, terrain: TerrainLayer, t: Terrain, now: number): void {
     switch (e.kind) {
       case 'launch':
         fx.launch(e.x, e.y, e.angle, e.weapon);
         tankSfx.fire(e.weapon);
-        if (shakeOk && e.weapon === 'heavy') this.worldCam.shake(120, 0.002);
+        if (e.weapon === 'heavy' || e.weapon === 'nuke' || e.weapon === 'mininuke') this.shake(120, 0.002);
         break;
       case 'whistle':
-        tankSfx.whistle(e.durMs);
+        tankSfx.whistle(e.durMs, e.weapon);
         break;
-      case 'boom':
+      case 'boom': {
         fx.boom(e.x, e.y, e.r, e.w, e.terrain, Boolean(e.direct));
         if (e.terrain === 'crater') terrain.invalidate(e.x - e.r * 1.4, e.x + e.r * 1.4);
         tankSfx.boom(e.r, e.w, e.terrain);
-        // Reduced motion: no camera shake — the blast's own flash and shockwave carry the impact.
-        if (shakeOk && e.terrain !== 'dirt') this.worldCam.shake(180 + e.r * 3, Math.min(0.012, 0.0022 + e.r / 9000));
+        if (e.w === 'nuke' || e.w === 'mininuke') {
+          this.screenFlash(e.w === 'nuke' ? 520 : 360, [255, 246, 220]);
+          this.shake(e.w === 'nuke' ? 1100 : 750, e.w === 'nuke' ? 0.02 : 0.014);
+        } else if (e.terrain !== 'dirt' && e.r > 0 && e.w !== 'excavator') {
+          this.shake(180 + e.r * 3, Math.min(0.012, 0.0022 + e.r / 9000));
+        }
         break;
+      }
       case 'bore':
-        fx.bore(e.x0, e.y0, e.x1, e.y1, e.durMs, performance.now());
-        tankSfx.drill(e.durMs);
+        fx.bore(e.x0, e.y0, e.x1, e.y1, e.durMs, now);
+        if (e.durMs > 100) tankSfx.drill(e.durMs);
+        break;
+      case 'patch':
+        fx.mud(e.x0, e.x1, (x) => heightAt(t, x));
+        terrain.invalidate(e.x0, e.x1);
+        tankSfx.mud();
         break;
       case 'split':
-        fx.split(e.x, e.y);
-        tankSfx.split();
+        fx.split(e.x, e.y, e.w);
+        tankSfx.split(e.w);
+        break;
+      case 'fire':
+        tankSfx.napalm(e.dur, e.hot);
+        break;
+      case 'beam':
+        fx.beam(e.x0, e.y0, e.x1, e.y1, e.w, now);
+        tankSfx.beam(e.w);
+        if (e.w === 'lightning') this.screenFlash(160, [220, 235, 255]);
+        if (e.w !== 'railgun') this.shake(e.w === 'skylance' ? 420 : 200, e.w === 'skylance' ? 0.009 : 0.005);
+        break;
+      case 'mark':
+        tankSfx.lanceMark();
         break;
       case 'damage':
-        fx.damage(e.x, e.y, e.amount, e.src);
-        tankSfx.hit();
+        fx.damage(e.x, e.y, e.amount, e.src, 0);
+        if (e.src === 'burn') tankSfx.burn();
+        else tankSfx.hit();
+        break;
+      case 'shield':
+        fx.shieldHit(e.x, e.y, e.shieldKind, e.broke);
+        if (!e.broke) fx.absorbed(e.x, e.y, e.absorbed);
+        if (e.broke) tankSfx.shieldBreak();
+        else tankSfx.shieldHit();
+        break;
+      case 'deflect':
+        fx.deflect(e.x, e.y);
+        tankSfx.deflect();
+        break;
+      case 'chute':
+        fx.chute(e.x, e.y);
+        tankSfx.chute();
+        break;
+      case 'warp':
+        fx.warp(e.x0, e.y0, e.x1, e.y1, hexToInt(e.color), now);
+        tankSfx.warp();
         break;
       case 'death':
         fx.death(e.id, e.x, e.y, e.color);
         tankSfx.death();
-        if (shakeOk) this.worldCam.shake(420, 0.01);
+        this.shake(420, 0.01);
+        break;
+      case 'quip':
+        tankSfx.quip();
         break;
       case 'land':
         fx.land(e.x, e.y, e.drop);
         tankSfx.land(e.drop);
+        break;
+      case 'portal':
+        fx.portal(e.x, e.y);
+        tankSfx.portal();
+        break;
+      case 'item':
+        fx.item(e.x, e.y, e.item);
+        if (e.item === 'battery') tankSfx.battery();
+        else if (e.item === 'fuel') tankSfx.fuel();
+        else tankSfx.shieldUp();
+        break;
+      case 'hazard':
+        tankSfx.hazardWarn();
         break;
       case 'lost':
         fx.lost(e.x, e.y);
@@ -386,29 +643,49 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  /** Aim guide for my turret + off-screen projectile markers. */
+  /** Aim guide for my turret, shot ghosts, tracer lines, lance markers + off-screen markers. */
   private drawOverlay(frame: BattleFrame, labelScale: number, now: number): void {
     const g = this.overlay;
     g.clear();
     const H = frame.terrain.height;
+    const s = Math.min(2, labelScale);
     const me = frame.myId ? frame.tanks.find((t) => t.id === frame.myId) : undefined;
-    const myTurn = me && frame.activeId === me.id && frame.stage === 'aim';
-    if (me && me.alive && !frame.playing && frame.stage !== 'over') {
+    const myTurn = me && me.alive && frame.stage === 'aim' && (frame.turnMode === 'volley' ? !me.locked : frame.activeId === me.id);
+
+    // Tracer ghosts: every tracer fired this battle stays as a dotted line (mine brighter).
+    for (const gh of frame.tracers) {
+      const tank = frame.tanks.find((t) => t.id === gh.owner);
+      const mine = gh.owner === frame.myId;
+      g.fillStyle(tank ? hexToInt(tank.color) : 0x9df7ff, mine ? 0.55 : 0.28);
+      for (const pts of gh.segs) for (let i = 0; i < pts.length - 1; i += 6) g.fillCircle(pts[i]!, H - pts[i + 1]!, (mine ? 1.5 : 1.1) * s);
+    }
+
+    if (me && me.alive && !frame.playing && frame.stage !== 'over' && frame.stage !== 'battle_over') {
       // Ghost of my previous shot: a faint dotted reference for adjusting the next one.
       const ghost = this.opts.presenter.lastPaths.get(me.id);
       if (ghost && myTurn) {
-        const step = 8;
         g.fillStyle(hexToInt(me.color), 0.32);
-        for (let i = step; i < ghost.length - 1; i += step) g.fillCircle(ghost[i]!, H - ghost[i + 1]!, 1.3 * Math.min(2, labelScale));
+        for (const pts of ghost) for (let i = 8; i < pts.length - 1; i += 8) g.fillCircle(pts[i]!, H - pts[i + 1]!, 1.3 * s);
       }
-      const pts = previewArc(me, me.angle, me.power, 0.34);
-      const alpha = myTurn ? 0.95 : 0.35;
-      const color = myTurn ? 0xffd23f : 0xd3cdf0;
-      for (let i = 2; i < pts.length; i += 2) {
-        const k = 1 - i / pts.length;
-        const r = (1.2 + k * 1.6) * Math.min(2, labelScale);
-        g.fillStyle(color, alpha * (0.25 + k * 0.75));
-        g.fillCircle(pts[i]!, H - pts[i + 1]!, r);
+      if (me.weapon === 'railgun') {
+        // The railgun flies straight: show a short straight sight line instead of an arc.
+        const rad = (me.angle * Math.PI) / 180;
+        const ox = me.x;
+        const oy = me.y + 13;
+        for (let d = 24; d < 150; d += 9) {
+          const k = 1 - d / 150;
+          g.fillStyle(myTurn ? 0x7cf5ff : 0xd3cdf0, (myTurn ? 0.9 : 0.35) * (0.25 + k * 0.75));
+          g.fillCircle(ox + Math.cos(rad) * d, H - (oy + Math.sin(rad) * d), (1 + k * 1.4) * s);
+        }
+      } else {
+        const pts = previewArc(me, me.angle, me.power, 0.34, 4, frame.gravity);
+        const alpha = myTurn ? 0.95 : 0.35;
+        const color = myTurn ? 0xffd23f : 0xd3cdf0;
+        for (let i = 2; i < pts.length; i += 2) {
+          const k = 1 - i / pts.length;
+          g.fillStyle(color, alpha * (0.25 + k * 0.75));
+          g.fillCircle(pts[i]!, H - pts[i + 1]!, (1.2 + k * 1.6) * s);
+        }
       }
       if (myTurn && !this.opts.reducedMotion) {
         const pulse = 0.5 + 0.5 * Math.sin(now / 260);
@@ -416,6 +693,27 @@ export class BattleScene extends Phaser.Scene {
         g.strokeCircle(me.x, H - me.y - 10, 26 + pulse * 3);
       }
     }
+
+    // Sky Lance markers: a turning reticle and a thin targeting line from the sky.
+    for (const m of frame.marks) {
+      const k = Math.min(1, (now - m.start) / Math.max(1, m.until - m.start));
+      const spin = this.opts.reducedMotion ? 0 : now / 300;
+      const r = (22 - k * 8) * s;
+      g.lineStyle(2 * s, 0xc4a5ff, 0.9);
+      g.strokeCircle(m.x, H - m.y, r);
+      for (let i = 0; i < 4; i++) {
+        const a = spin + (i * Math.PI) / 2;
+        g.lineBetween(
+          m.x + Math.cos(a) * r * 0.6,
+          H - m.y + Math.sin(a) * r * 0.6,
+          m.x + Math.cos(a) * r * 1.35,
+          H - m.y + Math.sin(a) * r * 1.35,
+        );
+      }
+      g.lineStyle(1, 0xc4a5ff, 0.25 + 0.35 * k);
+      g.lineBetween(m.x, H - m.y - r, m.x, H - m.y - 900);
+    }
+
     // Tanks outside the view (small screens follow the action): edge arrows in their colour.
     const view = this.worldCam.worldView;
     const vx0 = view.x;
@@ -424,16 +722,24 @@ export class BattleScene extends Phaser.Scene {
     for (const t of frame.tanks) {
       if (!t.alive || (t.x >= vx0 - 4 && t.x <= vx1 + 4)) continue;
       const left = t.x < vx0;
-      const s = labelScale;
-      const ex = left ? vx0 + 16 * s : vx1 - 16 * s;
-      const ey = Math.max(view.y + (this.insetTop * this.dpr) / this.worldCam.zoom + 30 * s, Math.min(view.bottom - (this.insetBottom * this.dpr) / this.worldCam.zoom - 20 * s, H - t.y - 12));
+      const ls = labelScale;
+      const ex = left ? vx0 + 16 * ls : vx1 - 16 * ls;
+      const ey = Math.max(
+        view.y + (this.insetTop * this.dpr) / this.worldCam.zoom + 30 * ls,
+        Math.min(view.bottom - (this.insetBottom * this.dpr) / this.worldCam.zoom - 20 * ls, H - t.y - 12),
+      );
       const dir = left ? -1 : 1;
       g.fillStyle(0x07050f, 0.85);
-      g.fillTriangle(ex + dir * 12 * s, ey, ex - dir * 4 * s, ey - 11 * s, ex - dir * 4 * s, ey + 11 * s);
+      g.fillTriangle(ex + dir * 12 * ls, ey, ex - dir * 4 * ls, ey - 11 * ls, ex - dir * 4 * ls, ey + 11 * ls);
       g.fillStyle(hexToInt(t.color), 1);
-      g.fillTriangle(ex + dir * 9 * s, ey, ex - dir * 2 * s, ey - 8 * s, ex - dir * 2 * s, ey + 8 * s);
+      g.fillTriangle(ex + dir * 9 * ls, ey, ex - dir * 2 * ls, ey - 8 * ls, ex - dir * 2 * ls, ey + 8 * ls);
       const label = this.edgeLabel(used++);
-      label.setText(t.id === frame.myId ? 'YOU' : t.name).setPosition(ex - dir * 8 * s, ey).setOrigin(left ? 0 : 1, 0.5).setScale(s).setVisible(true);
+      label
+        .setText(t.id === frame.myId ? 'YOU' : t.name)
+        .setPosition(ex - dir * 8 * ls, ey)
+        .setOrigin(left ? 0 : 1, 0.5)
+        .setScale(ls)
+        .setVisible(true);
     }
     for (let i = used; i < this.edgeLabels.length; i++) this.edgeLabels[i]!.setVisible(false);
 
@@ -443,11 +749,11 @@ export class BattleScene extends Phaser.Scene {
       const py = H - p.y;
       if (py >= topLimit) continue;
       const x = Math.max(view.x + 20, Math.min(view.right - 20, p.x));
-      const s = labelScale;
-      g.fillStyle(WEAPON_TINT[p.kind] ?? 0xffffff, 0.95);
-      g.fillTriangle(x, topLimit + 2 * s, x - 7 * s, topLimit + 14 * s, x + 7 * s, topLimit + 14 * s);
+      const ls = labelScale;
+      g.fillStyle(p.kind === 'confetti' ? CONFETTI_TINTS[p.id % CONFETTI_TINTS.length]! : (WEAPON_TINT[p.kind] ?? 0xffffff), 0.95);
+      g.fillTriangle(x, topLimit + 2 * ls, x - 7 * ls, topLimit + 14 * ls, x + 7 * ls, topLimit + 14 * ls);
       g.fillStyle(0x07050f, 0.8);
-      g.fillRect(x - 1.5 * s, topLimit + 14 * s, 3 * s, 6 * s);
+      g.fillRect(x - 1.5 * ls, topLimit + 14 * ls, 3 * ls, 6 * ls);
     }
   }
 
@@ -457,7 +763,14 @@ export class BattleScene extends Phaser.Scene {
     let t = this.edgeLabels[i];
     if (!t) {
       t = this.add
-        .text(0, 0, '', { fontFamily: DISPLAY_FONT, fontSize: '12px', color: '#f8f6ff', stroke: '#07050f', strokeThickness: 4, resolution: this.dpr * 2 })
+        .text(0, 0, '', {
+          fontFamily: DISPLAY_FONT,
+          fontSize: '12px',
+          color: '#f8f6ff',
+          stroke: '#07050f',
+          strokeThickness: 4,
+          resolution: this.dpr * 2,
+        })
         .setDepth(DEPTH.overlay + 1);
       this.worldLayer.add(t);
       this.edgeLabels.push(t);
@@ -554,7 +867,9 @@ export class BattleScene extends Phaser.Scene {
     if (p.slow < 2 || p.level >= 2) return;
     p.slow = 0;
     p.level++;
-    if (p.level === 1) this.fx?.degrade();
-    else this.opts.onDegrade?.();
+    if (p.level === 1) {
+      this.fx?.degrade();
+      this.fires?.degrade();
+    } else this.opts.onDegrade?.();
   }
 }

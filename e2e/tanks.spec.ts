@@ -12,12 +12,22 @@ async function press(page: Page, name: string): Promise<void> {
   else await button.click();
 }
 
+/** Host settings (the lobby's own message). */
+async function configure(page: Page, settings: Record<string, unknown>): Promise<void> {
+  await page.evaluate((s) => (window as any).__DASCADE__.session.lobby.settings(s), settings);
+  await expect.poll(async () => JSON.parse((await roomState(page))?.settingsJson ?? '{}').battles).toBe(settings.battles ?? 3);
+}
+
+/** One battle with the stocked loadout: no shop, straight into the fight. */
+const QUICK = { battles: 1, economy: 'stocked' };
+
 test.describe('DAS Tanks', () => {
   test('two players: aim, fire, the shell resolves on the server and the turn passes', async ({ page, browser }) => {
     test.setTimeout(120_000);
     const code = await createRoom(page, 'tanks', 'Host');
     const guest = await joinRoom(browser, code, 'Guest');
     await expect.poll(async () => Object.keys((await roomState(page))?.players ?? {}).length).toBe(2);
+    await configure(page, QUICK);
     await startGame(page);
     await waitForPhase(page, 'PLAYING', 20_000);
     await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('aim');
@@ -69,6 +79,7 @@ test.describe('DAS Tanks', () => {
   test('solo vs a CPU tank: the CPU gunner fires back', async ({ page }) => {
     test.setTimeout(120_000);
     await createRoom(page, 'tanks', 'Solo', { solo: true });
+    await configure(page, QUICK);
     await startGame(page);
     await waitForPhase(page, 'PLAYING', 20_000);
     const me = await myPlayerId(page);
@@ -90,6 +101,61 @@ test.describe('DAS Tanks', () => {
         { timeout: 60_000, intervals: [500] },
       )
       .toBeGreaterThan(0);
+    await leaveRoom(page);
+  });
+
+  test('the shop: buy, sell back, ready up — and the battle begins', async ({ page }) => {
+    test.setTimeout(120_000);
+    await createRoom(page, 'tanks', 'Shopper', { solo: true });
+    await configure(page, { battles: 3, economy: 'shop', startCredits: 20_000 });
+    await startGame(page);
+    await waitForPhase(page, 'PLAYING', 20_000);
+    await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('shop');
+    const me = await myPlayerId(page);
+    const credits = async () => (await roomState(page))?.fleet?.[me]?.credits as number;
+    const shop = page.locator('[data-part="shop"]');
+    await expect(shop).toBeVisible();
+    expect(await credits()).toBe(20_000);
+
+    await press(page, 'Buy Heavy Shell');
+    await expect.poll(credits).toBeLessThan(20_000);
+    await expect.poll(async () => (await roomState(page))?.fleet?.[me]?.ammo?.heavy).toBeGreaterThan(0);
+    await press(page, 'Sell back Heavy Shell');
+    await expect.poll(credits).toBe(20_000);
+    await page.getByRole('tab', { name: /Defense/ }).click();
+    await press(page, 'Buy Shield');
+    await expect.poll(async () => (await roomState(page))?.fleet?.[me]?.items?.shield).toBe(1);
+
+    await page.locator('[data-part="shop-ready"]').click();
+    await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).not.toBe('shop');
+    await expect(shop).toBeHidden();
+    await expect.poll(async () => ['aim', 'resolving', 'idle'].includes((await roomState(page))?.battle?.stage), { timeout: 15_000 }).toBe(true);
+    await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
+    await leaveRoom(page);
+  });
+
+  test('volley mode: both crews lock in and every shot flies together', async ({ page, browser }) => {
+    test.setTimeout(120_000);
+    const code = await createRoom(page, 'tanks', 'Host');
+    const guest = await joinRoom(browser, code, 'Guest');
+    await expect.poll(async () => Object.keys((await roomState(page))?.players ?? {}).length).toBe(2);
+    await configure(page, { ...QUICK, turnMode: 'volley' });
+    await startGame(page);
+    await waitForPhase(page, 'PLAYING', 20_000);
+    await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('aim');
+    expect((await roomState(page)).battle.activeId).toBe('');
+    // Both crews can fire right away.
+    await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled();
+    await expect(guest.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled();
+    await press(page, 'Fire');
+    const hostId = await myPlayerId(page);
+    await expect.poll(async () => (await roomState(guest))?.tanks?.[hostId]?.locked, { timeout: 10_000 }).toBe(true);
+    await press(guest, 'Fire');
+    await expect.poll(async () => (await roomState(page))?.battle?.shotSeq, { timeout: 10_000 }).toBe(1);
+    const s = await roomState(page);
+    expect(Object.values(s.tanks as Record<string, { shots: number }>).every((t) => t.shots === 1)).toBe(true);
+    await leaveRoom(guest);
+    await guest.context().close();
     await leaveRoom(page);
   });
 });

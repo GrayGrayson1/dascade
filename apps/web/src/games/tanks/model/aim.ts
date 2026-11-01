@@ -1,8 +1,11 @@
 /**
  * AimController — the local player's gunner console. Holds my aim (angle, power, weapon),
- * streams it to the server while it's my turn (throttled), drives in held steps, fires with
- * the current turn id, and owns the keyboard bindings. Players may pre-aim during other
- * turns; the aim is pushed the moment their turn starts.
+ * streams it to the server while I may act (throttled), drives in held steps, switches on
+ * items, fires with the current turn id, and owns the keyboard bindings.
+ *
+ * Turns mode: I act on my own turn. Volley mode: everyone acts during the shared aim window
+ * until they lock in (FIRE = lock in). Players may pre-aim at any time; the aim is pushed the
+ * moment they may act. Weapons cycle over what my crew owns (fleet inventory).
  */
 import {
   ANGLE_MAX,
@@ -10,25 +13,112 @@ import {
   POWER_MAX,
   POWER_MIN,
   TANKS_MSG,
-  WEAPON_IDS,
+  emptyAmmo,
+  emptyItems,
+  type Ammo,
+  type BattleStage,
+  type Items,
+  type ShieldKind,
   type TanksPublicState,
+  type UsableItemId,
   type WeaponId,
 } from '@dascade/shared/games/tanks';
 import { getStateSnapshot, session, subscribeState, useSessionStore } from '../../../net/session.ts';
+import { bestShield, ownedWeapons } from '../shop/helpers.ts';
+
+/** What my tank and crew look like right now (pure read of the room state). */
+export interface AimView {
+  /** I have a live tank in this battle. */
+  inBattle: boolean;
+  /** I may aim, drive, use items and fire right now (before any local "already fired"). */
+  acting: boolean;
+  volley: boolean;
+  /** Volley: the server has my shot locked in. */
+  locked: boolean;
+  stage: BattleStage;
+  turnId: number;
+  /** Changes with every battlefield built. */
+  serial: number;
+  ammo: Ammo;
+  items: Items;
+  fuel: number;
+  maxFuel: number;
+  shield: number;
+  shieldMax: number;
+  shieldKind: ShieldKind;
+  hp: number;
+  maxHp: number;
+  buried: boolean;
+  /** My tank's aim as the server knows it. */
+  tankAim: { angle: number; power: number; weapon: WeaponId };
+}
+
+export function readAimView(s: TanksPublicState | null | undefined, me: string | null | undefined): AimView | null {
+  const b = s?.battle;
+  const mine = me && s?.tanks ? s.tanks[me] : undefined;
+  if (!s || !b || !mine || !me) return null;
+  const crew = s.fleet?.[me];
+  const volley = b.turnMode === 'volley';
+  const alive = mine.alive && !mine.gone;
+  const acting = s.phase === 'PLAYING' && b.stage === 'aim' && alive && (volley ? !mine.locked : b.activeId === me);
+  return {
+    inBattle: alive,
+    acting,
+    volley,
+    locked: volley && Boolean(mine.locked),
+    stage: b.stage,
+    turnId: b.turnId,
+    serial: b.battleSerial ?? 0,
+    ammo: crew?.ammo ?? emptyAmmo(),
+    items: crew?.items ?? emptyItems(),
+    fuel: mine.fuel,
+    maxFuel: mine.maxFuel,
+    shield: mine.shield ?? 0,
+    shieldMax: mine.shieldMax ?? 0,
+    shieldKind: mine.shieldKind ?? '',
+    hp: mine.hp,
+    maxHp: mine.maxHp,
+    buried: (mine.buried ?? 0) > 0,
+    tankAim: { angle: mine.angle, power: mine.power, weapon: mine.weapon },
+  };
+}
+
+/** Why an item can't be switched on right now (null = it can). */
+export function itemBlock(
+  item: UsableItemId,
+  v: Pick<AimSnapshot, 'items' | 'hp' | 'maxHp' | 'maxFuel' | 'canAct' | 'inBattle' | 'locked' | 'volley'>,
+): string | null {
+  if ((v.items[item] ?? 0) <= 0) return 'None left';
+  if (!v.inBattle) return 'Not in battle';
+  if (v.volley && v.locked) return 'Locked in';
+  if (!v.canAct) return v.volley ? 'Wait for the next volley' : 'Wait for your turn';
+  if (item === 'battery' && v.hp >= v.maxHp) return 'Armor is full';
+  if (item === 'fuel' && v.maxFuel <= 0) return 'Driving is off';
+  return null;
+}
 
 export interface AimSnapshot {
   angle: number;
   power: number;
   weapon: WeaponId;
-  /** It's my turn and I can act. */
+  /** I may act and haven't fired / locked in yet. */
   canAct: boolean;
   /** I have a live tank in this battle. */
   inBattle: boolean;
-  /** Shot sent, waiting for the server. */
+  /** Shot sent (turns) or locked in (volley), waiting for it to fly. */
   firing: boolean;
-  ammo: Record<WeaponId, number>;
+  volley: boolean;
+  locked: boolean;
+  ammo: Ammo;
+  items: Items;
   fuel: number;
   maxFuel: number;
+  shield: number;
+  shieldMax: number;
+  shieldKind: ShieldKind;
+  hp: number;
+  maxHp: number;
+  buried: boolean;
   moving: -1 | 0 | 1;
   turnId: number;
 }
@@ -44,24 +134,36 @@ export class AimController {
     canAct: false,
     inBattle: false,
     firing: false,
-    ammo: { shell: -1, heavy: 0, cluster: 0, airburst: 0, driller: 0, dirt: 0 },
+    volley: false,
+    locked: false,
+    ammo: emptyAmmo(),
+    items: emptyItems(),
     fuel: 0,
     maxFuel: 0,
+    shield: 0,
+    shieldMax: 0,
+    shieldKind: '',
+    hp: 0,
+    maxHp: 0,
+    buried: false,
     moving: 0,
     turnId: 0,
   };
   private listeners = new Set<() => void>();
-  private battleKey = '';
+  private battleKey = -1;
   private sentTurn = -1;
   private firedTurn = -1;
   private dirty = false;
   private lastSent = 0;
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   private moveTimer: ReturnType<typeof setInterval> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private unsubs: Array<() => void> = [];
   /** Called on fire (for immediate local feedback). */
   onFire: (() => void) | null = null;
   onBlocked: ((why: string) => void) | null = null;
+  /** Called when an item was sent to the server. */
+  onItem: ((item: UsableItemId) => void) | null = null;
 
   start(): void {
     this.unsubs.push(subscribeState(() => this.sync()));
@@ -73,7 +175,9 @@ export class AimController {
     this.unsubs = [];
     this.stopMove();
     if (this.sendTimer) clearTimeout(this.sendTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
     this.sendTimer = null;
+    this.retryTimer = null;
     this.listeners.clear();
   }
 
@@ -102,39 +206,49 @@ export class AimController {
   private sync(): void {
     const s = getStateSnapshot<TanksPublicState>();
     const me = useSessionStore.getState().playerId;
-    const b = s?.battle;
-    const mine = me && s?.tanks ? s.tanks[me] : undefined;
-    if (!s || !b || !mine) {
-      if (this.snap.inBattle || this.snap.canAct) this.set({ inBattle: false, canAct: false, firing: false });
+    const v = readAimView(s, me);
+    if (!v) {
+      if (this.snap.inBattle || this.snap.canAct || this.snap.firing)
+        this.set({ inBattle: false, canAct: false, firing: false, locked: false });
       this.stopMove();
       return;
     }
-    const key = `${b.theme}:${b.terrain.slice(0, 32)}`;
-    // First sight of this battle (fresh mount / page reload) or a brand-new battle: adopt my tank's aim.
-    if (this.battleKey === '' || (key !== this.battleKey && b.shotSeq === 0)) {
-      this.battleKey = key;
+    // A brand-new battlefield (or first sight of this one): adopt my tank's aim.
+    if (v.serial !== this.battleKey) {
+      this.battleKey = v.serial;
       this.sentTurn = -1;
       this.firedTurn = -1;
-      this.set({ angle: mine.angle, power: mine.power, weapon: mine.weapon });
+      this.set({ angle: v.tankAim.angle, power: v.tankAim.power, weapon: v.tankAim.weapon });
     }
-    const myTurn = s.phase === 'PLAYING' && b.stage === 'aim' && b.activeId === me && mine.alive;
     let weapon = this.snap.weapon;
-    if (mine.ammo[weapon] === 0) weapon = 'shell';
+    if ((v.ammo[weapon] ?? 0) === 0 && weapon !== 'shell') weapon = 'shell';
+    const sentThisTurn = this.firedTurn === v.turnId;
+    const canAct = v.acting && !sentThisTurn;
+    const firing = v.stage === 'aim' && v.inBattle && (v.locked || (sentThisTurn && (v.acting || v.volley)));
     this.set({
-      inBattle: mine.alive && !mine.gone,
-      canAct: myTurn && this.firedTurn !== b.turnId,
-      firing: myTurn && this.firedTurn === b.turnId,
-      ammo: mine.ammo,
-      fuel: mine.fuel,
-      maxFuel: mine.maxFuel,
-      turnId: b.turnId,
+      inBattle: v.inBattle,
+      canAct,
+      firing,
+      volley: v.volley,
+      locked: v.locked,
+      ammo: v.ammo,
+      items: v.items,
+      fuel: v.fuel,
+      maxFuel: v.maxFuel,
+      shield: v.shield,
+      shieldMax: v.shieldMax,
+      shieldKind: v.shieldKind,
+      hp: v.hp,
+      maxHp: v.maxHp,
+      buried: v.buried,
+      turnId: v.turnId,
       weapon,
     });
-    if (!myTurn) this.stopMove();
-    // My turn just started: push my (pre-)aim right away.
-    if (myTurn && this.sentTurn !== b.turnId) {
-      this.sentTurn = b.turnId;
-      if (mine.angle !== this.snap.angle || mine.power !== this.snap.power || mine.weapon !== this.snap.weapon) {
+    if (!canAct || v.buried) this.stopMove();
+    // I may act from now on: push my (pre-)aim right away.
+    if (canAct && this.sentTurn !== v.turnId) {
+      this.sentTurn = v.turnId;
+      if (v.tankAim.angle !== this.snap.angle || v.tankAim.power !== this.snap.power || v.tankAim.weapon !== this.snap.weapon) {
         this.dirty = true;
         this.flush(true);
       }
@@ -165,7 +279,7 @@ export class AimController {
   }
 
   setWeapon(w: WeaponId): void {
-    if (this.snap.ammo[w] === 0) {
+    if (w !== 'shell' && (this.snap.ammo[w] ?? 0) === 0) {
       this.onBlocked?.('Out of that ammo');
       return;
     }
@@ -175,8 +289,8 @@ export class AimController {
   }
 
   cycleWeapon(dir: 1 | -1 = 1): void {
-    const list = WEAPON_IDS.filter((w) => this.snap.ammo[w] !== 0);
-    if (list.length === 0) return;
+    const list = ownedWeapons(this.snap.ammo);
+    if (list.length <= 1 && list[0] === this.snap.weapon) return;
     const i = list.indexOf(this.snap.weapon);
     const next = list[(i + dir + list.length) % list.length]!;
     this.setWeapon(next);
@@ -200,11 +314,41 @@ export class AimController {
   }
 
   // ---------------------------------------------------------------------------
+  // Items
+  // ---------------------------------------------------------------------------
+
+  /** Switch on an item. Returns false (and says why) when it can't be used now. */
+  useItem(item: UsableItemId): boolean {
+    const why = itemBlock(item, this.snap);
+    if (why) {
+      this.onBlocked?.(why);
+      return false;
+    }
+    session.send(TANKS_MSG.item, { item, turnId: this.snap.turnId });
+    this.onItem?.(item);
+    return true;
+  }
+
+  /** Key S: the strongest shield in stock. */
+  useBestShield(): boolean {
+    const id = bestShield(this.snap.items);
+    if (!id) {
+      this.onBlocked?.('No shields in stock');
+      return false;
+    }
+    return this.useItem(id);
+  }
+
+  // ---------------------------------------------------------------------------
   // Drive + fire
   // ---------------------------------------------------------------------------
 
   startMove(dir: -1 | 1): void {
     if (!this.snap.canAct) return;
+    if (this.snap.buried) {
+      this.onBlocked?.('Buried — dig out first');
+      return;
+    }
     if (this.snap.fuel <= 0) {
       this.onBlocked?.(this.snap.maxFuel > 0 ? 'Out of fuel this turn' : 'Driving is off in this battle');
       return;
@@ -213,7 +357,7 @@ export class AimController {
     this.stopMove();
     this.set({ moving: dir });
     const step = () => {
-      if (!this.snap.canAct || this.snap.fuel <= 0) {
+      if (!this.snap.canAct || this.snap.fuel <= 0 || this.snap.buried) {
         this.stopMove();
         return;
       }
@@ -229,6 +373,7 @@ export class AimController {
     if (this.snap.moving !== 0) this.set({ moving: 0 });
   }
 
+  /** Fire (turns) or lock in (volley). */
   fire(): boolean {
     if (!this.snap.canAct) return false;
     this.stopMove();
@@ -239,9 +384,12 @@ export class AimController {
     this.onFire?.();
     // If the server refuses (e.g. a stale turn), re-enable after a moment.
     const turn = this.snap.turnId;
-    setTimeout(() => {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
       const s = getStateSnapshot<TanksPublicState>();
-      if (this.firedTurn === turn && s?.battle.turnId === turn && s.battle.stage === 'aim') {
+      const v = readAimView(s, useSessionStore.getState().playerId);
+      if (this.firedTurn === turn && v && v.turnId === turn && v.acting) {
         this.firedTurn = -1;
         this.sync();
       }
@@ -275,7 +423,7 @@ export class Repeater {
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
-  if (el.closest('[role="dialog"], .dc-modal, .shell-menu__panel, .chat')) return true;
+  if (el.closest('[role="dialog"], .dc-modal, .shell-menu__panel, .chat, .tk-shop')) return true;
   const tag = el.tagName;
   if (tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return true;
   if (tag === 'INPUT') {
@@ -286,7 +434,8 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 /**
- * Keyboard: ←/→ angle, ↑/↓ power (Shift = ×5), A/D drive, Tab / Q·E weapon, Space / Enter fire.
+ * Keyboard: ←/→ angle, ↑/↓ power (Shift = ×5), A/D drive, Tab / Q·E weapon, Space / Enter fire
+ * (lock in during a volley), S shield, B battery, F fuel can.
  * Shift+Tab always moves focus normally (keyboard users can reach the menu and deck).
  * Returns an unbind function.
  */
@@ -302,7 +451,8 @@ export function bindKeyboard(aim: AimController): () => void {
     const el = e.target instanceof HTMLElement ? e.target : null;
     const role = el?.getAttribute('role');
     // Focused sliders / radio groups keep their own arrow keys; focused buttons keep Space/Enter.
-    const onSlider = (e.target instanceof HTMLInputElement && e.target.type === 'range') || role === 'radio' || role === 'tab' || role === 'slider';
+    const onSlider =
+      (e.target instanceof HTMLInputElement && e.target.type === 'range') || role === 'radio' || role === 'tab' || role === 'slider';
     const onButton = el?.tagName === 'BUTTON' || role === 'radio';
     switch (k) {
       case 'ArrowLeft':
@@ -334,6 +484,24 @@ export function bindKeyboard(aim: AimController): () => void {
       case 'D':
         e.preventDefault();
         if (!e.repeat) aim.startMove(1);
+        return;
+      case 's':
+      case 'S':
+        if (!aim.getSnapshot().inBattle) return;
+        e.preventDefault();
+        if (!e.repeat) aim.useBestShield();
+        return;
+      case 'b':
+      case 'B':
+        if (!aim.getSnapshot().inBattle) return;
+        e.preventDefault();
+        if (!e.repeat) aim.useItem('battery');
+        return;
+      case 'f':
+      case 'F':
+        if (!aim.getSnapshot().inBattle) return;
+        e.preventDefault();
+        if (!e.repeat) aim.useItem('fuel');
         return;
       case 'Tab':
         // Tab cycles weapons while nothing is focused; Shift+Tab (and Tab from any focused

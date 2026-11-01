@@ -27,7 +27,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | DAS Survey (`survey`) | 3–30 | Answer anonymously, then predict how your own group answered |
 | | DAS Survey Showdown (`showdown`) | 1–100 | Presenter-run survey game show for the big screen: hidden-answer board, strikes, steals, a phone audience; Halloween and Showtime looks ([docs/SHOWDOWN.md](docs/SHOWDOWN.md)) |
 | **DAS Putt** | DAS Putt (`putt`) | 1–12 | Neon mini golf on an original nine-hole course, server-simulated strokes |
-| **DAS Tanks** | DAS Tanks (`tanks`) | 1–8 | Turn-based artillery with destructible terrain, six weapons, teams and CPU gunners |
+| **DAS Tanks** | DAS Tanks (`tanks`) | 1–8 | Scorched-earth artillery: matches of battles, an armory of 24 weapons and defenses, volleys, wall modes, CPU personalities |
 | **DAScade Classics** | Pixel Paddle (`paddle`) | 1–2 | Paddle duel against the house AI or a coworker |
 | | Neon Snake (`snake`) | 1–12 | Solo score attack, or multiplayer survival and frenzy arenas |
 | | Brick Blitz (`bricks`) | 1–8 | Brick breaker with power-ups; solo or a race on the same levels |

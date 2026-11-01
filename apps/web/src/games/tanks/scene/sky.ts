@@ -51,6 +51,8 @@ export class Sky {
   private aurora: Phaser.GameObjects.TileSprite[] = [];
   private far: Phaser.GameObjects.TileSprite;
   private mid: Phaser.GameObjects.TileSprite;
+  /** Solid ground colour under the skyline (deep craters and canyons look down into it, not the sky). */
+  private base: Phaser.GameObjects.Rectangle;
   private haze: Phaser.GameObjects.Image;
   private clouds: Array<{ img: Phaser.GameObjects.Image; x: number; y: number; speed: number; scale: number }> = [];
   private motes: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -79,14 +81,23 @@ export class Sky {
     };
 
     this.gradient = add(
-      scene.add.image(0, 0, tex('grad', canvas(4, 512, (g) => {
-        const grad = g.createLinearGradient(0, 0, 0, 512);
-        grad.addColorStop(0, theme.sky[0]);
-        grad.addColorStop(0.55, theme.sky[1]);
-        grad.addColorStop(1, theme.sky[2]);
-        g.fillStyle = grad;
-        g.fillRect(0, 0, 4, 512);
-      }))).setOrigin(0, 0),
+      scene.add
+        .image(
+          0,
+          0,
+          tex(
+            'grad',
+            canvas(4, 512, (g) => {
+              const grad = g.createLinearGradient(0, 0, 0, 512);
+              grad.addColorStop(0, theme.sky[0]);
+              grad.addColorStop(0.55, theme.sky[1]);
+              grad.addColorStop(1, theme.sky[2]);
+              g.fillStyle = grad;
+              g.fillRect(0, 0, 4, 512);
+            }),
+          ),
+        )
+        .setOrigin(0, 0),
     );
 
     if (q.stars > 0 && theme.stars > 0) {
@@ -112,7 +123,13 @@ export class Sky {
     }
 
     const sun = theme.sun;
-    this.bodyGlow = add(scene.add.image(0, 0, 'tk-glow').setTint(hexToInt(sun.glow)).setBlendMode(Phaser.BlendModes.ADD).setAlpha(sun.kind === 'moon' ? 0.35 : 0.6));
+    this.bodyGlow = add(
+      scene.add
+        .image(0, 0, 'tk-glow')
+        .setTint(hexToInt(sun.glow))
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setAlpha(sun.kind === 'moon' ? 0.35 : 0.6),
+    );
     this.body = add(scene.add.image(0, 0, tex('body', this.drawBody())).setAlpha(sun.kind === 'moon' ? 0.82 : 1));
 
     if (theme.aurora) {
@@ -131,7 +148,14 @@ export class Sky {
             g.fillRect(x, top, 2, len);
           }
         });
-        this.aurora.push(add(scene.add.tileSprite(0, 0, 16, 16, tex(`aurora-${i}`, c)).setOrigin(0, 0).setBlendMode(Phaser.BlendModes.ADD)));
+        this.aurora.push(
+          add(
+            scene.add
+              .tileSprite(0, 0, 16, 16, tex(`aurora-${i}`, c))
+              .setOrigin(0, 0)
+              .setBlendMode(Phaser.BlendModes.ADD),
+          ),
+        );
       }
     }
 
@@ -142,24 +166,43 @@ export class Sky {
     scene.textures.get(midKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.far = add(scene.add.tileSprite(0, 0, 16, 16, farKey).setOrigin(0, 1));
     this.mid = add(scene.add.tileSprite(0, 0, 16, 16, midKey).setOrigin(0, 1));
+    this.base = add(scene.add.rectangle(0, 0, 16, 16, hexToInt(theme.mid)).setOrigin(0, 0));
     this.haze = add(
       scene.add
-        .image(0, 0, tex('haze', canvas(4, 128, (g) => {
-          const [r, gg, b] = hexToRgb(theme.haze);
-          const grad = g.createLinearGradient(0, 0, 0, 128);
-          grad.addColorStop(0, `rgba(${r},${gg},${b},0)`);
-          grad.addColorStop(0.6, `rgba(${r},${gg},${b},0.28)`);
-          grad.addColorStop(1, `rgba(${r},${gg},${b},0.05)`);
-          g.fillStyle = grad;
-          g.fillRect(0, 0, 4, 128);
-        })))
+        .image(
+          0,
+          0,
+          tex(
+            'haze',
+            canvas(4, 128, (g) => {
+              const [r, gg, b] = hexToRgb(theme.haze);
+              const grad = g.createLinearGradient(0, 0, 0, 128);
+              grad.addColorStop(0, `rgba(${r},${gg},${b},0)`);
+              grad.addColorStop(0.6, `rgba(${r},${gg},${b},0.28)`);
+              grad.addColorStop(1, `rgba(${r},${gg},${b},0.05)`);
+              g.fillStyle = grad;
+              g.fillRect(0, 0, 4, 128);
+            }),
+          ),
+        )
         .setOrigin(0, 1)
         .setBlendMode(Phaser.BlendModes.ADD),
     );
 
     for (let i = 0; i < q.clouds; i++) {
-      const img = add(scene.add.image(0, 0, 'tk-cloud').setTint(hexToInt(theme.cloud)).setAlpha(0.18 + hash2(i, 4, 4) * 0.14));
-      this.clouds.push({ img, x: hash2(i, 5, 5), y: 0.12 + hash2(i, 6, 6) * 0.3, speed: 0.4 + hash2(i, 7, 7) * 0.8, scale: 0.8 + hash2(i, 8, 8) * 1.4 });
+      const img = add(
+        scene.add
+          .image(0, 0, 'tk-cloud')
+          .setTint(hexToInt(theme.cloud))
+          .setAlpha(0.18 + hash2(i, 4, 4) * 0.14),
+      );
+      this.clouds.push({
+        img,
+        x: hash2(i, 5, 5),
+        y: 0.12 + hash2(i, 6, 6) * 0.3,
+        speed: 0.4 + hash2(i, 7, 7) * 0.8,
+        scale: 0.8 + hash2(i, 8, 8) * 1.4,
+      });
     }
 
     if (q.motes > 0 && theme.weather === 'rain') {
@@ -390,6 +433,8 @@ export class Sky {
     this.far.tilePositionX = par(0.12) / scale;
     this.mid.setPosition(0, anchor(horizon, 0.6) + 40 * scale);
     this.mid.tilePositionX = par(0.3) / scale + 300;
+    const midBottom = Math.floor(this.mid.y) - 1;
+    this.base.setPosition(0, midBottom).setSize(w, Math.max(0, h - midBottom + 2));
     this.haze.setPosition(0, anchor(horizon, 0.6) + 40 * scale);
 
     this.windSmoothed += (wind - this.windSmoothed) * Math.min(1, dt * 1.5);

@@ -162,6 +162,37 @@ export function addDirt(t: Terrain, cx: number, cy: number, r: number): DirtyRan
   return hi < lo ? { x0: 0, x1: 0 } : { x0: lo, x1: hi + 1 };
 }
 
+/**
+ * Set column heights directly (a mudslide's settled earth). `h` holds already-quantized heights
+ * for columns x0, x0+1, …; columns outside the world are ignored.
+ */
+export function applyPatch(t: Terrain, x0: number, h: readonly number[]): DirtyRange {
+  let lo = t.width;
+  let hi = -1;
+  for (let k = 0; k < h.length; k++) {
+    const i = x0 + k;
+    if (i < 0 || i >= t.width) continue;
+    const next = quantize(Math.max(TANKS_WORLD.bedrock, Math.min(TANKS_WORLD.ceiling, h[k]!)));
+    if (next !== t.h[i]) {
+      t.h[i] = next;
+      if (i < lo) lo = i;
+      if (i > hi) hi = i;
+    }
+  }
+  return hi < lo ? { x0: 0, x1: 0 } : { x0: lo, x1: hi + 1 };
+}
+
+/** Earth over a tank's centre column (0 when the surface is at or below the tank). */
+export function burialDepth(t: Terrain, x: number, y: number): number {
+  const top = heightAt(t, x);
+  return Number.isFinite(top) ? Math.max(0, top - y) : 0;
+}
+
+/** Whether a tank resting at (x, y) is buried (enough earth over its centre to cover the hull). */
+export function isBuried(t: Terrain, x: number, y: number): boolean {
+  return burialDepth(t, x, y) > TANK_GEOM.buriedDepth;
+}
+
 /** Level a pad for a tank to sit on (spawn), blending into the neighbouring ground. */
 export function flattenPad(t: Terrain, cx: number, half = TANK_GEOM.halfWidth + 4, blend = 14): number {
   const c0 = Math.max(0, Math.floor(cx - half));
@@ -224,10 +255,24 @@ function blur(h: Float64Array, radius: number, passes: number): void {
   }
 }
 
-export const TERRAIN_STYLE_LIST: readonly ConcreteTerrainStyle[] = ['hills', 'mesa', 'valley', 'peaks'];
+export const TERRAIN_STYLE_LIST: readonly ConcreteTerrainStyle[] = [
+  'hills',
+  'mesa',
+  'valley',
+  'peaks',
+  'dunes',
+  'canyon',
+  'cliffs',
+  'islands',
+];
 
 /** Generate a fresh battlefield. Same rng sequence → same terrain. */
-export function generateTerrain(rng: Rng, style: ConcreteTerrainStyle, width: number = TANKS_WORLD.width, height: number = TANKS_WORLD.height): Terrain {
+export function generateTerrain(
+  rng: Rng,
+  style: ConcreteTerrainStyle,
+  width: number = TANKS_WORLD.width,
+  height: number = TANKS_WORLD.height,
+): Terrain {
   const t = createTerrain(width, height);
   const h = t.h;
   const n1 = valueNoise(rng, width, 420);
@@ -235,6 +280,15 @@ export function generateTerrain(rng: Rng, style: ConcreteTerrainStyle, width: nu
   const n3 = valueNoise(rng, width, 64);
   const n4 = valueNoise(rng, width, 23);
   const detail = (x: number, k: number) => (n2[x]! * 55 + n3[x]! * 18 + n4[x]! * 5) * k;
+  // Style-specific random layout (drawn after the shared noise so older styles keep their shapes).
+  const cliffLevels: number[] = [];
+  const isles: Array<{ x: number; w: number; h: number }> = [];
+  if (style === 'cliffs') for (let i = 0; i < Math.ceil(width / 150) + 1; i++) cliffLevels.push(rng.next());
+  if (style === 'islands') {
+    const n = 4 + rng.int(3);
+    for (let i = 0; i < n; i++)
+      isles.push({ x: ((i + 0.5) / n) * width + (rng.next() - 0.5) * 90, w: 90 + rng.next() * 110, h: 170 + rng.next() * 260 });
+  }
 
   for (let x = 0; x < width; x++) {
     const u = x / (width - 1);
@@ -256,6 +310,39 @@ export function generateTerrain(rng: Rng, style: ConcreteTerrainStyle, width: nu
       case 'valley': {
         const c = u * 2 - 1;
         v = 150 + 360 * c * c + n1[x]! * 50 + detail(x, 0.8);
+        break;
+      }
+      case 'dunes':
+        // Long smooth swells with a fine ripple.
+        v = 240 + n1[x]! * 70 + n2[x]! * 95 + n4[x]! * 3;
+        break;
+      case 'canyon': {
+        // Two high plateaus split by a deep, narrow gorge.
+        const c = (u - 0.5 - n1[x]! * 0.03) / 0.085;
+        const c2 = c * c;
+        const gorge = 1 / (1 + c2 * c2);
+        v = 470 + n1[x]! * 50 + n3[x]! * 14 - 390 * gorge + detail(x, 0.35);
+        break;
+      }
+      case 'cliffs': {
+        // Flat-topped blocks at random levels with near-vertical faces.
+        const seg = 150;
+        const s0 = Math.floor(x / seg);
+        const f = (x - s0 * seg) / seg;
+        const a = 200 + cliffLevels[s0 % cliffLevels.length]! * 330;
+        const b = 200 + cliffLevels[(s0 + 1) % cliffLevels.length]! * 330;
+        const k = f < 0.86 ? 0 : smoothstep((f - 0.86) / 0.14);
+        v = a + (b - a) * k + n3[x]! * 7 + n4[x]! * 3;
+        break;
+      }
+      case 'islands': {
+        // Round hills rising out of a low plain.
+        let bumps = 0;
+        for (const isle of isles) {
+          const c = (x - isle.x) / isle.w;
+          if (c > -1 && c < 1) bumps += isle.h * (1 - c * c) * (1 - c * c);
+        }
+        v = 110 + bumps + n3[x]! * 12 + n4[x]! * 4;
         break;
       }
       case 'peaks':

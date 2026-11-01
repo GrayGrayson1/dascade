@@ -135,14 +135,55 @@ export const THEMES: Record<BattleTheme, ThemePalette> = {
   },
 };
 
+/** Projectile glow / trail colour per projectile kind (weapon ids plus sub-munitions). */
 export const WEAPON_TINT: Record<string, number> = {
   shell: 0xfff1c1,
   heavy: 0xffb347,
+  mininuke: 0xfff6a8,
+  nuke: 0xffffff,
+  airburst: 0x7cf5ff,
   cluster: 0xff4fd8,
   bomblet: 0xff8ae6,
-  airburst: 0x7cf5ff,
+  mirv: 0xff6a8a,
+  warhead: 0xff8a6a,
+  popper: 0xffd23f,
+  confetti: 0xffffff,
+  roller: 0xd3cdf0,
+  heavyroller: 0xb9a8ff,
+  rolling: 0xd3cdf0,
+  leapfrog: 0x2de38f,
+  hop: 0x2de38f,
+  napalm: 0xff7a1f,
+  hotnapalm: 0x9fd8ff,
   driller: 0xa3e635,
-  dirt: 0xc58b52,
+  seeker: 0xff5a5f,
+  railgun: 0x7cf5ff,
+  skylance: 0xc4a5ff,
+  warp: 0xd98bff,
+  tracer: 0x9df7ff,
+  excavator: 0xffcf8a,
+  dirtclod: 0xc58b52,
+  dirtball: 0xc58b52,
+  tonofdirt: 0xa8703c,
+  mudslide: 0x9a6a3a,
+  meteor: 0xff6a1f,
+};
+
+/** Popper confetti colours (picked by projectile id). */
+export const CONFETTI_TINTS = [0xff4fd8, 0xffd23f, 0x22d3ee, 0x2de38f, 0xff8a3d, 0xa78bfa] as const;
+
+/** Shield bubble colour per kind. */
+export const SHIELD_TINT: Record<'shield' | 'heavyshield' | 'deflector', number> = {
+  shield: 0x5ef0ff,
+  heavyshield: 0xffd23f,
+  deflector: 0xff4fd8,
+};
+
+/** Beam core / glow colours. */
+export const BEAM_TINT: Record<'railgun' | 'skylance' | 'lightning', { core: number; glow: number }> = {
+  railgun: { core: 0xffffff, glow: 0x22d3ee },
+  skylance: { core: 0xffffff, glow: 0xa78bfa },
+  lightning: { core: 0xf4f9ff, glow: 0x7cb8ff },
 };
 
 export function hexToRgb(hex: string): [number, number, number] {
@@ -168,7 +209,10 @@ export function shade(hex: string, amt: number): string {
   const c = hexToRgb(hex);
   const t: [number, number, number] = amt >= 0 ? [255, 255, 255] : [0, 0, 0];
   const [r, g, b] = mixRgb(c, t, Math.abs(amt));
-  const h = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  const h = (v: number) =>
+    Math.max(0, Math.min(255, Math.round(v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
@@ -186,7 +230,11 @@ export const NUM_FONT = "'Space Grotesk Variable', 'Inter Variable', system-ui, 
 
 export async function ensureArtFonts(timeoutMs = 1500): Promise<void> {
   if (typeof document === 'undefined' || !document.fonts?.load) return;
-  const load = Promise.all([document.fonts.load("16px 'Tiny5'"), document.fonts.load("8px 'Silkscreen'"), document.fonts.load("600 16px 'Space Grotesk Variable'")]).then(() => undefined);
+  const load = Promise.all([
+    document.fonts.load("16px 'Tiny5'"),
+    document.fonts.load("8px 'Silkscreen'"),
+    document.fonts.load("600 16px 'Space Grotesk Variable'"),
+  ]).then(() => undefined);
   await Promise.race([load.catch(() => undefined), new Promise<void>((r) => setTimeout(r, timeoutMs))]);
 }
 

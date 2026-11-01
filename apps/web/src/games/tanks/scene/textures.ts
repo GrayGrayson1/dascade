@@ -96,6 +96,100 @@ export function makeFxTextures(scene: Phaser.Scene): void {
     g.fillStyle = '#fff';
     g.fillRect(0, 0, 6, 10);
   });
+  // Roller: a ball with a stripe so its spin reads.
+  canvasTex(scene, 'tk-ball', 16, 16, (g) => {
+    const grad = g.createRadialGradient(6, 6, 1, 8, 8, 8);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#8d86ad');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(8, 8, 7, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(7,5,15,0.75)';
+    g.fillRect(7, 1, 2, 14);
+  });
+  // Dirt clod: an irregular lump.
+  canvasTex(scene, 'tk-clod', 12, 12, (g) => {
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.moveTo(2, 6);
+    g.lineTo(4, 2);
+    g.lineTo(8, 1);
+    g.lineTo(11, 5);
+    g.lineTo(10, 10);
+    g.lineTo(5, 11);
+    g.closePath();
+    g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    g.fillRect(6, 6, 3, 3);
+  });
+  // Flame tongue: bright base fading to a point.
+  canvasTex(scene, 'tk-flame', 16, 32, (g) => {
+    const grad = g.createLinearGradient(0, 32, 0, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.moveTo(8, 0);
+    g.quadraticCurveTo(15, 18, 12, 28);
+    g.quadraticCurveTo(8, 32, 4, 28);
+    g.quadraticCurveTo(1, 18, 8, 0);
+    g.fill();
+  });
+  // Shield shard.
+  canvasTex(scene, 'tk-shard', 8, 8, (g) => {
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.moveTo(0, 8);
+    g.lineTo(4, 0);
+    g.lineTo(8, 6);
+    g.closePath();
+    g.fill();
+  });
+  // Volley lock-in badge.
+  canvasTex(scene, 'tk-check', 24, 24, (g) => {
+    g.fillStyle = '#07050f';
+    g.beginPath();
+    g.arc(12, 12, 11.5, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#2de38f';
+    g.beginPath();
+    g.arc(12, 12, 9.5, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#07050f';
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(7, 12.5);
+    g.lineTo(10.5, 16);
+    g.lineTo(17, 8.5);
+    g.stroke();
+  });
+  // Sky Lance target reticle.
+  canvasTex(scene, 'tk-reticle', 64, 64, (g) => {
+    g.strokeStyle = '#fff';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(32, 32, 26, 0, Math.PI * 2);
+    g.stroke();
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(32, 32, 12, 0, Math.PI * 2);
+    g.stroke();
+    for (const [x0, y0, x1, y1] of [
+      [32, 0, 32, 14],
+      [32, 50, 32, 64],
+      [0, 32, 14, 32],
+      [50, 32, 64, 32],
+    ]) {
+      g.beginPath();
+      g.moveTo(x0!, y0!);
+      g.lineTo(x1!, y1!);
+      g.stroke();
+    }
+  });
   // Soft cloud blob.
   canvasTex(scene, 'tk-cloud', 256, 96, (g) => {
     const blobs = [
