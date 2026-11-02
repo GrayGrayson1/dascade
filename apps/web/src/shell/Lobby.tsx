@@ -29,6 +29,7 @@ import { crumbCabinet } from './crumbs.ts';
 import { hidesArcadeExit } from './arcadeExit.ts';
 import { ThemedText } from '../themes/ThemedText.tsx';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
+import { QrCode, copyJoinQr, joinAddressText, joinQrText } from './qr.tsx';
 
 type LobbyTab = 'players' | 'settings' | 'setup' | 'chat';
 
@@ -307,6 +308,7 @@ function LobbyHero({
   const cabinet = cabinetForGame(gameId);
   const multi = crumbCabinet(gameId) !== null;
   const [editing, setEditing] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [name, setName] = useState(roomName);
   useEffect(() => setName(roomName), [roomName]);
   const link = `${location.origin}/room/${code}`;
@@ -410,9 +412,69 @@ function LobbyHero({
           <Button size="sm" icon="share" variant="ghost" onClick={share}>
             Share
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-part="room-qr"
+            aria-label="Show join QR code"
+            aria-haspopup="dialog"
+            onClick={() => setQrOpen(true)}
+          >
+            QR
+          </Button>
         </div>
       </div>
+      <InviteQrModal code={code} open={qrOpen} onClose={() => setQrOpen(false)} />
     </header>
+  );
+}
+
+/**
+ * "Scan to join": the room's join QR, big, with the readable address and the code, for a lobby on a
+ * TV, a projector or a shared screen. "Copy QR image" puts it in a chat.
+ */
+function InviteQrModal({ code, open, onClose }: { code: string; open: boolean; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const address = joinAddressText(code);
+  const copyImage = async () => {
+    if (busy) return;
+    setBusy(true);
+    const result = await copyJoinQr(code);
+    setBusy(false);
+    const { toast } = useApp.getState();
+    if (result === 'failed') toast('error', 'Couldn’t copy the QR image. Scan it from this screen instead.');
+    else {
+      sfx('pop');
+      toast('success', result === 'copied' ? 'QR image copied' : 'QR image saved');
+    }
+  };
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Scan to join"
+      className="invite-qr"
+      footer={
+        <>
+          <Button variant="ghost" icon="copy" loading={busy} onClick={copyImage}>
+            Copy QR image
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            Done
+          </Button>
+        </>
+      }
+    >
+      <div className="invite-qr__body" data-part="invite-qr">
+        {open ? <QrCode text={joinQrText(code)} label={`QR code for ${address}`} className="invite-qr__code" /> : null}
+        <p className="invite-qr__addr">{address}</p>
+        <p className="invite-qr__room">
+          <span className="dc-label">Room code</span>
+          <span className="invite-qr__letters dc-num">{code}</span>
+        </p>
+        <p className="dc-field__hint">Point a phone camera at the code: it opens this room.</p>
+      </div>
+    </Modal>
   );
 }
 
