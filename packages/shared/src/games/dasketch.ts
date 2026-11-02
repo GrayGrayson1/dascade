@@ -81,7 +81,7 @@ export const SKETCH_PALETTE: readonly SketchSwatch[] = [
 // Word categories + custom words
 // ---------------------------------------------------------------------------
 
-export const SKETCH_CATEGORY_IDS = ['animals', 'food', 'objects', 'office', 'places', 'actions', 'arcade', 'nature'] as const;
+export const SKETCH_CATEGORY_IDS = ['animals', 'food', 'objects', 'office', 'places', 'actions', 'arcade', 'nature', 'seasons'] as const;
 export type SketchCategoryId = (typeof SKETCH_CATEGORY_IDS)[number];
 
 export const SKETCH_CATEGORY_LABELS: Record<SketchCategoryId, string> = {
@@ -93,6 +93,7 @@ export const SKETCH_CATEGORY_LABELS: Record<SketchCategoryId, string> = {
   actions: 'Actions & Sports',
   arcade: 'Arcade & Games',
   nature: 'Nature & Weather',
+  seasons: 'Holidays & Seasons',
 };
 
 export const SKETCH_WORD_MAX = 32;

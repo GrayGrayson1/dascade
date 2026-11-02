@@ -33,6 +33,7 @@ const CATEGORY_ART: Record<SketchCategoryId, string> = {
   actions: 'bolt',
   arcade: 'joystick',
   nature: 'cactus',
+  seasons: 'star',
 };
 
 const HINT_HELP: Record<SketchHintMode, string> = {
