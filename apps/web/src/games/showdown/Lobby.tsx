@@ -3,10 +3,11 @@
  * card — team pick for the audience, presenter tools for the presenter, big-screen mode for a TV.
  *
  * The format comes first: Team Showdown (teams, strikes, scores) or Presenter Showcase (one board
- * for a crowd in a meeting). Event presets set up a ready-made showcase in one click: DAS-O-Ween 2026
- * carries settings only (the boards come from the presenter's show file, never the app — ADM-01), the
- * rehearsal adds two practice boards. Loading either makes the room an event room: the presenter's
- * setup then gets "Crew & checks" (preflight, crew links and the log, names).
+ * for a crowd in a meeting). Event presets set up a ready-made showcase in one click: Event show
+ * (year-round) plays the question packs; DAS-O-Ween 2026 (seasonal) carries settings only (the boards
+ * come from the presenter's show file, never the app — ADM-01); each rehearsal adds two practice
+ * boards. Loading any of them makes the room an event room: the presenter's setup then gets "Crew &
+ * checks" (preflight, crew links and the log, names).
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { cleanText } from '@dascade/shared';
@@ -33,6 +34,8 @@ import {
   SHOWDOWN_SCORING_INFO,
   SHOWDOWN_TEAMS,
   SHOWDOWN_DEFAULT_TITLE,
+  eventShowFor,
+  isShowdownEventId,
   resolveShowdownLook,
   showTitle,
   teamName,
@@ -121,7 +124,15 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
     <div className="sd-settings" data-mode={settings.mode}>
       <FormatPicker value={settings.mode ?? 'classic'} canEdit={canEdit} onChange={(mode) => update({ mode })} />
 
-      {canEdit ? <EventPresets customRounds={customRounds} rehearsal={rehearsal} onLoadShowFile={() => setEditing('showfile')} /> : null}
+      {canEdit ? (
+        <EventPresets
+          customRounds={customRounds}
+          rehearsal={rehearsal}
+          source={settings.source}
+          packRounds={settings.rounds}
+          onLoadShowFile={() => setEditing('showfile')}
+        />
+      ) : null}
 
       <Field
         label="Show title"
@@ -363,38 +374,79 @@ function FormatPicker({ value, canEdit, onChange }: { value: ShowdownMode; canEd
 }
 
 const PRESET_LABEL: Record<ShowdownEventId, { title: string; icon: string }> = {
+  'event-show': { title: 'Event show', icon: '🎤' },
+  'event-rehearsal': { title: 'Event rehearsal (demo answers)', icon: '🧪' },
   'dasoween-2026': { title: 'DAS-O-Ween 2026', icon: '🎃' },
   'dasoween-rehearsal': { title: 'DAS-O-Ween rehearsal (demo answers)', icon: '🧪' },
 };
 
 /**
- * One-click ready-made shows. DAS-O-Ween 2026 sets the format, look and clock and keeps the rounds
- * already loaded (its boards live in the presenter's show file, never in the app); the rehearsal also
- * loads two practice boards, replacing the room's rounds (so it asks first).
+ * One-click ready-made shows; each makes the room an event room. Event show (year-round) sets the
+ * format, look and clock and plays the question packs; DAS-O-Ween 2026 keeps the rounds already
+ * loaded (its boards live in the presenter's show file, never in the app). Each rehearsal also loads
+ * two practice boards, replacing the room's rounds (so it asks first).
  */
 function EventPresets({
   customRounds,
   rehearsal,
+  source,
+  packRounds,
   onLoadShowFile,
 }: {
   customRounds: number;
   rehearsal: boolean;
+  source: ShowdownSettings['source'];
+  packRounds: number;
   onLoadShowFile: () => void;
 }) {
   const code = useSessionStore((s) => s.code) ?? '';
   const event = useEvent();
   const [pending, setPending] = useState<ShowdownEventId | null>(null);
-  /** The preset in the room now (the server says "rehearsal" and which preset made it an event room). */
-  const current: ShowdownEventId | null = rehearsal ? 'dasoween-rehearsal' : event === 'dasoween-2026' ? 'dasoween-2026' : null;
+  const loaded = isShowdownEventId(event) ? event : null;
+  /** The preset whose settings are on (a rehearsal only while its practice boards are loaded). */
+  const current: ShowdownEventId | null = loaded && (rehearsal || !SHOWDOWN_EVENT_INFO[loaded].rehearsal) ? loaded : null;
   const load = (id: ShowdownEventId) => {
     // Only a preset with boards replaces rounds: ask first when they're the presenter's own.
     const replaces = !SHOWDOWN_EVENT_INFO[id].settingsOnly;
     if (replaces && customRounds > 0 && !rehearsal) return setPending(id);
     loadEventPreset(code, id);
   };
-  const needShowFile = current === 'dasoween-2026' && customRounds === 0;
+  const info = current ? SHOWDOWN_EVENT_INFO[current] : null;
+  const needShowFile = Boolean(info?.settingsOnly) && source === 'custom' && customRounds === 0;
+  const realShow = SHOWDOWN_EVENT_INFO[eventShowFor(loaded ?? 'event-show')];
+  const realShowNeedsFile = realShow.settingsOnly && realShow.settings.source === 'custom';
+  const row = (id: ShowdownEventId) => {
+    const info = SHOWDOWN_EVENT_INFO[id];
+    const on = current === id;
+    return (
+      <div key={id} className="sdc-preset" data-on={on ? 'true' : undefined} data-rehearsal={info.rehearsal ? 'true' : undefined}>
+        <span className="sdc-preset__icon" aria-hidden>
+          {PRESET_LABEL[id].icon}
+        </span>
+        <span className="sdc-preset__body">
+          <span className="sdc-preset__title">
+            {PRESET_LABEL[id].title}
+            {on ? (
+              <Badge color="var(--success)" icon="check">
+                Loaded
+              </Badge>
+            ) : null}
+          </span>
+          <span className="sdc-preset__blurb">{info.blurb}</span>
+        </span>
+        <Button
+          size="sm"
+          variant={on ? 'ghost' : info.rehearsal ? 'secondary' : 'primary'}
+          onClick={() => load(id)}
+          aria-label={`${on ? 'Reload' : 'Load'} ${PRESET_LABEL[id].title}`}
+        >
+          {on ? 'Reload' : 'Load'}
+        </Button>
+      </div>
+    );
+  };
   return (
-    <section className="sdc-presets" aria-labelledby="sdc-presets-label">
+    <section className="sdc-presets" aria-labelledby="sdc-presets-label" data-part="showdown-presets">
       <div className="sdc-presets__head">
         <span className="dc-field__label" id="sdc-presets-label">
           Event presets
@@ -408,65 +460,40 @@ function EventPresets({
           ) : null}
         </span>
         <span className="dc-field__hint">
-          One click sets up the show’s format, look and clock and makes this an event room (crew links, the preflight, the sound station).
-          DAS-O-Ween 2026 keeps your boards out of the app: you load them from your show file. The rehearsal brings two practice boards.
+          One click sets up the show’s format, look and clock and makes this an event room: crew links, the preflight, the sound station,
+          and the black box that brings the show back after a server restart. Event show plays the question packs; each rehearsal brings two
+          practice boards.
         </span>
       </div>
-      <div className="sdc-presets__list">
-        {SHOWDOWN_EVENT_IDS.map((id) => {
-          const info = SHOWDOWN_EVENT_INFO[id];
-          const on = current === id;
-          return (
-            <div key={id} className="sdc-preset" data-on={on ? 'true' : undefined} data-rehearsal={info.rehearsal ? 'true' : undefined}>
-              <span className="sdc-preset__icon" aria-hidden>
-                {PRESET_LABEL[id].icon}
-              </span>
-              <span className="sdc-preset__body">
-                <span className="sdc-preset__title">
-                  {PRESET_LABEL[id].title}
-                  {on ? (
-                    <Badge color="var(--success)" icon="check">
-                      Loaded
-                    </Badge>
-                  ) : null}
-                </span>
-                <span className="sdc-preset__blurb">{info.blurb}</span>
-              </span>
-              <Button
-                size="sm"
-                variant={on ? 'ghost' : info.rehearsal ? 'secondary' : 'primary'}
-                onClick={() => load(id)}
-                aria-label={`${on ? 'Reload' : 'Load'} ${PRESET_LABEL[id].title}`}
-              >
-                {on ? 'Reload' : 'Load'}
-              </Button>
-            </div>
-          );
-        })}
-      </div>
+      <div className="sdc-presets__list">{SHOWDOWN_EVENT_IDS.map(row)}</div>
       <div className="sdc-presets__status" role="status" data-part="showdown-preset-status">
         {rehearsal ? (
           <p>
             <Badge color="var(--warning)" solid>
               Rehearsal
             </Badge>{' '}
-            Practice boards loaded — try every control without giving the real answers away. For the real show, load DAS-O-Ween 2026, then
-            your show file.
+            Practice boards loaded — try every control without giving the real answers away. For the real show, load {realShow.title}
+            {realShowNeedsFile ? ', then your show file' : ''}.
           </p>
-        ) : needShowFile ? (
+        ) : needShowFile && info ? (
           <div className="sdp-showfile-prompt" data-part="showdown-showfile-prompt">
             <p>
-              <PixelIcon name="warning" /> <b>Now load your show file.</b> DAS-O-Ween 2026’s settings are on, but its boards aren’t in the
-              app: open <b>Load show file</b> and pick the file on this computer (or <b>Load from this device</b> if you saved it here),
-              then press Save to the show.
+              <PixelIcon name="warning" /> <b>Now load your show file.</b> {info.title}’s settings are on, but its boards aren’t in the app:
+              open <b>Load show file</b> and pick the file on this computer (or <b>Load from this device</b> if you saved it here), then
+              press Save to the show.
             </p>
             <Button size="sm" variant="primary" icon="share" onClick={onLoadShowFile}>
               Load your show file
             </Button>
           </div>
-        ) : current === 'dasoween-2026' ? (
+        ) : info && source === 'packs' ? (
           <p>
-            <PixelIcon name="check" /> DAS-O-Ween 2026’s settings with <span className="dc-num">{customRounds}</span> round
+            <PixelIcon name="check" /> {info.title}’s settings with <span className="dc-num">{packRounds}</span> round
+            {packRounds === 1 ? '' : 's'} from the question packs. Pick the packs below.
+          </p>
+        ) : info?.settingsOnly ? (
+          <p>
+            <PixelIcon name="check" /> {info.title}’s settings with <span className="dc-num">{customRounds}</span> round
             {customRounds === 1 ? '' : 's'} from your show file. Check them with Edit your rounds.
           </p>
         ) : customRounds > 0 ? (

@@ -52,7 +52,7 @@ export function CrewPanel({ code }: { code: string }) {
         <h3 className="sd-panel__title" id="sdp-crew-title">
           <PixelIcon name="crown" /> Crew & log
         </h3>
-        <p className="sdp-empty">Crew links and the log exist in event rooms: load a DAS-O-Ween preset in the lobby.</p>
+        <p className="sdp-empty">Crew links and the log exist in event rooms: load an event preset (e.g. Event show) in the lobby.</p>
       </section>
     );
   }

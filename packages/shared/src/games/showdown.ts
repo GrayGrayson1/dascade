@@ -1117,6 +1117,13 @@ export interface ShowdownPreflightData {
   /** Custom rounds loaded, and how many of them have a special answer. */
   rounds: number;
   specials: number;
+  /**
+   * Where the show's rounds come from. With 'packs' (the year-round Event show) the server draws
+   * `packRounds` rounds from the question packs at the start, so no show file is needed.
+   * Absent = 'custom' (the DAS-O-Ween show file).
+   */
+  source?: 'packs' | 'custom';
+  packRounds?: number;
   /** Crew links issued for backup presenters, and how many of their holders are here right now. */
   backups: { issued: number; online: number };
   station: { playerId: string; name: string; ready: boolean; seenAgoMs: number | null };
@@ -1143,14 +1150,18 @@ export const SHOWDOWN_EVENT_GRACE_SECONDS = 30 * 60;
 // Event presets (metadata only — their rounds live in the server engine package)
 // ---------------------------------------------------------------------------
 
-export const SHOWDOWN_EVENT_IDS = ['dasoween-2026', 'dasoween-rehearsal'] as const;
+/**
+ * Listed in this order. The year-round pair comes first; a seasonal pair (DAS-O-Ween) is offered up
+ * front in its own month and sits in a collapsed group the rest of the year — never removed.
+ */
+export const SHOWDOWN_EVENT_IDS = ['event-show', 'event-rehearsal', 'dasoween-2026', 'dasoween-rehearsal'] as const;
 export type ShowdownEventId = (typeof SHOWDOWN_EVENT_IDS)[number];
 export const ShowdownPresetSchema = z.object({ id: z.enum(SHOWDOWN_EVENT_IDS) }).strict();
 
 export interface ShowdownEventInfo {
   title: string;
   blurb: string;
-  /** Rounds it loads. */
+  /** Rounds it loads (a settings-only preset on the packs loads none). */
   rounds: number;
   /** Demo answers for practising: the console and stage say "Rehearsal" while it's loaded. */
   rehearsal: boolean;
@@ -1160,13 +1171,41 @@ export interface ShowdownEventInfo {
    */
   event: boolean;
   /**
-   * Its rounds stay out of the public repo: the preset carries settings only, and the presenter loads
-   * the boards from a show file (rounds already loaded in the room are kept).
+   * It brings no boards: the preset carries settings only. Either its rounds stay out of the public
+   * repo and the presenter loads them from a show file (DAS-O-Ween 2026; rounds already loaded in the
+   * room are kept), or it plays the question packs (Event show).
    */
   settingsOnly: boolean;
   /** Settings it applies (the rest stay as they are). */
   settings: Partial<ShowdownSettings>;
+  /**
+   * A seasonal preset: grouped under "Seasonal: <name>" and offered up front only in `month`
+   * (0-based, like Date#getMonth). Absent = year-round.
+   */
+  season?: { name: string; month: number };
 }
+
+/**
+ * The year-round event show: Presenter Showcase on the neutral DAS Showtime look, drawing its rounds
+ * from the question packs (whichever are picked; a new room's packs follow the season), with every
+ * event-room feature. It leaves the show title and event name to the presenter.
+ */
+const EVENT_SETTINGS: Partial<ShowdownSettings> = {
+  mode: 'showcase',
+  look: 'showtime',
+  source: 'packs',
+  minutes: 10,
+  stageClock: true,
+  audience: true,
+  display: 'auto',
+  pickMode: 'fair',
+  crewDraw: false,
+  points: true,
+  medals: 'round',
+  reveal: 'standings',
+  gems: true,
+  pops: true,
+};
 
 const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
   mode: 'showcase',
@@ -1189,7 +1228,28 @@ const DASOWEEN_SETTINGS: Partial<ShowdownSettings> = {
   pops: true,
 };
 
+const DASOWEEN = { name: 'DAS-O-Ween', month: 9 };
+
 export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
+  'event-show': {
+    title: 'Event show',
+    blurb:
+      'Presenter Showcase on the DAS Showtime look with a 10-minute clock, crowd points and medals. Rounds come from the question packs below, so there’s no file to load.',
+    rounds: 0,
+    rehearsal: false,
+    event: true,
+    settingsOnly: true,
+    settings: EVENT_SETTINGS,
+  },
+  'event-rehearsal': {
+    title: 'Event rehearsal',
+    blurb: 'The same show with two practice boards (ice cream and the zoo), so you can try every control before the real one.',
+    rounds: 2,
+    rehearsal: true,
+    event: true,
+    settingsOnly: false,
+    settings: { ...EVENT_SETTINGS, source: 'custom' },
+  },
   'dasoween-2026': {
     title: 'DAS-O-Ween 2026',
     blurb:
@@ -1199,6 +1259,7 @@ export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
     event: true,
     settingsOnly: true,
     settings: DASOWEEN_SETTINGS,
+    season: DASOWEEN,
   },
   'dasoween-rehearsal': {
     title: 'DAS-O-Ween rehearsal',
@@ -1209,8 +1270,42 @@ export const SHOWDOWN_EVENT_INFO: Record<ShowdownEventId, ShowdownEventInfo> = {
     event: true,
     settingsOnly: false,
     settings: { ...DASOWEEN_SETTINGS, title: 'DAS-O-Ween Rehearsal' },
+    season: DASOWEEN,
   },
 };
+
+export function isShowdownEventId(id: unknown): id is ShowdownEventId {
+  return (SHOWDOWN_EVENT_IDS as readonly unknown[]).includes(id);
+}
+
+/** The real show a preset belongs to: a rehearsal's same-season partner, or the preset itself. */
+export function eventShowFor(id: ShowdownEventId): ShowdownEventId {
+  const season = SHOWDOWN_EVENT_INFO[id].season?.name;
+  if (!SHOWDOWN_EVENT_INFO[id].rehearsal) return id;
+  return SHOWDOWN_EVENT_IDS.find((x) => !SHOWDOWN_EVENT_INFO[x].rehearsal && SHOWDOWN_EVENT_INFO[x].season?.name === season) ?? id;
+}
+
+/** A seasonal preset is offered up front in its own month (the viewer's local date). */
+export function eventInSeason(id: ShowdownEventId, now: Date): boolean {
+  const season = SHOWDOWN_EVENT_INFO[id].season;
+  return !season || now.getMonth() === season.month;
+}
+
+/**
+ * The settings after loading a preset: its settings over the current ones. A preset that leaves the
+ * show title or event name alone also clears one another preset put there (so "DAS-O-Ween Trivia"
+ * doesn't follow you onto the Showtime look); words the presenter typed stay.
+ */
+export function applyEventPreset(current: ShowdownSettings, id: ShowdownEventId): ShowdownSettings {
+  const preset = SHOWDOWN_EVENT_INFO[id].settings;
+  const next: ShowdownSettings = { ...current, ...preset };
+  for (const key of ['title', 'eventName'] as const) {
+    if (preset[key] !== undefined) continue;
+    const fromPreset = SHOWDOWN_EVENT_IDS.some((x) => SHOWDOWN_EVENT_INFO[x].settings[key] === next[key]);
+    if (next[key] && fromPreset) next[key] = '';
+  }
+  return next;
+}
 
 // ---------------------------------------------------------------------------
 // Public views
