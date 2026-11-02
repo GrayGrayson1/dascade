@@ -287,6 +287,20 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 Already have a code? Use <strong>Join with code</strong> on the arcade floor.
               </li>
             </ol>
+            <h4 className="dc-label help-body__label">Keyboard shortcuts</h4>
+            <ul className="help-controls help-keys" data-part="help-shortcuts">
+              <li>
+                <kbd className="dc-kbd">?</kbd> opens this help (in a game, that game’s page)
+              </li>
+              <li>
+                <kbd className="dc-kbd">M</kbd> mutes or unmutes everything
+              </li>
+              <li>
+                <kbd className="dc-kbd">Esc</kbd> closes a pop-up, or goes back from a title screen, a cabinet menu or the Tournament
+                Center
+              </li>
+            </ul>
+            <p className="dc-field__hint">During a match the game’s own keys come first; its page here lists them.</p>
             <p className="dc-muted">
               Lost connection? DASCADE reconnects you automatically and keeps your seat. Refreshing the page puts you right back in your
               room — and if the network stays down, <strong>Rejoin my seat</strong> takes it back.

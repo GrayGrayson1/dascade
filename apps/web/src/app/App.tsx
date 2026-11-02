@@ -4,6 +4,7 @@ import { isValidRoomCode, normalizeRoomCode } from '@dascade/shared';
 import { Spinner } from '@dascade/ui';
 import { ArcadeFloor } from '../arcade/ArcadeFloor.tsx';
 import { Toasts } from '../shell/Toasts.tsx';
+import { GlobalShortcuts } from '../shell/shortcuts.ts';
 import { ThemeHost } from '../themes/ThemeHost.tsx';
 import { LoadingFlavour } from '../themes/LoadingFlavour.tsx';
 import { SeasonalHost } from '../themes/SeasonalHost.tsx';
@@ -83,6 +84,8 @@ function Modals() {
 export function App() {
   return (
     <BrowserRouter>
+      {/* ? opens Help and M mutes, anywhere outside a match (shell/shortcuts.ts). */}
+      <GlobalShortcuts />
       {/* Theme environment layer + transition overlay (+ quick picker). Outside <Routes>: never remounts screens. */}
       <QuietBoundary>
         <ThemeHost />

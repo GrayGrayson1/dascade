@@ -40,6 +40,7 @@ import { gameKeyFor, rememberGame, runViewTransition } from '../arcade/transitio
 import { requestVariant } from '../arcade/variantRequest.ts';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
 import { UnknownPlace } from './cabinet/UnknownPlace.tsx';
+import { useEscapeBack } from './shortcuts.ts';
 import { ProfileEditor, commitProfileName } from './common.tsx';
 import '../arcade/entry.css';
 
@@ -162,6 +163,7 @@ export function CabinetEntry() {
         </div>
       </div>
 
+      <EscapeBack onBack={back} />
       <div className="af-entry__frame" data-part="title-frame">
         <header className="af-entry__top" data-part="title-header">
           <Button
@@ -322,4 +324,10 @@ export function CabinetEntry() {
       </div>
     </GameTheme>
   );
+}
+
+/** Esc on the title screen does what its Back button does (a child component: the screen returns early for unknown games). */
+function EscapeBack({ onBack }: { onBack: () => void }): null {
+  useEscapeBack(onBack);
+  return null;
 }
