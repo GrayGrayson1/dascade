@@ -198,6 +198,19 @@ test.describe('keyboard shortcuts', () => {
     await expect(page.getByRole('dialog')).toBeHidden();
   });
 
+  test('in a lobby, ? opens that game’s Help and M mutes (the room’s session loads on its own)', async ({ page }) => {
+    await createRoom(page, 'wheel', 'Keys');
+    await unfocus(page);
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog').getByRole('heading', { name: /Wheel of DAStiny/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound off' })).toBeVisible();
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound on' })).toBeVisible();
+  });
+
   test('Esc goes back from a title screen and out of the Tournament Center, and puts its title back', async ({ page }) => {
     await page.goto('/play/wheel');
     await expect(page.locator('[data-part="title-screen"]')).toBeVisible();

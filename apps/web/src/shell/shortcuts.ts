@@ -16,7 +16,8 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { isGameId, type Phase } from '@dascade/shared';
 import { useApp } from '../app/store.ts';
-import { getStateSnapshot, useSessionStore } from '../net/session.ts';
+// Type only (erased in the build): see `session` below.
+import type * as SessionModule from '../net/session.ts';
 
 export type ShortcutAction = 'help' | 'mute';
 
@@ -61,9 +62,40 @@ export function popupOpen(): boolean {
   return useApp.getState().modal !== null || (typeof document !== 'undefined' && document.querySelector('dialog[open]') !== null);
 }
 
-function inMatch(): boolean {
-  if (!useSessionStore.getState().code) return false;
-  const phase = getStateSnapshot<{ phase?: Phase }>()?.phase;
+/** What the keys read from the session: whether you're in a room, its phase and its game. */
+export type SessionLike = Pick<typeof SessionModule, 'useSessionStore' | 'getStateSnapshot'>;
+
+/**
+ * net/session.ts, and the Colyseus SDK behind it, stays out of the landing page: it loads with a room.
+ * So this file never imports it statically. Off /room/ paths no match can be on and the help topic
+ * comes from the URL; on /room/ paths the session is read through this reference, loaded as soon as
+ * the path starts with /room/ (RoomScreen has loaded the module by then, so it resolves at once).
+ */
+let session: SessionLike | null = null;
+let sessionLoad: Promise<void> | null = null;
+
+function loadSession(): void {
+  sessionLoad ??= import('../net/session.ts').then(
+    (m) => {
+      session = m;
+    },
+    () => {
+      sessionLoad = null; // a failed chunk load: try again on the next room path
+    },
+  );
+}
+
+const isRoomPath = (pathname: string) => pathname.startsWith('/room/');
+
+/**
+ * A match is being played on this screen. Off /room/ paths there's none. On a room path, until the
+ * session has loaded, assume there is one, so the keys stand aside rather than guess.
+ */
+export function matchOn(pathname: string, mod: SessionLike | null = session): boolean {
+  if (!isRoomPath(pathname)) return false;
+  if (!mod) return true;
+  if (!mod.useSessionStore.getState().code) return false;
+  const phase = mod.getStateSnapshot<{ phase?: Phase }>()?.phase;
   return phase !== undefined && MATCH_PHASES.has(phase);
 }
 
@@ -81,13 +113,15 @@ export function useGlobalShortcuts(): void {
   const path = useRef(pathname);
   useEffect(() => {
     path.current = pathname;
+    if (isRoomPath(pathname)) loadSession();
   }, [pathname]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const action = shortcutFor(e, { typing: isTypingTarget(e.target), modalOpen: popupOpen(), inMatch: inMatch() });
+      const action = shortcutFor(e, { typing: isTypingTarget(e.target), modalOpen: popupOpen(), inMatch: matchOn(path.current) });
       if (!action) return;
       e.preventDefault();
-      if (action === 'help') useApp.getState().openModal('help', helpTopicFor(path.current, useSessionStore.getState().gameId));
+      const roomGameId = isRoomPath(path.current) ? (session?.useSessionStore.getState().gameId ?? null) : null;
+      if (action === 'help') useApp.getState().openModal('help', helpTopicFor(path.current, roomGameId));
       else toggleMute();
     };
     // Bubble phase on window: a page element's own key handler runs first and can claim the key.

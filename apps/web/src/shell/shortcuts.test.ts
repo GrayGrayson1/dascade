@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// The real store and session boot persistence and the network; these tests only need the pure parts.
+// The real store boots persistence; these tests only need the pure parts. (shortcuts.ts loads the
+// session itself only on /room/ paths; matchOn takes it as a parameter here.)
 vi.mock('../app/store.ts', () => ({ useApp: { getState: () => ({ modal: null }) } }));
-vi.mock('../net/session.ts', () => ({ getStateSnapshot: () => null, useSessionStore: { getState: () => ({ code: null, gameId: null }) } }));
 
-const { helpTopicFor, isTypingTarget, shortcutFor } = await import('./shortcuts.ts');
+const { helpTopicFor, isTypingTarget, matchOn, shortcutFor } = await import('./shortcuts.ts');
+type SessionLike = NonNullable<Parameters<typeof matchOn>[1]>;
+
+/** A stand-in for net/session.ts: in room `code` (or none) with the room in `phase`. */
+const fakeSession = (code: string | null, phase?: string) =>
+  ({
+    useSessionStore: { getState: () => ({ code, gameId: code ? 'wheel' : null }) },
+    getStateSnapshot: () => (phase ? { phase } : null),
+  }) as unknown as SessionLike;
 
 const key = (k: string, mods: Partial<Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'repeat' | 'defaultPrevented'>> = {}) => ({
   key: k,
@@ -71,3 +79,24 @@ describe('helpTopicFor', () => {
     expect(helpTopicFor('/room/K7QXM', null)).toBeNull();
   });
 });
+
+describe('matchOn', () => {
+  it('is off away from /room/ paths, whatever the session says (no match can be on there)', () => {
+    for (const path of ['/', '/play/wheel', '/cabinet/dasino', '/tournaments', '/r/K7QXM']) {
+      expect(matchOn(path, fakeSession('K7QXM', 'PLAYING'))).toBe(false);
+      expect(matchOn(path, null)).toBe(false);
+    }
+  });
+
+  it('on a room path, follows the room’s phase', () => {
+    for (const phase of ['COUNTDOWN', 'PLAYING', 'INTERMISSION']) expect(matchOn('/room/K7QXM', fakeSession('K7QXM', phase))).toBe(true);
+    for (const phase of ['LOBBY', 'RESULTS', 'ENDED']) expect(matchOn('/room/K7QXM', fakeSession('K7QXM', phase))).toBe(false);
+    expect(matchOn('/room/K7QXM', fakeSession('K7QXM'))).toBe(false);
+    expect(matchOn('/room/K7QXM', fakeSession(null, 'PLAYING'))).toBe(false);
+  });
+
+  it('on a room path before the session has loaded, stands aside (assumes a match)', () => {
+    expect(matchOn('/room/K7QXM', null)).toBe(true);
+  });
+});
+
