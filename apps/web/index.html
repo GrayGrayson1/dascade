@@ -6,6 +6,25 @@
     <meta name="theme-color" content="#05040b" />
     <meta name="description" content="DASCADE — the Delta Alpha Sierra Arcade. Multiplayer party, casino, racing and adventure games in your browser." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Installable app (Add to Home screen / Install app). No service worker: app/chunkReload.ts handles stale chunks. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="DASCADE" />
+    <!-- Link previews (Teams, Slack, Messages…). Scrapers need absolute URLs, so these name the live site. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DASCADE" />
+    <meta property="og:title" content="DASCADE — Delta Alpha Sierra Arcade" />
+    <meta property="og:description" content="Multiplayer party, casino, racing and board games in your browser. No account needed." />
+    <meta property="og:url" content="https://dascade.onrender.com/" />
+    <meta property="og:image" content="https://dascade.onrender.com/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="DASCADE, the Delta Alpha Sierra Arcade: pixel-art logo and title on a neon grid." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DASCADE — Delta Alpha Sierra Arcade" />
+    <meta name="twitter:description" content="Multiplayer party, casino, racing and board games in your browser. No account needed." />
+    <meta name="twitter:image" content="https://dascade.onrender.com/og-image.png" />
     <title>DASCADE — Delta Alpha Sierra Arcade</title>
     <!-- Applies the stored theme's background + theme-color before the first paint (public/boot-theme.js). -->
     <script src="/boot-theme.js"></script>

@@ -78,6 +78,30 @@ test('results offer "Back to cabinet", which leaves the room for the cabinet tit
   expect(await page.evaluate(() => (window as any).__DASCADE__.store.getState().room)).toBeNull();
 });
 
+test('the site is installable and its preview image is served', async ({ page, browserName, request }) => {
+  test.skip(browserName !== 'chromium', 'Installability is read from Chromium (DevTools protocol).');
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.ok()).toBe(true);
+  expect(manifest.headers()['content-type']).toMatch(/^application\/manifest\+json/);
+  for (const path of ['/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png', '/og-image.png']) {
+    const res = await request.get(path);
+    expect(res.ok(), path).toBe(true);
+    expect(res.headers()['content-type']).toBe('image/png');
+  }
+  // The page's CSP lets the manifest load (manifest-src falls back to default-src 'self').
+  const html = await request.get('/');
+  expect(html.headers()['content-security-policy']).toContain("default-src 'self'");
+
+  await page.goto('/');
+  await expect(page.locator('[data-arcade-floor]')).toBeVisible();
+  const cdp = await page.context().newCDPSession(page);
+  const { url, errors } = (await cdp.send('Page.getAppManifest')) as { url: string; errors: Array<{ message: string }> };
+  expect(new URL(url).pathname).toBe('/manifest.webmanifest');
+  expect(errors).toEqual([]);
+  const { installabilityErrors } = (await cdp.send('Page.getInstallabilityErrors')) as { installabilityErrors: Array<{ errorId: string }> };
+  expect(installabilityErrors.map((e) => e.errorId)).toEqual([]);
+});
+
 test('pasting a whole invite link into a code box gives its code, not "HTTPS"', async ({ page: guest, browser }) => {
   // The guest is this project's page (so mobile runs paste on a phone); the host has its own context.
   const host = await (await browser.newContext()).newPage();
