@@ -19,6 +19,8 @@ import {
 } from '@dascade/shared';
 import { Button, GameTheme, IconButton, PixelIcon, Spinner, cx } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
+import { APP_TITLE } from '../app/title.ts';
+import { useEscapeBack } from '../shell/shortcuts.ts';
 import { sfx } from '../audio/audio.ts';
 import { fetchTournaments } from './api.ts';
 import { PixelBracket, PixelTrophy } from './art.tsx';
@@ -85,7 +87,7 @@ function Center({ params, setParams }: { params: URLSearchParams; setParams: Ret
   useEffect(() => {
     document.title = creating ? 'Create a tournament · DASCADE' : 'Tournament Center · DASCADE';
     return () => {
-      document.title = 'DASCADE';
+      document.title = APP_TITLE;
     };
   }, [creating]);
 
@@ -95,6 +97,9 @@ function Center({ params, setParams }: { params: URLSearchParams; setParams: Ret
     else next.set(key, value);
     setParams(next, { replace: key === 'game' });
   };
+
+  // Esc does what the Back button does: out of the wizard, else back to the floor.
+  useEscapeBack(() => (creating ? setParam('create', null) : navigate('/')));
 
   const startCreate = () => {
     sfx('click');

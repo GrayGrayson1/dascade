@@ -1,0 +1,18 @@
+{
+  "name": "DASCADE — Delta Alpha Sierra Arcade",
+  "short_name": "DASCADE",
+  "description": "Multiplayer party, casino, racing and board games in your browser. No account needed.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05040b",
+  "theme_color": "#05040b",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

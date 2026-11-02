@@ -2,7 +2,7 @@
  * Shared shell polish: cabinet context in the lobby, clear room status, results → "Back to cabinet",
  * dismissible toasts. Only shared shell behaviour is asserted.
  */
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createRoom, roomState, setName, startGame, waitForPhase } from './helpers.ts';
 
 test('the lobby shows its cabinet, seats and lock state', async ({ page }) => {
@@ -23,6 +23,47 @@ test('the lobby shows its cabinet, seats and lock state', async ({ page }) => {
     await expect(page.locator('.topbar').getByRole('img', { name: 'Room locked' })).toBeVisible();
 });
 
+test('tabs name their panels: Settings, Profile and the phone lobby', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  const sound = dialog.getByRole('tab', { name: 'Sound' });
+  await expect(dialog.getByRole('tabpanel', { name: 'Sound' })).toBeVisible();
+  const panelId = await sound.getAttribute('aria-controls');
+  expect(panelId).toBeTruthy();
+  expect(await dialog.getByRole('tabpanel').getAttribute('id')).toBe(panelId);
+  await dialog.getByRole('tab', { name: 'Display' }).click();
+  await expect(dialog.getByRole('tabpanel', { name: 'Display' })).toBeVisible();
+  // Only the shown panel is in the page, so only the selected tab points at one.
+  expect(await sound.getAttribute('aria-controls')).toBeNull();
+  await dialog.getByRole('tab', { name: 'Profile' }).click();
+  await expect(dialog.getByRole('tabpanel', { name: 'Profile' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(dialog).toBeHidden();
+
+  // The profile modal's Profile / Stats tabs.
+  await page.getByRole('button', { name: /Set your name|Profile:/ }).click();
+  const profile = page.getByRole('dialog');
+  await expect(profile.getByRole('tabpanel', { name: 'Profile' })).toBeVisible();
+  await profile.getByRole('tab', { name: 'Stats' }).click();
+  await expect(profile.getByRole('tabpanel', { name: 'Stats' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(profile).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await createRoom(page, 'wheel', 'Tabber');
+  const lobbyTabs = page.getByRole('tablist', { name: 'Lobby sections' });
+  await expect(page.getByRole('tabpanel', { name: /^Players/ })).toBeVisible();
+  for (const name of ['Settings', 'Chat']) {
+    const t = lobbyTabs.getByRole('tab', { name: new RegExp(`^${name}`) });
+    const controls = await t.getAttribute('aria-controls');
+    expect(controls).toBeTruthy();
+    await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute('role', 'tabpanel');
+    await t.click();
+    await expect(page.getByRole('tabpanel', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+});
+
 test('results offer "Back to cabinet", which leaves the room for the cabinet title screen', async ({ page }) => {
   await createRoom(page, 'wheel', 'Spinner');
   await startGame(page);
@@ -35,6 +76,30 @@ test('results offer "Back to cabinet", which leaves the room for the cabinet tit
   await page.waitForURL((url) => url.pathname === '/play/wheel');
   await expect(page.getByRole('button', { name: 'Create game' })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__DASCADE__.store.getState().room)).toBeNull();
+});
+
+test('the site is installable and its preview image is served', async ({ page, browserName, request }) => {
+  test.skip(browserName !== 'chromium', 'Installability is read from Chromium (DevTools protocol).');
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.ok()).toBe(true);
+  expect(manifest.headers()['content-type']).toMatch(/^application\/manifest\+json/);
+  for (const path of ['/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png', '/og-image.png']) {
+    const res = await request.get(path);
+    expect(res.ok(), path).toBe(true);
+    expect(res.headers()['content-type']).toBe('image/png');
+  }
+  // The page's CSP lets the manifest load (manifest-src falls back to default-src 'self').
+  const html = await request.get('/');
+  expect(html.headers()['content-security-policy']).toContain("default-src 'self'");
+
+  await page.goto('/');
+  await expect(page.locator('[data-arcade-floor]')).toBeVisible();
+  const cdp = await page.context().newCDPSession(page);
+  const { url, errors } = (await cdp.send('Page.getAppManifest')) as { url: string; errors: Array<{ message: string }> };
+  expect(new URL(url).pathname).toBe('/manifest.webmanifest');
+  expect(errors).toEqual([]);
+  const { installabilityErrors } = (await cdp.send('Page.getInstallabilityErrors')) as { installabilityErrors: Array<{ errorId: string }> };
+  expect(installabilityErrors.map((e) => e.errorId)).toEqual([]);
 });
 
 test('pasting a whole invite link into a code box gives its code, not "HTTPS"', async ({ page: guest, browser }) => {
@@ -88,4 +153,76 @@ test('toasts can be dismissed with their close button', async ({ page }) => {
   await expect(toast).toBeVisible();
   await toast.getByRole('button', { name: 'Dismiss notification' }).click();
   await expect(page.locator('.dc-toast')).toHaveCount(0);
+});
+
+test.describe('keyboard shortcuts', () => {
+  test.skip(({ isMobile }) => isMobile, 'Hardware-keyboard shortcuts; phones have the on-screen buttons.');
+  /** Keys go to the page, not a field (title screens focus their name box). */
+  const unfocus = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  test('? opens Help with the shortcuts listed, M mutes and unmutes, never while typing', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('[data-arcade-floor]')).toBeVisible();
+    await unfocus(page);
+
+    await page.keyboard.press('?');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Welcome to DASCADE')).toBeVisible();
+    await expect(dialog.locator('[data-part="help-shortcuts"]')).toContainText('mutes or unmutes everything');
+    // Keys stand aside while a pop-up is open; Esc closes it.
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    const muted = () => page.evaluate(() => JSON.parse(localStorage.getItem('dascade:v1:settings') ?? '{}').muted);
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound off' })).toBeVisible();
+    await expect.poll(muted).toBe(true);
+    await page.keyboard.press('M');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound on' })).toBeVisible();
+    await expect.poll(muted).toBe(false);
+
+    // Typing an "m" in a name is just typing.
+    await page.goto('/play/wheel');
+    const name = page.getByPlaceholder('Pick a nickname');
+    await name.fill('');
+    await name.pressSequentially('Mim');
+    await expect(name).toHaveValue('Mim');
+    expect(await muted()).toBe(false);
+    // ? on a title screen opens that game's page.
+    await unfocus(page);
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog').getByRole('heading', { name: /Wheel of DAStiny/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+  });
+
+  test('in a lobby, ? opens that game’s Help and M mutes (the room’s session loads on its own)', async ({ page }) => {
+    await createRoom(page, 'wheel', 'Keys');
+    await unfocus(page);
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog').getByRole('heading', { name: /Wheel of DAStiny/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound off' })).toBeVisible();
+    await page.keyboard.press('m');
+    await expect(page.locator('.dc-toast').filter({ hasText: 'Sound on' })).toBeVisible();
+  });
+
+  test('Esc goes back from a title screen and out of the Tournament Center, and puts its title back', async ({ page }) => {
+    await page.goto('/play/wheel');
+    await expect(page.locator('[data-part="title-screen"]')).toBeVisible();
+    await unfocus(page);
+    await page.keyboard.press('Escape');
+    await page.waitForURL((url) => !url.pathname.startsWith('/play/'));
+
+    await page.goto('/tournaments');
+    await expect(page).toHaveTitle('Tournament Center · DASCADE');
+    await unfocus(page);
+    await page.keyboard.press('Escape');
+    await page.waitForURL((url) => url.pathname === '/');
+    await expect(page).toHaveTitle('DASCADE — Delta Alpha Sierra Arcade');
+  });
 });
