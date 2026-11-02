@@ -1610,6 +1610,33 @@
     font-size: 12px !important;
   }
 }
+/* Tablets and narrow windows (the compact HUD, 700–1023 px; COMPACT_HUD_QUERY in seasonalController.ts):
+   the HUD has no room for Join beside the profile chip, the icons and the claw machine's quick button, so
+   Settings and Help were pushed off-screen. Join moves to the extras row, beside the Tournament strip. */
+@media (min-width: 700px) and (max-width: 1023px) {
+  .af-hud__join {
+    display: none !important;
+  }
+  .af-floor__join-mobile {
+    display: inline-flex !important;
+    flex: none;
+    min-height: 44px;
+    padding-inline: 14px;
+    font-size: 12px !important;
+  }
+}
+/* …and below 768 px the profile chip shows just the avatar, as on phones (wide brands like Corporate '98's
+   title bar still overflowed). Its label keeps the name for assistive tech. */
+@media (min-width: 700px) and (max-width: 767px) {
+  .af-hud__profile-name {
+    display: none !important;
+  }
+  .af-hud__profile {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+}
 /* Tablets */
 @media (max-width: 1199px) and (min-width: 700px) {
   .af-plaque {

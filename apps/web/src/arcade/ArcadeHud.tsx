@@ -67,22 +67,24 @@ export function useServerStatus(intervalMs = 15_000): ServerStatus {
   return status;
 }
 
+/**
+ * "Online · N rooms live". Only the connection state is a live region: the room count changes on every
+ * poll and sits outside it, so screen readers announce going offline / back online, not each new count.
+ */
 export function ServerStatusPill({ status, className }: { status: ServerStatus; className?: string }) {
-  const text =
-    status.state === 'online'
-      ? `Online · ${status.rooms} ${status.rooms === 1 ? 'room' : 'rooms'} live`
-      : status.state === 'offline'
-        ? 'Arcade offline — retrying'
-        : 'Connecting…';
+  const state = status.state === 'online' ? 'Online' : status.state === 'offline' ? 'Arcade offline — retrying' : 'Connecting…';
+  const rooms = status.state === 'online' ? ` · ${status.rooms} ${status.rooms === 1 ? 'room' : 'rooms'} live` : null;
   return (
     <span
       className={`af-srv ${className ?? ''}`}
       data-state={status.state}
-      role="status"
       title={status.state === 'offline' ? 'The game server isn’t reachable right now. We’ll keep trying.' : undefined}
     >
       <i aria-hidden />
-      <span>{text}</span>
+      <span>
+        <span role="status">{state}</span>
+        {rooms}
+      </span>
     </span>
   );
 }

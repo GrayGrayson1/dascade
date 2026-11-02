@@ -450,6 +450,19 @@ test.describe('cabinets, pickers and title screens', () => {
 });
 
 test.describe('floor HUD', () => {
+  test('the status pill is a live region for the connection state only, not the room count', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openFloor(page);
+    const pill = page.locator('.af-srv:visible');
+    await expect(pill).toHaveCount(1);
+    await expect(pill).toHaveText(/^Online · \d+ rooms? live$/);
+    await expect(pill).not.toHaveAttribute('role', /.+/);
+    // The 15 s poll changes the count; only "Online" / "Arcade offline — retrying" / "Connecting…" is announced.
+    const live = pill.getByRole('status');
+    await expect(live).toHaveCount(1);
+    await expect(live).toHaveText('Online');
+  });
+
   test('join modal rejects invalid and unknown codes with friendly errors', async ({ page }) => {
     await openFloor(page);
     await page
