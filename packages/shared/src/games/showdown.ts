@@ -202,7 +202,8 @@ export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: st
 // Question packs (metadata only — the questions live in the server engine package)
 // ---------------------------------------------------------------------------
 
-export const SHOWDOWN_PACK_IDS = ['spooky', 'office', 'tech', 'food', 'life'] as const;
+/** The seasonal packs in calendar order (October, November, December), then the year-round ones. */
+export const SHOWDOWN_PACK_IDS = ['spooky', 'harvest', 'winter', 'office', 'tech', 'food', 'life'] as const;
 export type ShowdownPackId = (typeof SHOWDOWN_PACK_IDS)[number];
 
 export interface ShowdownPackInfo {
@@ -222,10 +223,24 @@ export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, ShowdownPackInfo> = {
     seasonal: true,
     icon: '🎃',
   },
+  harvest: {
+    title: 'Harvest & Gratitude',
+    blurb: 'Fall feasts, pies, leaf piles and what we’re thankful for at work.',
+    rounds: 8,
+    seasonal: true,
+    icon: '🍂',
+  },
+  winter: {
+    title: 'Winter Holidays & Snow Days',
+    blurb: 'Snow days, cozy nights, holiday parties and New Year’s Eve.',
+    rounds: 10,
+    seasonal: true,
+    icon: '❄️',
+  },
   office: { title: 'Office Life', blurb: 'Meetings, desks, the kitchen fridge and Friday at 4:59.', rounds: 10 },
-  tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 8 },
-  food: { title: 'Snack Attack', blurb: 'Pizza, coffee, potlucks and leftovers.', rounds: 8 },
-  life: { title: 'Life & Leisure', blurb: 'Lazy Sundays, chores, vacations and hobbies.', rounds: 8 },
+  tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 10 },
+  food: { title: 'Snack Attack', blurb: 'Pizza, coffee, potlucks and leftovers.', rounds: 10 },
+  life: { title: 'Life & Leisure', blurb: 'Lazy Sundays, chores, vacations, road trips and hobbies.', rounds: 10 },
 };
 
 // ---------------------------------------------------------------------------

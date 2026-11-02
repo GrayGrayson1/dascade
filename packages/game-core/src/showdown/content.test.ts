@@ -28,6 +28,8 @@ describe('built-in packs', () => {
 
   it('match their published metadata', () => {
     for (const id of SHOWDOWN_PACK_IDS) expect(SHOWDOWN_PACKS[id], id).toHaveLength(SHOWDOWN_PACK_INFO[id].rounds);
+    // Every question's id names its own pack.
+    for (const id of SHOWDOWN_PACK_IDS) for (const r of SHOWDOWN_PACKS[id]) expect(r.id.startsWith(`${id}-`), r.id).toBe(true);
   });
 
   it('every seasonal pack shows its own icon in the lobby; the regulars none', () => {
@@ -35,6 +37,18 @@ describe('built-in packs', () => {
     const icons = SHOWDOWN_PACK_IDS.map((id) => SHOWDOWN_PACK_INFO[id].icon).filter(Boolean);
     expect(new Set(icons).size).toBe(icons.length);
     expect(SHOWDOWN_PACK_INFO.spooky.icon).toBe('🎃');
+  });
+
+  it('the bank: 10 rounds in every regular pack, Winter (10) and Harvest (8) for November and December', () => {
+    for (const id of ['office', 'tech', 'food', 'life'] as const) expect(SHOWDOWN_PACK_INFO[id].rounds, id).toBe(10);
+    expect(SHOWDOWN_PACK_INFO.winter).toMatchObject({ rounds: 10, seasonal: true, icon: '❄️' });
+    expect(SHOWDOWN_PACK_INFO.harvest).toMatchObject({ rounds: 8, seasonal: true, icon: '🍂' });
+    expect(SHOWDOWN_PACK_IDS.reduce((n, id) => n + SHOWDOWN_PACK_INFO[id].rounds, 0)).toBe(68);
+  });
+
+  it('no question is asked twice across the packs', () => {
+    const prompts = all.map((r) => normalizeForCompare(r.prompt));
+    expect(new Set(prompts).size).toBe(prompts.length);
   });
 
   it('are valid boards: 3–10 distinct answers, most popular first, at most 100 points', () => {
@@ -85,7 +99,9 @@ describe('built-in packs', () => {
     expect(first.every((r) => r.id.startsWith('tech-'))).toBe(true);
     const seen = new Set(first.map((r) => r.id));
     const second = pickRounds(['tech'], 5, rng, seen);
-    expect(second.slice(0, 3).every((r) => !seen.has(r.id))).toBe(true); // 8 in the pack → 3 fresh, then repeats
+    expect(second.every((r) => !seen.has(r.id))).toBe(true); // 10 in the pack → 5 fresh
+    const third = pickRounds(['tech'], 5, rng, new Set([...seen, ...second.map((r) => r.id)]));
+    expect(third).toHaveLength(5); // all seen: repeats rather than a short show
     expect(pickRounds(['food'], 50, rng)).toHaveLength(SHOWDOWN_PACK_INFO.food.rounds);
     // Copies: changing a picked round never edits the bank.
     second[0]!.answers[0]!.text = 'mutated';
