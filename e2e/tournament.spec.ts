@@ -2,7 +2,8 @@
  * Tournament Center E2E: an organizer creates a chess tournament in the wizard, two players register
  * and check in from their own browsers, the organizer starts it, a player launches the match from the
  * kiosk, the match resolves by resignation, and the bracket crowns the champion. A Classics match
- * (Memory Matrix) starts by itself, and leaving a match room leads back to the kiosk.
+ * (Memory Matrix) starts by itself, and leaving a match room leads back to the kiosk. The wizard's
+ * organizer options (Ships' combined fleet + grid, Putt's course) reach the kiosk.
  */
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test';
 import { dropConnection, myPlayerId, roomState, setName, waitForPhase } from './helpers.ts';
@@ -181,6 +182,41 @@ test.describe('Tournament Center', () => {
 
     await ada.context().close();
     await bo.context().close();
+  });
+
+  test('organizer options: Ships fleet and grid are one choice and reach the kiosk; Putt picks its course', async ({ page }) => {
+    await page.goto('/tournaments');
+    await page.getByRole('button', { name: 'Create tournament' }).first().click();
+    await page.getByRole('radio', { name: /DAS SHIPS/ }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    const fleet = page.getByLabel('Fleet and grid');
+    await expect(fleet).toHaveValue('standard-10');
+    // The Armada needs a 10×10 sea, so the wizard never offers it on 8×8.
+    await expect(fleet.locator('option')).toHaveCount(8);
+    await expect(fleet.locator('option', { hasText: 'Armada · 8×8' })).toHaveCount(0);
+    await fleet.selectOption('armada-12');
+    await page.getByLabel('Firing').selectOption('salvo');
+    const summary = page.getByRole('complementary', { name: 'Summary' });
+    await expect(summary).toContainText('Armada · 12×12');
+    await expect(summary).toContainText('Salvo');
+    await page.getByLabel('Tournament name').fill('Fleet Cup');
+    await setName(page, 'Orga');
+    await page.getByRole('button', { name: 'Create tournament' }).click();
+    await page.waitForURL(/\/room\/[A-Z0-9]{5}$/);
+    await expect
+      .poll(async () => JSON.parse((await roomState<{ settingsJson?: string }>(page))?.settingsJson ?? '{}').gameSettings)
+      .toEqual({ firing: 'salvo', fleet: 'armada', gridSize: 12 });
+
+    await page.goto('/tournaments');
+    await page.getByRole('button', { name: 'Create tournament' }).first().click();
+    await page.getByRole('radio', { name: /DAS PUTT/ }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    const course = page.getByLabel('Course');
+    await expect(course).toHaveValue('full');
+    await course.selectOption('front');
+    await expect(page.getByRole('complementary', { name: 'Summary' })).toContainText('Front three');
   });
 
   test('the landing lists live tournaments and filters by game', async ({ page }) => {
