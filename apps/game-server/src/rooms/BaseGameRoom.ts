@@ -37,6 +37,7 @@ import {
   ReadySchema,
   RoomCloseCode,
   RoomUpdateSchema,
+  SEAT_RESERVATION_SECONDS,
   SYS,
   SettingsUpdateSchema,
   SpectateSchema,
@@ -363,6 +364,11 @@ export abstract class BaseGameRoom<
   }
 
   override async onCreate(rawOptions: unknown): Promise<void> {
+    // Outlast the heartbeat (HEARTBEAT_WINDOW_MS): an auto-reconnect that arrives while this server
+    // still sees the old socket is parked until the heartbeat ends that socket, and with Colyseus'
+    // 15 s default it was refused first (close 4003, never retried). Landing keeps the same session,
+    // so nothing remounts (Phaser, kart, circuit). Also the time a reserved seat waits for its socket.
+    this.seatReservationTimeout = SEAT_RESERVATION_SECONDS;
     const parsed = CreateOptionsSchema.safeParse(rawOptions ?? {});
     const options: CreateOptions = parsed.success ? parsed.data : { name: 'Player' };
     this.catalog = GAME_CATALOG[this.gameId];
