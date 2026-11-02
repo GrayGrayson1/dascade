@@ -55,3 +55,60 @@ test('DASQuest smoke: pick heroes, start, vote, roll a check, leave', async ({ p
   await leaveRoom(guest);
   await leaveRoom(page);
 });
+
+test('DASQuest: the lobby offers Snowed In at Delta Alpha, and it plays to an ending', async ({ page }) => {
+  await createRoom(page, 'quest', 'Ava');
+
+  // The pack picker lists the winter adventure straight from the server's pack registry.
+  const settingsTab = page.getByRole('tab', { name: 'Settings' });
+  if (await settingsTab.isVisible().catch(() => false)) await settingsTab.click();
+  const adventure = page.getByLabel('Adventure');
+  await expect(adventure.locator('option', { hasText: 'Snowed In at Delta Alpha' })).toHaveCount(1);
+  await adventure.selectOption({ label: 'Snowed In at Delta Alpha' });
+  await expect.poll(async () => (await roomState(page))?.packId).toBe('snowed-in');
+  await expect(page.getByText(/The roads are closed, the heat is off/)).toBeVisible();
+
+  await pickHero(page, 'Guardian');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await expect.poll(() => nodeId(page)).toBe('w_start');
+  await expect(page.getByRole('heading', { level: 2, name: 'Away Mode' })).toBeVisible();
+
+  // One choice per scene that is always on offer; checks may go either way, every branch is covered.
+  const route: Record<string, string> = {
+    w_start: 'Check the break room for anything hot',
+    w_vending: 'Leave it: heat first, cocoa later',
+    w_hall: 'Take the stairs down',
+    w_stairs: 'Dash past the spray',
+    w_boiler: 'Relight BERTHA by the book',
+    w_sputter: 'Retreat upstairs and regroup',
+    w_retreat: 'Build the greatest blanket fort in company history',
+    w_relight: 'Head up to the potluck',
+    w_potluck: 'Dig in',
+  };
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const s = await roomState(page);
+    if (s?.phase === 'RESULTS') break;
+    const id = s?.sceneJson ? JSON.parse(s.sceneJson).nodeId : undefined;
+    const label = id ? route[id] : undefined;
+    if (s?.stage !== 'voting' || !label) {
+      await page.waitForTimeout(250);
+      continue;
+    }
+    await page.getByRole('button', { name: label }).click();
+    await expect
+      .poll(
+        async () => {
+          const next = await roomState(page);
+          return next?.phase === 'RESULTS' || next?.sceneRev !== s.sceneRev;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+  }
+  await waitForPhase(page, 'RESULTS');
+  await expect(page.locator('#qs-ending-title')).toHaveText(/Warm Enough|Fort Delta Alpha|Office Popsicles/);
+
+  await leaveRoom(page);
+});
