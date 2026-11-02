@@ -811,6 +811,18 @@ export abstract class BaseGameRoom<
   }
 
   /**
+   * Solo rooms that play several runs inside one match (the Classics' Start / Retry, all in PLAYING):
+   * call when a run begins. It opens a new outcome window, so reportOutcome() accepts this run's
+   * result, and restarts the match clock for its startedAt. Does nothing outside solo rooms: every
+   * other match (tournaments included) keeps exactly one outcome per match.
+   */
+  protected beginSoloOutcome(): void {
+    if (!this.isSolo || this.tournamentInfo) return;
+    this.matchSerial++;
+    this.matchStartedAt = Date.now();
+  }
+
+  /**
    * Room player ids of players seated when the current match started who have since left the room,
    * so a game can still list them in its outcome (usually as the last group).
    */

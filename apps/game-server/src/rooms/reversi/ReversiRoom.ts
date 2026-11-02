@@ -142,7 +142,18 @@ export class ReversiRoom extends BoardGameRoom<ReversiState, ReversiSettings> {
     const plies = this.game.plies;
     const moves = plies.length <= MAX_DETAIL_PLIES ? plies.map((p) => p.notation).join(' ') : undefined;
     const [black, white] = this.game.result?.score ?? [0, 0];
-    return { variant: this.variant, ...(this.game.result ? { black, white } : {}), ...(moves !== undefined ? { moves } : {}) };
+    // Profile stats (packages/shared/src/stats.ts): from the public move record.
+    const playerStats: Record<string, { discsFlipped: number; maxFlip: number }> = {};
+    for (const side of ['first', 'second'] as const) {
+      const id = this.seatFor(side).playerId;
+      if (!id) continue;
+      const mine = plies.filter((p) => p.side === side && p.cell >= 0);
+      playerStats[id] = {
+        discsFlipped: mine.reduce((n, p) => n + p.flips.length, 0),
+        maxFlip: mine.reduce((m, p) => Math.max(m, p.flips.length), 0),
+      };
+    }
+    return { variant: this.variant, ...(this.game.result ? { black, white } : {}), ...(moves !== undefined ? { moves } : {}), playerStats };
   }
 
   // ---------------------------------------------------------------------------

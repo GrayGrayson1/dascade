@@ -78,7 +78,26 @@ export const STAT_EXTRA_LABELS: Record<string, string> = {
   maxLines: 'Most lines',
   bestStreak: 'Best streak',
   shipsSunk: 'Ships sunk',
+  // DASwords (also wordsFound)
   wordsFound: 'Words found',
+  uniqueWords: 'Only-one finds',
+  maxWordLength: 'Longest word (letters)',
+  chainLinks: 'Chain links made',
+  // DASterpiece
+  votesReceived: 'Votes received',
+  showdownsWon: 'Showdowns won',
+  sweeps: 'Sweeps',
+  audiencePicks: 'Audience picks',
+  // DAS Survey
+  predictionsHit: 'Predictions on target',
+  bonusCalls: 'Bonus calls',
+  // DASception
+  survived: 'Games survived',
+  glitchGames: 'Games as a Glitch',
+  awardsWon: 'Awards won',
+  // DAS Reversi
+  discsFlipped: 'Discs flipped',
+  maxFlip: 'Biggest flip',
   roundsWon: 'Rounds won',
   checkmates: 'Checkmates',
   captures: 'Captures',

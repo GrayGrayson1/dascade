@@ -157,8 +157,23 @@ export abstract class ClassicsRoom<S extends ClassicsState = ClassicsState, Sett
     if (!this.isSolo) {
       this.broadcastEvent({ kind: 'player-over', playerId, score: Math.floor(summary.score), place: s?.rank || null, reason });
       this.checkMatchEnd();
+    } else if (RECORDABLE.has(reason) && player) {
+      // Each finished solo run is one game for Profile → Stats (solo is never rated). Quit and left
+      // runs aren't results. onStartRequest opened this run's outcome window.
+      this.reportOutcome({
+        placements: [[playerId]],
+        scores: { [playerId]: Math.max(0, Math.floor(summary.score)) },
+        reason,
+        details: { board, mode: this.modeLabel(), playerStats: { [playerId]: this.runStats(s, summary) } },
+      });
     }
     return info;
+  }
+
+  /** Platform stats extras for one player's run (see the tournament kit notes): `max…` keys keep the best value. */
+  private runStats(s: ClassicsStanding | undefined, summary?: RunSummary): Record<string, number> {
+    const statKey = `max${this.statLabel.replace(/[^A-Za-z]/g, '') || 'Stat'}`;
+    return { maxLevel: s?.level ?? Math.floor(summary?.level ?? 0), [statKey]: s?.stat ?? Math.floor(summary?.stat ?? 0) };
   }
 
   /**
@@ -237,12 +252,10 @@ export abstract class ClassicsRoom<S extends ClassicsState = ClassicsState, Sett
       place += group.length;
     }
     this.ranksFinal = true;
-    // Platform stats extras (see the tournament kit notes): `max…` keys keep the best value per player.
-    const statKey = `max${this.statLabel.replace(/[^A-Za-z]/g, '') || 'Stat'}`;
     const playerStats: Record<string, Record<string, number>> = {};
     for (const id of this.entrants) {
       const s = this.standingOf(id);
-      if (s) playerStats[id] = { maxLevel: s.level, [statKey]: s.stat };
+      if (s) playerStats[id] = this.runStats(s);
     }
     this.reportOutcome({ placements, scores, reason, details: { board: this.boardKey(), mode: this.modeLabel(), matchNo: this.state.classics.matchNo, playerStats } });
     this.schedule('classics:results', this.resultsDelayMs, () => {
@@ -377,6 +390,8 @@ export abstract class ClassicsRoom<S extends ClassicsState = ClassicsState, Sett
     this.entrants = [p.id];
     this.soloPauses = 0;
     this.soloLiveAt = 0;
+    // Solo rooms stay in PLAYING across retries: each run gets its own outcome (reported by playerFinished).
+    this.beginSoloOutcome();
     this.beginSoloRun(p);
   }
 
