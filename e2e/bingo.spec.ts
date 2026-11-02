@@ -59,6 +59,22 @@ test('DAS Bingo: set up a quick text game, call squares by hand, claim and see t
   await leaveRoom(page);
 });
 
+test('DAS Bingo: the Holiday party and Thanksgiving dinner quick setups load full 5×5 text cards', async ({ page }) => {
+  await createRoom(page, 'bingo', 'Host');
+  await openSettings(page);
+  for (const [label, sample] of [
+    ['Holiday party', 'Ugly sweater'],
+    ['Thanksgiving dinner', 'Pumpkin pie'],
+  ] as const) {
+    await page.getByRole('button', { name: new RegExp(label) }).click();
+    await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).items ?? []).toContain(sample);
+    const s = JSON.parse((await roomState(page)).settingsJson);
+    expect(s).toMatchObject({ mode: 'text', size: 5, freeCenter: true });
+    expect(s.items.length).toBeGreaterThanOrEqual(24);
+  }
+  await leaveRoom(page);
+});
+
 test('DAS Bingo: a false claim is rejected by the server', async ({ page, browser }) => {
   const code = await createRoom(page, 'bingo', 'Host');
   await openSettings(page);
@@ -76,5 +92,17 @@ test('DAS Bingo: a false claim is rejected by the server', async ({ page, browse
   }).toBe(1);
   expect((await roomState(page)).winners).toHaveLength(0);
   await leaveRoom(guest);
+  await leaveRoom(page);
+});
+
+test('DAS Bingo: the pattern library has the Pine tree and Snowflake shapes', async ({ page }) => {
+  await createRoom(page, 'bingo', 'Host');
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Edit patterns' }).first().click();
+  const library = page.getByRole('region', { name: 'Pattern library' });
+  await expect(library.getByRole('button', { name: 'Pine tree', exact: true })).toBeEnabled();
+  await library.getByRole('button', { name: 'Snowflake', exact: true }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect.poll(async () => JSON.stringify(JSON.parse((await roomState(page)).settingsJson).rounds)).toContain('"snowflake"');
   await leaveRoom(page);
 });

@@ -131,6 +131,8 @@ describe('shape presets on 5×5', () => {
   it('checkerboard', () => expect(one('checkerboard')).toEqual(['#.#.#', '.#.#.', '#.#.#', '.#.#.', '#.#.#']));
   it('heart', () => expect(one('heart')).toEqual(['.#.#.', '#####', '#####', '.###.', '..#..']));
   it('smiley', () => expect(one('smiley')).toEqual(['.#.#.', '.#.#.', '.....', '#...#', '.###.']));
+  it('pine tree', () => expect(one('tree')).toEqual(['..#..', '.###.', '#####', '..#..', '..#..']));
+  it('snowflake', () => expect(one('snowflake')).toEqual(['#.#.#', '.###.', '#####', '.###.', '#.#.#']));
   it('blackout', () => expect(one('blackout')).toEqual(['#####', '#####', '#####', '#####', '#####']));
 });
 
@@ -160,6 +162,21 @@ describe('size-dependent presets', () => {
     expect(one('heart', 7)).toEqual(['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...']);
     expect(one('diamond', 3)).toEqual(['.#.', '#.#', '.#.']);
     expect(one('inner-frame', 7)).toEqual(['.......', '.#####.', '.#...#.', '.#...#.', '.#...#.', '.#####.', '.......']);
+  });
+
+  it('the winter shapes come in 5×5 and 7×7 only, and differ from every other shape', () => {
+    expect(one('tree', 7)).toEqual(['...#...', '..###..', '.#####.', '..###..', '.#####.', '#######', '...#...']);
+    expect(one('snowflake', 7)).toEqual(['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#']);
+    for (const id of ['tree', 'snowflake'] as const) {
+      for (const size of [3, 4, 6]) expect(PATTERN_PRESETS[id].supports(size), `${id} ${size}`).toBe(false);
+      for (const size of [5, 7]) {
+        const mine = show(presetMasks(id, size)[0]!).join('/');
+        for (const other of BINGO_PRESET_IDS) {
+          if (other === id || !PATTERN_PRESETS[other].supports(size)) continue;
+          for (const m of presetMasks(other, size)) expect(show(m).join('/'), `${id} vs ${other} at ${size}`).not.toBe(mine);
+        }
+      }
+    }
   });
 });
 

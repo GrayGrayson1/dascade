@@ -70,6 +70,8 @@ export const BINGO_PRESET_IDS = [
   'checkerboard',
   'heart',
   'smiley',
+  'tree',
+  'snowflake',
   'blackout',
 ] as const;
 export type BingoPresetId = (typeof BINGO_PRESET_IDS)[number];

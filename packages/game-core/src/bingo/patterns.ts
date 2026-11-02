@@ -184,6 +184,14 @@ const SMILEY: Record<number, string[]> = {
   5: ['.#.#.', '.#.#.', '.....', '#...#', '.###.'],
   7: ['.......', '.#...#.', '.#...#.', '.......', '#.....#', '.#...#.', '..###..'],
 };
+const TREE: Record<number, string[]> = {
+  5: ['..#..', '.###.', '#####', '..#..', '..#..'],
+  7: ['...#...', '..###..', '.#####.', '..###..', '.#####.', '#######', '...#...'],
+};
+const SNOWFLAKE: Record<number, string[]> = {
+  5: ['#.#.#', '.###.', '#####', '.###.', '#.#.#'],
+  7: ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#'],
+};
 
 export const PATTERN_PRESETS: Record<BingoPresetId, PatternPreset> = {
   'any-line': {
@@ -426,6 +434,24 @@ export const PATTERN_PRESETS: Record<BingoPresetId, PatternPreset> = {
     supports: (n) => n in SMILEY,
     build: (n) => [fromArt(SMILEY[n] ?? [])],
   },
+  tree: {
+    id: 'tree',
+    name: 'Pine tree',
+    description: 'A pixel pine tree on its trunk.',
+    family: false,
+    group: 'Fun',
+    supports: (n) => n in TREE,
+    build: (n) => [fromArt(TREE[n] ?? [])],
+  },
+  snowflake: {
+    id: 'snowflake',
+    name: 'Snowflake',
+    description: 'A pixel snowflake, arms out to every corner.',
+    family: false,
+    group: 'Fun',
+    supports: (n) => n in SNOWFLAKE,
+    build: (n) => [fromArt(SNOWFLAKE[n] ?? [])],
+  },
   blackout: {
     id: 'blackout',
     name: 'Blackout',
@@ -462,6 +488,8 @@ export const PRESET_ORDER: readonly BingoPresetId[] = [
   'checkerboard',
   'heart',
   'smiley',
+  'tree',
+  'snowflake',
   'blackout',
 ];
 

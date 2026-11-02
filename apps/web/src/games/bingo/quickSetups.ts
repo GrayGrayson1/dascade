@@ -1,0 +1,222 @@
+/**
+ * DAS Bingo quick-start setups and their built-in square lists (text mode).
+ * Plain data so the lists can be checked by tests; the host's Settings panel renders them.
+ */
+import type { BingoPatternRef, BingoPresetId, BingoSettings } from '@dascade/shared/games/bingo';
+
+export const preset = (id: BingoPresetId): BingoPatternRef => ({ type: 'preset', id, rotate: false, mirror: false });
+
+export const OFFICE_ITEMS = [
+  'Can you hear me?',
+  'You’re on mute',
+  'Let’s take this offline',
+  'Circle back',
+  'Synergy',
+  'Low-hanging fruit',
+  'Can everyone see my screen?',
+  'Sorry, go ahead',
+  'Quick sync',
+  'Per my last email',
+  'Touch base',
+  'Deep dive',
+  'Action items',
+  'Bandwidth',
+  'Move the needle',
+  'Dog barks in the background',
+  'Someone joins late',
+  'I have a hard stop',
+  'Parking lot',
+  'Let’s be mindful of time',
+  'Alignment',
+  'Paradigm shift',
+  'Stakeholders',
+  'Win-win',
+  'Deliverables',
+  'Leverage',
+  'Ping me',
+  'Next steps',
+  'Game changer',
+  'Reply-all accident',
+  'Frozen video',
+  'Wrong window shared',
+  'Awkward silence',
+  'Coffee refill',
+  'Pivot',
+  'Great question!',
+];
+
+export const PARTY_ITEMS = [
+  'Someone sings along',
+  'Group photo',
+  'Spilled drink',
+  'Dance battle',
+  'Inside joke',
+  'Cake!',
+  'Someone arrives late',
+  'A toast speech',
+  'Karaoke',
+  'Lost phone',
+  'Birthday song',
+  'Surprise guest',
+  'Someone tells a bad joke',
+  'Selfie',
+  'High five',
+  'Snack run',
+  'Someone changes the music',
+  'Charades',
+  'Matching outfits',
+  'A magic trick',
+  'Terrible pun',
+  'Confetti',
+  'Slow clap',
+  'Contagious laugh',
+];
+
+/** Winter party squares: secular and work-friendly. */
+export const HOLIDAY_ITEMS = [
+  'Ugly sweater',
+  'Gift swap',
+  'A gift gets stolen',
+  'Someone forgets their gift',
+  'Hot cocoa',
+  'Paper snowflakes',
+  'Twinkly lights',
+  'The same song plays twice',
+  'Group photo',
+  'Someone in a festive hat',
+  'Wrapping paper everywhere',
+  'Someone checks the snow forecast',
+  'Gingerbread',
+  'Sparkling cider',
+  'Cheese board',
+  'Too many cookies',
+  'Toast to the team',
+  'Someone dances',
+  'A board game breaks out',
+  'Matching outfits',
+  'Winter-break travel plans',
+  'Year-in-review slideshow',
+  'Someone wears slippers',
+  'Spilled glitter',
+  'Someone hums along',
+  'Leftover dessert',
+  'Cozy socks',
+  'Someone says “Happy New Year” early',
+  'Secret gift giver revealed',
+  'Out-of-office already on',
+];
+
+/** Thanksgiving dinner-table squares. */
+export const THANKSGIVING_ITEMS = [
+  'Turkey',
+  'Stuffing',
+  'Mashed potatoes',
+  'Gravy boat',
+  'Cranberry sauce',
+  'Pumpkin pie',
+  'Sweet potato casserole',
+  'Green bean casserole',
+  'Cornbread',
+  'Mac and cheese',
+  'Someone carves the turkey',
+  'Everyone shares a thank-you',
+  'Football on TV',
+  'The parade is on',
+  'Kids’ table',
+  'Second helpings',
+  'Food coma nap',
+  'Burnt rolls',
+  'Leftover containers',
+  'Wishbone pull',
+  'Someone arrives late',
+  'Group photo',
+  'Debate over the dishes',
+  'Too many pies',
+  'A brand-new recipe',
+  'Stretchy pants',
+  'Elbow-to-elbow seating',
+  'Board game after dinner',
+  'Pie for breakfast',
+  'A long family story',
+];
+
+export interface QuickSetup {
+  id: string;
+  label: string;
+  blurb: string;
+  settings: Partial<BingoSettings>;
+}
+
+export const QUICK_SETUPS: QuickSetup[] = [
+  {
+    id: 'classic',
+    label: 'Classic 75-ball',
+    blurb: 'Any line wins',
+    settings: { mode: 'numbers', format: 'single', freeCenter: true, rounds: [{ prize: '', patterns: [preset('any-line')] }] },
+  },
+  {
+    id: 'hall',
+    label: 'Hall night',
+    blurb: 'Line → corners → X → blackout',
+    settings: {
+      mode: 'numbers',
+      format: 'progressive',
+      freeCenter: true,
+      continueCalls: false,
+      rounds: [
+        { prize: 'Snack', patterns: [preset('any-line')] },
+        { prize: 'Drink', patterns: [preset('four-corners')] },
+        { prize: '', patterns: [preset('x')] },
+        { prize: 'Grand prize', patterns: [preset('blackout')] },
+      ],
+    },
+  },
+  {
+    id: 'uk',
+    label: 'Line → full house',
+    blurb: 'Calls carry over between rounds',
+    settings: {
+      mode: 'numbers',
+      format: 'progressive',
+      continueCalls: true,
+      newCardsEachRound: false,
+      rounds: [
+        { prize: 'One line', patterns: [preset('any-row')] },
+        { prize: 'Two lines', patterns: [preset('two-lines')] },
+        { prize: 'Full house', patterns: [preset('blackout')] },
+      ],
+    },
+  },
+  {
+    id: 'office',
+    label: 'Meeting buzzwords',
+    blurb: '5×5 custom squares',
+    settings: { mode: 'text', size: 5, freeCenter: true, items: OFFICE_ITEMS, format: 'single', rounds: [{ prize: '', patterns: [preset('any-line')] }] },
+  },
+  {
+    id: 'party',
+    label: 'Quick 3×3 party',
+    blurb: 'Tiny cards, fast rounds',
+    settings: {
+      mode: 'text',
+      size: 3,
+      freeCenter: true,
+      items: PARTY_ITEMS,
+      format: 'single',
+      callSeconds: 4,
+      rounds: [{ prize: '', patterns: [preset('any-line')] }],
+    },
+  },
+  {
+    id: 'holiday',
+    label: 'Holiday party',
+    blurb: '5×5 winter party squares',
+    settings: { mode: 'text', size: 5, freeCenter: true, items: HOLIDAY_ITEMS, format: 'single', rounds: [{ prize: '', patterns: [preset('any-line')] }] },
+  },
+  {
+    id: 'thanksgiving',
+    label: 'Thanksgiving dinner',
+    blurb: '5×5 dinner-table squares',
+    settings: { mode: 'text', size: 5, freeCenter: true, items: THANKSGIVING_ITEMS, format: 'single', rounds: [{ prize: '', patterns: [preset('any-line')] }] },
+  },
+];
