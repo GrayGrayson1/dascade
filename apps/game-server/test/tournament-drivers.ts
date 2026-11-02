@@ -16,6 +16,7 @@ import { PADDLE_TOURNAMENT_RULES } from '@dascade/shared/games/paddle';
 import { PUTT_MSG, type PuttShotView } from '@dascade/shared/games/putt';
 import { SHIPS_MSG } from '@dascade/shared/games/ships';
 import { SNAKE_MSG } from '@dascade/shared/games/snake';
+import { KART_MSG } from '@dascade/shared/games/kart';
 import { FACE_X, type PaddleMatch } from '@dascade/game-core/paddle';
 import { CODE as BLOCKS_CODE, createBlocksSim } from '@dascade/game-core/blocks';
 import { CODE as BRICKS_CODE, FIELD_W, createBricksSim, type BricksSim } from '@dascade/game-core/bricks';
@@ -23,6 +24,7 @@ import type { ClassicsSim } from '@dascade/game-core/classics/shared';
 import { randomLayout } from '@dascade/game-core/ships';
 import { getHole, searchShots } from '@dascade/game-core/putt';
 import { botDirection, cellY, type SnakeGame } from '@dascade/game-core/snake';
+import { KartBot } from '@dascade/game-core/kart';
 import { collect, quiet, sleep, waitFor } from './helpers.ts';
 import { playRun, type ClassicsClient } from './classicsBot.ts';
 
@@ -502,6 +504,39 @@ const memoryDriver: GameDriver = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// DASphalt GP: the room's computer driver races the winner's kart; the race is fast-forwarded
+// ---------------------------------------------------------------------------
+
+/** Run the room's own 60 Hz tick synchronously (as kart-helpers' fastForward does) until this race is decided. */
+function kartFastForward(server: ServerRoom, maxTicks = 60 * 60 * 8): void {
+  const sim = server.sim;
+  for (let i = 0; i < maxTicks && sim && server.sim === sim && sim.status !== 'done'; i++) server.tick();
+}
+
+const kartDriver: GameDriver = {
+  gameId: 'kart',
+  sided: false,
+  fast(server) {
+    server.countdownMs = 60;
+    server.resultsDelayMs = 40;
+  },
+  live: (seat) => stateOf(seat.room).phase === 'PLAYING' && Boolean(seat.server().sim),
+  rematch: { type: KART_MSG.next, payload: {} },
+  async win(winner) {
+    // The winner's kart drives itself (the room's test autopilot); the loser never touches the
+    // throttle. The winner finishes, the finish window closes and the loser is classified DNF.
+    const server = winner.server();
+    const slot = server.slotOf.get(winner.playerId()) as number;
+    server.autopilots.set(slot, new KartBot('hard', slot + 1));
+    kartFastForward(server);
+  },
+  async draw(a) {
+    // Nobody drives: the race reaches its time limit with no finishers, which a tournament scores as a draw.
+    kartFastForward(a.server());
+  },
+};
+
 export const DRIVERS: Record<string, GameDriver> = {
   chess: boardDriver('chess'),
   checkers: boardDriver('checkers'),
@@ -514,4 +549,5 @@ export const DRIVERS: Record<string, GameDriver> = {
   blocks: blocksDriver,
   bricks: bricksDriver,
   memory: memoryDriver,
+  kart: kartDriver,
 };

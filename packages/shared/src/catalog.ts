@@ -335,6 +335,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     ],
     virtualChips: false,
     prefersLandscape: true,
+    // Tournament games are single races with no computer racers; a race nobody finishes is a draw.
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3], maxField: 32, draws: true, sides: false },
   },
   quest: {
     id: 'quest',
@@ -935,7 +937,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     marquee: 'TOURNAMENTS',
     tagline: 'Brackets, Swiss and round robins for any head-to-head game.',
     description:
-      'Run a tournament for chess, checkers, tic-tac-toe, ships, putt and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
+      'Run a tournament for chess, checkers, tic-tac-toe, ships, putt, DASphalt GP races and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
     category: 'meta',
     cabinet: null,
     accent: { primary: '#ffd23f', secondary: '#22d3ee', deep: '#1a1405' },
