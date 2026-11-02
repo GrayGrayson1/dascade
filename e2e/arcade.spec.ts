@@ -468,6 +468,23 @@ test.describe('cabinets, pickers and title screens', () => {
     await expect.poll(async () => (await roomState(page))?.seats?.[me]?.table, { timeout: 15_000 }).toBe('floor');
     await page.evaluate(() => (window as any).__DASCADE__?.session.leaveRoom());
   });
+
+  test('Classics: the picker shows the selected game’s top three', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'the preview panel is desktop-only');
+    const entries = [5200, 4100, 3900, 1200].map((score, i) => ({ id: `e${i}`, name: `Ace ${i + 1}`, score, level: 3, stat: 20, at: 1 }));
+    await page.route('**/api/classics/scores/**', (route) => {
+      const gameId = new URL(route.request().url()).pathname.split('/').pop();
+      return route.fulfill({ json: { gameId, board: 'default', statLabel: 'Lines', entries: gameId === 'blocks' ? entries : [] } });
+    });
+    await page.goto('/cabinet/classics');
+    const scores = page.locator('[data-part="picker-scores"]');
+    await page.locator('[data-part="picker-card-link"][data-game="blocks"]').hover();
+    await expect(scores.locator('.cl-board__row')).toHaveCount(3);
+    await expect(scores.locator('.cl-board__name')).toHaveText(['Ace 1', 'Ace 2', 'Ace 3']);
+    await expect(scores.locator('.cl-board__score').first()).toHaveText('5,200');
+    await page.locator('[data-part="picker-card-link"][data-game="snake"]').hover();
+    await expect(scores).toContainText('No scores yet');
+  });
 });
 
 test.describe('floor HUD', () => {
