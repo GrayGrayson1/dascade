@@ -7,11 +7,21 @@
  * piece sequence and starts together; Marathon runs until each stack tops out, Blitz until the
  * clock (in engine ticks) runs out. Live stack previews are public (they're on everyone's
  * screen anyway); seeds and logs stay private.
+ *
+ * Tournament matches (head to head) always race BLOCKS_TOURNAMENT_SETTINGS (a 3-minute Blitz): the
+ * kit ranks by verified score (equal scores draw), puts a leaver last and refuses rematches. Their
+ * runs are verified like any other, so they post to the Blitz high-score board too.
  */
 import { t, type SchemaType } from '@colyseus/schema';
 import type { CreateOptions } from '@dascade/shared';
 import { CLASSICS } from '@dascade/shared/games/classics';
-import { BlocksSettingsSchema, DEFAULT_BLOCKS_SETTINGS, blocksBoardKey, type BlocksSettings } from '@dascade/shared/games/blocks';
+import {
+  BLOCKS_TOURNAMENT_SETTINGS,
+  BlocksSettingsSchema,
+  DEFAULT_BLOCKS_SETTINGS,
+  blocksBoardKey,
+  type BlocksSettings,
+} from '@dascade/shared/games/blocks';
 import { MAX_CODE, createBlocksSim, type BlocksSim } from '@dascade/game-core/blocks';
 import type { ClassicsSim } from '@dascade/game-core/classics/shared';
 import type { PlayerRecord, RemovalReason } from '../BaseGameRoom.ts';
@@ -48,6 +58,9 @@ export class BlocksRoom extends VerifiedClassicsRoom<BlocksState, BlocksSettings
     super.onRoomCreated(options);
     // Solo players pick Marathon/Blitz on the start card (between runs).
     this.settingsEditablePhases = this.isSolo ? ['LOBBY', 'PLAYING'] : ['LOBBY'];
+    // Tournament matches race the fixed format, published so every client shows it (the base room
+    // refuses lobby settings in tournament rooms, so it can't change afterwards).
+    if (this.tournamentMatch) this.updateSettings(structuredClone(BLOCKS_TOURNAMENT_SETTINGS));
   }
 
   protected createSim(seed: string, options: Record<string, number | string | boolean>): ClassicsSim {

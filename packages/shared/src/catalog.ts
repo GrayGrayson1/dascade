@@ -850,6 +850,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     howToPlay: ['Bounce the ball off your paddle to break bricks.', 'Catch falling power-ups; don’t let the ball fall.', 'Clear the level to advance.'],
     virtualChips: false,
     prefersLandscape: false,
+    // Tournament games are a 3-minute Blitz score race (BRICKS_TOURNAMENT_SETTINGS).
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: false },
   },
   asteroids: {
     id: 'asteroids',
@@ -924,6 +926,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     howToPlay: ['Move and rotate falling blocks.', 'Fill a row completely to clear it.', 'The game ends when the stack reaches the top.'],
     virtualChips: false,
     prefersLandscape: false,
+    // Tournament games are a 3-minute Blitz score race (BLOCKS_TOURNAMENT_SETTINGS).
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: false },
   },
   tournament: {
     id: 'tournament',
