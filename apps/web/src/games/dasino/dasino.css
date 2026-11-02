@@ -23,9 +23,43 @@
   --dn-red: #e3345f;
   --dn-teal: #5eead4;
   --dn-ink: #0a0414;
-  --dn-panel: rgba(12, 7, 26, 0.8);
+  /* Casino-floor chrome (glass panels, nav, ticker, balance, floor cards, gold text on them). Each
+   * value is Delta Neon's violet art as the fallback of a --dn-theme-* hook that only the other
+   * themes set (from their own tokens, below), so Delta Neon renders exactly as before. */
+  --dn-panel: var(--dn-theme-panel, rgba(12, 7, 26, 0.8));
+  --dn-nav-bg: var(--dn-theme-nav, rgba(8, 4, 18, 0.75));
+  --dn-ticker-bg: var(--dn-theme-ticker, rgba(6, 3, 14, 0.72));
+  --dn-balance-top: var(--dn-theme-raised, #2c1654);
+  --dn-balance-bottom: var(--dn-theme-raised-deep, #140a29);
+  --dn-card-top: var(--dn-theme-card, #150b2b);
+  --dn-card-bottom: var(--dn-theme-card-deep, #0b0617);
+  --dn-gold-ink: var(--dn-theme-gold-ink, #ffd23f);
+  --dn-gold-ink-soft: var(--dn-theme-gold-ink, #ffe79a);
+  --dn-up-ink: var(--dn-theme-up-ink, var(--green));
+  --dn-live-ink: var(--dn-theme-up-ink, #b7ffcf);
+  --dn-down-ink: var(--dn-theme-down-ink, #ff7a82);
+  --dn-urgent-ink: var(--dn-theme-down-ink, #ffb3b6);
+  --dn-inset: var(--dn-theme-inset, rgba(0, 0, 0, 0.38));
+  --dn-inset-strong: var(--dn-theme-inset-strong, rgba(0, 0, 0, 0.4));
   position: relative;
   overflow-x: clip;
+}
+/* Every other theme: the chrome takes the theme's own surfaces and inks (light in Corporate '98).
+ * Table art (felts, wheel, machines, dice, chips, pick tiles) keeps its own colours and materials. */
+:root[data-theme]:not([data-theme='delta-neon']) .dn {
+  --dn-theme-panel: var(--panel-bg);
+  --dn-theme-nav: var(--hud-bg);
+  --dn-theme-ticker: var(--hud-bg);
+  --dn-theme-raised: var(--bg-3);
+  --dn-theme-raised-deep: var(--bg-2);
+  --dn-theme-card: var(--bg-3);
+  --dn-theme-card-deep: var(--bg-2);
+  /* Status inks pulled toward the theme's own text ink: darker on light panels, lighter on dark ones. */
+  --dn-theme-gold-ink: color-mix(in srgb, var(--warning) 60%, var(--text-0));
+  --dn-theme-up-ink: color-mix(in srgb, var(--success) 60%, var(--text-0));
+  --dn-theme-down-ink: color-mix(in srgb, var(--danger) 60%, var(--text-0));
+  --dn-theme-inset: color-mix(in srgb, var(--text-0) 8%, transparent);
+  --dn-theme-inset-strong: color-mix(in srgb, var(--text-0) 14%, transparent);
 }
 /* Casino carpet: faint diamond lattice + soft spotlights. */
 .dn::before {
@@ -98,10 +132,10 @@
   color: var(--text-2);
 }
 .dn .is-up {
-  color: var(--green);
+  color: var(--dn-up-ink);
 }
 .dn .is-down {
-  color: #ff7a82;
+  color: var(--dn-down-ink);
 }
 .dn-glass {
   background:
@@ -126,7 +160,7 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: rgba(8, 4, 18, 0.75);
+  background: var(--dn-nav-bg);
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
@@ -185,7 +219,7 @@
   gap: 10px;
   padding: 6px 16px 6px 8px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #2c1654, #140a29);
+  background: linear-gradient(180deg, var(--dn-balance-top), var(--dn-balance-bottom));
   border: 1px solid rgba(255, 210, 63, 0.5);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
@@ -207,7 +241,7 @@
 .dn-balance__value {
   font-size: 1.55rem;
   line-height: 1;
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
   text-shadow: 0 0 12px rgba(255, 210, 63, 0.45);
 }
 .dn-net {
@@ -245,7 +279,7 @@
   min-height: 28px;
   border-radius: 999px;
   border: 1px dashed rgba(255, 210, 63, 0.4);
-  color: #ffe79a;
+  color: var(--dn-gold-ink-soft);
   font-family: var(--font-pixel);
   font-size: 9px;
   letter-spacing: 0.1em;
@@ -262,7 +296,7 @@
   padding-left: 12px;
   overflow: hidden;
   border-radius: 10px;
-  background: rgba(6, 3, 14, 0.72);
+  background: var(--dn-ticker-bg);
   border: 1px solid rgba(255, 210, 63, 0.2);
 }
 .dn-ticker__tag {
@@ -274,7 +308,7 @@
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
 }
 .dn-ticker__track {
   position: relative;
@@ -314,7 +348,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(255, 210, 63, 0.14);
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
   font-family: var(--font-pixel);
   font-size: 9px;
 }
@@ -402,7 +436,7 @@
   border-radius: 18px;
   background:
     radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--tint) 20%, transparent), transparent 70%),
-    linear-gradient(180deg, #150b2b, #0b0617 75%);
+    linear-gradient(180deg, var(--dn-card-top), var(--dn-card-bottom) 75%);
   border: 1px solid color-mix(in srgb, var(--tint) 50%, transparent);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.45),
@@ -514,7 +548,7 @@
   background: var(--text-3);
 }
 .dn-live.is-live {
-  color: #b7ffcf;
+  color: var(--dn-live-ink);
 }
 .dn-live.is-live i {
   background: var(--green);
@@ -654,7 +688,7 @@
   color: var(--text-2);
 }
 .dn-standings__bal {
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
 }
 .dn-standings__net {
   min-width: 70px;
@@ -675,7 +709,7 @@
   min-height: 64px;
   padding: 8px 12px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.38);
+  background: var(--dn-inset);
   border: 1px solid var(--line);
   transition:
     border-color var(--dur-3),
@@ -738,7 +772,7 @@
   transform: rotate(-90deg);
 }
 .dn-timer__track {
-  fill: rgba(0, 0, 0, 0.4);
+  fill: var(--dn-inset-strong);
   stroke: rgba(255, 255, 255, 0.08);
   stroke-width: 4;
 }
@@ -760,7 +794,7 @@
   filter: drop-shadow(0 0 4px var(--red));
 }
 .dn-timer[data-urgent='true'] span {
-  color: #ffb3b6;
+  color: var(--dn-urgent-ink);
 }
 .dn-felt__controls {
   display: flex;
@@ -1677,7 +1711,7 @@
   gap: 2px;
 }
 .dn-paymini__pay {
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
 }
 .dn-paymini__extra span:first-child {
   display: inline-flex;
@@ -1771,7 +1805,7 @@
 .dn-stats dd {
   margin: 4px 0 0;
   font-size: var(--fs-xl);
-  color: var(--dn-gold);
+  color: var(--dn-gold-ink);
 }
 
 /* ---------- Dice ---------- */
@@ -1922,17 +1956,24 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.dn [data-outcome='higher'] > em,
-.dn-dicelog li[data-outcome='higher'] em {
+.dn [data-outcome='higher'] > em {
   color: var(--green);
 }
-.dn [data-outcome='lower'] > em,
-.dn-dicelog li[data-outcome='lower'] em {
+.dn [data-outcome='lower'] > em {
   color: #ff7a82;
 }
-.dn [data-outcome='same'] > em,
-.dn-dicelog li[data-outcome='same'] em {
+.dn [data-outcome='same'] > em {
   color: var(--dn-gold);
+}
+/* The roll history sits on the chrome: theme-aware inks (identical in Delta Neon). */
+.dn-dicelog li[data-outcome='higher'] em {
+  color: var(--dn-up-ink);
+}
+.dn-dicelog li[data-outcome='lower'] em {
+  color: var(--dn-down-ink);
+}
+.dn-dicelog li[data-outcome='same'] em {
+  color: var(--dn-gold-ink);
 }
 .dn-dice__arena .dn-status {
   grid-area: status;
@@ -2721,17 +2762,19 @@
 }
 
 /* ---------- Local ink on DASino's own dark art (non-default themes) ----------
- * The floor cards, glass panels, nav, ticker, balance and felts are DASino's dark casino art, but a
+ * The card art, felts, dice tray, point box, pick tiles and podium blocks are DASino's dark art, but a
  * theme's --text-* may be dark (Corporate Desktop '98 is a light theme). On those surfaces we keep
  * the theme's ink hue and only lift its lightness (relative colour; static light inks where that's
- * unsupported). Light UI components inside keep the theme's own ink. Delta Neon never matches. */
+ * unsupported). Light UI components inside keep the theme's own ink. The chrome around them (glass
+ * panels, nav, ticker, balance, floor cards) follows the theme's surfaces, so it uses the theme's
+ * own ink. Delta Neon never matches. */
 .dn {
   --dn-theme-t0: var(--text-0);
   --dn-theme-t1: var(--text-1);
   --dn-theme-t2: var(--text-2);
   --dn-theme-t3: var(--text-3);
 }
-:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-glass, .dn-nav, .dn-ticker, .dn-balance, .dn-card, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick) {
+:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-card__art, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick, .dn-podium__block) {
   --text-0: #f8f6ff;
   --text-1: #d3cdf0;
   --text-2: #b3acd8;
@@ -2739,14 +2782,14 @@
   color: var(--text-0);
 }
 @supports (color: oklch(from red l c h)) {
-  :root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-glass, .dn-nav, .dn-ticker, .dn-balance, .dn-card, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick) {
+  :root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-card__art, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick, .dn-podium__block) {
     --text-0: oklch(from var(--dn-theme-t0) max(l, 0.93) min(c, 0.06) h);
     --text-1: oklch(from var(--dn-theme-t1) max(l, 0.84) min(c, 0.07) h);
     --text-2: oklch(from var(--dn-theme-t2) max(l, 0.75) min(c, 0.08) h);
     --text-3: oklch(from var(--dn-theme-t3) max(l, 0.7) min(c, 0.08) h);
   }
 }
-:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-glass, .dn-nav, .dn-ticker, .dn-balance, .dn-card, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick) :is(input, textarea, select, .dc-input, .dc-segmented, .dc-slider, .dc-toggle, .dc-timer, .dc-modal, dialog, .dn-machine) {
+:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-card__art, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick, .dn-podium__block) :is(input, textarea, select, .dc-input, .dc-segmented, .dc-slider, .dc-toggle, .dc-timer, .dc-modal, dialog, .dn-machine) {
   --text-0: var(--dn-theme-t0);
   --text-1: var(--dn-theme-t1);
   --text-2: var(--dn-theme-t2);
@@ -2754,7 +2797,7 @@
   color: var(--text-0);
 }
 /* Transparent (ghost) buttons sit straight on the dark art: give them the lifted ink too. */
-:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-glass, .dn-nav, .dn-ticker, .dn-balance, .dn-card, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick) .dc-btn--ghost {
+:root[data-theme]:not([data-theme='delta-neon']) .dn :is(.dn-card__art, .dn-roulette__felt, .dn-tray, .dn-point, .dn-pick, .dn-podium__block) .dc-btn--ghost {
   --btn-fg: var(--text-1);
 }
 
