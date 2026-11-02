@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { createRoom, joinRoom, roomState, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 test.skip(({ isMobile }) => isMobile, 'The presenter runs the show from a laptop or a desk screen.');
 
@@ -40,7 +41,7 @@ test('the Dashboard: every tool open beside the show, no sideways scroll, folds 
   const code = await createRoom(page, 'showdown', 'Host');
   const settingsTab = page.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await page.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(page, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).mode).toBe('showcase');
   const guest = await joinRoom(browser, code, 'Priya S.');
   await startGame(page);

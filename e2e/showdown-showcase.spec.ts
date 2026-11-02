@@ -10,6 +10,7 @@
  */
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { createRoom, joinRoom, leaveRoom, roomState, startGame, waitForPhase } from './helpers';
+import { loadPreset } from './showdown-presets';
 
 /** Same device profile as the running project (so mobile runs use phones for every player). */
 function device(testInfo: TestInfo) {
@@ -33,7 +34,7 @@ async function loadRehearsal(page: Page): Promise<void> {
   // Phones show one lobby section at a time.
   const settingsTab = page.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await page.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(page, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => (await roomState(page)).customRounds).toBe(2);
   await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).mode).toBe('showcase');
   await expect.poll(async () => (await roomState(page)).event).toBe('dasoween-rehearsal');

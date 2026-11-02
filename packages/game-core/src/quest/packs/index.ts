@@ -12,8 +12,9 @@ import type { Adventure, AdventureInput } from '../schema.ts';
 import { loadAdventure } from '../validate.ts';
 import { GLITCH_BENEATH } from './glitch-beneath.ts';
 import { MISSING_BEANS } from './missing-beans.ts';
+import { SNOWED_IN } from './snowed-in.ts';
 
-export const BUILT_IN_PACKS: readonly AdventureInput[] = [GLITCH_BENEATH, MISSING_BEANS];
+export const BUILT_IN_PACKS: readonly AdventureInput[] = [GLITCH_BENEATH, MISSING_BEANS, SNOWED_IN];
 
 const sources = new Map<string, AdventureInput>(BUILT_IN_PACKS.map((p) => [p.id, p]));
 const loaded = new Map<string, Adventure>();

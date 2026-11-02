@@ -10,8 +10,9 @@ rest of the year), and two formats (the `mode` setting):
   out loud or in a video-call chat (see [Presenter Showcase](#presenter-showcase) below). There are no
   teams and no scores. Wrong answers are a buzzer and a big ✕, never strikes, and a special answer
   (e.g. #5) sets off the show's biggest celebration. There's a round clock, the rest of the board is
-  revealed from #10 up, and stage cards cover the rest of an event. The **DAS-O-Ween 2026** preset is
-  a ready-made show of this kind (presenter guide: [DAS-O-WEEN-RUNBOOK.md](DAS-O-WEEN-RUNBOOK.md)).
+  revealed from #10 up, and stage cards cover the rest of an event. The year-round **Event show**
+  preset is a ready-made show of this kind on the question packs; **DAS-O-Ween 2026** is the October
+  one (presenter guide: [DAS-O-WEEN-RUNBOOK.md](DAS-O-WEEN-RUNBOOK.md)).
 
 It lives in the DAStravaganza cabinet (`/cabinet/stravaganza`, or straight to `/play/showdown`).
 
@@ -147,13 +148,28 @@ Showdown. What differs:
     watch the Teams share" card; the console's preview shows the frame and what's playing. The
     jukebox pauses during Cinema (`musicSegment` → `cinema`) with no theme bed under it.
 - **Event presets** (`showdown:preset {id}`, lobby or results). Each preset's settings are public
-  metadata (`SHOWDOWN_EVENT_INFO`). **`dasoween-2026` is settings only** (`settingsOnly`, ADM-01): the
-  real boards are never in the repo — the presenter loads them from a show file (the content editor's
-  _Load show file_ / _Load from this device_) before doors, in either order (a settings-only preset
-  keeps the rounds already loaded; `validateStart` refuses a custom show with no rounds).
-  `dasoween-rehearsal` loads practice boards (server-only, `packages/game-core/src/showdown/events.ts`),
-  and every screen says "Rehearsal" (`state.rehearsal`) until the presenter saves rounds of their own.
-  Both presets make the room an **event room** (below).
+  metadata (`SHOWDOWN_EVENT_INFO`), applied with `applyEventPreset` (a preset that leaves the show
+  title or event name alone clears one another preset put there, never words the presenter typed).
+  Every preset makes the room an **event room** (below), so every show can come back from its black
+  box after a deploy. The lobby lists them in this order:
+  - **`event-show`** (year-round, first): Presenter Showcase on the **DAS Showtime** look with the
+    10-minute clock, crowd points and medals, drawing its rounds from the **question packs** (whichever
+    are picked; a new room's packs follow the season). Settings only, nothing to load. Loaded after a
+    rehearsal, it puts the practice boards away (`state.rehearsal` off).
+  - **`event-rehearsal`**: the same show with two practice boards (ice cream, the zoo — topics no pack
+    asks).
+  - **`dasoween-2026`** (seasonal) **is settings only** (`settingsOnly`, ADM-01): the real boards are
+    never in the repo — the presenter loads them from a show file (the content editor's _Load show
+    file_ / _Load from this device_) before doors, in either order (a settings-only preset keeps the
+    rounds already loaded; `validateStart` refuses a custom show with no rounds).
+  - **`dasoween-rehearsal`** loads the candy and costume practice boards.
+
+  Practice boards are server-only (`packages/game-core/src/showdown/events.ts`), and every screen says
+  "Rehearsal" (`state.rehearsal`) until the presenter saves rounds of their own. A seasonal preset
+  carries `season: { name, month }`: the lobby shows it in a **"Seasonal: DAS-O-Ween"** group that's
+  open in October (the season clock, so `?season=` QA dates work) or while one of its presets is
+  loaded, and collapsed — never removed — the rest of the year.
+
 - **Outcome:** no winner is ever invented. The finale has `mode: 'showcase'` and per-round
   `found`/`total`, and the reported outcome places the whole audience together.
 - **Theme music:** a looping procedural bed under the opening, the category cards and the holding
@@ -178,7 +194,8 @@ Undo, a restart or a restored black box recomputes exactly, and a repeated messa
 | `gems` — Hidden gems          | on / off                                                            | on          | on                            |
 | `pops` — Called-it pops       | on / off                                                            | on          | on                            |
 
-The DAS-O-Ween presets also switch phone guesses on (`audience: true`).
+The event presets also switch phone guesses on (`audience: true`); Event show uses the same settings
+as DAS-O-Ween here except `guesses`, which it leaves as the room has it.
 
 **The crowd — Called it.** Phones (and desktop tabs: one responsive component) get a **Top 10
 scorecard**: numbered rows #1–#N, each taking one guess (`showdown:guess {round, text, pos}`), up to
@@ -264,7 +281,8 @@ the same timeline at `/tutorial/showdown?film=1`, made to be recorded at 1920×1
 
 ## Event rooms (the DAS-O-Ween decisions)
 
-Loading either DAS-O-Ween preset makes the room an event room for the rest of its life
+Loading any event preset (Event show, its rehearsal, or either DAS-O-Ween one) makes the room an event
+room for the rest of its life
 (`state.event` = the preset id; also in the room metadata, so `/api/rooms/:code` returns `event` and
 `/r/<code>` can show the event join screen). Ordinary Showdown rooms keep today's behaviour, except
 the hardening that only makes the server safer (screens and spectators can never take over) and the
@@ -436,7 +454,7 @@ Everything is new files, plus a few one-line registrations.
 | Layer          | Files                                                                                                                                                                                                                                                                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Contract       | `packages/shared/src/games/showdown.ts`: settings, messages, Zod payloads, views, `validateShowContent`, looks, pack metadata                                                                                                                                                                                                                                                              |
-| Engine (pure)  | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset rounds, server-only), tests                                                                                                                                |
+| Engine (pure)  | `packages/game-core/src/showdown/`: `engine.ts` (show state machine for both formats, `boardView`, `sheetView`), `guesses.ts` (audience guess book), `packs.ts` (44 built-in questions, server-only), `events.ts` (event preset practice boards, server-only), tests                                                                                                                       |
 | Server         | `apps/game-server/src/rooms/showdown/`: `ShowdownRoom.ts` (extends `BaseGameRoom`; also wrong answers, the clock, the sweep, cards and presets), `schema.ts`; tests in `apps/game-server/test/showdown.test.ts` and `showdown-showcase.test.ts`                                                                                                                                            |
 | Client         | `apps/web/src/games/showdown/`: `ShowdownView.tsx` (routing by role, show feed, sounds, stage window portal), `Console.tsx`, `Audience.tsx`, `Stage.tsx`, `Board.tsx`, `Host.tsx`, `Decor.tsx`, `Lobby.tsx`, `ContentEditor.tsx`, `look.ts`, `sounds.ts`, `fx.ts`, `stageWindow.ts`, `access.ts`, `state.ts`, `showdown.css`                                                               |
 | Floor          | `apps/web/src/arcade/scenes/showdown.ts` (attract scene)                                                                                                                                                                                                                                                                                                                                   |

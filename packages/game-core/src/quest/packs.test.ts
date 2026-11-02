@@ -5,6 +5,7 @@ import { BUILT_IN_PACKS, getPack, hasPack, packCatalog, packIds, registerPack } 
 import { AdventureError, exploreAdventure, loadAdventure, validateAdventure } from './validate.ts';
 import { availableChoices, createRun, enterNode, presentScene, resolveChoice } from './engine.ts';
 import type { AdventureInput } from './schema.ts';
+import { SNOWED_IN } from './packs/snowed-in.ts';
 import { LAB_PACK } from './test-fixtures.ts';
 
 const PARTIES: QuestArchetypeId[][] = [
@@ -17,12 +18,12 @@ const PARTIES: QuestArchetypeId[][] = [
 ];
 
 describe('pack registry', () => {
-  it('ships the starter adventure and a mini pack, all valid', () => {
-    expect(packIds()).toEqual(['glitch-beneath', 'missing-beans']);
+  it('ships the starter adventure and two mini packs, all valid', () => {
+    expect(packIds()).toEqual(['glitch-beneath', 'missing-beans', 'snowed-in']);
     const catalog = packCatalog((id, err) => {
       throw new Error(`${id}: ${String(err)}`);
     });
-    expect(catalog.map((p) => p.id)).toEqual(['glitch-beneath', 'missing-beans']);
+    expect(catalog.map((p) => p.id)).toEqual(['glitch-beneath', 'missing-beans', 'snowed-in']);
     expect(catalog[0]).toMatchObject({ chapters: 5, endings: 7 });
     expect(catalog[0]!.kits.tinker).toEqual([{ name: 'Duct Tape', qty: 1 }]);
   });
@@ -200,5 +201,29 @@ describe('THE GLITCH BENEATH DELTA ALPHA (content shape)', () => {
     expect(json).toContain('"removeItem":"duct_tape"');
     // Routes branch on accumulated state.
     expect(adv.nodes.some((n) => n.routes.length > 0)).toBe(true);
+  });
+});
+
+describe('SNOWED IN AT DELTA ALPHA (content shape)', () => {
+  const adv = getPack('snowed-in');
+
+  it('is a short two-chapter winter mini pack with endings in four tiers', () => {
+    expect(adv.chapters).toHaveLength(2);
+    expect(adv.nodes.length).toBeGreaterThanOrEqual(12);
+    expect(adv.nodes.length).toBeLessThanOrEqual(20);
+    expect(Object.values(adv.endings).map((e) => e.tier).sort()).toEqual(['bad', 'comedic', 'good', 'great']);
+  });
+
+  it('gates its best routes on what the party found: the keycard, the override code, cocoa and a Trickster', () => {
+    const choices = adv.nodes.flatMap((n) => n.choices);
+    const gates = choices.filter((c) => c.if).map((c) => JSON.stringify(c.if));
+    expect(gates).toEqual(
+      expect.arrayContaining(['{"hasItem":"facilities_key"}', '{"flag":"code_hint"}', '{"hasItem":"cocoa"}', '{"archetype":"trickster"}', '{"flag":"fort_started"}']),
+    );
+    expect(choices.some((c) => c.secret)).toBe(true);
+  });
+
+  it('stays secular and work-friendly: no holiday-specific words anywhere in its text', () => {
+    expect(JSON.stringify(SNOWED_IN)).not.toMatch(/\b(christmas|xmas|santa|hanukkah|chanukah|kwanzaa|diwali|nativity|reindeer|elf|elves|mistletoe|church|prayer)\b/i);
   });
 });

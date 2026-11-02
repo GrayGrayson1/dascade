@@ -11,6 +11,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createRoom, myPlayerId, roomState, setName, startGame } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 const SHOTS = process.env.SHOTS_DIR ?? '';
 async function shot(page: Page, name: string): Promise<void> {
@@ -51,7 +52,7 @@ test('event crew: producer link, moderator screen, rename and hide follow on sta
 
   // Loading the rehearsal makes this an event room; its producer link arrives once and is kept here.
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   await expect(host.locator('[data-part="showdown-event-badge"]')).toBeVisible();
   await showLobbySection(host, 'Setup');
@@ -160,7 +161,7 @@ test('event crew: the producer downloads the log as JSON', async ({ page }, test
   const host = page;
   const code = await createRoom(host, 'showdown', 'Marcus');
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   await showLobbySection(host, 'Setup');
   const crewPanel = host.locator('[data-part="showdown-crew-checks"] [data-part="showdown-crew-panel"]');
@@ -188,7 +189,7 @@ test('picker strip: K draws (name first), K again nudges, D / A end the turn, a 
   await host.setViewportSize({ width: 1280, height: 720 });
   const code = await createRoom(host, 'showdown', 'Marcus');
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   const contexts = [];
   for (const name of ['Priya S.', 'Sam P.', 'Luis R.']) {
@@ -267,7 +268,7 @@ test('show file (ADM-01): DAS-O-Ween 2026 asks for the show file; loading it is 
   const host = page;
   await createRoom(host, 'showdown', 'Marcus');
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween 2026' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween 2026');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-2026');
   // Settings only: no boards came with it, so the lobby says what to do next.
   expect((await roomState(host)).customRounds).toBe(0);
@@ -326,7 +327,7 @@ test('backup presenter (ADM-04): Take over opens only while the presenter is off
   const host = await hostCtx.newPage();
   const code = await createRoom(host, 'showdown', 'Marcus');
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   await showLobbySection(host, 'Setup');
   const crewPanel = host.locator('[data-part="showdown-crew-checks"] [data-part="showdown-crew-panel"]');
