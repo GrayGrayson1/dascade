@@ -1,5 +1,6 @@
 import { createDascadeServer } from './server.ts';
 import { config, supabaseEnabled } from './config.ts';
+import { liveRooms } from './http/health.ts';
 import { log } from './lib/log.ts';
 import { drainWrites } from './lib/pendingWrites.ts';
 import { statsPersistence } from './platform/statsPersistence.ts';
@@ -15,8 +16,13 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 const server = await createDascadeServer({ serveWeb: config.isProduction || process.env.SERVE_WEB === '1' });
 
-// SIGTERM (deploy, instance sleep): rooms are disposed first (tournaments save their final snapshot),
-// then queued stats/ratings, high scores, tournament and match writes get a bounded moment to finish.
+// SIGTERM (deploy, instance sleep): say what's being dropped, then rooms are disposed (tournaments save
+// their final snapshot), then queued stats/ratings, high scores, tournament and match writes get a
+// bounded moment to finish.
+server.onBeforeShutdown(async () => {
+  const live = await liveRooms().catch(() => null);
+  if (live) log.info(`shutting down with ${live.rooms} rooms / ${live.clients} clients`, { games: live.games });
+});
 server.onShutdown(async () => {
   const settled = await drainWrites(SHUTDOWN_FLUSH_MS, [() => statsPersistence.flush()]);
   if (!settled) log.warn('shutdown: some database writes did not finish in time', { waitedMs: SHUTDOWN_FLUSH_MS });

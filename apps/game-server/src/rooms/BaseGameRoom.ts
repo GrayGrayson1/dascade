@@ -229,6 +229,10 @@ export abstract class BaseGameRoom<
   private codeAllocated = false;
   private metadataDirty = false;
   private unknownTypeWarned = new Set<string>();
+  /** Lifecycle logs (log.info): when the room was made, its most seated players, when each player dropped. */
+  private readonly createdAtMs = Date.now();
+  private peakPlayers = 0;
+  private readonly droppedAt = new Map<string, number>();
   /** Per-room byte budget for host settings updates (each one is re-broadcast to everyone). */
   private readonly settingsBytes = new TokenBucket(SETTINGS_BYTE_BUDGET);
   /** Room DJ (synchronized jukebox playback; cosmetic, messages only — see "Room DJ" below). */
@@ -458,6 +462,7 @@ export abstract class BaseGameRoom<
     this.markMetadataDirty();
     this.flushMetadata();
     this.clock.setInterval(() => this.flushMetadata(), 1000);
+    log.info('room created', { room: this.roomId, game: this.gameId, solo: this.isSolo, restored: restoring });
   }
 
   override onJoin(client: Client, rawOptions: unknown): void {
@@ -538,7 +543,10 @@ export abstract class BaseGameRoom<
     this.markMetadataDirty();
     this.tournamentPresenceChanged();
 
-    const deferred = this.allowReconnection(client, this.reconnectGraceFor(record));
+    const graceSeconds = this.reconnectGraceFor(record);
+    this.droppedAt.set(record.id, Date.now());
+    log.info('player dropped', { room: this.roomId, game: this.gameId, player: record.id, graceSeconds });
+    const deferred = this.allowReconnection(client, graceSeconds);
     this.pendingReconnects.set(client.sessionId, deferred);
     // The deferred rejects on timeout; onLeave handles the outcome.
     void Promise.resolve(deferred).catch(() => undefined);
@@ -564,6 +572,7 @@ export abstract class BaseGameRoom<
     record.client = client;
     record.away = false;
     record.state.connected = true;
+    log.info('player reconnected', { room: this.roomId, game: this.gameId, player: record.id, afterMs: this.sinceDrop(record) });
     this.claimHostIfOrphaned(record);
     this.markMetadataDirty();
     this.sendWelcome(record, true);
@@ -574,6 +583,8 @@ export abstract class BaseGameRoom<
   }
 
   override onLeave(client: Client, code?: number): void {
+    // Still waiting for this session to come back: this leave is its reconnect grace running out.
+    const graceExpired = this.pendingReconnects.has(client.sessionId);
     this.pendingReconnects.delete(client.sessionId);
     this.kickedSessions.delete(client.sessionId);
     const record = this.bySession.get(client.sessionId);
@@ -582,7 +593,11 @@ export abstract class BaseGameRoom<
 
     const consented = code === CloseCode.CONSENTED;
     const inMatch = this.state.phase !== 'LOBBY' && this.state.phase !== 'RESULTS' && this.state.phase !== 'ENDED';
-    if (consented || !inMatch || record.state.spectator) {
+    const removed = consented || !inMatch || record.state.spectator;
+    if (graceExpired) {
+      log.info('reconnect grace expired', { room: this.roomId, game: this.gameId, player: record.id, afterMs: this.sinceDrop(record), seatKept: !removed });
+    }
+    if (removed) {
       this.removePlayer(record, consented ? 'left' : 'disconnected');
       return;
     }
@@ -608,6 +623,12 @@ export abstract class BaseGameRoom<
     this.djTimer?.clear();
     this.djTimer = null;
     this.safeHook(() => this.onRoomDisposed(), 'onRoomDisposed');
+    log.info('room disposed', {
+      room: this.roomId,
+      game: this.gameId,
+      lifetimeSeconds: Math.round((Date.now() - this.createdAtMs) / 1000),
+      peakPlayers: Math.max(this.peakPlayers, this.seatedCount()),
+    });
     if (this.codeAllocated) await releaseRoomCode(this.presence, this.roomId).catch(() => undefined);
   }
 
@@ -1347,6 +1368,10 @@ export abstract class BaseGameRoom<
   private rebind(record: PlayerRecord, client: Client): void {
     const previousSession = record.sessionId;
     const previousClient = record.client;
+    // A second tab, or a socket whose network died that the heartbeat hasn't ended yet (a client
+    // falling back to its seat token after a half-open drop: the Oct 29 signature).
+    const pushedOutLiveSocket = Boolean(previousClient && previousClient !== client && record.state.connected);
+    log.info('seat rebound', { room: this.roomId, game: this.gameId, player: record.id, pushedOutLiveSocket, afterMs: this.sinceDrop(record) });
     if (previousSession) {
       this.bySession.delete(previousSession);
       const pending = this.pendingReconnects.get(previousSession);
@@ -1974,7 +1999,15 @@ export abstract class BaseGameRoom<
       solo: this.isSolo,
       ...this.metadataExtra(),
     };
+    this.peakPlayers = Math.max(this.peakPlayers, meta.players);
     void this.setMetadata(meta).catch(() => undefined);
+  }
+
+  /** Milliseconds since this player dropped (null if they didn't), for the lifecycle logs; forgets the drop. */
+  private sinceDrop(record: PlayerRecord): number | null {
+    const at = this.droppedAt.get(record.id);
+    this.droppedAt.delete(record.id);
+    return at === undefined ? null : Date.now() - at;
   }
 }
 
