@@ -270,10 +270,10 @@ The Vite plugin (`apps/web/vite/jukebox-plugin.ts`, indexer in `apps/web/vite/ju
 
 - **Missing tags** are fine. The title comes from the file name: `this_is_my_song_v4_final.mp3` becomes "This Is My Song". Underscores, copy suffixes like `(1)` and version words like `v4` and `final` are stripped, and punctuation is kept.
 - **Bad files never break the build.** A file that isn't really an MP3 (the audio frames are checked, not just the extension) is listed as *rejected*, with the reason. Non-MP3 files are ignored.
-- **Duplicates:** byte-identical files are detected by content hash and only one is published. The copy without a `(1)`/`copy` suffix wins, otherwise the first by name. The rest are reported and left out of `dist/`. The indexer never deletes your files. (Right now `Hope's Turnaround (1).mp3` is a duplicate of `Hope's Turnaround.mp3`.)
+- **Duplicates:** byte-identical files are detected by content hash and only one is published. The copy without a `(1)`/`copy` suffix wins, otherwise the first by name. The rest are reported and left out of `dist/`. The indexer never deletes your files.
 - **Track ids** are slugs of the file name (`Neon Cruising.mp3` → `neon-cruising`). They stay the same when you re-tag a file, and renaming a file changes its id. If two names give the same slug, the first by name keeps it and the others get a short hash suffix.
 - **Order:** sidecar `order`, then ID3 track number, then title.
-- A build prints one line, e.g. `jukebox: 7 tracks indexed, 1 duplicate skipped, 0 rejected (17.1 MB, 12:42 of music)`, and copies only the files the manifest references into `dist/audio/jukebox/`.
+- A build prints one line, e.g. `jukebox: 14 tracks indexed, 2 records, 0 duplicates skipped, 0 rejected (45.6 MB, 34:00 of music)`, and copies only the files the manifest references into `dist/audio/jukebox/`.
 - **Size warnings** (never errors): `pnpm music:index` and the build warn about a song over 12 MB (probably a lossless or 320 kbps export; 128–192 kbps is plenty) and a jukebox over 150 MB.
 
 **Optional sidecar** `apps/web/public/audio/jukebox/jukebox.json` (every field optional; keys are file names). If it is invalid, you get a warning and it is ignored; it never stops the build.
@@ -297,7 +297,7 @@ A **record** is an album people can put on. Up close, the jukebox shows its reco
 
 ```
 apps/web/public/audio/jukebox/
-├── *.mp3              the loose files: the main record (Cyber Nightpulse)
+├── *.mp3              the loose files: the main record (Cyber Nightpulse, from the files' album tag)
 ├── jukebox.json       optional sidecar for the loose files (add a "record" block to name the main record)
 └── halloween/         every sub-folder holding MP3s is a record (one level deep)
     ├── jukebox.json   optional: the record's name, artist, sleeve, paired theme and shelf order
