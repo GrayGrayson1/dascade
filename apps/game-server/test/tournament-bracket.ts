@@ -23,6 +23,7 @@ export const GAME_SETTINGS: Partial<Record<GameId, Record<string, unknown>>> = {
   memory: { rule: 'sudden' },
   ships: { firing: 'salvo', fleet: 'skirmish', gridSize: 8 },
   chess: { timeControl: { baseMinutes: 3, incrementSeconds: 2 } },
+  putt: { course: 'back' },
 };
 
 /** Rooms whose timings were already compressed (one call per launched match room). */

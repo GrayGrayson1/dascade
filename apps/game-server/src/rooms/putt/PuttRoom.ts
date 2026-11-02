@@ -18,15 +18,15 @@ import {
   PUTT_AIM_RATE,
   PUTT_LAUNCH_DELAY_MS,
   PUTT_MSG,
-  PUTT_PLAYOFF_HOLES,
   PUTT_RELEASE_WINDOW_MS,
   PUTT_STROKE_RATE,
-  PUTT_TOURNAMENT_SETTINGS,
   PuttAimSchema,
   PuttSettingsSchema,
   PuttStrokeSchema,
+  puttPlayoffHoles,
   puttRoute,
   puttScoreLabel,
+  puttTournamentSettings,
   type PuttAimRelay,
   type PuttEvent,
   type PuttSettings,
@@ -130,7 +130,8 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
   }
 
   private effectiveSettings(): PuttSettings {
-    return this.tournamentMatch ? PUTT_TOURNAMENT_SETTINGS : this.getSettings();
+    // Tournaments: the fixed format, on the organizer's course length (gameSettings.course).
+    return this.tournamentMatch ? puttTournamentSettings(this.getSettings().course) : this.getSettings();
   }
 
   // ---------------------------------------------------------------------------
@@ -430,7 +431,7 @@ export class PuttRoom extends BaseGameRoom<PuttState, PuttSettings> {
     if (this.state.tournament && !match.playoffResult) {
       const leaders = match.isPlayoff ? match.playoffIds : match.leaders();
       if (leaders.length >= 2) {
-        const hole = PUTT_PLAYOFF_HOLES[this.playoffCount];
+        const hole = puttPlayoffHoles(puttRoute(this.config))[this.playoffCount];
         if (hole !== undefined) {
           this.playoffCount++;
           match.startPlayoff(leaders, hole);

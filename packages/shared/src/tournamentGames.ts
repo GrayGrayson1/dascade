@@ -53,6 +53,20 @@ const timeControl = (defaultId: string): TournamentGameSettingField => ({
 });
 
 export const TOURNAMENT_GAME_SETTINGS: Partial<Record<GameId, TournamentGameSettingField[]>> = {
+  putt: [
+    {
+      // Values are PUTT_TOURNAMENT_COURSES; the room plays its fixed tournament format on this course.
+      key: 'course',
+      label: 'Course',
+      help: 'Classic stroke play with a 45-second shot clock. A tie goes to sudden-death playoff holes from the same course.',
+      options: [
+        { id: 'full', label: 'Full course (all nine holes)', value: 'full' },
+        { id: 'front', label: 'Front three (holes 1–3, gentle)', value: 'front' },
+        { id: 'back', label: 'Back three (holes 7–9, wild)', value: 'back' },
+      ],
+      defaultId: 'full',
+    },
+  ],
   chess: [
     {
       key: 'variant',
