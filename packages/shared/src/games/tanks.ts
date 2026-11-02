@@ -526,7 +526,7 @@ export type TurnMode = (typeof TURN_MODES)[number];
 export const TALK_LEVELS = ['off', 'some', 'lots'] as const;
 export type TalkLevel = (typeof TALK_LEVELS)[number];
 
-export const BATTLE_THEMES = ['dusk', 'night', 'aurora', 'ember'] as const;
+export const BATTLE_THEMES = ['dusk', 'night', 'aurora', 'ember', 'harvest'] as const;
 export type BattleTheme = (typeof BATTLE_THEMES)[number];
 
 export const TEAM_COUNT = 2;

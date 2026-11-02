@@ -223,11 +223,13 @@ export class Sky {
       );
     } else if (q.motes > 0) {
       const tint = hexToInt(theme.motes);
+      // Snow and leaves fall (leaves drift sideways more); embers, sparks and ash rise.
+      const leaf = theme.moteKind === 'leaf';
       this.motes = add(
         scene.add.particles(0, 0, theme.moteKind === 'snow' ? 'tk-dot' : 'tk-px', {
           lifespan: { min: 5000, max: 9000 },
-          speedY: theme.moteKind === 'snow' ? { min: 12, max: 30 } : { min: -22, max: -6 },
-          speedX: { min: -8, max: 8 },
+          speedY: theme.moteKind === 'snow' ? { min: 12, max: 30 } : leaf ? { min: 10, max: 24 } : { min: -22, max: -6 },
+          speedX: leaf ? { min: -18, max: 10 } : { min: -8, max: 8 },
           scale: theme.moteKind === 'snow' ? { min: 0.25, max: 0.55 } : { min: 0.35, max: 0.8 },
           alpha: { start: 0.8, end: 0 },
           tint,
@@ -340,7 +342,8 @@ export class Sky {
     const W = 1024;
     const H = 260;
     const lights = t.midLights.map(hexToRgb);
-    const spires = t.moteKind === 'snow';
+    // Pointed silhouettes: snowy spires (Aurora Ice) and autumn pines (Harvest Moon).
+    const spires = t.moteKind === 'snow' || t.moteKind === 'leaf';
     const ruins = t.moteKind === 'ash';
     return canvas(W, H, (g) => {
       g.fillStyle = t.mid;
