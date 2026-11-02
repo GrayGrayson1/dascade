@@ -205,12 +205,22 @@ export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: st
 export const SHOWDOWN_PACK_IDS = ['spooky', 'office', 'tech', 'food', 'life'] as const;
 export type ShowdownPackId = (typeof SHOWDOWN_PACK_IDS)[number];
 
-export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, { title: string; blurb: string; rounds: number; seasonal?: boolean }> = {
+export interface ShowdownPackInfo {
+  title: string;
+  blurb: string;
+  rounds: number;
+  seasonal?: boolean;
+  /** An emoji shown after the pack's title in the lobby (decorative). */
+  icon?: string;
+}
+
+export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, ShowdownPackInfo> = {
   spooky: {
     title: 'Halloween Spooktacular',
     blurb: 'Haunted houses, costumes, candy and things that go bump.',
     rounds: 10,
     seasonal: true,
+    icon: '🎃',
   },
   office: { title: 'Office Life', blurb: 'Meetings, desks, the kitchen fridge and Friday at 4:59.', rounds: 10 },
   tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 8 },

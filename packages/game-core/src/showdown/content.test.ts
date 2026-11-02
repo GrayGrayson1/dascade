@@ -30,6 +30,13 @@ describe('built-in packs', () => {
     for (const id of SHOWDOWN_PACK_IDS) expect(SHOWDOWN_PACKS[id], id).toHaveLength(SHOWDOWN_PACK_INFO[id].rounds);
   });
 
+  it('every seasonal pack shows its own icon in the lobby; the regulars none', () => {
+    for (const id of SHOWDOWN_PACK_IDS) expect(Boolean(SHOWDOWN_PACK_INFO[id].icon), id).toBe(Boolean(SHOWDOWN_PACK_INFO[id].seasonal));
+    const icons = SHOWDOWN_PACK_IDS.map((id) => SHOWDOWN_PACK_INFO[id].icon).filter(Boolean);
+    expect(new Set(icons).size).toBe(icons.length);
+    expect(SHOWDOWN_PACK_INFO.spooky.icon).toBe('🎃');
+  });
+
   it('are valid boards: 3–10 distinct answers, most popular first, at most 100 points', () => {
     const ids = new Set<string>();
     for (const round of all) {
