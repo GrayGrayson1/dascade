@@ -106,6 +106,7 @@ export const PACK_ART: Record<SurveyPackId, string> = {
   tech: 'robot',
   whatif: 'alien',
   travel: 'rocket',
+  seasons: 'star',
 };
 
 /** "2nd" / "2nd–3rd" for a (possibly tied) rank range. */

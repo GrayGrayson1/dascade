@@ -50,6 +50,16 @@ describe('survey packs', () => {
     }
   });
 
+  it('Seasons & Celebrations: 32 questions (12 majority, 8 rank, 12 percent), no religious holidays', () => {
+    const list = SURVEY_PACKS.seasons;
+    expect(list).toHaveLength(32);
+    expect(list.filter((q) => q.mode === 'majority')).toHaveLength(12);
+    expect(list.filter((q) => q.mode === 'rank')).toHaveLength(8);
+    expect(list.filter((q) => q.mode === 'percent')).toHaveLength(12);
+    const religious = /\b(christmas|xmas|santa|easter|hanukkah|diwali|ramadan|eid|church|prayer)\b/i;
+    for (const q of list) for (const text of [q.prompt, ...q.options]) expect(text, q.id).not.toMatch(religious);
+  });
+
   it('keeps prompts short enough for phones', () => {
     for (const q of ALL_SURVEY_QUESTIONS) {
       expect(q.prompt.length, q.id).toBeLessThanOrEqual(SURVEY_LIMITS.promptMax);

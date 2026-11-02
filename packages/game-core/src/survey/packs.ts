@@ -304,7 +304,75 @@ const travel: Q[] = [
   p('travel', 12, 'Do you learn a few words of the local language before a trip?'),
 ];
 
-export const SURVEY_PACKS: Record<SurveyPackId, readonly SurveyQuestion[]> = { office, food, weekend, tech, whatif, travel };
+// Seasonal, secular: snow days, summer evenings, autumn leaves and year-end parties (no religious holidays).
+const seasons: Q[] = [
+  m('seasons', 1, 'Which season is your favourite?', ['Spring', 'Summer', 'Autumn', 'Winter']),
+  m('seasons', 2, 'Snow day: what is the plan?', ['Build a snowman', 'Go sledging', 'Stay in with a film', 'Work as usual']),
+  m('seasons', 3, 'Hot chocolate or hot apple cider?', ['Hot chocolate', 'Hot apple cider']),
+  m('seasons', 4, 'Long summer evenings or cosy winter nights?', ['Long summer evenings', 'Cosy winter nights']),
+  m('seasons', 5, 'How early do you start planning a holiday party?', [
+    'Weeks ahead',
+    'A few days before',
+    'On the day',
+    'Someone else plans it',
+  ]),
+  m('seasons', 6, 'Pick the best way to spend a rainy spring day.', ['Board games', 'A good book', 'Baking', 'Splashing in puddles']),
+  m('seasons', 7, 'Would you rather have a snowy winter or a mild one?', ['Snow, please', 'Mild and dry']),
+  m('seasons', 8, 'What is the best part of autumn?', ['The colours', 'Cosy jumpers', 'Seasonal food', 'Crunchy leaves']),
+  m('seasons', 9, 'At a year-end party, where are you?', [
+    'On the dance floor',
+    'By the snacks',
+    'Chatting in a corner',
+    'Running the playlist',
+  ]),
+  m('seasons', 10, 'What is your gift-wrapping style?', [
+    'Neat corners and ribbon',
+    'Gift bags all the way',
+    'Whatever paper is left',
+    'No wrapping at all',
+  ]),
+  m('seasons', 11, 'When does it start to feel like summer?', [
+    'First ice cream outside',
+    'First barbecue',
+    'The longest day',
+    'When the holidays start',
+  ]),
+  m('seasons', 12, 'Would you rather go sledging or ice skating?', ['Sledging', 'Ice skating']),
+  r('seasons', 1, 'Pick your favourite winter activity.', [
+    'Sledging',
+    'Ice skating',
+    'Skiing',
+    'Building a snowman',
+    'Staying in by the fire',
+  ]),
+  r('seasons', 2, 'Pick the best summer treat.', ['Ice cream', 'Ice lolly', 'Watermelon', 'Lemonade', 'Strawberries']),
+  r('seasons', 3, 'Pick your favourite autumn smell.', ['Bonfire smoke', 'Cinnamon', 'Fallen leaves', 'Apple pie', 'Rain on the pavement']),
+  r('seasons', 4, 'Pick the best thing about spring.', ['Longer days', 'Blossom', 'Birdsong', 'Warmer weather', 'Spring cleaning']),
+  r('seasons', 5, 'Pick the best snack for a cosy night in.', ['Popcorn', 'Hot soup', 'Cookies', 'Toast', 'Cheese and crackers']),
+  r('seasons', 6, 'Pick the best part of a year-end celebration.', [
+    'Fireworks',
+    'Good food',
+    'Games',
+    'Music and dancing',
+    'The countdown',
+  ]),
+  r('seasons', 7, 'Pick the best seasonal decoration.', ['Fairy lights', 'Pumpkins', 'Spring flowers', 'Paper snowflakes', 'Bunting']),
+  r('seasons', 8, 'Pick your favourite party game for the holidays.', ['Gift swap', 'Quiz', 'Charades', 'Karaoke', 'Board games']),
+  p('seasons', 1, 'Have you ever built a snowman?'),
+  p('seasons', 2, 'Do you prefer winter to summer?'),
+  p('seasons', 3, 'Do you make resolutions for the new year?'),
+  p('seasons', 4, 'Do you put up decorations before December?'),
+  p('seasons', 5, 'Have you ever gone ice skating?'),
+  p('seasons', 6, 'Do you own a novelty winter jumper?'),
+  p('seasons', 7, 'Have you ever passed on a gift you were given?'),
+  p('seasons', 8, 'Do you check the weather forecast every day?'),
+  p('seasons', 9, 'Do you enjoy walking in the snow?'),
+  p('seasons', 10, 'Have you ever jumped into a pile of leaves?'),
+  p('seasons', 11, 'Do you eat ice cream in the winter?'),
+  p('seasons', 12, 'Do you wrap gifts at the very last minute?'),
+];
+
+export const SURVEY_PACKS: Record<SurveyPackId, readonly SurveyQuestion[]> = { office, food, weekend, tech, whatif, travel, seasons };
 
 /** Every built-in question. */
 export const ALL_SURVEY_QUESTIONS: readonly SurveyQuestion[] = Object.values(SURVEY_PACKS).flat();
