@@ -71,6 +71,25 @@ describe('stat extras aggregation', () => {
     }
   });
 
+  it('labels the party and Reversi extras: bests keep the highest, counts add up', () => {
+    for (const key of ['maxWordLength', 'maxFlip']) {
+      expect(statAggregation(key)).toBe('max');
+      expect(STAT_EXTRA_LABELS[key]).toBeTruthy();
+    }
+    const counts = [
+      ['wordsFound', 'uniqueWords', 'chainLinks'],
+      ['votesReceived', 'showdownsWon', 'sweeps', 'audiencePicks'],
+      ['predictionsHit', 'bonusCalls'],
+      ['survived', 'glitchGames', 'awardsWon'],
+      ['discsFlipped'],
+    ].flat();
+    for (const key of counts) {
+      expect(statAggregation(key)).toBe('sum');
+      expect(STAT_EXTRA_LABELS[key]).toBeTruthy();
+    }
+    expect(statExtraLabel('glitchGames')).toBe('Games as a Glitch');
+  });
+
   it('formats duration extras', () => {
     expect(isDurationStat('minLapMs')).toBe(true);
     expect(isDurationStat('minGuessMs')).toBe(true);

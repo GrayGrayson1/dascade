@@ -565,10 +565,15 @@ export class MasterpieceRoom extends PartyRoom<MasterpieceState, MasterpieceSett
     const present = new Set(this.seatedPlayers().map((p) => p.id));
     const awards = computeAwards([...this.stats.values()].filter((s) => present.has(s.id)));
     const extras: MpPodiumExtras = { awards, sweeps: this.sweepCount, showdowns: this.scoredShowdowns };
+    // Profile stats (packages/shared/src/stats.ts): counted at each showdown's reveal, where authors are shown.
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const s of this.stats.values()) {
+      playerStats[s.id] = { votesReceived: s.votes, showdownsWon: s.wins, sweeps: s.sweeps, audiencePicks: s.audiencePicks };
+    }
     this.clearRoundState();
     this.finishParty({
       reason,
-      details: { rounds: this.state.round, showdowns: this.scoredShowdowns, sweeps: this.sweepCount },
+      details: { rounds: this.state.round, showdowns: this.scoredShowdowns, sweeps: this.sweepCount, playerStats },
       extras: extras as unknown as Record<string, unknown>,
     });
     this.sendViewAll();

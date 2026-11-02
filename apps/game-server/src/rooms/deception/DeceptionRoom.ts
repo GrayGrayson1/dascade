@@ -505,11 +505,25 @@ export class DeceptionRoom extends PartyRoom<DeceptionState, DeceptionSettings> 
     // Team result: every member of the winning team shares first place (winning team first).
     const winners = report.roles.filter((r) => roleTeam(r.role) === win.team);
     const losers = report.roles.filter((r) => roleTeam(r.role) !== win.team);
+    // Profile stats (packages/shared/src/stats.ts): only what the final report reveals to everyone.
+    const awardsWon = new Map<string, number>();
+    for (const a of report.awards) awardsWon.set(a.playerId, (awardsWon.get(a.playerId) ?? 0) + 1);
+    const playerStats = Object.fromEntries(
+      report.roles.map((r) => [
+        r.playerId,
+        { survived: r.alive ? 1 : 0, glitchGames: roleTeam(r.role) === 'glitches' ? 1 : 0, awardsWon: awardsWon.get(r.playerId) ?? 0 },
+      ]),
+    );
     this.reportOutcome({
       placements: [winners.map((r) => r.playerId), losers.map((r) => r.playerId)],
       scores: Object.fromEntries(report.roles.map((r) => [r.playerId, r.score])),
       reason: win.reason,
-      details: { winner: win.team, cycles: game.cycle, roles: Object.fromEntries(report.roles.map((r) => [r.playerId, r.role])) },
+      details: {
+        winner: win.team,
+        cycles: game.cycle,
+        roles: Object.fromEntries(report.roles.map((r) => [r.playerId, r.role])),
+        playerStats,
+      },
     });
     this.endMatch({
       players: report.roles.map((r) => {
