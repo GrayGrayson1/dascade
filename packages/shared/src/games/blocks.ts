@@ -21,6 +21,12 @@ export type BlocksSettings = z.infer<typeof BlocksSettingsSchema>;
 export const DEFAULT_BLOCKS_SETTINGS: BlocksSettings = { mode: 'marathon', blitzSeconds: 180, startLevel: 1 };
 
 /**
+ * Head-to-head tournament games always use this format (lobby settings never change it): a 3-minute
+ * Blitz from level 1 — both players get the same pieces and the higher verified score wins.
+ */
+export const BLOCKS_TOURNAMENT_SETTINGS: BlocksSettings = { mode: 'blitz', blitzSeconds: 180, startLevel: 1 };
+
+/**
  * High-score board for a settings combination. The start level multiplies every score, so a run
  * started above level 1 has its own board (e.g. `marathon-l5`, `blitz-3-l10`).
  */

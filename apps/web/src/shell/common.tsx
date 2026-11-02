@@ -8,6 +8,8 @@ import {
   AVATARS,
   GAME_CATALOG,
   LIMITS,
+  RATE,
+  TokenBucket,
   cabinetForGame,
   cabinetPath,
   isGameId,
@@ -150,6 +152,9 @@ export function ProfileEditor({ compact = false, onSubmit }: { compact?: boolean
 }
 
 // ---------------------------------------------------------------------------
+/** The lobby's one-tap messages (C5). Plain chat: no protocol change, same filter and rate limit. */
+export const QUICK_CHAT = ['GG', 'Nice!', 'One more?', 'brb'] as const;
+
 export function ChatPanel({
   placeholder = 'Say something…',
   className,
@@ -157,6 +162,7 @@ export function ChatPanel({
   renderMessage,
   onSend,
   emptyText = 'No messages yet. Say hi!',
+  quick,
 }: {
   placeholder?: string;
   className?: string;
@@ -164,11 +170,16 @@ export function ChatPanel({
   renderMessage?: (m: ChatMessage) => ReactNode;
   onSend?: (text: string) => void;
   emptyText?: string;
+  /** One-tap messages shown above the box (the lobby passes QUICK_CHAT). Sent like typed chat. */
+  quick?: readonly string[];
 }) {
   const chat = useSessionStore((s) => s.chat);
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  // Quick taps are easy to spam: keep them inside the server's chat limit (RATE.chat, 6 then 1.5/s)
+  // so a burst is dropped here instead of earning "slow down" errors.
+  const quickBucket = useRef<TokenBucket | null>(null);
   useEffect(() => {
     const el = listRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
@@ -179,6 +190,16 @@ export function ChatPanel({
     if (onSend) onSend(t);
     else session.lobby.chat(t);
     setText('');
+  };
+  const sendQuick = (t: string) => {
+    quickBucket.current ??= new TokenBucket(RATE.chat);
+    if (!quickBucket.current.take()) {
+      useApp.getState().toast('info', 'Whoa — slow down a little!');
+      return;
+    }
+    stick.current = true;
+    if (onSend) onSend(t);
+    else session.lobby.chat(t);
   };
   return (
     <div className={cx('chat', className)} data-part="chat">
@@ -210,6 +231,15 @@ export function ChatPanel({
           ),
         )}
       </div>
+      {quick?.length ? (
+        <div className="chat__quick" role="group" aria-label="Quick messages" data-part="chat-quick">
+          {quick.map((q) => (
+            <Button key={q} size="sm" variant="ghost" disabled={disabled} onClick={() => sendQuick(q)}>
+              {q}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <form
         className="chat__form"
         data-part="chat-form"

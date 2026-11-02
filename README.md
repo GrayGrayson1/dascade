@@ -36,7 +36,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | Block Drop (`blocks`) | 1–16 | Falling-block puzzle (marathon or timed blitz), solo or a score race |
 | **DAS Raceway** | DASh Circuit (`circuit`) | 1–20 | Top-down neon racer with a car customizer and time trials |
 | | DASphalt GP (`kart`) | 1–30 | 3D kart racer: eight racers, drift mini-turbos, eleven items, eight tracks in two cups, bots, Grand Prix and time trial with ghosts |
-| **DASQuest** | DASQuest (`quest`) | 1–12 | Co-op branching adventure: *The Glitch Beneath Delta Alpha* |
+| **DASQuest** | DASQuest (`quest`) | 1–12 | Co-op branching adventure: *The Glitch Beneath Delta Alpha*, plus the minis *The Case of the Missing Beans* and *Snowed In at Delta Alpha* (winter) |
 
 Every game supports spectators. Classics games keep verified high-score boards.
 
@@ -89,11 +89,13 @@ Games read materials with an exact fallback (`var(--mat-board-light, <original c
 | Game | Formats | Series (best of) | Field |
 |---|---|---|---|
 | Chess, Checkers, Reversi | single elim, double elim, round robin, Swiss | 1, 2, 3, 5 | up to 64 |
-| Tic-Tac-Toe, Ships, Pixel Paddle, Neon Snake, Memory Matrix | same | 1, 3, 5 | up to 64 |
-| DAS Putt | same | 1, 3 | up to 32 |
+| Tic-Tac-Toe, Ships, Pixel Paddle, Neon Snake, Memory Matrix, Block Drop, Brick Blitz | same | 1, 3, 5 | up to 64 |
+| DAS Putt, DASphalt GP | same | 1, 3 | up to 32 |
 
 - **Lifecycle:** draft, registration, optional check-in, seeding (random, manual or by DASCADE rating), live rounds, then champion. Double elimination has an optional grand-final reset. Swiss pairs players on the same score and avoids rematches. Round robin uses Berger tables. Byes are handled automatically.
+- **Organizer options:** the create wizard sets per-game options that every match uses: variant and time control (chess, checkers, tic-tac-toe, Reversi), mode and lives (Memory Matrix), firing and fleet + grid (Ships), and course length (DAS Putt: all nine, front three or back three; a tie plays off on the same course's holes).
 - **Matches run themselves.** When a match is ready, the server creates the game room and gives each participant a private ticket. **Play match** seats you, and anyone can **Spectate**. Games start automatically once both players are present. Series continue with sides swapped after a short intermission. No-shows forfeit after the configured time, counted from when the match room opens (if neither player turns up, both forfeit so the bracket keeps moving).
+- **Score races and kart races:** Block Drop and Brick Blitz matches are always a 3-minute Blitz on the same seed (higher verified score wins; equal scores draw; these runs count for the Blitz high scores). DASphalt GP matches are a single race with no computer racers; a race nobody finishes is a draw.
 - **Organizer console:** open or close registration and check-in, seed, begin, pause or resume, forfeit, disqualify, override a result, relaunch a match room, end or cancel. Every action is written to a public audit log with its reason.
 - Brackets render as a tree on desktop and as a round strip on phones. Round robin shows a crosstable and Swiss shows standings with explained tiebreaks.
 - Public tournaments are listed at `GET /api/tournaments`. Unlisted ones are joined by code.
@@ -358,7 +360,7 @@ A **variant** (like the DASino tables) is just another `games[]` entry with the 
 1. Add `tournament: { formats, bestOf, maxField, draws, sides }` to its catalog entry. The wizard, config validation (`TournamentConfigSchema`) and the kiosk derive the game list from the catalog.
 2. In the room, read `this.tournamentMatch`. When it is set, give seats and first move by `participants[].side` in **every** game of the series (sides swap between games), and use fixed tournament rules and no casual-only features such as take-backs or rematch votes. The base room already locks the room to the two ticket holders, refuses lobby controls, starts games automatically and drives the series.
 3. Call `this.reportOutcome({ placements, … })` at **every** ending: win, draw, resign, timeout, forfeit and abandonment. The bracket advances only on reported outcomes, and duplicates are ignored.
-4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for the variant and time control (tic-tac-toe and Reversi likewise).
+4. Optionally expose organizer choices in `TOURNAMENT_GAME_SETTINGS` (`packages/shared/src/tournamentGames.ts`), as chess and checkers do for the variant and time control (tic-tac-toe and Reversi likewise). Settings that only work together go in one `combined` field (Ships' fleet + grid). `tournamentGames.test.ts` checks every option against the room's settings schema, because the room silently drops merged settings that fail it.
 5. Test it with a real kiosk (`apps/game-server/test/tournament-helpers.ts`; see `tournament-chess.test.ts`).
 
 To make a head-to-head game **rated**, also set `rated: true` in the catalog. Tournament games are then always rated, and casual rooms can opt in by overriding `ratedOptIn()` (the boardroom kit does this with a lobby toggle).

@@ -6,11 +6,21 @@
  * level, lives and game over. Multiplayer = a synchronized high-score race on the same seeded
  * levels (same capsule drops too): Arcade runs until everyone is out of lives, Blitz until the
  * clock runs out. Field previews are public (they're on everyone's screen anyway).
+ *
+ * Tournament matches (head to head) always race BRICKS_TOURNAMENT_SETTINGS (a 3-minute Blitz): the
+ * kit ranks by verified score (equal scores draw), puts a leaver last and refuses rematches. Their
+ * runs are verified like any other, so they post to the Blitz high-score board too.
  */
 import { t, type SchemaType } from '@colyseus/schema';
 import type { CreateOptions } from '@dascade/shared';
 import { CLASSICS } from '@dascade/shared/games/classics';
-import { BricksSettingsSchema, DEFAULT_BRICKS_SETTINGS, bricksBoardKey, type BricksSettings } from '@dascade/shared/games/bricks';
+import {
+  BRICKS_TOURNAMENT_SETTINGS,
+  BricksSettingsSchema,
+  DEFAULT_BRICKS_SETTINGS,
+  bricksBoardKey,
+  type BricksSettings,
+} from '@dascade/shared/games/bricks';
 import { COLS, MAX_CODE, createBricksSim, type BricksSim } from '@dascade/game-core/bricks';
 import type { ClassicsSim } from '@dascade/game-core/classics/shared';
 import type { PlayerRecord, RemovalReason } from '../BaseGameRoom.ts';
@@ -54,6 +64,9 @@ export class BricksRoom extends VerifiedClassicsRoom<BricksState, BricksSettings
     super.onRoomCreated(options);
     // Solo players pick Arcade/Blitz on the start card (between runs).
     this.settingsEditablePhases = this.isSolo ? ['LOBBY', 'PLAYING'] : ['LOBBY'];
+    // Tournament matches race the fixed format, published so every client shows it (the base room
+    // refuses lobby settings in tournament rooms, so it can't change afterwards).
+    if (this.tournamentMatch) this.updateSettings(structuredClone(BRICKS_TOURNAMENT_SETTINGS));
   }
 
   protected createSim(seed: string, options: Record<string, number | string | boolean>): ClassicsSim {

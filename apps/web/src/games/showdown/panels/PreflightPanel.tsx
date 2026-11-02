@@ -154,7 +154,7 @@ export function PreflightPanel({ look, code, title }: { look: ShowdownLook; code
       <div className="sdp-block__head">
         <span className="sdp-note">
           {!event
-            ? 'Server checks run in event rooms (load a DAS-O-Ween preset).'
+            ? 'Server checks run in event rooms (load an event preset, e.g. Event show).'
             : checkedAgo === null
               ? 'Asking the server…'
               : `Checked ${checkedAgo} s ago · again every 10 s.`}

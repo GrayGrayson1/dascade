@@ -112,7 +112,7 @@ describe('DASQuest lobby', () => {
     const guest = await join(host.room.roomId, 'Bea');
     const watcher = await join(host.room.roomId, 'Wes', { spectator: true });
     const packs = JSON.parse(st(host.room).packsJson);
-    expect(packs.map((p: { id: string }) => p.id)).toEqual(['glitch-beneath', 'missing-beans']);
+    expect(packs.map((p: { id: string }) => p.id)).toEqual(['glitch-beneath', 'missing-beans', 'snowed-in']);
     expect(st(host.room).packTitle).toBe('The Glitch Beneath Delta Alpha');
 
     await pick(host, 'tinker');

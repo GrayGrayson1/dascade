@@ -424,6 +424,42 @@
   cursor: default;
   margin: 6px 0;
 }
+/* Lobby → QR: the join QR, big. The code itself is black on white in every theme (scanners need it). */
+.invite-qr__body {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  text-align: center;
+}
+.invite-qr__code {
+  display: block;
+  width: min(300px, 70vw, 50dvh);
+  aspect-ratio: 1;
+  background: #fff;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+.invite-qr__addr {
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: var(--fs-md);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.invite-qr__room {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.invite-qr__letters {
+  font-size: var(--fs-2xl);
+  letter-spacing: 0.2em;
+  color: var(--accent);
+}
+.invite-qr__body .dc-field__hint {
+  margin: 0;
+}
 .lobby__tabs {
   display: none;
 }
@@ -828,6 +864,34 @@
 }
 .chat__form .dc-btn {
   flex: none;
+}
+/* Quick chat (lobby): one-tap messages above the box. */
+.chat__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) 0;
+  border-top: 1px solid var(--panel-divider);
+}
+.chat__quick + .chat__form {
+  border-top: 0;
+}
+
+/* Phone lobby: the Chat tab's unread count. */
+.lobby__unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 2px;
 }
 
 /* ---------- Help ---------- */

@@ -415,6 +415,23 @@ describe('preflight', () => {
     expect(row(evaluatePreflight(ready({ data: facts({ rounds: 0, specials: 0 }) })), 'show').state).toBe('fail');
   });
 
+  it('the year-round Event show plays the question packs: no show file needed; its rehearsal points back to it', () => {
+    const packs = facts({ event: 'event-show', rounds: 0, specials: 0, source: 'packs', packRounds: 4 });
+    expect(row(evaluatePreflight(ready({ data: packs, customRounds: 0 })), 'show')).toMatchObject({
+      state: 'ok',
+      detail: '4 rounds from the question packs · not the rehearsal',
+    });
+    const practice = facts({ event: 'event-rehearsal', rehearsal: true, source: 'custom' });
+    expect(row(evaluatePreflight(ready({ data: practice })), 'show')).toMatchObject({
+      state: 'warn',
+      fix: 'For the real show, load Event show',
+    });
+    // DAS-O-Ween's rehearsal still points at the show file.
+    expect(row(evaluatePreflight(ready({ data: facts({ event: 'dasoween-rehearsal', rehearsal: true }) })), 'show').fix).toBe(
+      'For the real show, load your show file',
+    );
+  });
+
   it('warns (never blocks) on backups, a recent deploy and snapshots off — GO with warnings', () => {
     const rows = evaluatePreflight(ready({ data: facts({ backups: { issued: 0, online: 0 }, uptimeSeconds: 240, blackbox: false }) }));
     expect(row(rows, 'backup').state).toBe('warn');

@@ -18,6 +18,12 @@ export type BricksSettings = z.infer<typeof BricksSettingsSchema>;
 
 export const DEFAULT_BRICKS_SETTINGS: BricksSettings = { mode: 'arcade', blitzSeconds: 180 };
 
+/**
+ * Head-to-head tournament games always use this format (lobby settings never change it): a 3-minute
+ * Blitz — both players get the same levels and capsule drops and the higher verified score wins.
+ */
+export const BRICKS_TOURNAMENT_SETTINGS: BricksSettings = { mode: 'blitz', blitzSeconds: 180 };
+
 export function bricksBoardKey(s: Pick<BricksSettings, 'mode' | 'blitzSeconds'>): string {
   return s.mode === 'blitz' ? `blitz-${Math.round(s.blitzSeconds / 60)}` : 'arcade';
 }

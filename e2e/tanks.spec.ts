@@ -111,7 +111,7 @@ test.describe('DAS Tanks', () => {
     await startGame(page);
     await waitForPhase(page, 'PLAYING', 20_000);
     await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('shop');
-    const me = await myPlayerId(page);
+    const me = (await myPlayerId(page))!;
     const credits = async () => (await roomState(page))?.fleet?.[me]?.credits as number;
     const shop = page.locator('[data-part="shop"]');
     await expect(shop).toBeVisible();
@@ -148,7 +148,7 @@ test.describe('DAS Tanks', () => {
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled();
     await expect(guest.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled();
     await press(page, 'Fire');
-    const hostId = await myPlayerId(page);
+    const hostId = (await myPlayerId(page))!;
     await expect.poll(async () => (await roomState(guest))?.tanks?.[hostId]?.locked, { timeout: 10_000 }).toBe(true);
     await press(guest, 'Fire');
     await expect.poll(async () => (await roomState(page))?.battle?.shotSeq, { timeout: 10_000 }).toBe(1);

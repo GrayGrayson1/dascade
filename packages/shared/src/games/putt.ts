@@ -50,7 +50,10 @@ export const DEFAULT_PUTT_SETTINGS: PuttSettings = {
   maxOverPar: 4,
 };
 
-/** The fixed match format for Tournament Center matches (lobby settings never change it). */
+/**
+ * The fixed match format for Tournament Center matches (lobby settings never change it). Only the
+ * course length is the organizer's choice (see puttTournamentSettings).
+ */
 export const PUTT_TOURNAMENT_SETTINGS: PuttSettings = {
   mode: 'turns',
   course: 'full',
@@ -58,6 +61,15 @@ export const PUTT_TOURNAMENT_SETTINGS: PuttSettings = {
   shotClock: 45,
   maxOverPar: 4,
 };
+
+/** Course lengths an organizer can pick for tournament matches (a single practice hole isn't one). */
+export const PUTT_TOURNAMENT_COURSES = ['full', 'front', 'back'] as const;
+export type PuttTournamentCourse = (typeof PUTT_TOURNAMENT_COURSES)[number];
+
+/** Tournament format with the organizer's course length (`gameSettings.course`); anything else plays the full nine. */
+export function puttTournamentSettings(course: unknown): PuttSettings {
+  return { ...PUTT_TOURNAMENT_SETTINGS, course: PUTT_TOURNAMENT_COURSES.find((c) => c === course) ?? 'full' };
+}
 
 /** Holes (1-based) played for a course selection. */
 export function puttRoute(settings: Pick<PuttSettings, 'course' | 'hole'>): number[] {
@@ -73,8 +85,18 @@ export function puttRoute(settings: Pick<PuttSettings, 'course' | 'hole'>): numb
   }
 }
 
-/** Sudden-death playoff holes for a tied Tournament Center match (then the match is reported drawn). */
+/** Sudden-death playoff holes for a tied Tournament Center match on the full course (then the match is reported drawn). */
 export const PUTT_PLAYOFF_HOLES = [9, 6, 1] as const;
+
+/**
+ * Playoff holes for a regulation route: the full course uses PUTT_PLAYOFF_HOLES; a shorter route
+ * replays its own holes from its last one back (front three: 3, 2, 1), so a playoff never sends the
+ * golfers to a hole their match didn't include.
+ */
+export function puttPlayoffHoles(route: readonly number[]): readonly number[] {
+  if (route.length === PUTT_HOLE_COUNT) return PUTT_PLAYOFF_HOLES;
+  return [...route].reverse().slice(0, PUTT_PLAYOFF_HOLES.length);
+}
 
 // ---------------------------------------------------------------------------
 // Stroke intents

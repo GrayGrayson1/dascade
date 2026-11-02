@@ -7,18 +7,18 @@
  * ordinary custom rounds (the presenter can edit and save them, and they reach only the presenter).
  *
  * The rankings are curated host picks, NOT a survey or poll, and every round says so in its
- * attribution ("According to DAS-O-Ween Host Picks…"). The presenter can change the attribution and
- * the order in the round editor before the show.
+ * attribution ("According to DAS Host Picks…", "According to DAS-O-Ween Host Picks…"). The presenter
+ * can change the attribution and the order in the round editor before the show.
  */
 import type { ShowdownEventId, ShowdownRoundInput } from '@dascade/shared/games/showdown';
 
 type A = [text: string, note: string, aliases?: string[]];
 
-function top10(prompt: string, title: string, answers: A[], special = 5): ShowdownRoundInput {
+function top10(prompt: string, title: string, answers: A[], source = 'DAS-O-Ween Host Picks', special = 5): ShowdownRoundInput {
   return {
     prompt,
     title,
-    source: 'DAS-O-Ween Host Picks',
+    source,
     special,
     // Ranked: every answer at 0 points keeps the order given (#1 first).
     answers: answers.map(([text, note, aliases]) => ({ text, points: 0, note, aliases: aliases ?? [] })),
@@ -26,6 +26,45 @@ function top10(prompt: string, title: string, answers: A[], special = 5): Showdo
 }
 
 export const SHOWDOWN_EVENT_ROUNDS: Record<ShowdownEventId, ShowdownRoundInput[]> = {
+  // The year-round event show: SETTINGS ONLY. Its rounds are drawn from the question packs at the start.
+  'event-show': [],
+  // Its practice boards: neutral topics that no question pack asks, so a rehearsal spoils nothing.
+  'event-rehearsal': [
+    top10(
+      'Name the Top 10 Ice Cream Flavours.',
+      'Practice: Ice Cream',
+      [
+        ['Vanilla', 'The classic', ['french vanilla']],
+        ['Chocolate', 'Rich and dark', ['double chocolate']],
+        ['Cookies and Cream', 'Crunchy bits', ['cookies n cream', 'cookies & cream', 'oreo']],
+        ['Mint Chip', 'Cool and green', ['mint chocolate chip', 'mint']],
+        ['Strawberry', 'Pink', ['strawberries']],
+        ['Cookie Dough', 'Straight from the bowl', ['chocolate chip cookie dough']],
+        ['Rocky Road', 'Marshmallows and nuts', ['rockyroad']],
+        ['Salted Caramel', 'Sweet and salty', ['caramel']],
+        ['Butter Pecan', 'Nutty', ['pecan']],
+        ['Pistachio', 'Pale green', ['pistachios']],
+      ],
+      'DAS Host Picks',
+    ),
+    top10(
+      'Name the Top 10 Animals at the Zoo.',
+      'Practice: The Zoo',
+      [
+        ['Lion', 'King of the jungle', ['lions']],
+        ['Elephant', 'Never forgets', ['elephants']],
+        ['Giraffe', 'Long neck', ['giraffes']],
+        ['Monkey', 'Swinging around', ['monkeys', 'chimp', 'chimpanzee']],
+        ['Penguin', 'Dressed for dinner', ['penguins']],
+        ['Tiger', 'Stripes', ['tigers']],
+        ['Zebra', 'More stripes', ['zebras']],
+        ['Panda', 'Black and white', ['pandas', 'panda bear']],
+        ['Hippo', 'Big yawn', ['hippos', 'hippopotamus']],
+        ['Gorilla', 'Silverback', ['gorillas']],
+      ],
+      'DAS Host Picks',
+    ),
+  ],
   // DAS-O-Ween 2026: SETTINGS ONLY. The real boards live in a show file outside git (ADM-01) and are loaded
   // in the console before doors; the old answers are public in git history, so the show uses new ones.
   'dasoween-2026': [],
