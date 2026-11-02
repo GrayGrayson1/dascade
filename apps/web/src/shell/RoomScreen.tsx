@@ -22,6 +22,7 @@ import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './R
 import { ShowRecovery, canRecover } from './ShowRecovery.tsx';
 import { recoveringCode, subscribeRecovery } from '../net/recovery.ts';
 import { crumbCabinet } from './crumbs.ts';
+import { joinOutlook, type RoomLookup } from '../net/joinOutlook.ts';
 import { hidesArcadeExit } from './arcadeExit.ts';
 import { shouldLeaveBeforeResolving, shouldLeaveOnExit } from './roomPath.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
@@ -278,27 +279,41 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
   );
 }
 
+/** How often the join prompt refreshes the room's status (it's rate limited per IP, generously). */
+const JOIN_STATUS_REFRESH_MS = 5000;
+
 function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'join' | 'watch' | null>(null);
   // Enabled from the typed name (not only once it's committed on blur: a tap on iOS doesn't blur).
   const canPlay = useApp(selectCanPlay);
-  const [lookup, setLookup] = useState<{ gameId?: string; roomName?: string; exists: boolean } | null>(null);
+  const [lookup, setLookup] = useState<RoomLookup | null>(null);
   useEffect(() => {
-    session
-      .lookup(code)
-      .then(setLookup)
-      .catch(() => setLookup(null));
+    let alive = true;
+    const refresh = () =>
+      session
+        .lookup(code)
+        .then((info) => alive && setLookup(info))
+        .catch(() => undefined);
+    void refresh();
+    // A game may start (or fill up) while the player types a name: keep the status current.
+    const timer = setInterval(() => void refresh(), JOIN_STATUS_REFRESH_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
   }, [code]);
   const gameId = lookup?.gameId && isGameId(lookup.gameId) ? lookup.gameId : null;
   const game = gameId ? GAME_CATALOG[gameId] : null;
   const cabinet = gameId ? crumbCabinet(gameId) : null;
+  // Said before joining: a running game or a full room seats newcomers as spectators.
+  const outlook = lookup && game ? joinOutlook(lookup, game.capacity.lateJoinAsPlayer) : null;
   // A dead code keeps its way back (shell/arcadeExit.ts: error screens never strand anyone).
   const exit = !hidesArcadeExit(gameId) || lookup?.exists === false;
-  const join = async () => {
+  const join = async (as: 'join' | 'watch') => {
     if (busy || lookup?.exists === false || !commitProfileName()) return;
-    setBusy(true);
-    await session.joinRoom(code);
-    setBusy(false);
+    setBusy(as);
+    await session.joinRoom(code, as === 'watch' ? { spectator: true } : {});
+    setBusy(null);
   };
   return (
     <GameTheme
@@ -331,9 +346,19 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
               ))}
             </div>
             {lookup?.roomName ? <p className="join-prompt__room">{lookup.roomName}</p> : null}
+            {outlook ? (
+              <p className="join-prompt__room" data-part="join-status" aria-live="polite">
+                {outlook.status}
+              </p>
+            ) : null}
+            {outlook?.warning ? (
+              <p className={outlook.joinsAs === 'refused' ? 'dc-field__error' : 'dc-field__hint'} data-part="join-warning">
+                {outlook.warning}
+              </p>
+            ) : null}
             {lookup && !lookup.exists ? <p className="dc-field__error">No room is using this code right now.</p> : null}
           </div>
-          <ProfileEditor compact onSubmit={() => void join()} />
+          <ProfileEditor compact onSubmit={() => void join('join')} />
           <div className={cx('dc-row dc-row--wrap', !exit && 'join-prompt__actions--solo')}>
             {exit ? (
               <>
@@ -343,7 +368,26 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
                 <span className="dc-spacer" />
               </>
             ) : null}
-            <Button variant="primary" size="lg" icon="play" loading={busy} disabled={!canPlay || lookup?.exists === false} onClick={join}>
+            {outlook?.offerWatch ? (
+              <Button
+                variant="ghost"
+                size="lg"
+                icon="eye"
+                loading={busy === 'watch'}
+                disabled={!canPlay || busy !== null}
+                onClick={() => void join('watch')}
+              >
+                Watch instead
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              size="lg"
+              icon="play"
+              loading={busy === 'join'}
+              disabled={!canPlay || lookup?.exists === false || (busy !== null && busy !== 'join')}
+              onClick={() => void join('join')}
+            >
               Join game
             </Button>
           </div>
