@@ -1241,6 +1241,58 @@
 .hd-results__board {
   width: 100%;
 }
+
+/* Awards (most hands won, biggest pot) */
+.hd-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+.hd-award {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--glass-strong);
+  animation: dc-pop-in var(--dur-3) var(--ease-out) both;
+  animation-delay: var(--delay);
+}
+.hd-award[data-me='true'] {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.hd-award__icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  color: var(--hd-gold);
+}
+.hd-award__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hd-award__name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-0);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hd-award__value {
+  font-family: var(--hd-num);
+  font-size: 18px;
+  color: var(--accent);
+}
+.hd-award__detail {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
 .hd-standings {
   margin: 0;
   padding: 6px;

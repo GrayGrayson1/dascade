@@ -118,3 +118,38 @@ test("DAS Hold'em: a fold ends the hand and the pot goes to the other player", a
   await leaveRoom(guest);
   await leaveRoom(page);
 });
+
+test("DAS Hold'em: the results screen shows the awards for most hands won and the biggest pot", async ({ page, browser }) => {
+  const code = await createRoom(page, 'holdem', 'Ranker');
+  const guest = await joinRoom(browser, code, 'Awardee');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await expect.poll(async () => (await roomState(page)).toActSeat).toBeGreaterThanOrEqual(0);
+
+  // A fold settles hand 1; the host ends the game (between hands it ends at once, else after hand 2).
+  const pages = [page, guest];
+  const start = await roomState(page);
+  const actor = (await mySeat(page)) === start.toActSeat ? page : guest;
+  await actor.locator('.hd-actions').getByRole('button', { name: 'Fold' }).click();
+  await expect.poll(async () => (await roomState(page)).winners.length).toBe(1);
+  await page.locator('.hd-hud').getByRole('button', { name: 'End game' }).click();
+  await page.locator('dialog').getByRole('button', { name: 'End game' }).click();
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline && (await roomState(page)).phase !== 'RESULTS') {
+    const s = await roomState(page);
+    const who = s.toActSeat >= 0 ? ((await mySeat(page)) === s.toActSeat ? page : (await mySeat(guest)) === s.toActSeat ? guest : null) : null;
+    if (who) await who.locator('.hd-actions').getByRole('button', { name: 'Fold' }).click().catch(() => undefined);
+    await page.waitForTimeout(250);
+  }
+  await waitForPhase(page, 'RESULTS');
+
+  // Both players see the awards above the leaderboard.
+  for (const p of pages) {
+    const awards = p.locator('[data-part="awards"]');
+    await expect(awards).toContainText('Most hands won');
+    await expect(awards).toContainText('Biggest pot');
+    await expect(awards).toContainText(/Hand #\d+ · no showdown| each/);
+  }
+  await leaveRoom(guest);
+  await leaveRoom(page);
+});

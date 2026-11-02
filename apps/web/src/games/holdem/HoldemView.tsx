@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import {
   HOLDEM_MSG,
   formatBlinds,
+  type HoldemAwardsPayload,
   type HoldemPrivatePayload,
   type HoldemPublicState,
   type HoldemSettings,
@@ -36,6 +37,7 @@ function useMedia(query: string): boolean {
 export function HoldemView() {
   const game = useGame<HoldemPublicState, HoldemSettings>();
   const priv = useLatestMessage<HoldemPrivatePayload>(HOLDEM_MSG.private);
+  const awards = useLatestMessage<HoldemAwardsPayload>(HOLDEM_MSG.awards);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
   const fx = useApp((s) => s.settings.fx);
   const compactDock = useMedia('(max-width: 719px), (max-height: 560px)');
@@ -85,7 +87,7 @@ export function HoldemView() {
   if (game.phase === 'RESULTS') {
     return (
       <GameStage gameId="holdem" className="hd hd--results">
-        <Results state={state} players={state.players} playerId={playerId} />
+        <Results state={state} players={state.players} playerId={playerId} awards={awards} />
       </GameStage>
     );
   }
