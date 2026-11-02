@@ -21,7 +21,12 @@ import {
   type TournamentConfig,
   type TournamentFormat,
 } from '@dascade/shared';
-import { TOURNAMENT_GAME_SETTINGS } from '@dascade/shared/tournamentGames';
+import {
+  TOURNAMENT_GAME_SETTINGS,
+  applyTournamentGameSetting,
+  defaultTournamentGameSettings,
+  selectedTournamentGameSetting,
+} from '@dascade/shared/tournamentGames';
 import { Button, Field, NumberInput, PixelIcon, Segmented, Select, TextInput, Toggle, cx } from '@dascade/ui';
 import { selectCanPlay, useApp } from '../app/store.ts';
 import { session, useSessionStore } from '../net/session.ts';
@@ -100,14 +105,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
 
   // Default the per-game settings (e.g. time control) whenever the game changes.
   useEffect(() => {
-    setConfig((c) => {
-      const gs: Record<string, unknown> = {};
-      for (const f of TOURNAMENT_GAME_SETTINGS[c.gameId] ?? []) {
-        const opt = f.options.find((o) => o.id === f.defaultId) ?? f.options[0];
-        if (opt) gs[f.key] = opt.value;
-      }
-      return { ...c, gameSettings: gs };
-    });
+    setConfig((c) => ({ ...c, gameSettings: defaultTournamentGameSettings(c.gameId) }));
   }, [config.gameId]);
 
   const problem = useMemo(() => {
@@ -367,9 +365,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
               {settingsFields.length > 0 ? (
                 <WizSection title={`${game.title} settings`} hint="Every match of the tournament uses these. Players can’t change them.">
                   {settingsFields.map((f) => {
-                    const current =
-                      f.options.find((o) => JSON.stringify(o.value) === JSON.stringify(config.gameSettings[f.key])) ??
-                      f.options.find((o) => o.id === f.defaultId);
+                    const current = selectedTournamentGameSetting(f, config.gameSettings) ?? f.options.find((o) => o.id === f.defaultId);
                     return (
                       <Field key={f.key} label={f.label} hint={f.help}>
                         {({ id }) => (
@@ -378,7 +374,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
                             value={current?.id ?? f.defaultId}
                             onChange={(e) => {
                               const opt = f.options.find((o) => o.id === e.currentTarget.value);
-                              if (opt) patch({ gameSettings: { ...config.gameSettings, [f.key]: opt.value } });
+                              if (opt) patch({ gameSettings: applyTournamentGameSetting(config.gameSettings, f, opt) });
                             }}
                           >
                             {f.options.map((o) => (
@@ -433,7 +429,7 @@ export function CreateWizard({ initialGame, onCancel }: { initialGame: GameId | 
               <dd>{config.checkIn ? (config.checkInMinutes ? `${config.checkInMinutes} min window` : 'Until closed') : 'Off'}</dd>
             </div>
             {settingsFields.map((f) => {
-              const current = f.options.find((o) => JSON.stringify(o.value) === JSON.stringify(config.gameSettings[f.key]));
+              const current = selectedTournamentGameSetting(f, config.gameSettings);
               return current ? (
                 <div key={f.key}>
                   <dt>{f.label}</dt>
