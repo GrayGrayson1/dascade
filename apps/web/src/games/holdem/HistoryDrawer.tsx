@@ -1,8 +1,11 @@
-/** Slide-over drawer with the hand history (grouped by hand) and table chat. */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+/** Slide-over drawer with the hand history (grouped by hand), table chat and the hand rankings. */
+import { useEffect, useMemo, type ReactNode } from 'react';
 import type { HoldemLogEntry } from '@dascade/shared/games/holdem';
 import { IconButton, Tabs, cx } from '@dascade/ui';
 import { ChatPanel } from '../../shell/common.tsx';
+import { HandRankings } from './HandRankings.tsx';
+
+export type DrawerTab = 'hands' | 'chat' | 'rankings';
 
 const SUIT: Record<string, string> = { s: '♠', h: '♥', d: '♦', c: '♣' };
 const CARD_RE = /\b([2-9TJQKA])([shdc])\b/g;
@@ -28,8 +31,24 @@ function withCards(text: string): ReactNode[] {
   return out;
 }
 
-export function HistoryDrawer({ open, onClose, log, currentHand }: { open: boolean; onClose: () => void; log: HoldemLogEntry[]; currentHand: number }) {
-  const [tab, setTab] = useState<'hands' | 'chat'>('hands');
+export function HistoryDrawer({
+  open,
+  onClose,
+  tab,
+  onTab,
+  log,
+  currentHand,
+  heroRanking,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tab: DrawerTab;
+  onTab: (tab: DrawerTab) => void;
+  log: HoldemLogEntry[];
+  currentHand: number;
+  /** The hero's current row in the hand rankings (null = not holding cards). */
+  heroRanking: string | null;
+}) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -50,15 +69,16 @@ export function HistoryDrawer({ open, onClose, log, currentHand }: { open: boole
   }, [log]);
 
   return (
-    <aside className={cx('hd-drawer', open && 'hd-drawer--open')} aria-label="Hand history and chat" aria-hidden={!open} inert={!open}>
+    <aside className={cx('hd-drawer', open && 'hd-drawer--open')} aria-label="Hand history, chat and hand rankings" aria-hidden={!open} inert={!open}>
       <header className="hd-drawer__head">
         <Tabs
           label="Drawer sections"
           value={tab}
-          onChange={setTab}
+          onChange={onTab}
           tabs={[
             { value: 'hands', label: 'Hand history' },
             { value: 'chat', label: 'Chat' },
+            { value: 'rankings', label: 'Rankings' },
           ]}
         />
         <IconButton icon="close" label="Close drawer" size="sm" onClick={onClose} />
@@ -79,6 +99,8 @@ export function HistoryDrawer({ open, onClose, log, currentHand }: { open: boole
             </section>
           ))}
         </div>
+      ) : tab === 'rankings' ? (
+        <HandRankings current={heroRanking} />
       ) : (
         <ChatPanel className="hd-chat" placeholder="Chat with the table…" />
       )}

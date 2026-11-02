@@ -74,6 +74,32 @@ test("DAS Hold'em smoke: create, join, start, play a hand to the pot award, leav
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("DAS Hold'em: the hand rankings card lists every hand, best first, and marks yours", async ({ page, browser }) => {
+  const code = await createRoom(page, 'holdem', 'Ranker');
+  const guest = await joinRoom(browser, code, 'Railbird');
+  await startGame(page);
+  await waitForPhase(page, 'PLAYING');
+  await expect.poll(async () => (await roomState(page)).toActSeat).toBeGreaterThanOrEqual(0);
+
+  // All ten hands, best first; the hero's hand (a pair or a high card pre-flop) is marked.
+  await page.getByRole('button', { name: 'Hand rankings' }).click();
+  const ranks = page.locator('[data-part="hand-rankings"]');
+  await expect(ranks).toBeVisible();
+  const rows = ranks.locator('.hd-ranks__row');
+  await expect(rows).toHaveCount(10);
+  await expect(rows.first()).toContainText('Royal Flush');
+  await expect(rows.last()).toContainText('High Card');
+  const mine = ranks.locator('.hd-ranks__row[data-current="true"]');
+  await expect(mine).toHaveCount(1);
+  await expect(mine).toContainText(/Your hand/);
+  await expect(mine).toContainText(/Pair|High Card/);
+  await page.keyboard.press('Escape');
+  await expect(ranks).toBeHidden();
+
+  await leaveRoom(guest);
+  await leaveRoom(page);
+});
+
 test("DAS Hold'em: a fold ends the hand and the pot goes to the other player", async ({ page, browser }) => {
   const code = await createRoom(page, 'holdem', 'Folder');
   const guest = await joinRoom(browser, code, 'Taker');
