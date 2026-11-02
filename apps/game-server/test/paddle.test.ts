@@ -10,12 +10,12 @@ import type { PaddleRoom } from '../src/rooms/paddle/PaddleRoom.ts';
 import { bootTestServer, collect, sleep, waitFor, quiet } from './helpers.ts';
 
 let colyseus: ColyseusTestServer;
-const outcomes: Array<{ outcome: GameOutcome; game: string }> = [];
+const outcomes: Array<{ outcome: GameOutcome; game: string; rated: boolean; tournament: unknown }> = [];
 let unsubscribe: () => void = () => undefined;
 
 beforeAll(async () => {
   ({ colyseus } = await bootTestServer(['paddle']));
-  unsubscribe = onOutcome((outcome, ctx) => outcomes.push({ outcome, game: ctx.gameId }));
+  unsubscribe = onOutcome((outcome, ctx) => outcomes.push({ outcome, game: ctx.gameId, rated: ctx.rated, tournament: ctx.tournament }));
 });
 afterEach(async () => {
   await colyseus.cleanup();
@@ -127,8 +127,11 @@ describe('PaddleRoom — solo practice', () => {
     await waitFor(() => st(host.room).standings.get(me)?.status === 'over', 2000, 'standing over');
     expect(st(host.room).match.winner).toBe(0);
     expect(host.events.some((e) => e.kind === 'over' && e.winner === 0)).toBe(true);
-    // Solo runs never report outcomes to ratings/tournaments.
-    expect(outcomes.filter((o) => o.game === 'paddle')).toHaveLength(0);
+    // A finished solo run counts in Profile → Stats, but never in ratings or tournaments.
+    const solo = outcomes.filter((o) => o.game === 'paddle');
+    expect(solo).toHaveLength(1);
+    expect(solo[0]).toMatchObject({ rated: false, tournament: null });
+    expect(solo[0]!.outcome.placements).toEqual([[me]]);
     // Retry → a brand new game.
     host.room.send(CLASSICS_MSG.start, {});
     await waitFor(() => st(host.room).standings.get(me)?.status === 'playing', 3000, 'retry');
