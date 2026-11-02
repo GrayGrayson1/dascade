@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { HOLDEM_MSG, type HoldemEvent } from '@dascade/shared/games/holdem';
 import { useRoomMessage } from '../../net/hooks.ts';
 import { sfx, synth } from '../../audio/audio.ts';
+import { buzz } from '../../app/haptics.ts';
 
 function knock(): void {
   synth.noise({ dur: 0.05, gain: 0.3, freq: 420, q: 2, type: 'bandpass' });
@@ -72,7 +73,7 @@ export function useHoldemSounds(opts: { mySeat: number; myTurn: boolean; bigBlin
     if (myTurn && !wasMyTurn.current) {
       yourTurn();
       try {
-        navigator.vibrate?.(35);
+        buzz(35);
       } catch {
         /* unsupported */
       }

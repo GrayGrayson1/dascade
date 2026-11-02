@@ -19,6 +19,7 @@ import { serverNow, useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
 import { useMe, useMotion, usePicker } from './state.ts';
 import { hasLanded, shouldBuzz } from './poolStatus.ts';
+import { buzz } from '../../app/haptics.ts';
 
 /** True from `landAt` on (server time). Re-renders once, at the landing. */
 export function useLanded(landAt: number): boolean {
@@ -126,7 +127,7 @@ function YoureUp({
       buzzed.add(key);
       if (shouldBuzz(landAt, serverNow())) {
         try {
-          navigator.vibrate?.([200, 100, 200]);
+          buzz([200, 100, 200]);
         } catch {
           /* not allowed here: the alert is enough */
         }

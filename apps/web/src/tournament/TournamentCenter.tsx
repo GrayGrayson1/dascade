@@ -13,6 +13,7 @@ import {
   TOURNAMENT_FORMATS,
   TOURNAMENT_GAME_LIST,
   TOURNAMENT_STATUS_LABELS,
+  extractRoomCode,
   normalizeRoomCode,
   type TournamentListing,
 } from '@dascade/shared';
@@ -188,13 +189,13 @@ function Hero({ onCreate, game }: { onCreate: () => void; game: string | null })
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              maxLength={7}
               placeholder="ABCDE"
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'tc-join-err' : undefined}
+              // No maxLength: a whole pasted invite link has to arrive here to give up its code.
               onChange={(e) => {
                 setError(null);
-                setCode(normalizeRoomCode(e.currentTarget.value).slice(0, ROOM_CODE_LENGTH));
+                setCode(extractRoomCode(e.currentTarget.value).slice(0, ROOM_CODE_LENGTH));
               }}
             />
             <Button type="submit" variant="secondary" icon="arrow-right">

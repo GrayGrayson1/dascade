@@ -7,6 +7,7 @@ import {
   GAME_LIST,
   ROOM_CODE_LENGTH,
   cabinetForGame,
+  extractRoomCode,
   isGameId,
   normalizeRoomCode,
   type GameId,
@@ -369,11 +370,11 @@ function JoinModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
-              maxLength={7}
               placeholder="ABCDE"
               aria-describedby={describedBy}
               aria-invalid={error ? true : undefined}
-              onChange={(e) => setCode(normalizeRoomCode(e.currentTarget.value).slice(0, 5))}
+              // No maxLength: a whole pasted invite link has to arrive here to give up its code.
+              onChange={(e) => setCode(extractRoomCode(e.currentTarget.value).slice(0, ROOM_CODE_LENGTH))}
             />
           )}
         </Field>

@@ -2,8 +2,8 @@
  * Shared shell polish: cabinet context in the lobby, clear room status, results → "Back to cabinet",
  * dismissible toasts. Only shared shell behaviour is asserted.
  */
-import { expect, test } from '@playwright/test';
-import { createRoom, roomState, startGame, waitForPhase } from './helpers.ts';
+import { expect, test, type Locator } from '@playwright/test';
+import { createRoom, roomState, setName, startGame, waitForPhase } from './helpers.ts';
 
 test('the lobby shows its cabinet, seats and lock state', async ({ page }) => {
   await createRoom(page, 'holdem', 'Dealer');
@@ -35,6 +35,49 @@ test('results offer "Back to cabinet", which leaves the room for the cabinet tit
   await page.waitForURL((url) => url.pathname === '/play/wheel');
   await expect(page.getByRole('button', { name: 'Create game' })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__DASCADE__.store.getState().room)).toBeNull();
+});
+
+test('pasting a whole invite link into a code box gives its code, not "HTTPS"', async ({ page: guest, browser }) => {
+  // The guest is this project's page (so mobile runs paste on a phone); the host has its own context.
+  const host = await (await browser.newContext()).newPage();
+  const code = await createRoom(host, 'wheel', 'Host');
+  const origin = new URL(host.url()).origin;
+  // insertText is what a paste does: the whole text arrives in one input event.
+  const paste = async (box: Locator, text: string) => {
+    await box.click();
+    await guest.keyboard.insertText(text);
+  };
+
+  // The cabinet title screen's box, with chatter around the link.
+  await guest.goto('/play/wheel');
+  await setName(guest, 'Paster');
+  await guest.getByRole('button', { name: 'Join with code' }).click();
+  const titleBox = guest.getByRole('textbox', { name: 'Room code' });
+  await paste(titleBox, `Join me! ${origin}/room/${code.toLowerCase()} see you`);
+  await expect(titleBox).toHaveValue(code);
+
+  // The Tournament Center's box, with the short /r/ link.
+  await guest.goto('/tournaments');
+  const tcBox = guest.locator('#tc-join-code');
+  await paste(tcBox, `${origin}/r/${code}`);
+  await expect(tcBox).toHaveValue(code);
+
+  // The floor's Join modal, all the way into the room.
+  await guest.goto('/');
+  await guest
+    .locator('button:visible')
+    .filter({ hasText: /Join with code/ })
+    .first()
+    .click();
+  const dialog = guest.getByRole('dialog');
+  const modalBox = dialog.getByRole('textbox', { name: 'Room code' });
+  await paste(modalBox, `${origin}/room/${code}`);
+  await expect(modalBox).toHaveValue(code);
+  await dialog.getByRole('button', { name: 'Join game' }).click();
+  await guest.waitForURL((url) => url.pathname === `/room/${code}`);
+  await expect(guest.locator('.lobby')).toBeVisible();
+  await expect(host.locator('.player-list')).toContainText('Paster');
+  await host.context().close();
 });
 
 test('toasts can be dismissed with their close button', async ({ page }) => {

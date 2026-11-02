@@ -23,6 +23,20 @@ export function normalizeRoomCode(input: string): string {
     .slice(0, 12);
 }
 
+/** A room link's code: `/room/<code>` (lobby and crew links) or `/r/<code>` (the short join link). */
+const ROOM_LINK_RE = /\/(?:r|room)\/([A-Z0-9]{5})(?![A-Z0-9])/i;
+
+/**
+ * The room code in whatever was typed or pasted into a code box. An invite link
+ * (`https://dascade.onrender.com/room/k7qxm`, `…/r/K7QXM?x=1`, or a message with a link in it)
+ * gives its code; anything else is a typed code and goes through normalizeRoomCode, so "abc-de"
+ * still reads "ABCDE". Without this, a pasted link kept its first letters and became "HTTPS".
+ */
+export function extractRoomCode(input: string): string {
+  const link = ROOM_LINK_RE.exec(input);
+  return link ? link[1]!.toUpperCase() : normalizeRoomCode(input);
+}
+
 export function isValidRoomCode(code: string): boolean {
   if (code.length !== ROOM_CODE_LENGTH) return false;
   for (const ch of code) if (!ROOM_CODE_ALPHABET.includes(ch)) return false;

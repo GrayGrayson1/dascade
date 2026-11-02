@@ -15,7 +15,17 @@
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { CABINETS, GAME_CATALOG, cabinetForGame, isGameId, normalizeRoomCode, type CabinetGame, type GameId } from '@dascade/shared';
+import {
+  CABINETS,
+  GAME_CATALOG,
+  ROOM_CODE_LENGTH,
+  cabinetForGame,
+  extractRoomCode,
+  isGameId,
+  normalizeRoomCode,
+  type CabinetGame,
+  type GameId,
+} from '@dascade/shared';
 import { Badge, Button, GameTheme, PixelIcon, TextInput } from '@dascade/ui';
 import { session, useSessionStore } from '../net/session.ts';
 import { selectCanPlay, useApp } from '../app/store.ts';
@@ -259,7 +269,7 @@ export function CabinetEntry() {
                     autoCapitalize="characters"
                     autoComplete="off"
                     spellCheck={false}
-                    onChange={(e) => setCode(normalizeRoomCode(e.currentTarget.value).slice(0, 5))}
+                    onChange={(e) => setCode(extractRoomCode(e.currentTarget.value).slice(0, ROOM_CODE_LENGTH))}
                   />
                   <Button
                     type="submit"

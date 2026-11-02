@@ -56,11 +56,17 @@ export interface AppSettings {
    * absent = nothing recorded. Added without a version bump: there is nothing to migrate.
    */
   seasonal?: SeasonalPrefs;
+  /**
+   * Vibration on phones (your turn at Hold'em, "You're up" in Showdown). Optional: absent = on, so
+   * it was added without a version bump. "Mute everything" stops vibration too (app/haptics.ts).
+   */
+  haptics?: boolean;
 }
 
 /**
  * v1 = the original shape (no version stamp); v2 adds `theme`; v3 adds the jukebox audio fields. The
- * optional `seasonal` field came later without a bump (absent = nothing recorded; nothing to migrate).
+ * optional `seasonal` and `haptics` fields came later without a bump (absent = the default; nothing
+ * to migrate).
  */
 export const SETTINGS_VERSION = 3;
 export const DEFAULT_THEME_PREF = 'delta-neon';
@@ -124,6 +130,8 @@ export function migrateSettings(stored: unknown, defaults: AppSettings): StoredS
     theme: typeof raw.theme === 'string' && THEME_ID_RE.test(raw.theme) ? raw.theme : defaults.theme,
     // Seasonal invite bookkeeping (optional, no version bump: absent = nothing recorded).
     seasonal: parseSeasonal(raw.seasonal),
+    // Vibration (optional, no version bump: absent or invalid = the default).
+    haptics: typeof raw.haptics === 'boolean' ? raw.haptics : defaults.haptics,
     // A settings blob written by a newer build keeps its (higher) version.
     settingsVersion: Math.max(version, SETTINGS_VERSION),
   };
