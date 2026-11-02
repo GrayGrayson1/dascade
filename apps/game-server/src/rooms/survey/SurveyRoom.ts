@@ -68,6 +68,8 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
 
   private readonly deck = new QuestionDeck();
   private readonly stats = new SurveyStats();
+  /** Profile stats per player: predictions on target and bonus calls, from revealed (public) results. */
+  private readonly calls = new Map<string, { hits: number; bonuses: number }>();
   private plan: SurveyQuestion[] = [];
   private book: SurveyBook | null = null;
   private serial = 0;
@@ -205,6 +207,7 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
     this.plan = this.deck.plan({ mode: s.mode, count: s.questions, packs: s.packs, custom: this.custom }, this.rng);
     this.startParty({ totalRounds: this.plan.length });
     this.stats.reset();
+    this.calls.clear();
     this.history = [];
     this.voided = 0;
     this.book = null;
@@ -317,6 +320,14 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
     this.commitScores();
     if (result.voided) this.voided++;
     this.stats.record(result);
+    if (!result.voided) {
+      for (const s of result.scores) {
+        const c = this.calls.get(s.playerId) ?? { hits: 0, bonuses: 0 };
+        if (s.hit) c.hits++;
+        if (s.bonus > 0) c.bonuses++;
+        this.calls.set(s.playerId, c);
+      }
+    }
     this.history.push(historyEntry(result));
     const st = this.state;
     st.resultJson = JSON.stringify(result);
@@ -342,9 +353,11 @@ export class SurveyRoom extends PartyRoom<SurveyState, SurveySettings> {
       questions: this.history.length,
       voided: this.voided,
     };
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const [id, c] of this.calls) playerStats[id] = { predictionsHit: c.hits, bonusCalls: c.bonuses };
     this.finishParty({
       reason,
-      details: { mode: this.getSettings().mode, questions: this.history.length, voided: this.voided },
+      details: { mode: this.getSettings().mode, questions: this.history.length, voided: this.voided, playerStats },
       extras: extras as unknown as Record<string, unknown>,
     });
     this.emit({ type: 'final' });
