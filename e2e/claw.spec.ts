@@ -292,7 +292,8 @@ test.describe('the claw machine', () => {
 
   test('mid-width floors: a speck of a machine is replaced by the quick button', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop widths');
-    await page.setViewportSize({ width: 900, height: 700 });
+    // Short enough that the machine would be under CLAW_FLOOR_MIN_H (at 900×700 it's just tall enough).
+    await page.setViewportSize({ width: 900, height: 640 });
     await openFloor(page);
     await expect(page.locator('[data-part="claw-machine"]:visible')).toHaveCount(0);
     const quick = page.locator('[data-part="claw-quick"]:visible');
