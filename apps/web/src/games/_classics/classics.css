@@ -1284,3 +1284,10 @@
     right: calc(var(--safe-right) + 26px);
   }
 }
+
+/* ------------------------------------------------------------------ the Classics picker's top three */
+.cl-picker-scores {
+  max-width: 420px;
+  min-height: 132px; /* three rows + head: no jump when the board arrives */
+  margin-block: 4px 2px;
+}

@@ -1115,6 +1115,23 @@
   display: none;
   color: var(--af-ink-2);
 }
+/* "Live now" (liveCounts.ts): rooms and players in this cabinet's games right now. */
+.af-plaque__live {
+  color: var(--af-ink-0);
+}
+.af-plaque__live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--green, #2de38f);
+  box-shadow: 0 0 6px var(--green, #2de38f);
+  vertical-align: 1px;
+}
+:root[data-fx='off'] .af-plaque__live-dot {
+  box-shadow: none;
+}
 .af-plaque__title {
   --pw-max-h: 36px;
   --pw-ink: #fff;
@@ -1195,6 +1212,65 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* "Back to your room" (ResumeChip.tsx): under the HUD, over the room's sign band, like the October
+   invite (seasonal.css); generic panel tokens so it reads in every theme. */
+.af-resume {
+  position: fixed;
+  z-index: var(--z-overlay);
+  top: calc(var(--safe-top) + 76px);
+  left: 50%;
+  translate: -50% 0;
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 8px 8px 14px;
+  background: var(--panel-bg-opaque);
+  color: var(--text-0);
+  border: var(--panel-border-width, 1px) solid var(--panel-border);
+  border-left: 4px solid var(--cyan);
+  border-radius: min(var(--panel-radius), 12px);
+  box-shadow: var(--toast-shadow);
+  animation: dc-pop-in var(--dur-3) var(--ease-out) both;
+}
+/* The October invite takes the same spot: while it shows, the chip waits at the bottom instead. */
+:root:has(.ssn-invite) .af-resume {
+  top: auto;
+  bottom: calc(var(--safe-bottom) + 12px);
+}
+:root[data-reduced-motion='true'] .af-resume,
+:root[data-fx='off'] .af-resume {
+  animation: none;
+}
+.af-resume__glyph {
+  color: var(--cyan);
+}
+.af-resume__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-ui);
+}
+.af-resume__title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-0);
+}
+.af-resume__room {
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.af-resume .af-resume__go {
+  min-height: 40px;
 }
 .af-floor__extras {
   display: none;

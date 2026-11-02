@@ -1,7 +1,8 @@
 /** High-score board (server-verified) and live multiplayer standings. */
 import { PixelIcon, Spinner, cx } from '@dascade/ui';
 import type { HighScoreBoardView } from '@dascade/shared/games/classics';
-import { formatScore } from './Hud.tsx';
+// highScores.ts, not Hud.tsx: the arcade's Classics picker lazy-loads this board without the room code.
+import { formatScore } from './highScores.ts';
 import type { StandingRow } from './useClassics.ts';
 
 const STATUS_LABEL: Record<string, string> = {

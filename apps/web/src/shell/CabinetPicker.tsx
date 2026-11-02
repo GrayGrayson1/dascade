@@ -10,6 +10,8 @@
  * the back button all work. Single-game cabinets skip the picker entirely.
  */
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -48,6 +50,9 @@ import { UnknownPlace } from './cabinet/UnknownPlace.tsx';
 import '../arcade/arcade.css';
 import '../arcade/entry.css';
 import './cabinet/picker.css';
+
+/** Classics: the selected game's top three (its own small chunk; the picker never loads the Classics kit). */
+const PickerScores = lazy(() => import('../games/_classics/PickerScores.tsx'));
 
 /** DASino floor tables share one room; give each its own light on the menu. */
 const TABLE_ACCENT: Record<string, GameAccent> = {
@@ -383,6 +388,11 @@ function Picker({ cabinet }: { cabinet: CabinetDef }) {
                   <PixelWord text={entry.title} variant="title" />
                 </h2>
                 <p className="cp-detail__desc">{entryDescription(entry)}</p>
+                {GAME_CATALOG[entry.gameId].cabinet === 'classics' ? (
+                  <Suspense fallback={null}>
+                    <PickerScores gameId={entry.gameId} />
+                  </Suspense>
+                ) : null}
                 <div className="cp-detail__badges">
                   {badges.map((b) => (
                     <Badge key={b.key} icon={b.icon} color={b.color}>

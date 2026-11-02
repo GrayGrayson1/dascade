@@ -3,10 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PixelIcon, cx, type IconName } from '@dascade/ui';
 import { useCountdown } from '../../net/hooks.ts';
 import { useApp } from '../../app/store.ts';
+import { formatScore } from './highScores.ts';
 
-export function formatScore(n: number): string {
-  return Math.max(0, Math.floor(n)).toLocaleString('en-US');
-}
+export { formatScore };
 
 /** A labelled HUD value. `emphasis` makes it the big score readout; `bump` flashes on change. */
 export function HudStat({

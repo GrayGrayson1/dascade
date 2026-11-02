@@ -4,10 +4,9 @@
  * a per-device personal best.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { ClassicsMetaView, ClassicsPublicState, ClassicsStandingView, HighScoreBoardView } from '@dascade/shared/games/classics';
+import type { ClassicsMetaView, ClassicsPublicState, ClassicsStandingView } from '@dascade/shared/games/classics';
 import { useRoomSelector } from '../../net/hooks.ts';
 import { useSessionStore } from '../../net/session.ts';
-import { serverUrl } from '../../net/serverUrl.ts';
 
 // ---------------------------------------------------------------------------
 // Room selectors
@@ -100,31 +99,8 @@ export function useHud<T extends Record<string, unknown>, R>(store: HudStore<T>,
 // High scores
 // ---------------------------------------------------------------------------
 
-export async function fetchBoard(gameId: string, board: string): Promise<HighScoreBoardView> {
-  const res = await fetch(`${serverUrl()}/api/classics/scores/${encodeURIComponent(gameId)}?board=${encodeURIComponent(board)}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`scores ${res.status}`);
-  return (await res.json()) as HighScoreBoardView;
-}
-
-/** Top verified scores for a board; `refresh` changes (e.g. a verdict id) trigger a refetch. */
-export function useHighScores(gameId: string, board: string, refresh: unknown = 0): { data: HighScoreBoardView | null; error: boolean; loading: boolean } {
-  const [state, setState] = useState<{ data: HighScoreBoardView | null; error: boolean; loading: boolean }>({ data: null, error: false, loading: true });
-  useEffect(() => {
-    if (!board) {
-      setState({ data: null, error: false, loading: false });
-      return;
-    }
-    let alive = true;
-    setState((s) => ({ ...s, loading: true }));
-    fetchBoard(gameId, board)
-      .then((data) => alive && setState({ data, error: false, loading: false }))
-      .catch(() => alive && setState((s) => ({ data: s.data, error: true, loading: false })));
-    return () => {
-      alive = false;
-    };
-  }, [gameId, board, refresh]);
-  return state;
-}
+// In highScores.ts (no session imports, so the arcade's Classics picker can load them on their own).
+export { fetchBoard, useHighScores } from './highScores.ts';
 
 // ---------------------------------------------------------------------------
 // Personal best (this device), updated from server verdicts only

@@ -43,6 +43,7 @@ import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
 import { CLAW_ART, CLAW_FLOOR_MIN_H } from './claw.ts';
 import { ClawHost, ClawMachine, ClawQuickButton } from './ClawMachine.tsx';
+import { ResumeChip } from './ResumeChip.tsx';
 import { JUKEBOX_FLOOR, JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
   COVERFLOW,
@@ -59,6 +60,7 @@ import {
   springStep,
   type SpringState,
 } from './carousel.ts';
+import { cabinetLive } from './liveCounts.ts';
 import { Plaque, plaqueAnnouncement } from './Plaque.tsx';
 import { TournamentKiosk } from './TournamentKiosk.tsx';
 import { lastCabinet, rememberCabinet, runViewTransition } from './transition.ts';
@@ -736,7 +738,7 @@ export function ArcadeFloor() {
       </section>
 
       <div className="af-floor__plaque-wrap" data-part="plaque-wrap">
-        <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} />
+        <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} live={cabinetLive(cabinet, status.games)} />
         <div className="af-floor__extras" data-part="floor-extras">
           {wide ? null : <TournamentKiosk variant="strip" />}
           {/* Phones: the jukebox's quick control lives here (the HUD has no room; the floor no corner). */}
@@ -762,6 +764,7 @@ export function ArcadeFloor() {
 
       <ArcadeFooter status={status} />
       <ClawHost />
+      <ResumeChip />
     </main>
   );
 }
