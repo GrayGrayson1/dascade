@@ -530,16 +530,25 @@ export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
 export const SHOWDOWN_DEFAULT_TITLE = 'DAS Survey Showdown';
 
-/** Defaults for a new room; in October the show opens with the Halloween pack. */
+const REGULAR_PACKS: ShowdownPackId[] = ['office', 'tech', 'food', 'life'];
+
+/** A new room's packs (the server's clock): October = Halloween; December = Winter plus the regulars. */
+export function defaultShowdownPacks(now: Date): ShowdownPackId[] {
+  const month = now.getMonth();
+  if (month === 9) return ['spooky'];
+  if (month === 11) return ['winter', ...REGULAR_PACKS];
+  return [...REGULAR_PACKS];
+}
+
+/** Defaults for a new room; the packs follow the season (defaultShowdownPacks). */
 export function defaultShowdownSettings(now: Date = new Date()): ShowdownSettings {
-  const october = now.getMonth() === 9;
   return {
     mode: 'classic',
     title: '',
     eventName: '',
     look: 'auto',
     source: 'packs',
-    packs: october ? ['spooky'] : ['office', 'tech', 'food', 'life'],
+    packs: defaultShowdownPacks(now),
     rounds: 4,
     scoring: 'final-double',
     steal: true,

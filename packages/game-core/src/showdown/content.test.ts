@@ -376,7 +376,11 @@ describe('settings', () => {
     // New rooms are Team Showdown, as before; the showcase clock defaults to 10 minutes.
     expect(defaultShowdownSettings(new Date(2026, 9, 14))).toMatchObject({ mode: 'classic', minutes: 10, stageClock: true, eventName: '' });
     expect(defaultShowdownSettings(new Date(2026, 9, 14)).packs).toEqual(['spooky']);
-    expect(defaultShowdownSettings(new Date(2026, 10, 2)).packs).not.toContain('spooky');
+    expect(defaultShowdownSettings(new Date(2026, 10, 2)).packs).toEqual(['office', 'tech', 'food', 'life']);
+    // December: the winter pack plus the regulars (the server's clock decides, like October).
+    expect(defaultShowdownSettings(new Date(2026, 11, 1)).packs).toEqual(['winter', 'office', 'tech', 'food', 'life']);
+    expect(ShowdownSettingsSchema.safeParse(defaultShowdownSettings(new Date(2026, 11, 31))).success).toBe(true);
+    expect(defaultShowdownSettings(new Date(2027, 0, 2)).packs).toEqual(['office', 'tech', 'food', 'life']);
   });
 
   it('cleans titles and team names, and rejects bad values', () => {
