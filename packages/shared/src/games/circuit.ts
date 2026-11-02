@@ -18,7 +18,7 @@ import type { RateSpec } from '../rateLimit.ts';
 // Content ids
 // ---------------------------------------------------------------------------
 
-export const CIRCUIT_TRACK_IDS = ['neon-loop', 'skyline-switchback'] as const;
+export const CIRCUIT_TRACK_IDS = ['neon-loop', 'skyline-switchback', 'sunset-ribbon'] as const;
 export type CircuitTrackId = (typeof CIRCUIT_TRACK_IDS)[number];
 
 export const CHASSIS_IDS = ['volt', 'brick', 'comet', 'pixel'] as const;

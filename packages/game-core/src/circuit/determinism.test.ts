@@ -140,7 +140,7 @@ describe('circuit determinism across JS engines', () => {
   it('a 4-car race with collisions, drift and boost is bit-identical under perturbed Math.*', () => {
     // Sanity: the perturbation is live inside the wrapper.
     expect(withPerturbedMath(() => Math.cos(1))).not.toBe(Math.cos(1));
-    for (const id of ['neon-loop', 'skyline-switchback'] as const) {
+    for (const id of ['neon-loop', 'skyline-switchback', 'sunset-ribbon'] as const) {
       const reference = raceSnapshots(id, 60 * 12);
       expect(reference.collisions, id).toBeGreaterThan(0);
       const perturbed = withPerturbedMath(() => raceSnapshots(id, 60 * 12));
