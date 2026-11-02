@@ -11,6 +11,7 @@ import { session, useSessionStore } from '../net/session.ts';
 import { useCountdown, useRoomSelector } from '../net/hooks.ts';
 import { selectCanPlay, useApp } from '../app/store.ts';
 import { friendly, type FriendlyError } from '../net/errors.ts';
+import { roomTabTitle } from '../net/roomTitle.ts';
 import { loadGameModule } from '../games/registry.ts';
 import type { GameClientModule } from '../games/types.ts';
 import { music, sfx } from '../audio/audio.ts';
@@ -21,6 +22,7 @@ import { ConnectionLostScreen, ReconnectedFlash, ReconnectingOverlay } from './R
 import { ShowRecovery, canRecover } from './ShowRecovery.tsx';
 import { recoveringCode, subscribeRecovery } from '../net/recovery.ts';
 import { crumbCabinet } from './crumbs.ts';
+import { joinOutlook, type RoomLookup } from '../net/joinOutlook.ts';
 import { hidesArcadeExit } from './arcadeExit.ts';
 import { shouldLeaveBeforeResolving, shouldLeaveOnExit } from './roomPath.ts';
 import { TournamentBanner } from '../tournament/TournamentBanner.tsx';
@@ -251,6 +253,8 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
 
   return (
     <GameTheme accent={GAME_CATALOG[gameId].accent} className="room" data-part="room" data-immersive={immersive ? 'true' : undefined}>
+      {/* First child: its effects run before the game's, so a game's own tab title (the presenter console, the kiosk) wins. */}
+      <RoomTabTitle code={code} gameId={gameId} phase={phase} />
       {immersive ? <ShellMenu gameId={gameId} code={code} /> : <TopBar gameId={gameId} code={code} />}
       <TournamentBanner compact={immersive} />
       <ReconnectingOverlay gameId={gameId} immersive={immersive} />
@@ -275,27 +279,41 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
   );
 }
 
+/** How often the join prompt refreshes the room's status (it's rate limited per IP, generously). */
+const JOIN_STATUS_REFRESH_MS = 5000;
+
 function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'join' | 'watch' | null>(null);
   // Enabled from the typed name (not only once it's committed on blur: a tap on iOS doesn't blur).
   const canPlay = useApp(selectCanPlay);
-  const [lookup, setLookup] = useState<{ gameId?: string; roomName?: string; exists: boolean } | null>(null);
+  const [lookup, setLookup] = useState<RoomLookup | null>(null);
   useEffect(() => {
-    session
-      .lookup(code)
-      .then(setLookup)
-      .catch(() => setLookup(null));
+    let alive = true;
+    const refresh = () =>
+      session
+        .lookup(code)
+        .then((info) => alive && setLookup(info))
+        .catch(() => undefined);
+    void refresh();
+    // A game may start (or fill up) while the player types a name: keep the status current.
+    const timer = setInterval(() => void refresh(), JOIN_STATUS_REFRESH_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
   }, [code]);
   const gameId = lookup?.gameId && isGameId(lookup.gameId) ? lookup.gameId : null;
   const game = gameId ? GAME_CATALOG[gameId] : null;
   const cabinet = gameId ? crumbCabinet(gameId) : null;
+  // Said before joining: a running game or a full room seats newcomers as spectators.
+  const outlook = lookup && game ? joinOutlook(lookup, game.capacity.lateJoinAsPlayer) : null;
   // A dead code keeps its way back (shell/arcadeExit.ts: error screens never strand anyone).
   const exit = !hidesArcadeExit(gameId) || lookup?.exists === false;
-  const join = async () => {
+  const join = async (as: 'join' | 'watch') => {
     if (busy || lookup?.exists === false || !commitProfileName()) return;
-    setBusy(true);
-    await session.joinRoom(code);
-    setBusy(false);
+    setBusy(as);
+    await session.joinRoom(code, as === 'watch' ? { spectator: true } : {});
+    setBusy(null);
   };
   return (
     <GameTheme
@@ -328,9 +346,19 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
               ))}
             </div>
             {lookup?.roomName ? <p className="join-prompt__room">{lookup.roomName}</p> : null}
+            {outlook ? (
+              <p className="join-prompt__room" data-part="join-status" aria-live="polite">
+                {outlook.status}
+              </p>
+            ) : null}
+            {outlook?.warning ? (
+              <p className={outlook.joinsAs === 'refused' ? 'dc-field__error' : 'dc-field__hint'} data-part="join-warning">
+                {outlook.warning}
+              </p>
+            ) : null}
             {lookup && !lookup.exists ? <p className="dc-field__error">No room is using this code right now.</p> : null}
           </div>
-          <ProfileEditor compact onSubmit={() => void join()} />
+          <ProfileEditor compact onSubmit={() => void join('join')} />
           <div className={cx('dc-row dc-row--wrap', !exit && 'join-prompt__actions--solo')}>
             {exit ? (
               <>
@@ -340,7 +368,26 @@ function JoinPrompt({ code, onCancel }: { code: string; onCancel: () => void }) 
                 <span className="dc-spacer" />
               </>
             ) : null}
-            <Button variant="primary" size="lg" icon="play" loading={busy} disabled={!canPlay || lookup?.exists === false} onClick={join}>
+            {outlook?.offerWatch ? (
+              <Button
+                variant="ghost"
+                size="lg"
+                icon="eye"
+                loading={busy === 'watch'}
+                disabled={!canPlay || busy !== null}
+                onClick={() => void join('watch')}
+              >
+                Watch instead
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              size="lg"
+              icon="play"
+              loading={busy === 'join'}
+              disabled={!canPlay || lookup?.exists === false || (busy !== null && busy !== 'join')}
+              onClick={() => void join('join')}
+            >
               Join game
             </Button>
           </div>
@@ -492,4 +539,28 @@ function CountdownOverlay() {
       <span className="dc-label">Get ready</span>
     </div>
   );
+}
+
+/**
+ * Names the browser tab after the room ("ABCDE · DAS Chess · Lobby") and puts the old title back on the way
+ * out. A game that names the tab itself (it renders later, so its effect runs after this one) keeps its
+ * title: this only rewrites a title it wrote itself.
+ */
+function RoomTabTitle({ code, gameId, phase }: { code: string; gameId: GameId; phase: Parameters<typeof roomTabTitle>[2] }) {
+  const written = useRef<string | null>(null);
+  const before = useRef<string | null>(null);
+  useEffect(() => {
+    const next = roomTabTitle(code, GAME_CATALOG[gameId].title, phase);
+    if (written.current === null) before.current = document.title;
+    else if (document.title !== written.current) return;
+    document.title = next;
+    written.current = next;
+  }, [code, gameId, phase]);
+  useEffect(
+    () => () => {
+      if (written.current !== null && document.title === written.current && before.current !== null) document.title = before.current;
+    },
+    [],
+  );
+  return null;
 }
