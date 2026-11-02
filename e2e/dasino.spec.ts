@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { createRoom, joinRoom, leaveRoom, roomState, startGame, waitForPhase } from './helpers';
+import { createRoom, joinRoom, leaveRoom, presetSettings, roomState, startGame, waitForPhase } from './helpers';
 
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
@@ -99,3 +99,36 @@ test('DASino smoke: roulette, slots and dice with two players', async ({ page, b
   await leaveRoom(page);
   await expect(page).toHaveURL(/\/$/);
 });
+
+/** Relative luminance of the first colour in a computed background (colour or gradient). */
+async function surfaceLuminance(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).first().evaluate((el) => {
+    const cs = getComputedStyle(el);
+    // A solid panel colour wins (glass panels add a faint white sheen gradient on top); else the gradient.
+    const solid = !/rgba\([^)]*,\s*0\)$/.test(cs.backgroundColor) && cs.backgroundColor !== 'transparent';
+    const src = solid ? cs.backgroundColor : cs.backgroundImage.slice(cs.backgroundImage.indexOf('linear-gradient'));
+    const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(src);
+    if (!m) return -1;
+    const lin = (v: number) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(+m[1]!) + 0.7152 * lin(+m[2]!) + 0.0722 * lin(+m[3]!);
+  });
+}
+
+for (const [theme, light] of [
+  ['corporate-98', true],
+  ['delta-neon', false],
+] as const) {
+  test(`DASino chrome follows the theme: ${theme} panels are ${light ? 'light' : 'the dark violet originals'}`, async ({ page }) => {
+    await presetSettings(page, { theme });
+    await createRoom(page, 'dasino', 'Host');
+    await startGame(page);
+    await waitForPhase(page, 'PLAYING');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    for (const part of ['.dn-card', '.dn-balance', '.dn-glass']) {
+      const l = await surfaceLuminance(page, part);
+      if (light) expect(l, part).toBeGreaterThan(0.4);
+      else expect(l, part).toBeLessThan(0.05);
+    }
+    await leaveRoom(page);
+  });
+}
