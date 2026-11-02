@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WHEEL_SETTINGS, WheelSettingsSchema, cleanWheelEmoji, cleanWheelLabel } from '@dascade/shared/games/wheel';
 import { readableTextColor, relativeLuminance } from '@dascade/game-core/wheel';
-import { BUILTIN_PRESETS, applyPreset, suggestedPresetId } from './presets.ts';
+import { BUILTIN_PRESETS, applyPreset, inSeason, suggestedPresetId } from './presets.ts';
 
 const contrast = (a: string, b: string) => {
   const la = relativeLuminance(a);
@@ -56,6 +56,66 @@ describe('built-in wheel presets', () => {
     it('uses original names only', () => {
       for (const s of segments) expect(s.label).not.toMatch(/great pumpkin|pumpkin king/i);
     });
+  });
+
+  describe.each([
+    ['builtin:snow-day', 'Snow Day Party'],
+    ['builtin:gratitude', 'Gratitude / Harvest'],
+  ])('%s', (id, name) => {
+    const preset = BUILTIN_PRESETS.find((p) => p.id === id)!;
+    const { segments } = preset.build({ playerNames: [] });
+
+    it(`is listed as "${name}"`, () => {
+      expect(preset.name).toBe(name);
+      expect(segments.length).toBeGreaterThanOrEqual(8);
+    });
+
+    it('keeps every label readable and no slice disappears into the dark chrome', () => {
+      for (const s of segments) {
+        expect(contrast(s.color, readableTextColor(s.color)), s.label).toBeGreaterThanOrEqual(4.5);
+        expect(relativeLuminance(s.color), s.label).toBeGreaterThan(0.1);
+      }
+    });
+
+    it('never puts two slices of the same colour side by side, all the way round', () => {
+      segments.forEach((s, i) => expect(s.color, s.label).not.toBe(segments[(i + 1) % segments.length]!.color));
+    });
+
+    it('stays secular and work-friendly', () => {
+      const text = JSON.stringify(segments.map((s) => s.label)) + preset.name + preset.description;
+      expect(text).not.toMatch(/\b(christmas|xmas|santa|hanukkah|kwanzaa|diwali|thanksgiving|pilgrim|church|prayer|bless|drink|beer|wine|shots?)\b/i);
+    });
+  });
+
+  it('Snow Day Party is weighted, and the Snow Day Jackpot is the rarest slice', () => {
+    const { segments, sliceMode } = BUILTIN_PRESETS.find((p) => p.id === 'builtin:snow-day')!.build({ playerNames: [] });
+    expect(sliceMode).toBe('weighted');
+    const jackpot = segments.find((s) => s.label === 'Snow Day Jackpot')!;
+    for (const s of segments) if (s !== jackpot) expect(s.weight, s.label).toBeGreaterThan(jackpot.weight);
+  });
+
+  it('season windows: inclusive, and wrapping over New Year', () => {
+    const d = (iso: string) => new Date(`${iso}T12:00:00`);
+    const winter = { from: '12-01', to: '02-29' };
+    expect(inSeason(winter, d('2026-12-01'))).toBe(true);
+    expect(inSeason(winter, d('2027-01-15'))).toBe(true);
+    expect(inSeason(winter, d('2028-02-29'))).toBe(true);
+    expect(inSeason(winter, d('2027-03-01'))).toBe(false);
+    expect(inSeason(winter, d('2026-11-30'))).toBe(false);
+    expect(inSeason({ from: '11-01', to: '11-30' }, d('2026-11-02'))).toBe(true);
+    expect(inSeason({ from: '11-01', to: '11-30' }, d('2026-12-01'))).toBe(false);
+    expect(inSeason(undefined, d('2026-07-04'))).toBe(true);
+  });
+
+  it('suggests the seasonal wheels only under their themes and only in season', () => {
+    const d = (iso: string) => new Date(`${iso}T12:00:00`);
+    expect(suggestedPresetId('saturday-morning', d('2026-12-20'))).toBe('builtin:snow-day');
+    expect(suggestedPresetId('saturday-morning', d('2026-07-20'))).toBe('builtin:lunch');
+    expect(suggestedPresetId('executive', d('2026-11-15'))).toBe('builtin:gratitude');
+    expect(suggestedPresetId('corporate-98', d('2026-11-15'))).toBe('builtin:gratitude');
+    expect(suggestedPresetId('corporate-98', d('2026-12-15'))).toBe('builtin:lunch');
+    expect(suggestedPresetId('delta-neon', d('2026-12-20'))).toBe('builtin:lunch');
+    expect(suggestedPresetId('halloween-night', d('2026-12-20'))).toBe('builtin:trick-or-treat');
   });
 
   it('suggests Trick or Treat under Halloween Night and the Lunch spot everywhere else', () => {
