@@ -61,7 +61,7 @@ export const SURVEY_GAME_MODE_INFO: Record<SurveyGameMode, { title: string; blur
   custom: { title: 'Custom Survey', blurb: 'Your own questions, asked in the order you wrote them.' },
 };
 
-export const SURVEY_PACK_IDS = ['office', 'food', 'weekend', 'tech', 'whatif', 'travel'] as const;
+export const SURVEY_PACK_IDS = ['office', 'food', 'weekend', 'tech', 'whatif', 'travel', 'seasons'] as const;
 export type SurveyPackId = (typeof SURVEY_PACK_IDS)[number];
 
 export const SURVEY_PACK_INFO: Record<SurveyPackId, { title: string; blurb: string }> = {
@@ -71,6 +71,7 @@ export const SURVEY_PACK_INFO: Record<SurveyPackId, { title: string; blurb: stri
   tech: { title: 'Tech & Gadgets', blurb: 'Phones, passwords, tabs and chargers.' },
   whatif: { title: 'What If…', blurb: 'Hypotheticals, superpowers and silly dilemmas.' },
   travel: { title: 'Travel & Places', blurb: 'Trips, commutes, seats and suitcases.' },
+  seasons: { title: 'Seasons & Celebrations', blurb: 'Snow days, summer evenings, autumn leaves and year-end parties.' },
 };
 
 // ---------------------------------------------------------------------------

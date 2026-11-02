@@ -445,6 +445,29 @@ export const FORBIDDEN_CATEGORIES: readonly ForbiddenCategory[] = [
       rucksack, handbag, holdall, jerrycan, lunchbox, packet, pod, quiver, sheath, silo, skip, tote, tray, trough,
       vat, beaker, casket, coffer, keg, punnet, scabbard, tankard, thimble, tumbler, wineglass`),
   },
+  // Seasonal (November and December), secular: winter weather and cozy things, and the autumn feast table.
+  {
+    id: 'winter',
+    label: 'Winter things',
+    hint: 'Bundle up: snow, ice and cozy nights in.',
+    members: list(`snow, snowflake, snowman, snowball, snowdrift, snowstorm, snowplow, snowshoe, blizzard, icicle, frost, ice, igloo,
+      sled, sledge, toboggan, sleigh, ski, skate, snowboard, rink, hockey, curling, mitten, glove, scarf, hat, beanie, earmuff,
+      boot, coat, parka, jacket, sweater, jumper, fleece, wool, thermal, balaclava, fireplace, hearth, log, blanket, quilt, cocoa,
+      hot chocolate, marshmallow, soup, stew, porridge, cider, chimney, reindeer, penguin, polar bear, husky, shovel, salt, slush,
+      sleet, hail, flurry, frostbite, chill, cold, freezing, cozy, hibernation, candle, lantern, evergreen, pine, avalanche,
+      glacier, iceberg, cabin, lodge, chairlift, heater, radiator, kettle, gift, ribbon, firework, resolution, countdown, solstice`),
+  },
+  {
+    id: 'feast',
+    label: 'Harvest feast',
+    hint: 'What’s on (and around) the big autumn table?',
+    members: list(`turkey, ham, gravy, stuffing, mashed potato, potato, sweet potato, yam, squash, pumpkin, pie, pumpkin pie,
+      apple pie, pecan, corn, cornbread, cranberry, sauce, roll, bread, butter, biscuit, carrot, parsnip, turnip, sprout,
+      green bean, casserole, salad, soup, roast, chicken, cheese, cracker, walnut, chestnut, apple, pear, grape, cider, juice,
+      cinnamon, nutmeg, ginger, clove, sage, thyme, rosemary, maple, syrup, honey, caramel, whipped cream, custard, tart, crumble,
+      cobbler, muffin, scone, cake, cookie, platter, napkin, tablecloth, candle, gourd, harvest, cornucopia, leftover, plate, fork,
+      knife, spoon, dish, bowl, jug, gravy boat, toast, wishbone, drumstick`),
+  },
 ];
 
 export function forbiddenCategory(id: string): ForbiddenCategory | undefined {

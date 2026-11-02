@@ -101,6 +101,16 @@ describe('letter choice', () => {
     expect(forbiddenCategory('fruit')?.label).toBe('Fruit');
   });
 
+  it('ships the seasonal Winter and Harvest feast categories, each with fair letters', () => {
+    for (const id of ['winter', 'feast']) {
+      const c = forbiddenCategory(id);
+      expect(c, id).toBeDefined();
+      expect(fairLetters(c!).length, id).toBeGreaterThanOrEqual(2);
+    }
+    expect(forbiddenCategory('winter')!.members).toEqual(expect.arrayContaining(['snowman', 'hot chocolate', 'mitten']));
+    expect(forbiddenCategory('feast')!.members).toEqual(expect.arrayContaining(['pumpkin pie', 'gravy', 'cornbread']));
+  });
+
   it('picks unused categories first and a fair letter', () => {
     const rng = createSeededRng('forbid');
     const used = new Set<string>();

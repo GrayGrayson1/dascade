@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { containsProfanity } from '@dascade/shared';
-import { SKETCH_CATEGORY_IDS, sanitizeSketchWord, sketchWordKey } from '@dascade/shared/games/dasketch';
+import { SKETCH_CATEGORY_IDS, SKETCH_CATEGORY_LABELS, sanitizeSketchWord, sketchWordKey } from '@dascade/shared/games/dasketch';
 import { WORD_BANK } from './words.ts';
 
 describe('built-in word bank', () => {
@@ -31,5 +31,13 @@ describe('built-in word bank', () => {
       }
     }
     expect(seen.size).toBeGreaterThanOrEqual(480);
+  });
+
+  it('Holidays & Seasons: all four seasons and secular celebrations, no religious holidays', () => {
+    expect(SKETCH_CATEGORY_LABELS.seasons).toBe('Holidays & Seasons');
+    expect(WORD_BANK.seasons.length).toBeGreaterThanOrEqual(60);
+    expect(WORD_BANK.seasons).toEqual(expect.arrayContaining(['snow globe', 'cherry blossom', 'beach ball', 'scarecrow', 'fireworks']));
+    const religious = /\b(christmas|xmas|santa|easter|hanukkah|menorah|diwali|ramadan|eid|nativity|church|bible)\b/;
+    for (const word of WORD_BANK.seasons) expect(word, word).not.toMatch(religious);
   });
 });

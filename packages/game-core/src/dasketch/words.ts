@@ -77,4 +77,15 @@ export const WORD_BANK: Readonly<Record<SketchCategoryId, readonly string[]>> = 
     'tulip', 'lily pad', 'bamboo', 'branch', 'log', 'bird nest', 'beehive', 'spider web', 'footprint', 'seashell',
     'aurora', 'eclipse', 'hill', 'cliff', 'meadow', 'mushroom ring', 'autumn leaves', 'apple tree',
   ],
+  // All four seasons and secular celebrations (no religious holidays).
+  seasons: [
+    'snow globe', 'mittens', 'scarf', 'earmuffs', 'hot cocoa', 'fireplace', 'sleigh', 'snowball fight', 'snow angel', 'snowplow',
+    'ice rink', 'log cabin', 'marshmallow', 'gingerbread house', 'string lights', 'wrapping paper', 'party hat', 'confetti', 'fireworks', 'party popper',
+    'snow boots', 'ski lift', 'sweater', 'cherry blossom', 'daffodil', 'rain boots', 'baby chick', 'birdhouse', 'picnic basket', 'flower pot',
+    'butterfly net', 'beach ball', 'sunscreen', 'sunglasses', 'flip-flops', 'water balloon', 'barbecue', 'lemonade stand', 'campfire', 'hammock',
+    'surfboard', 'snorkel', 'sun hat', 'sprinkler', 'ice cream truck', 'firefly', 'pool float', 'swimsuit', 'beach towel', 'sandals',
+    'scarecrow', 'hay bale', 'corn maze', 'leaf pile', 'rake', 'caramel apple', 'harvest moon', 'turkey', 'pumpkin pie', 'cornucopia',
+    'raincoat', 'lunchbox', 'apple cider', 'birthday party', 'pinata', 'parade', 'jack-o-lantern', 'costume', 'witch hat', 'candy corn',
+    'graduation cap', 'greeting card',
+  ],
 };
