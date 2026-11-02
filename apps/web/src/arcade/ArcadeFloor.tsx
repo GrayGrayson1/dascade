@@ -43,6 +43,7 @@ import { Cabinet } from './Cabinet.tsx';
 import { CAB_H, CAB_W, FACE_W } from './cabinetArt.tsx';
 import { CLAW_ART, CLAW_FLOOR_MIN_H } from './claw.ts';
 import { ClawHost, ClawMachine, ClawQuickButton } from './ClawMachine.tsx';
+import { ResumeChip } from './ResumeChip.tsx';
 import { JUKEBOX_FLOOR, JUKEBOX_H, JUKEBOX_W } from '../jukebox/geometry.ts';
 import {
   COVERFLOW,
@@ -762,6 +763,7 @@ export function ArcadeFloor() {
 
       <ArcadeFooter status={status} />
       <ClawHost />
+      <ResumeChip />
     </main>
   );
 }

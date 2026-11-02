@@ -5,7 +5,7 @@
  * claw machine has its own spec: claw.spec.ts). Runs on every project (desktop + mobile).
  */
 import { expect, test, type Page } from '@playwright/test';
-import { roomState, setName } from './helpers';
+import { createRoom, myPlayerId, roomState, setName } from './helpers';
 
 const CABINETS = ['dasketch', 'bingo', 'wheel', 'dasino', 'boardroom', 'stravaganza', 'putt', 'tanks', 'classics', 'circuit', 'quest'];
 const TITLES: Record<string, string> = {
@@ -497,6 +497,54 @@ test.describe('floor HUD', () => {
     await openFloor(page);
     await page.locator('[data-kiosk]:visible').click();
     await expect(page).toHaveURL(/\/tournaments$/);
+  });
+});
+
+test.describe('floor: back to your room', () => {
+  test('a tab closed mid-room: the floor offers "Back to your room" and Rejoin takes the same seat back', async ({ context }) => {
+    const first = await context.newPage();
+    const code = await createRoom(first, 'chess', 'Resumer');
+    await expect.poll(() => myPlayerId(first)).toBeTruthy();
+    const seat = await myPlayerId(first);
+    await first.close(); // no goodbye: the server keeps the seat for the reconnect grace
+
+    const page = await context.newPage();
+    await page.goto('/');
+    const chip = page.locator('[data-part="floor-resume"]');
+    await expect(chip).toBeVisible();
+    await expect(chip).toContainText('Back to your room?');
+    await expect(chip).toContainText(`DAS Chess · ${code}`);
+    await chip.getByRole('button', { name: `Rejoin DAS Chess room ${code}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/room/${code}$`));
+    await expect(page.locator('.lobby, .game-stage').first()).toBeVisible();
+    await expect.poll(() => myPlayerId(page)).toBe(seat);
+  });
+
+  test('the chip can be dismissed, and never shows for a room that has closed', async ({ page }) => {
+    const seat = (code: string, gameId: string, ago: number) => ({ code, gameId, seatToken: 'tok', savedAt: Date.now() - ago });
+    await page.addInitScript(
+      (seats) => {
+        if (sessionStorage.getItem('seeded')) return;
+        sessionStorage.setItem('seeded', '1');
+        for (const s of seats) localStorage.setItem(`dascade:seat:${s.code}`, JSON.stringify(s));
+      },
+      [seat('ABCDE', 'trivia', 1_000), seat('FGHJK', 'chess', 2_000)],
+    );
+    await page.route('**/api/rooms/*', (route) => {
+      const code = route.request().url().split('/').pop()!;
+      return route.fulfill({
+        json: code === 'FGHJK' ? { exists: true, code, gameId: 'chess', roomName: 'Lunch chess' } : { exists: false, code },
+      });
+    });
+    await page.goto('/');
+    const chip = page.locator('[data-part="floor-resume"]');
+    // ABCDE (newest) has closed: the chip offers the next one that's still open.
+    await expect(chip).toContainText('DAS Chess · FGHJK · Lunch chess');
+    await chip.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(chip).toHaveCount(0);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(chip).toHaveCount(0);
   });
 });
 
