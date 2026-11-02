@@ -19,6 +19,7 @@ import {
   tapSockets,
   waitForPhase,
 } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 const GAME = 'wheel';
 
@@ -174,11 +175,11 @@ test.describe('half-open drops (the network died, the server still sees the sock
     test.setTimeout(90_000);
     const tap = await tapSockets(page);
     await createRoom(page, 'showdown', 'Host');
-    // Load the event preset: the room becomes an event room this device waits for.
+    // Load the year-round event preset: the room becomes an event room this device waits for.
     const settingsTab = page.getByRole('tab', { name: 'Settings' });
     if (await settingsTab.isVisible()) await settingsTab.click();
-    await page.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
-    await expect.poll(async () => (await roomState(page)).event).toBe('dasoween-rehearsal');
+    await loadPreset(page, /^Load Event rehearsal/);
+    await expect.poll(async () => (await roomState(page)).event).toBe('event-rehearsal');
     const playerId = await myPlayerId(page);
     const sessionId = await mySessionId(page);
 
@@ -198,6 +199,6 @@ test.describe('half-open drops (the network died, the server still sees the sock
       .not.toBeNull();
     expect(await mySessionId(page)).not.toBe(sessionId);
     expect(await myPlayerId(page)).toBe(playerId);
-    expect((await roomState(page)).event).toBe('dasoween-rehearsal');
+    expect((await roomState(page)).event).toBe('event-rehearsal');
   });
 });
