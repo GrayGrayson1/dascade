@@ -1,10 +1,13 @@
 /**
- * Reconnection UX shared by every cabinet:
+ * Reconnection UX shared by every cabinet (the policy is in net/reconnectPolicy.ts):
  *   1. <ReconnectingOverlay> — the socket dropped: a prominent RECONNECTING… card over the (inert,
  *      dimmed) stage with how long the seat is held; the top bar / Leave stays reachable.
- *   2. <ReconnectedFlash>    — a short RECONNECTED confirmation once the seat is back.
- *   3. <ConnectionLostScreen> — auto-reconnect gave up: what happened + "Rejoin my seat"
- *      (seat-token rejoin, also automatic when the device comes back online) or "Back to arcade".
+ *   2. <ReconnectedFlash>    — a short RECONNECTED confirmation once the seat is back, whether the
+ *      session itself came back or the seat was taken back by token (which the session tries once by
+ *      itself when the session can't come back).
+ *   3. <ConnectionLostScreen> — that didn't work either (no network, the server unreachable): what
+ *      happened + "Rejoin my seat" (seat-token rejoin, also automatic when the device comes back
+ *      online) or "Back to arcade".
  * Honours reduced motion (no pulsing) and visual-effects settings via tokens.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -16,8 +19,8 @@ import { sfx } from '../audio/audio.ts';
 import { LeaveButton, NoticeCard } from './common.tsx';
 import { crumbCabinet } from './crumbs.ts';
 
-/** Set by a manual rejoin so the next mounted room shows the RECONNECTED confirmation. */
-let pendingRejoinFlash = false;
+/** The seat rejoin (session `rejoinedAt`) last confirmed, so a remount doesn't confirm it twice. */
+let flashedRejoin: number | null = null;
 
 function graceSeconds(gameId: GameId | null): number {
   return (gameId && GAME_CATALOG[gameId]?.reconnectGraceSeconds) || RECONNECT_GRACE_SECONDS;
@@ -106,15 +109,16 @@ export function ReconnectingOverlay({ gameId, immersive }: { gameId: GameId; imm
 // ---------------------------------------------------------------------------
 export function ReconnectedFlash() {
   const status = useSessionStore((s) => s.status);
+  const rejoinedAt = useSessionStore((s) => s.rejoinedAt);
   const prev = useRef(status);
   const [shownAt, setShownAt] = useState<number | null>(null);
 
-  // A manual "Rejoin my seat" remounts the room: confirm it here too.
+  // A seat-token rejoin (automatic or "Rejoin my seat") remounts the room: confirm it here too.
   useEffect(() => {
-    if (!pendingRejoinFlash) return;
-    pendingRejoinFlash = false;
+    if (rejoinedAt === null || rejoinedAt === flashedRejoin) return;
+    flashedRejoin = rejoinedAt;
     setShownAt(Date.now());
-  }, []);
+  }, [rejoinedAt]);
 
   useEffect(() => {
     const was = prev.current;
@@ -157,9 +161,7 @@ export function ConnectionLostScreen({ code, error, onBack }: { code: string; er
     setBusy(true);
     sfx('click');
     session.clearNotices();
-    pendingRejoinFlash = true;
-    const res = await session.joinRoom(code);
-    if (!res.ok) pendingRejoinFlash = false;
+    await session.rejoinSeat(code);
     busyRef.current = false;
     setBusy(false);
   };

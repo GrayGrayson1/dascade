@@ -39,12 +39,16 @@ import { persistence } from '../persistence/index.ts';
 import { sfx } from '../audio/audio.ts';
 import { registerDjSession } from '../audio/jukebox/roomDj.ts';
 import { forgetRoom, isRecoverable, loadBlackBox } from './recovery.ts';
+import {
+  RESTART_PROBE_MS,
+  classifyClose,
+  consentToLeave,
+  fallbackAfterAnswers,
+  noticeAfterFailedRejoin,
+  toastsRoomError,
+} from './reconnectPolicy.ts';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
-
-/** Colyseus close codes (see @colyseus/shared-types CloseCode). */
-const CLOSE_CONSENTED = 4000;
-const CLOSE_SERVER_SHUTDOWN = 4001;
 
 export interface SessionState {
   status: ConnectionStatus;
@@ -58,6 +62,8 @@ export interface SessionState {
   pingMs: number | null;
   /** Seconds the server holds our seat after a drop (from the welcome; null until it arrives). */
   graceSeconds: number | null;
+  /** Set when a seat-token rejoin after a drop brought this room back (the shell flashes RECONNECTED). */
+  rejoinedAt: number | null;
   chat: ChatMessage[];
 }
 
@@ -71,6 +77,7 @@ const initial: SessionState = {
   removed: null,
   pingMs: null,
   graceSeconds: null,
+  rejoinedAt: null,
   chat: [],
 };
 
@@ -265,12 +272,28 @@ let attachGeneration = 0;
  * becoming a ghost seat.
  */
 let intent = 0;
+/**
+ * The room code this tab means to be in: set by every create / join / resume / restore / leave (null
+ * while creating or after leaving) and by every attach. A connection to that same room that completes
+ * late is closed without consent, so the server keeps the seat for the rejoin (see consentToLeave).
+ */
+let heading: string | null = null;
+
+function newIntent(code: string | null): number {
+  heading = code;
+  return ++intent;
+}
+
+/** Close a connection this tab no longer uses (its handlers are already inert). */
+function abandon(room: Room): void {
+  room.reconnection.maxRetries = 0;
+  void room.leave(consentToLeave(room.roomId, heading)).catch(() => undefined);
+}
 
 /** The player moved on while `room` was connecting: leave it quietly and report whether that happened. */
 function superseded(my: number, room: Room): boolean {
   if (my === intent) return false;
-  room.reconnection.maxRetries = 0;
-  void room.leave(true).catch(() => undefined);
+  abandon(room);
   return true;
 }
 
@@ -306,18 +329,22 @@ function resetBus(): void {
 }
 
 const RECONNECT_MAX_DELAY_MS = 4000;
-/** How often a reconnecting client asks whether its room still exists (see attach()). */
-const RESTART_PROBE_MS = 5000;
 
 /** Auto-reconnect attempts that cover a seat held for `graceSeconds` (retries back off to 4 s apart). */
 function retriesFor(graceSeconds: number): number {
   return Math.max(12, Math.ceil((graceSeconds * 1000) / RECONNECT_MAX_DELAY_MS) + 1);
 }
 
-function attach(room: Room, gameId: GameId, ticket?: string): void {
+/** An event room (a Survey Showdown with its preset): ShowRecovery brings it back, see RoomScreen. */
+function isEventRoom(code: string): boolean {
+  return isRecoverable(code) || Boolean(loadBlackBox(code));
+}
+
+function attach(room: Room, gameId: GameId, ticket?: string, opts: { rejoined?: boolean } = {}): void {
   const generation = ++attachGeneration;
   resetBus();
   leavingIntentionally = false;
+  heading = room.roomId;
   room.reconnection.minUptime = 1500;
   // Keep retrying for as long as the server holds the seat (longer for chess, tournaments…). The
   // catalog default is refined by the welcome, which carries the room's actual window.
@@ -330,6 +357,7 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
     room,
     gameId,
     code: room.roomId,
+    rejoinedAt: opts.rejoined ? Date.now() : null,
   });
 
   const alive = () => generation === attachGeneration;
@@ -408,17 +436,35 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
     if (probe) clearInterval(probe);
     probe = null;
   };
-  const roomGone = (kind: 'server_restarted' | 'reconnect_failed') => {
+  /**
+   * Stop using this session. A parked or scheduled SDK attempt may still land later: onReconnect then
+   * closes it without consent when the player is still headed for this room, so the seat survives for
+   * the seat-token rejoin. (Closing the parked socket here instead would let the server finish that
+   * reconnect on a dead socket and treat it as a leave, which removes a lobby seat.)
+   */
+  const stopSession = () => {
     stopProbe();
     attachGeneration++;
     stopClockSync();
     room.reconnection.maxRetries = 0;
+  };
+  const roomGone = (kind: 'server_restarted' | 'reconnect_failed') => {
+    stopSession();
     useSessionStore.setState({ status: 'lost', room: null, error: friendly(kind) });
+  };
+  /** The SDK can't bring this session back: take the seat back by token, once (event rooms: ShowRecovery). */
+  const fallBackToSeat = () => {
+    if (isEventRoom(room.roomId) || !loadSeat(room.roomId)) return roomGone('reconnect_failed');
+    stopSession();
+    // Off the store first: a join leaves the store's room, and leaving clears that room's seat token.
+    useSessionStore.setState({ status: 'connecting', room: null });
+    void takeSeatBack(room.roomId, gameId, { auto: true });
   };
   room.onDrop(() => {
     if (!alive()) return;
     useSessionStore.setState({ status: 'reconnecting' });
-    stopProbe();
+    // The SDK reports every failed retry as another drop: keep the running probe (and its count).
+    if (probe) return;
     answeredWhileDown = 0;
     probe = setInterval(() => {
       if (!alive() || useSessionStore.getState().status !== 'reconnecting') return stopProbe();
@@ -427,8 +473,8 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
           if (!alive() || useSessionStore.getState().status !== 'reconnecting') return;
           // The server answers and the room is gone: it restarted.
           if (!info.exists) return roomGone('server_restarted');
-          // It's back (an event room restored from its black box) but our old session can't be: rejoin by seat.
-          if (++answeredWhileDown >= 2 && (isRecoverable(room.roomId) || loadBlackBox(room.roomId))) roomGone('reconnect_failed');
+          // The room is there but our old session isn't coming back: rejoin by seat.
+          if (++answeredWhileDown >= fallbackAfterAnswers(isEventRoom(room.roomId))) fallBackToSeat();
         })
         .catch(() => undefined); // unreachable: keep retrying
     }, RESTART_PROBE_MS);
@@ -436,10 +482,10 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
 
   room.onReconnect(() => {
     stopProbe();
-    // An in-flight retry can still succeed after the player left or moved to another room:
-    // leave properly instead of keeping a ghost connection on the old seat.
+    // An in-flight retry can still succeed after the player left, moved to another room, or this tab
+    // started rejoining the seat by token: don't keep a ghost connection on the old seat.
     if (!alive()) {
-      void room.leave(true).catch(() => undefined);
+      abandon(room);
       return;
     }
     useSessionStore.setState({ status: 'connected' });
@@ -455,7 +501,8 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
     stopClockSync();
     const state = useSessionStore.getState();
     if (leavingIntentionally) return;
-    if (code === RoomCloseCode.KICKED || code === RoomCloseCode.ROOM_CLOSED || state.removed || removalNotified) {
+    const outcome = classifyClose(code, Boolean(state.removed) || removalNotified);
+    if (outcome === 'removed') {
       clearSeat(room.roomId);
       useSessionStore.setState({
         status: 'idle',
@@ -472,7 +519,7 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
       });
       return;
     }
-    if (code === CLOSE_CONSENTED) {
+    if (outcome === 'taken_over') {
       // Consented close initiated by the server (e.g. seat reclaimed elsewhere).
       useSessionStore.setState({
         status: 'idle',
@@ -481,16 +528,17 @@ function attach(room: Room, gameId: GameId, ticket?: string): void {
       });
       return;
     }
-    if (code === CLOSE_SERVER_SHUTDOWN) {
+    if (outcome === 'server_restarted') {
       useSessionStore.setState({ status: 'lost', room: null, error: friendly('server_restarted') });
       return;
     }
-    useSessionStore.setState({ status: 'lost', room: null, error: friendly('reconnect_failed') });
+    // A refused reconnect (4003: e.g. parked past the seat reservation), retries used up, an abnormal close.
+    fallBackToSeat();
   });
 
-  room.onError((_code: number, message?: string) => {
+  room.onError((code: number, message?: string) => {
     if (!alive()) return;
-    if (message) useApp.getState().toast('error', message);
+    if (message && toastsRoomError(useSessionStore.getState().status, code)) useApp.getState().toast('error', message);
   });
 
   startClockSync(room);
@@ -504,7 +552,7 @@ async function resumeOnce(code: string): Promise<boolean> {
   if (!seat) return false;
   const current = useSessionStore.getState();
   if (current.room && current.code === code) return true;
-  const my = ++intent;
+  const my = newIntent(code);
   // Switching rooms: leave the current one first — resetting the store below would otherwise drop
   // the only reference to its socket (and a later join's leaveCurrent() would find nothing to leave).
   await leaveCurrent();
@@ -523,6 +571,69 @@ async function resumeOnce(code: string): Promise<boolean> {
   if (my !== intent) return false;
   const result = await session.joinRoom(code);
   return result.ok;
+}
+
+type JoinExtra = { spectator?: boolean; ticket?: string; strictName?: boolean };
+/** `stale`: a newer create / join / leave took over meanwhile (it owns the store). */
+type JoinResult = { ok: true; gameId: GameId } | { ok: false; error: FriendlyError; stale?: true };
+
+/** Join by code, reusing this browser's stored seat token for it. `rejoined`: back after a drop (flash RECONNECTED). */
+async function joinCode(rawCode: string, extra: JoinExtra, rejoined: boolean): Promise<JoinResult> {
+  const code = normalizeRoomCode(rawCode);
+  if (!isValidRoomCode(code)) {
+    const error = friendly('invalid_code');
+    useSessionStore.setState({ error });
+    return { ok: false, error };
+  }
+  const current = useSessionStore.getState();
+  if (current.room && current.code === code && current.status === 'connected' && current.gameId) {
+    return { ok: true, gameId: current.gameId };
+  }
+  const my = newIntent(code);
+  await leaveCurrent();
+  if (my !== intent) return { ok: false, error: friendly('unknown', 'The join was cancelled.'), stale: true };
+  useSessionStore.setState({ ...initial, status: 'connecting', code });
+  try {
+    const info = await lookup(code);
+    if (!info.exists || !info.gameId) throw { code: JoinErrorCode.NOT_FOUND };
+    const seat = loadSeat(code);
+    // A tournament participant whose seat expired (e.g. a long outage before the game started) comes
+    // back with the ticket they first joined with, instead of as a spectator of their own match.
+    const ticket = extra.ticket ?? (extra.spectator ? undefined : seat?.ticket);
+    const room = await getClient().joinById(
+      code,
+      await joinOptions({ ...extra, ...(ticket ? { ticket } : {}), ...(seat ? { seatToken: seat.seatToken } : {}) }),
+    );
+    if (superseded(my, room)) return { ok: false, error: friendly('unknown', 'The join was cancelled.'), stale: true };
+    attach(room, info.gameId as GameId, ticket, { rejoined });
+    sfx('join');
+    return { ok: true, gameId: info.gameId as GameId };
+  } catch (err) {
+    const error = toFriendlyError(err);
+    // A newer create/join/leave owns the store now: don't paint this failure over it.
+    if (my !== intent) return { ok: false, error, stale: true };
+    useSessionStore.setState({ status: 'idle', error, code });
+    return { ok: false, error };
+  }
+}
+
+/**
+ * Take this browser's seat back by token after a drop: once by itself when the SDK can't bring the
+ * session back (`auto`), or from "Connection lost" (Rejoin my seat, or the device came back online).
+ * A failure a retry could fix stays "Connection lost"; a final answer (room gone, kicked…) shows as is.
+ */
+async function takeSeatBack(code: string, gameId: GameId | null, opts: { auto?: boolean } = {}): Promise<boolean> {
+  const res = await joinCode(code, {}, true);
+  if (res.ok) return true;
+  if (res.stale) return false;
+  const kind = noticeAfterFailedRejoin(res.error.kind);
+  useSessionStore.setState({
+    status: opts.auto ? 'lost' : 'idle',
+    code,
+    gameId,
+    error: kind === res.error.kind ? res.error : friendly(kind),
+  });
+  return false;
 }
 
 async function lookup(code: string): Promise<RoomLookup> {
@@ -570,7 +681,7 @@ export const session = {
     gameId: GameId,
     extra: { solo?: boolean; settings?: Record<string, unknown>; roomName?: string } = {},
   ): Promise<string | null> {
-    const my = ++intent;
+    const my = newIntent(null);
     await leaveCurrent();
     if (my !== intent) return null;
     useSessionStore.setState({ ...initial, status: 'connecting', gameId });
@@ -587,45 +698,13 @@ export const session = {
   },
 
   /** Join by code. Reuses a stored seat token for this code when present (rejoin). */
-  async joinRoom(
-    rawCode: string,
-    extra: { spectator?: boolean; ticket?: string; strictName?: boolean } = {},
-  ): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
-    const code = normalizeRoomCode(rawCode);
-    if (!isValidRoomCode(code)) {
-      const error = friendly('invalid_code');
-      useSessionStore.setState({ error });
-      return { ok: false, error };
-    }
-    const current = useSessionStore.getState();
-    if (current.room && current.code === code && current.status === 'connected' && current.gameId) {
-      return { ok: true, gameId: current.gameId };
-    }
-    const my = ++intent;
-    await leaveCurrent();
-    if (my !== intent) return { ok: false, error: friendly('unknown', 'The join was cancelled.') };
-    useSessionStore.setState({ ...initial, status: 'connecting', code });
-    try {
-      const info = await lookup(code);
-      if (!info.exists || !info.gameId) throw { code: JoinErrorCode.NOT_FOUND };
-      const seat = loadSeat(code);
-      // A tournament participant whose seat expired (e.g. a long outage before the game started) comes
-      // back with the ticket they first joined with, instead of as a spectator of their own match.
-      const ticket = extra.ticket ?? (extra.spectator ? undefined : seat?.ticket);
-      const room = await getClient().joinById(
-        code,
-        await joinOptions({ ...extra, ...(ticket ? { ticket } : {}), ...(seat ? { seatToken: seat.seatToken } : {}) }),
-      );
-      if (superseded(my, room)) return { ok: false, error: friendly('unknown', 'The join was cancelled.') };
-      attach(room, info.gameId as GameId, ticket);
-      sfx('join');
-      return { ok: true, gameId: info.gameId as GameId };
-    } catch (err) {
-      const error = toFriendlyError(err);
-      // A newer create/join/leave owns the store now: don't paint this failure over it.
-      if (my === intent) useSessionStore.setState({ status: 'idle', error, code });
-      return { ok: false, error };
-    }
+  joinRoom(rawCode: string, extra: JoinExtra = {}): Promise<{ ok: true; gameId: GameId } | { ok: false; error: FriendlyError }> {
+    return joinCode(rawCode, extra, false);
+  },
+
+  /** "Connection lost": take this browser's seat back by token (RECONNECTED flashes when it works). */
+  rejoinSeat(rawCode: string): Promise<boolean> {
+    return takeSeatBack(normalizeRoomCode(rawCode), useSessionStore.getState().gameId);
   },
 
   /**
@@ -636,7 +715,7 @@ export const session = {
     const code = normalizeRoomCode(rawCode);
     // Read the seat before anything else: it's how the restored room recognises this browser.
     const seat = loadSeat(code);
-    const my = ++intent;
+    const my = newIntent(code);
     await leaveCurrent();
     if (my !== intent) return { ok: false, error: friendly('unknown', 'The restore was cancelled.') };
     useSessionStore.setState({ ...initial, status: 'connecting', code, gameId });
@@ -668,7 +747,7 @@ export const session = {
   },
 
   async leaveRoom(): Promise<void> {
-    const my = ++intent;
+    const my = newIntent(null);
     await leaveCurrent();
     // Another create/join started while we were leaving: it owns the store now.
     if (my !== intent) return;

@@ -36,13 +36,25 @@ Browser ──HTTPS─▶ Supabase (optional): anonymous auth, profile, presets,
   2. Reloading the page: `client.reconnect(token)`, falling back to `joinById(code, { seatToken })`, which rebinds the same seat.
   3. After the grace period expires mid-match, the seat is kept as *away* and can still be reclaimed with the token.
 
-  A second tab with the same token replaces the first, so a player is never duplicated.
+  A second tab with the same token replaces the first, so a player is never duplicated. How a dropped socket comes back is under [Reconnects](#reconnects).
 - **Rating identity.** Ratings and stats are keyed by a DASCADE identity: `u:<account id>` for a verified Supabase account, otherwise `g:<guest id>` (the browser's local guest id, best effort). A room player id is never used across rooms.
 - **Host.** The host is a playerId. It migrates immediately on leave, or after 10s if the host is disconnected. Candidates are ordered by connected players first (spectators last), then join order. Mid-match only seated players can become host (`canBecomeHost`).
 - **Ready-up.** Advisory only: the server never waits for it, and the host starts when they like. The host's *Players ready up before the start* switch (lobby Room panel; `state.readyUp`, set with `lobby:room {readyUp}`) starts from the catalog's `readyUp` (default on; off for Survey Showdown). When it's off, `lobby:ready` is refused, every ready flag is cleared, and the lobby shows no Ready up button, no Ready labels and no *Start anyway?* prompt. Solo rooms, tournament match rooms and the kiosk never use it.
 - **Lifecycle.** `LOBBY → COUNTDOWN → PLAYING ↔ INTERMISSION → RESULTS → LOBBY`. `ENDED` means the host closed the room.
 - **Validation.** Every client message goes through `BaseGameRoom.handle()`: per-player token bucket, Zod parse, phase, host and spectator guards, and exception isolation. Frames are capped at 256 KB. Matchmaking is rate-limited per IP in `static onAuth`, and the HTTP APIs have their own per-IP limiters. Clients may only `create`, `joinById` and `reconnect` over HTTP matchmaking (`server.ts`), and every room is private, so nobody lands in a room without its code.
 - **Room codes.** 5 characters from a 31-symbol unambiguous alphabet, unique via Colyseus presence (Redis-ready).
+
+## Reconnects
+
+A dropped socket comes back in this order (`net/session.ts` with `net/reconnectPolicy.ts`; `BaseGameRoom` `onDrop`, `onReconnect`, `rebind`):
+
+1. **The same session.** The SDK auto-reconnects. After a *half-open* drop, the client's side of the socket died (Wi-Fi off, a proxy cut it) while the server's still looks open. The server then parks that reconnect until its heartbeat ends the old socket: a ping every 5 s, ended after 3 misses, so 15–20 s (`HEARTBEAT_*` in `protocol.ts`). Every room holds seat reservations for 30 s (`SEAT_RESERVATION_SECONDS`), so the parked reconnect lands and nothing remounts. Colyseus' default of 15 s was shorter, and it refused the reconnect with close 4003, which the SDK never retries.
+2. **The seat token.** When the session can't come back (a refused reconnect, retries used up, an abnormal close), the client rejoins its seat by token once, by itself, in any room that still exists. A reconnect probe does the same after 35 s as a safety net. Event rooms (a Survey Showdown with its preset) do it from `ShowRecovery` after about 10 s. A late reconnect that lands meanwhile is closed *without* consent, so the server keeps the seat for the rejoin (a consented leave deletes it).
+3. **Connection lost.** If the rejoin can't reach the server, the screen offers *Rejoin my seat* and rejoins by itself when the device comes back online.
+
+The heartbeat stays at 5 s × 3. At 4 s × 2 a half-open drop would recover a few seconds sooner, but a phone that stalls for 8–12 s (screen lock, app switch, cell handoff) would really drop: its "disconnected" hooks and host-migration timer would run, and moves sent into the dead socket would be lost.
+
+Logs (`log.info`): `player dropped`, `player reconnected` (`afterMs`), `reconnect grace expired`, `seat rebound` (`pushedOutLiveSocket: true` is a second tab or a half-open drop), `room created`, `room disposed`, and `shutting down with N rooms / M clients`. `GET /api/health` keeps `ok`, `uptimeSeconds` and `rooms` and adds `clients`, `commit`, `rssMb` and `games` (per game id: multiplayer rooms and their seated players).
 
 ## Platform services (`apps/game-server/src/platform/`)
 

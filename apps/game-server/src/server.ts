@@ -4,7 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import { defineServer, defineRoom, matchMaker, type Room } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { isGameId, type GameId } from '@dascade/shared';
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_MAX_MISSES, isGameId, type GameId } from '@dascade/shared';
 import { loadRoomClasses } from './rooms/registry.ts';
 import { registerApiRoutes } from './http/routes.ts';
 import { config } from './config.ts';
@@ -68,8 +68,10 @@ export async function createDascadeServer(options: CreateServerOptions = {}) {
     transport: new WebSocketTransport({
       server: createHttpServer(),
       maxPayload: config.maxPayloadBytes,
-      pingInterval: 5000,
-      pingMaxRetries: 3,
+      // A dead socket is ended within HEARTBEAT_WINDOW_MS (15–20 s), inside every room's seat
+      // reservation (SEAT_RESERVATION_SECONDS), so a parked auto-reconnect lands. See docs/ARCHITECTURE.md.
+      pingInterval: HEARTBEAT_INTERVAL_MS,
+      pingMaxRetries: HEARTBEAT_MAX_MISSES,
     }),
     rooms,
     greet: false,
