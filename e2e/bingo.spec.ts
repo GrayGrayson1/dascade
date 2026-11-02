@@ -94,3 +94,15 @@ test('DAS Bingo: a false claim is rejected by the server', async ({ page, browse
   await leaveRoom(guest);
   await leaveRoom(page);
 });
+
+test('DAS Bingo: the pattern library has the Pine tree and Snowflake shapes', async ({ page }) => {
+  await createRoom(page, 'bingo', 'Host');
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Edit patterns' }).first().click();
+  const library = page.getByRole('region', { name: 'Pattern library' });
+  await expect(library.getByRole('button', { name: 'Pine tree', exact: true })).toBeEnabled();
+  await library.getByRole('button', { name: 'Snowflake', exact: true }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect.poll(async () => JSON.stringify(JSON.parse((await roomState(page)).settingsJson).rounds)).toContain('"snowflake"');
+  await leaveRoom(page);
+});
