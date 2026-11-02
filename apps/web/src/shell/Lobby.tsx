@@ -2,7 +2,7 @@
  * The shared lobby used by every cabinet. Games plug in their own SettingsPanel
  * and PlayerSetup via their GameClientModule.
  */
-import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { GAME_CATALOG, LIMITS, cabinetForGame, type GameId, type PlayerView } from '@dascade/shared';
 import {
   Badge,
@@ -24,7 +24,8 @@ import { session, useSessionStore } from '../net/session.ts';
 import { useApp } from '../app/store.ts';
 import { sfx } from '../audio/audio.ts';
 import type { GameClientModule, SettingsPanelProps } from '../games/types.ts';
-import { ChatPanel, GameStage, LeaveButton } from './common.tsx';
+import { ChatPanel, GameStage, LeaveButton, QUICK_CHAT } from './common.tsx';
+import { ONE_SECTION_QUERY, countUnread, unreadLabel } from './chatUnread.ts';
 import { crumbCabinet } from './crumbs.ts';
 import { hidesArcadeExit } from './arcadeExit.ts';
 import { ThemedText } from '../themes/ThemedText.tsx';
@@ -34,6 +35,51 @@ import { QrCode, copyJoinQr, joinAddressText, joinQrText } from './qr.tsx';
 type LobbyTab = 'players' | 'settings' | 'setup' | 'chat';
 
 const updateSettings = (patch: Record<string, unknown>) => session.lobby.settings(patch);
+
+function subscribeOneSection(onChange: () => void): () => void {
+  if (typeof matchMedia !== 'function') return () => {};
+  const mq = matchMedia(ONE_SECTION_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+/** True on phones, where the lobby shows one section (tab) at a time. */
+function useOneSection(): boolean {
+  return useSyncExternalStore(
+    subscribeOneSection,
+    () => typeof matchMedia === 'function' && matchMedia(ONE_SECTION_QUERY).matches,
+    () => false,
+  );
+}
+
+/**
+ * The Chat tab's label, with a count of what other players said while you were on another tab
+ * (phones only: wider screens show the chat beside everything else). Its own component, so a new
+ * message re-renders the tab, not the lobby.
+ */
+function ChatTabLabel({ open }: { open: boolean }) {
+  const chat = useSessionStore((s) => s.chat);
+  const meId = useSessionStore((s) => s.playerId);
+  const oneSection = useOneSection();
+  const watching = open || !oneSection;
+  const lastId = chat.at(-1)?.id ?? null;
+  // What was already there when the lobby opened (the history, a return from a game) counts as read,
+  // and so does everything that arrives while the chat is on screen.
+  const [seenId, setSeenId] = useState(lastId);
+  if (watching && seenId !== lastId) setSeenId(lastId);
+  const unread = watching ? 0 : countUnread(chat, seenId, meId);
+  return (
+    <>
+      Chat
+      {unread > 0 ? (
+        <span className="lobby__unread dc-num" data-part="chat-unread">
+          <span aria-hidden>{unreadLabel(unread)}</span>
+          <span className="visually-hidden">{`, ${unread} unread`}</span>
+        </span>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * Lobby view of the room built from the base state only, so game-specific patches that happen in
@@ -108,7 +154,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
     },
     ...(PlayerSetup ? [{ value: 'setup' as const, label: 'Your setup' }] : []),
     { value: 'settings', label: 'Settings' },
-    { value: 'chat', label: 'Chat' },
+    { value: 'chat', label: <ChatTabLabel open={tab === 'chat'} /> },
   ];
 
   const start = () => {
@@ -197,7 +243,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           </div>
 
           <Panel className="lobby__chat" data-part="lobby-chat" data-section="chat" title="Lobby chat" padded={false}>
-            <ChatPanel />
+            <ChatPanel quick={QUICK_CHAT} />
           </Panel>
         </div>
       </div>
