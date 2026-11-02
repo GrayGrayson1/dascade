@@ -159,6 +159,22 @@ export function setMatchmakingLimits(join: RateSpec, create: RateSpec): void {
   createLimiter = new KeyedRateLimiter(create);
 }
 
+/**
+ * How long a room warns its players before a shutdown (a deploy) disconnects them. 0 under tests: test
+ * teardown shuts servers down, and a wait there would slow every integration test.
+ */
+const SHUTDOWN_NOTICE_MS = 3000;
+let shutdownNoticeMs = process.env.NODE_ENV === 'test' ? 0 : SHUTDOWN_NOTICE_MS;
+
+/** Override the shutdown notice (tests). */
+export function setShutdownNoticeMs(ms: number): void {
+  shutdownNoticeMs = ms;
+}
+
+/** Only event rooms (a Survey Showdown with its preset) come back after a restart: never promise it elsewhere. */
+export const SHUTDOWN_NOTICE = 'The arcade is restarting for an update in a few seconds. This room will close; you can start a new game right after.';
+export const SHUTDOWN_NOTICE_EVENT = 'The arcade is restarting for an update in a few seconds. The show comes back under the same code right after.';
+
 export abstract class BaseGameRoom<
   S extends BaseRoomState = BaseRoomState,
   Settings extends object = Record<string, unknown>,
@@ -605,10 +621,19 @@ export abstract class BaseGameRoom<
     if (this.codeAllocated) await releaseRoomCode(this.presence, this.roomId).catch(() => undefined);
   }
 
-  /** Graceful process shutdown: let the game speak last (onServerShutdown), then disconnect as Colyseus does. */
+  /**
+   * Graceful process shutdown (a deploy, SIGTERM). The game speaks first (onServerShutdown: e.g. Showdown
+   * sends its black box at once, so a quick kill can't lose it), then everyone gets a warning, and the
+   * room disconnects as Colyseus does a few seconds later (the shutdown waits for every room to go).
+   */
   override onBeforeShutdown(): void {
     this.safeHook(() => this.onServerShutdown(), 'onServerShutdown');
-    super.onBeforeShutdown();
+    if (shutdownNoticeMs <= 0 || this.clients.length === 0) {
+      super.onBeforeShutdown();
+      return;
+    }
+    this.toast('all', 'warning', this.metadataExtra().event ? SHUTDOWN_NOTICE_EVENT : SHUTDOWN_NOTICE);
+    this.clock.setTimeout(() => super.onBeforeShutdown(), shutdownNoticeMs);
   }
 
   override onUncaughtException(error: unknown, methodName: string): void {
