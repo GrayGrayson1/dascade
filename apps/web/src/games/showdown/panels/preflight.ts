@@ -5,7 +5,13 @@
  * sound station, snapshots) and from this device (the stage window); what software can't see — what
  * Teams shows, the join link in the chat, the change freeze — is a manual confirmation.
  */
-import { SHOWDOWN_STATION_TIMEOUT_MS, type ShowdownPreflightData } from '@dascade/shared/games/showdown';
+import {
+  SHOWDOWN_EVENT_INFO,
+  SHOWDOWN_STATION_TIMEOUT_MS,
+  eventShowFor,
+  isShowdownEventId,
+  type ShowdownPreflightData,
+} from '@dascade/shared/games/showdown';
 
 export type CheckState = 'ok' | 'warn' | 'fail' | 'todo' | 'wait';
 export type CheckId = 'stage' | 'share' | 'sound' | 'show' | 'backup' | 'server' | 'blackbox' | 'popups' | 'join' | 'freeze';
@@ -113,11 +119,20 @@ function showRow(i: PreflightInput): CheckRow {
   const base = { id: 'show' as const, label: 'Show loaded', manual: false, action: 'editRounds' as const };
   const rounds = i.data ? i.data.rounds : i.event ? null : i.customRounds;
   if (rounds === null) return { ...base, state: 'wait', detail: 'Asking the server…' };
+  // The year-round Event show draws its rounds from the question packs when it starts: nothing to load.
+  if (i.data?.source === 'packs' && !i.data.rehearsal) {
+    const n = i.data.packRounds ?? 0;
+    return { ...base, state: 'ok', detail: `${n} round${n === 1 ? '' : 's'} from the question packs · not the rehearsal` };
+  }
   if (rounds === 0)
     return { ...base, state: 'fail', detail: 'No boards loaded', fix: 'Load your show file: Edit your rounds → Load show file' };
   const plural = `${rounds} round${rounds === 1 ? '' : 's'}`;
-  if (i.data?.rehearsal)
-    return { ...base, state: 'warn', detail: `The rehearsal’s practice boards (${plural})`, fix: 'For the real show, load your show file' };
+  if (i.data?.rehearsal) {
+    const show = isShowdownEventId(i.data.event) ? SHOWDOWN_EVENT_INFO[eventShowFor(i.data.event)] : null;
+    const fix =
+      show && show.settings.source === 'packs' ? `For the real show, load ${show.title}` : 'For the real show, load your show file';
+    return { ...base, state: 'warn', detail: `The rehearsal’s practice boards (${plural})`, fix };
+  }
   if (i.data && i.data.specials < rounds) {
     return {
       ...base,

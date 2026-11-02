@@ -30,6 +30,7 @@ import {
   SHOWDOWN_EVENT_GRACE_SECONDS,
   SHOWDOWN_EVENT_IDS,
   SHOWDOWN_EVENT_INFO,
+  applyEventPreset,
   SHOWDOWN_LIMITS,
   SHOWDOWN_MISS_GAP_MS,
   SHOWDOWN_MSG,
@@ -802,8 +803,9 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
 
   /**
    * An event preset: its settings, and — unless it's settings-only (ADM-01: the real boards come from
-   * the presenter's show file, never from the repo) — its rounds as this room's custom rounds. A
-   * settings-only preset keeps whatever rounds are already loaded, in either order.
+   * the presenter's show file, never from the repo; or the show plays the question packs) — its rounds
+   * as this room's custom rounds. A settings-only preset keeps whatever rounds are already loaded, in
+   * either order, except practice boards when it moves the show onto the packs: the rehearsal is over.
    */
   private loadPreset(player: PlayerRecord, id: ShowdownEventId): void {
     if (!this.isPresenter(player)) return this.reject(player, SHOWDOWN_MSG.preset, 'not_host', 'Only the presenter loads a show.');
@@ -813,20 +815,27 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       this.custom = report;
       this.state.customRounds = report.rounds.length;
       this.state.rehearsal = info.rehearsal;
+    } else if (info.settings.source === 'packs' && this.state.rehearsal) {
+      this.custom = { rounds: [], issues: [], dropped: 0 };
+      this.state.customRounds = 0;
+      this.state.rehearsal = false;
     }
-    this.updateSettings({ ...this.getSettings(), ...info.settings });
+    this.updateSettings(applyEventPreset(this.getSettings(), id));
     this.sendTo(player, SHOWDOWN_MSG.content, this.custom);
     if (info.event) this.becomeEventRoom(player, id);
     if (this.event) this.log({ ...this.actor(player), action: 'preset.load', after: info.title });
     const rounds = this.custom.rounds.length;
+    const settings = this.getSettings();
     this.toast(
       player,
       'success',
-      info.settingsOnly
-        ? rounds > 0
-          ? `Loaded ${info.title}’s settings. Your ${rounds} loaded round${rounds === 1 ? '' : 's'} stay as they are.`
-          : `Loaded ${info.title}’s settings. Now load your show file (Settings → Your own rounds → Load).`
-        : `Loaded ${info.title}: ${rounds} rounds. Check them in Settings → Your own rounds.`,
+      info.settingsOnly && settings.source === 'packs'
+        ? `Loaded ${info.title}: ${settings.rounds} round${settings.rounds === 1 ? '' : 's'} from the question packs. Pick the packs in Settings.`
+        : info.settingsOnly
+          ? rounds > 0
+            ? `Loaded ${info.title}’s settings. Your ${rounds} loaded round${rounds === 1 ? '' : 's'} stay as they are.`
+            : `Loaded ${info.title}’s settings. Now load your show file (Settings → Your own rounds → Load).`
+          : `Loaded ${info.title}: ${rounds} rounds. Check them in Settings → Your own rounds.`,
     );
     this.markSnapshot();
   }
@@ -2338,6 +2347,8 @@ export class ShowdownRoom extends BaseGameRoom<ShowdownState, ShowdownSettings> 
       rehearsal: this.state.rehearsal,
       rounds: this.custom.rounds.length,
       specials: this.custom.rounds.filter((r) => r.special !== undefined && r.special >= 0).length,
+      source: this.getSettings().source,
+      packRounds: this.getSettings().rounds,
       backups: { issued: backups.length, online: backups.filter((l) => l.holderId && this.getPlayer(l.holderId)?.client).length },
       station: {
         playerId: this.state.soundStation,

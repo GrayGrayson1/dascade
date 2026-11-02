@@ -7,8 +7,11 @@ import {
   SHOWDOWN_PACK_IDS,
   SHOWDOWN_PACK_INFO,
   ShowdownSettingsSchema,
+  applyEventPreset,
   boardTotal,
   defaultShowdownSettings,
+  eventInSeason,
+  eventShowFor,
   eventTitle,
   resolveShowdownLook,
   roundToInput,
@@ -252,17 +255,84 @@ describe('event presets', () => {
     });
   });
 
-  it('the rehearsal: two ranked practice boards, #5 special, attributed as host picks (not a poll)', () => {
-    const rounds = validateShowContent(SHOWDOWN_EVENT_ROUNDS['dasoween-rehearsal']).rounds;
-    expect(rounds).toHaveLength(2);
-    for (const r of rounds) {
-      expect(r.answers).toHaveLength(10);
-      expect(r.ranked).toBe(true);
-      expect(r.special).toBe(4);
-      expect(r.source).toBeTruthy();
+  it('the rehearsals: two ranked practice boards, #5 special, attributed as host picks (not a poll)', () => {
+    for (const id of ['dasoween-rehearsal', 'event-rehearsal'] as const) {
+      const rounds = validateShowContent(SHOWDOWN_EVENT_ROUNDS[id]).rounds;
+      expect(rounds, id).toHaveLength(2);
+      for (const r of rounds) {
+        expect(r.answers).toHaveLength(10);
+        expect(r.ranked).toBe(true);
+        expect(r.special).toBe(4);
+        expect(r.source).toMatch(/Host Picks$/);
+      }
+      expect(SHOWDOWN_EVENT_INFO[id].rehearsal).toBe(true);
+      expect(SHOWDOWN_EVENT_INFO[id].settingsOnly).toBe(false);
     }
-    expect(SHOWDOWN_EVENT_INFO['dasoween-rehearsal'].rehearsal).toBe(true);
-    expect(SHOWDOWN_EVENT_INFO['dasoween-rehearsal'].settingsOnly).toBe(false);
+  });
+
+  it('the year-round pair comes first: Showtime, the question packs, every event-room feature; DAS-O-Ween stays (seasonal)', () => {
+    expect(SHOWDOWN_EVENT_IDS.slice(0, 2)).toEqual(['event-show', 'event-rehearsal']);
+    expect(SHOWDOWN_EVENT_IDS).toEqual(expect.arrayContaining(['dasoween-2026', 'dasoween-rehearsal']));
+    const show = SHOWDOWN_EVENT_INFO['event-show'];
+    expect(show).toMatchObject({ event: true, rehearsal: false, settingsOnly: true });
+    expect(show.season).toBeUndefined();
+    expect(show.settings).toMatchObject({
+      mode: 'showcase',
+      look: 'showtime',
+      source: 'packs',
+      minutes: 10,
+      points: true,
+      medals: 'round',
+    });
+    // It leaves the packs (a new room's follow the season) and the presenter's own names alone.
+    expect(show.settings).not.toHaveProperty('packs');
+    expect(show.settings).not.toHaveProperty('title');
+    expect(show.settings).not.toHaveProperty('eventName');
+    expect(SHOWDOWN_EVENT_INFO['event-rehearsal'].settings).toMatchObject({ look: 'showtime', source: 'custom' });
+    expect(SHOWDOWN_EVENT_INFO['event-rehearsal'].season).toBeUndefined();
+    for (const id of ['dasoween-2026', 'dasoween-rehearsal'] as const)
+      expect(SHOWDOWN_EVENT_INFO[id].season).toEqual({ name: 'DAS-O-Ween', month: 9 });
+  });
+
+  it('a rehearsal belongs to its own season’s real show', () => {
+    expect(eventShowFor('event-rehearsal')).toBe('event-show');
+    expect(eventShowFor('dasoween-rehearsal')).toBe('dasoween-2026');
+    expect(eventShowFor('event-show')).toBe('event-show');
+    expect(eventShowFor('dasoween-2026')).toBe('dasoween-2026');
+  });
+
+  it('DAS-O-Ween is up front in October only; the year-round pair always', () => {
+    for (const month of [0, 9, 10, 11]) {
+      expect(eventInSeason('event-show', new Date(2026, month, 15))).toBe(true);
+      expect(eventInSeason('dasoween-2026', new Date(2026, month, 15))).toBe(month === 9);
+    }
+  });
+
+  it('loading a preset: its settings over the room’s; a neutral preset clears another preset’s names, never the presenter’s', () => {
+    const base = defaultShowdownSettings(new Date(2026, 10, 2));
+    const halloween = applyEventPreset(base, 'dasoween-rehearsal');
+    expect(halloween).toMatchObject({ look: 'halloween', title: 'DAS-O-Ween Rehearsal', eventName: 'Remoties DAS-O-Ween Happy Hour' });
+    const show = applyEventPreset(halloween, 'event-show');
+    expect(show).toMatchObject({ mode: 'showcase', look: 'showtime', source: 'packs', title: '', eventName: '' });
+    expect(show.packs).toEqual(base.packs);
+    expect(ShowdownSettingsSchema.safeParse(show).success).toBe(true);
+    const typed = applyEventPreset({ ...base, title: 'Friday Showdown', eventName: 'Remoties Happy Hour' }, 'event-show');
+    expect(typed).toMatchObject({ title: 'Friday Showdown', eventName: 'Remoties Happy Hour' });
+    // Rehearsal, then the real show: the names typed in between stay.
+    const practised = applyEventPreset({ ...applyEventPreset(base, 'event-rehearsal'), title: 'Year-End Trivia' }, 'event-show');
+    expect(practised.title).toBe('Year-End Trivia');
+  });
+
+  it('the year-round practice boards ask nothing a question pack asks (a rehearsal spoils no pack round)', () => {
+    const packPrompts = SHOWDOWN_PACK_IDS.flatMap((id) => SHOWDOWN_PACKS[id]).map((r) => normalizeForCompare(r.prompt));
+    for (const round of SHOWDOWN_EVENT_ROUNDS['event-rehearsal']) {
+      const topic = normalizeForCompare(round.title ?? '').replace(/^practice:?\s*/, '');
+      expect(packPrompts).not.toContain(normalizeForCompare(round.prompt));
+      expect(
+        packPrompts.filter((p) => p.includes(topic)),
+        topic,
+      ).toEqual([]);
+    }
   });
 
   it('every answer and alias is matched back to its own slot', () => {

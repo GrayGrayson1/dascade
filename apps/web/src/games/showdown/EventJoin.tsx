@@ -124,7 +124,7 @@ export function EventJoinRoute({ code }: { code: string }) {
   );
 }
 
-/** The show's look on the join screen: the event preset's (both DAS-O-Ween presets are Halloween Night). */
+/** The show's look on the join screen: the event preset's (Showtime for Event show, Halloween Night for DAS-O-Ween). */
 function eventLook(info: ShowdownEventInfo | undefined): ShowdownLook {
   return resolveShowdownLook(info?.settings.look ?? 'auto', seasonClock());
 }

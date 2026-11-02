@@ -10,6 +10,7 @@
  */
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { createRoom, leaveRoom, myPlayerId, roomState, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 /** Counts the audio nodes this page creates (window.__sdNodes); the show's theme music stays off unless `music`. */
 async function instrument(target: Page | BrowserContext, music = false): Promise<void> {
@@ -64,7 +65,7 @@ test('DAS-O-Ween sound station: one device plays the show, and the console takes
   // The DAS-O-Ween rehearsal makes this an event room.
   const settingsTab = host.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
 
   // A big screen on another device (a TV laptop).
@@ -198,7 +199,7 @@ test('DAS-O-Ween music: the jukebox pauses while a question is live and comes ba
   const code = await createRoom(host, 'showdown', 'Host');
   const settingsTab = host.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   await expect.poll(async () => (await jukebox(host)).tracks).toBeGreaterThan(0);
   /** Audio nodes made over 1.5 s with no cue: only the theme bed makes any. */
