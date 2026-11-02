@@ -506,7 +506,8 @@ describe('DAS Putt room', () => {
     await waitFor(() => outcomes.length === 2, 3000, 'game 2 reported');
     expect(outcomes[1]!.outcome.placements).toEqual([[hostId]]);
     expect(outcomes[1]!.outcome.reason).toBe('forfeit');
-    expect(st(host.room).phase).toBe('RESULTS');
+    // The outcome is reported on the server at once; the client's state patch arrives a moment later.
+    await waitFor(() => st(host.room).phase === 'RESULTS', 3000, 'game 2 results');
   });
 
   it('tournament forfeit: the remaining golfer wins when the opponent leaves', async () => {

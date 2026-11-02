@@ -735,8 +735,17 @@ export class WordsRoom extends PartyRoom<WordsState, WordsSettings> {
 
   private finishMatch(): void {
     const awards = this.computeAwards();
+    // Profile stats (packages/shared/src/stats.ts): every word here was shown at a reveal.
+    const playerStats: Record<string, Record<string, number>> = {};
+    for (const [id, s] of this.stats) {
+      playerStats[id] = {
+        wordsFound: s.words,
+        maxWordLength: s.longest.replace(/ /g, '').length,
+        ...(this.mode === 'chain' ? { chainLinks: s.links } : { uniqueWords: s.unique }),
+      };
+    }
     this.finishParty({
-      details: { mode: this.mode, rounds: this.state.round },
+      details: { mode: this.mode, rounds: this.state.round, playerStats },
       extras: { awards },
     });
   }

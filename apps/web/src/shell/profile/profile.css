@@ -128,6 +128,13 @@
   font-size: var(--fs-lg);
   color: var(--text-0);
 }
+/* The overall summary above the game cards: the most played game takes a row of its own. */
+.ps-summary__most {
+  grid-column: 1 / -1;
+}
+.ps-summary__most dd {
+  font-size: var(--fs-md);
+}
 .ps-state {
   display: grid;
   justify-items: center;

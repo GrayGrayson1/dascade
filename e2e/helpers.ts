@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from '@playwright/test';
+import { expect, type Browser, type Page, type WebSocketRoute } from '@playwright/test';
 
 /** Sets the nickname on a cabinet entry / join prompt. */
 export async function setName(page: Page, name: string): Promise<void> {
@@ -113,4 +113,73 @@ export async function dropConnection(page: Page, reconnect: { maxRetries?: numbe
 /** The logical player id of this page's session. */
 export async function myPlayerId(page: Page): Promise<string | null> {
   return page.evaluate(() => (window as any).__DASCADE__.store.getState().playerId);
+}
+
+/** The Colyseus session id of this page's room connection (it survives an auto-reconnect, not a seat rejoin). */
+export async function mySessionId(page: Page): Promise<string | null> {
+  return page.evaluate(() => (window as any).__DASCADE__.session.room?.sessionId ?? null);
+}
+
+export interface SocketTap {
+  /**
+   * Cuts the page's live room socket the way a dead network does (the Oct 29 drops): the page sees an
+   * abnormal close (1006) and starts reconnecting, while the server's side stays open. That side keeps
+   * answering the server's pings, so it only goes away when the test calls `endServerSide()` (what the
+   * server's heartbeat does 15–20 s after a real network dies) or when the client's seat-token rejoin
+   * pushes it out (as when a proxy keeps the server's side alive).
+   */
+  dropHalfOpen(): Promise<{ endServerSide: () => Promise<void> }>;
+}
+
+/**
+ * Routes this page's room sockets through Playwright, passing everything through, so a test can cut one
+ * half-open (unlike `dropConnection`, which closes cleanly and lets the server notice at once). Call it
+ * before the page connects.
+ */
+export async function tapSockets(page: Page): Promise<SocketTap> {
+  type Link = { page: WebSocketRoute; server: WebSocketRoute; cut: boolean; closed: boolean };
+  const links: Link[] = [];
+  await page.routeWebSocket(/[?&]sessionId=/, (ws) => {
+    const server = ws.connectToServer();
+    const link: Link = { page: ws, server, cut: false, closed: false };
+    links.push(link);
+    // Forward closes by hand (a handler turns Playwright's forwarding off) so a cut link keeps its server side.
+    ws.onClose((code, reason) => {
+      link.closed = true;
+      if (!link.cut) void server.close({ code, reason });
+    });
+    server.onClose((code, reason) => {
+      link.closed = true;
+      void ws.close({ code, reason });
+    });
+  });
+  // The Colyseus SDK first tries Node's `new WebSocket(url, { headers, protocols })` and relies on the
+  // browser throwing to fall back to `new WebSocket(url, protocols)`. Playwright's routing mock accepts
+  // the object (and the real connection then fails), so give it the browser's check.
+  await page.addInitScript(() => {
+    const Routed = globalThis.WebSocket;
+    globalThis.WebSocket = class WebSocket extends Routed {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        if (protocols !== undefined && typeof protocols !== 'string' && !Array.isArray(protocols)) {
+          throw new SyntaxError("Failed to construct 'WebSocket': The subprotocol is invalid.");
+        }
+        super(url, protocols);
+      }
+    };
+  });
+  return {
+    async dropHalfOpen() {
+      const link = [...links].reverse().find((l) => !l.closed);
+      if (!link) throw new Error('no open room socket to drop');
+      // As in dropConnection: a room joined under 1.5 s ago would skip the auto-reconnect.
+      await page.evaluate(() => {
+        const room = (window as any).__DASCADE__?.session.room;
+        if (room) room.reconnection.minUptime = 0;
+      });
+      link.cut = true;
+      link.closed = true;
+      await link.page.close({ code: 1006, reason: 'network lost' });
+      return { endServerSide: () => link.server.close() };
+    },
+  };
 }

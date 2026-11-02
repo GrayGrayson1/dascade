@@ -151,6 +151,21 @@ test('the stage window: F toggles full screen; nothing pops up on a mouse move; 
   await stageWin.keyboard.press('Control+f');
   await stageWin.waitForTimeout(300);
   expect(await isFull(stageWin)).toBe(false);
+  // The mouse click left no focus behind, so the key presses after it didn't light the button up on
+  // the share (a focused button turns :focus-visible on a key press and would stay lit all show).
+  await nudge(stageWin);
+  await stageWin.waitForTimeout(400);
+  await expect(button).not.toBeFocused();
+  expect(await opacity(button)).toBe(0);
+  // From the keyboard it keeps its focus, and shows: Enter toggles full screen both ways.
+  await button.focus();
+  await stageWin.keyboard.press('Enter');
+  await expect.poll(() => isFull(stageWin)).toBe(true);
+  await expect(button).toBeFocused();
+  await expect.poll(() => opacity(button)).toBe(1);
+  await stageWin.keyboard.press('Enter');
+  await expect.poll(() => isFull(stageWin)).toBe(false);
+  await blur(stageWin);
 
   // The show: the board, then Cinema with a video playing over the whole stage.
   await startGame(host);

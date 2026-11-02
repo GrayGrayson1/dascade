@@ -17,6 +17,7 @@ import {
 import { Badge, Button, IconButton, PixelIcon, Spinner } from '@dascade/ui';
 import { useApp } from '../../app/store.ts';
 import { fetchMyStats } from './api.ts';
+import { averageLabel, averageScore, formatAverage, summarize } from './statsSummary.ts';
 import './profile.css';
 
 type Load = { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; data: PlayerStatsResponse };
@@ -78,6 +79,7 @@ export function StatsPanel() {
   const { data } = load;
   const games = data.games.filter((g) => isGameId(g.gameId));
   const ratings = data.ratings.filter((r) => isGameId(r.gameId));
+  const summary = summarize(games, (id) => Boolean(STAT_GAME_DISPLAY[id]?.coop));
   return (
     <div className="ps">
       <div className="ps-bar">
@@ -122,11 +124,38 @@ export function StatsPanel() {
             <p className="dc-muted">Finish a game at any cabinet — your wins, best scores and highlights show up here.</p>
           </div>
         ) : (
-          <ul className="ps-games">
-            {games.map((g) => (
-              <GameCard key={g.gameId} g={g} />
-            ))}
-          </ul>
+          <>
+            <dl className="ps-game__stats ps-summary" aria-label="All games" data-part="stats-summary">
+              <div>
+                <dt>Games played</dt>
+                <dd className="dc-num">{fmt(summary.games)}</dd>
+              </div>
+              <div>
+                <dt>Different games</dt>
+                <dd className="dc-num">{summary.kinds}</dd>
+              </div>
+              {summary.wins > 0 ? (
+                <div>
+                  <dt>Wins</dt>
+                  <dd className="dc-num">{fmt(summary.wins)}</dd>
+                </div>
+              ) : null}
+              {summary.mostPlayed ? (
+                <div className="ps-summary__most">
+                  <dt>Most played</dt>
+                  <dd>
+                    {GAME_CATALOG[summary.mostPlayed.gameId].title} · <span className="dc-num">{fmt(summary.mostPlayed.games)}</span>{' '}
+                    {summary.mostPlayed.games === 1 ? 'game' : 'games'}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <ul className="ps-games">
+              {games.map((g) => (
+                <GameCard key={g.gameId} g={g} />
+              ))}
+            </ul>
+          </>
         )}
       </section>
     </div>
@@ -162,6 +191,7 @@ function GameCard({ g }: { g: GameStatLine }) {
   // Co-op games share every result with the party, so a win/draw/loss record means nothing there.
   const decided = display.coop ? 0 : g.wins + g.losses + g.draws;
   const winRate = decided > 0 ? Math.round((g.wins / decided) * 100) : null;
+  const average = averageScore(g);
   const extras = Object.entries(g.extras);
   return (
     <li className="ps-game" style={{ '--g': game.accent.primary } as CSSProperties}>
@@ -206,6 +236,12 @@ function GameCard({ g }: { g: GameStatLine }) {
           <div>
             <dt>{display.scoreLabel ?? (g.lowerIsBetter ? 'Best (lowest)' : 'Best score')}</dt>
             <dd className="dc-num">{display.scoreFormat === 'ms' ? formatStatDuration(g.bestScore) : fmt(g.bestScore)}</dd>
+          </div>
+        ) : null}
+        {average !== null ? (
+          <div>
+            <dt>{averageLabel(display, g.lowerIsBetter)}</dt>
+            <dd className="dc-num">{display.scoreFormat === 'ms' ? formatStatDuration(Math.round(average)) : formatAverage(average)}</dd>
           </div>
         ) : null}
         {g.tournamentGames > 0 ? (

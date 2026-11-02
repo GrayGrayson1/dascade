@@ -29,6 +29,22 @@ export const LIMITS = {
 
 /** Seconds a dropped client may reconnect with its Colyseus session before being marked away. */
 export const RECONNECT_GRACE_SECONDS = 45;
+/**
+ * Socket liveness (server.ts): the server pings every socket this often and ends one that misses
+ * HEARTBEAT_MAX_MISSES pings in a row. Until then a socket whose network died (Wi-Fi off, a proxy that
+ * cut the client side) still looks open to the server.
+ */
+export const HEARTBEAT_INTERVAL_MS = 5_000;
+export const HEARTBEAT_MAX_MISSES = 3;
+/** The longest the server can take to notice a dead socket: 15–20 s with the values above. */
+export const HEARTBEAT_WINDOW_MS = HEARTBEAT_INTERVAL_MS * (HEARTBEAT_MAX_MISSES + 1);
+/**
+ * Colyseus `seatReservationTimeout` for every room. It also bounds how long an auto-reconnect that
+ * arrives while the server still sees the old socket waits for the heartbeat to end that socket.
+ * Colyseus' default (15 s) is shorter than HEARTBEAT_WINDOW_MS, so such a reconnect was refused
+ * (close 4003, which the SDK never retries). It must outlast the heartbeat window.
+ */
+export const SEAT_RESERVATION_SECONDS = 30;
 /** Milliseconds a disconnected host keeps host powers before they migrate. */
 export const HOST_MIGRATION_DELAY_MS = 10_000;
 /** Pre-game countdown. */

@@ -6,7 +6,7 @@ import { CLIENT_IP_HEADER, ipRateKey } from '../lib/clientIp.ts';
 import { registerStatsRoutes } from '../platform/statsRoutes.ts';
 import { registerClassicsRoutes } from '../rooms/classics/scoresRoute.ts';
 import { registerTournamentRoutes } from './tournamentRoutes.ts';
-import { processStartedAt as startedAt } from '../lib/process.ts';
+import { healthReport } from './health.ts';
 
 // Room lookups reveal whether a code is live: throttle per IP so codes can't be enumerated,
 // while staying generous for offices where everyone shares one public address.
@@ -17,8 +17,7 @@ export function registerApiRoutes(app: express.Application): void {
   registerClassicsRoutes(app);
   registerTournamentRoutes(app);
   app.get('/api/health', async (_req, res) => {
-    const rooms = await matchMaker.query({});
-    res.json({ ok: true, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000), rooms: rooms.length });
+    res.json(await healthReport());
   });
 
   app.get('/api/rooms/:code', async (req, res) => {

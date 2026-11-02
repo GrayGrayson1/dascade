@@ -4,7 +4,8 @@
  *
  *  - Out of the show: nothing pops up over the shared screen, not when the window opens and not when
  *    the mouse moves over it. The button stays invisible until you hover its corner or tab to it; F
- *    (stageWindow.ts) works without it, and the console's Stage window button says to press F.
+ *    (stageWindow.ts) works without it, and the console's Stage window button says to press F. A
+ *    mouse click doesn't leave it focused (so a later F doesn't light it up on the share).
  *  - Above every scene: the chrome layer sits over the Cinema layer (cinema.ts), so the button is
  *    there during a cartoon break too.
  *  - The click (or F, handled in stageWindow.ts) happens in the stage window itself: the browser
@@ -31,7 +32,13 @@ export function StageWindowChrome({ host }: { host: HTMLElement }) {
         className="sd-wchrome__button sd-fullscreen"
         data-part="showdown-fullscreen"
         title={leave ? 'Leave full screen (Esc or F)' : 'Full screen: hides the browser bar (F)'}
-        onClick={(e) => toggleFullscreen(e.currentTarget)}
+        onClick={(e) => {
+          toggleFullscreen(e.currentTarget);
+          // A mouse click leaves no focus behind: a focused button turns :focus-visible on the next key
+          // press (F, Esc), and would then stay lit over the share for the rest of the show. From the
+          // keyboard (detail 0) focus stays where the user is, and shows.
+          if (e.detail > 0) e.currentTarget.blur();
+        }}
       >
         {leave ? 'Exit full screen' : 'Full screen'} <Kbd>F</Kbd>
       </Button>

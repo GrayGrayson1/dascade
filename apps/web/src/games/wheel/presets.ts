@@ -24,6 +24,8 @@ export interface BuiltinPreset {
   description: string;
   /** Theme ids under which the editor pre-selects this preset. It is never applied automatically. */
   suggestFor?: readonly string[];
+  /** Only suggested between these dates ("MM-DD", inclusive; `from` after `to` wraps over New Year). */
+  season?: { from: string; to: string };
   build: (ctx: { playerNames: string[] }) => Partial<WheelPresetData> & { segments: WheelSegment[] };
 }
 
@@ -142,11 +144,70 @@ export const BUILTIN_PRESETS: BuiltinPreset[] = [
       ],
     }),
   },
+  {
+    id: 'builtin:snow-day',
+    name: 'Snow Day Party',
+    description: 'Weighted winter fun: cocoa is common, the Snow Day Jackpot is rare.',
+    suggestFor: ['saturday-morning'],
+    season: { from: '12-01', to: '02-29' },
+    build: () => ({
+      title: 'Snow day! What now?',
+      sliceMode: 'weighted',
+      afterSpin: 'keep',
+      repeats: 'allow',
+      // Relative odds out of 41. Light, icy colours (dark labels ≥ 4.5:1), neighbours distinct all the way round.
+      segments: [
+        seg('Hot cocoa round', '☕', '#ffb020', 8),
+        seg('Build a snowman', '⛄', '#e0f2fe', 6),
+        seg('Snowball fight!', '❄️', '#7dd3fc', 6),
+        seg('Sledding race', '🛷', '#ff6fa8', 5),
+        seg('Pick the movie', '🍿', '#c4b5fd', 5),
+        seg('Cookie swap', '🍪', '#ff8a3d', 4),
+        seg('Swap seats!', '🧤', '#5eead4', 4),
+        seg('Snow Day Jackpot', '🌟', '#ffd23f', 1),
+        seg('Pick a song', '🎧', '#a3e635', 2),
+      ],
+    }),
+  },
+  {
+    id: 'builtin:gratitude',
+    name: 'Gratitude / Harvest',
+    description: 'Autumn prompts for sharing thanks. Each prompt comes up once.',
+    suggestFor: ['executive', 'corporate-98'],
+    season: { from: '11-01', to: '11-30' },
+    build: () => ({
+      title: 'What are you thankful for?',
+      sliceMode: 'equal',
+      afterSpin: 'remove',
+      repeats: 'prevent',
+      segments: [
+        seg('A teammate to thank', '🤝', '#ff8a3d'),
+        seg('A small win', '🏅', '#ffd23f'),
+        seg('Something you learned', '📚', '#7ed957'),
+        seg('Comfort food', '🥧', '#f4a261'),
+        seg('A big laugh', '😂', '#ffb020'),
+        seg('A kind gesture', '🙌', '#ff6f61'),
+        seg('A handy tool', '🧰', '#a3e635'),
+        seg('Perfect autumn day', '🍁', '#fbbf24'),
+        seg('Apple, pie or pumpkin?', '🍎', '#ff9f7a'),
+      ],
+    }),
+  },
 ];
 
-/** The built-in preset the editor pre-selects under a theme (Lunch spot unless one suggests itself). */
-export function suggestedPresetId(themeId: string): string {
-  return (BUILTIN_PRESETS.find((p) => p.suggestFor?.includes(themeId)) ?? BUILTIN_PRESETS[0]!).id;
+/** True when `now` falls inside the month-day window (always true without one). Uses the device's local date. */
+export function inSeason(season: BuiltinPreset['season'], now: Date): boolean {
+  if (!season) return true;
+  const md = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return season.from <= season.to ? md >= season.from && md <= season.to : md >= season.from || md <= season.to;
+}
+
+/**
+ * The built-in preset the editor pre-selects under a theme (Lunch spot unless one suggests itself).
+ * Seasonal presets only suggest themselves in season, so a theme's default doesn't stay wintry all year.
+ */
+export function suggestedPresetId(themeId: string, now: Date = new Date()): string {
+  return (BUILTIN_PRESETS.find((p) => p.suggestFor?.includes(themeId) && inSeason(p.season, now)) ?? BUILTIN_PRESETS[0]!).id;
 }
 
 /**
