@@ -183,6 +183,8 @@ export function RoomScreen() {
               }
             : undefined
         }
+        // The room is gone for good (only event rooms come back, through ShowRecovery above).
+        offerNewRoom={err.kind === 'server_restarted'}
       />
     );
   }
@@ -377,15 +379,20 @@ export function ErrorScreen({
   error,
   onBack,
   onRetry,
+  offerNewRoom = false,
 }: {
   error: FriendlyError;
   onBack?: () => void;
   onRetry?: () => void | Promise<void>;
+  /** Offer "New <game> room": a full load of the game's cabinet page (which also picks up a new deploy). */
+  offerNewRoom?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const gameId = useSessionStore((s) => s.gameId);
   const game = gameId && isGameId(gameId) ? GAME_CATALOG[gameId] : null;
+  // Platform rooms (the Tournament Center kiosk) have no cabinet page to start from.
+  const newRoomGame = offerNewRoom && gameId && game?.cabinet ? { id: gameId, title: game.title } : null;
   const tone =
     error.kind === 'kicked' || error.kind === 'unknown'
       ? 'danger'
@@ -408,9 +415,22 @@ export function ErrorScreen({
         role="alert"
         actions={
           <>
-            {onRetry ? (
+            {newRoomGame ? (
               <Button
                 variant="primary"
+                size="lg"
+                icon="play"
+                onClick={() => {
+                  session.clearNotices();
+                  location.assign(`/play/${newRoomGame.id}`);
+                }}
+              >
+                New {newRoomGame.title} room
+              </Button>
+            ) : null}
+            {onRetry ? (
+              <Button
+                variant={newRoomGame ? 'ghost' : 'primary'}
                 size="lg"
                 icon="refresh"
                 loading={busy}
@@ -423,7 +443,7 @@ export function ErrorScreen({
                 Try again
               </Button>
             ) : null}
-            <Button variant={onRetry ? 'ghost' : 'primary'} icon="arrow-left" onClick={onBack ?? (() => navigate('/'))}>
+            <Button variant={onRetry || newRoomGame ? 'ghost' : 'primary'} icon="arrow-left" onClick={onBack ?? (() => navigate('/'))}>
               Back to arcade
             </Button>
           </>
