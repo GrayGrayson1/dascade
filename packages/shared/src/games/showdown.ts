@@ -202,20 +202,45 @@ export const SHOWDOWN_CARD_INFO: Record<ShowdownCard, { title: string; blurb: st
 // Question packs (metadata only — the questions live in the server engine package)
 // ---------------------------------------------------------------------------
 
-export const SHOWDOWN_PACK_IDS = ['spooky', 'office', 'tech', 'food', 'life'] as const;
+/** The seasonal packs in calendar order (October, November, December), then the year-round ones. */
+export const SHOWDOWN_PACK_IDS = ['spooky', 'harvest', 'winter', 'office', 'tech', 'food', 'life'] as const;
 export type ShowdownPackId = (typeof SHOWDOWN_PACK_IDS)[number];
 
-export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, { title: string; blurb: string; rounds: number; seasonal?: boolean }> = {
+export interface ShowdownPackInfo {
+  title: string;
+  blurb: string;
+  rounds: number;
+  seasonal?: boolean;
+  /** An emoji shown after the pack's title in the lobby (decorative). */
+  icon?: string;
+}
+
+export const SHOWDOWN_PACK_INFO: Record<ShowdownPackId, ShowdownPackInfo> = {
   spooky: {
     title: 'Halloween Spooktacular',
     blurb: 'Haunted houses, costumes, candy and things that go bump.',
     rounds: 10,
     seasonal: true,
+    icon: '🎃',
+  },
+  harvest: {
+    title: 'Harvest & Gratitude',
+    blurb: 'Fall feasts, pies, leaf piles and what we’re thankful for at work.',
+    rounds: 8,
+    seasonal: true,
+    icon: '🍂',
+  },
+  winter: {
+    title: 'Winter Holidays & Snow Days',
+    blurb: 'Snow days, cozy nights, holiday parties and New Year’s Eve.',
+    rounds: 10,
+    seasonal: true,
+    icon: '❄️',
   },
   office: { title: 'Office Life', blurb: 'Meetings, desks, the kitchen fridge and Friday at 4:59.', rounds: 10 },
-  tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 8 },
-  food: { title: 'Snack Attack', blurb: 'Pizza, coffee, potlucks and leftovers.', rounds: 8 },
-  life: { title: 'Life & Leisure', blurb: 'Lazy Sundays, chores, vacations and hobbies.', rounds: 8 },
+  tech: { title: 'Tech Talk', blurb: 'Frozen screens, passwords, video calls and IT support.', rounds: 10 },
+  food: { title: 'Snack Attack', blurb: 'Pizza, coffee, potlucks and leftovers.', rounds: 10 },
+  life: { title: 'Life & Leisure', blurb: 'Lazy Sundays, chores, vacations, road trips and hobbies.', rounds: 10 },
 };
 
 // ---------------------------------------------------------------------------
@@ -505,16 +530,25 @@ export type ShowdownSettings = z.infer<typeof ShowdownSettingsSchema>;
 
 export const SHOWDOWN_DEFAULT_TITLE = 'DAS Survey Showdown';
 
-/** Defaults for a new room; in October the show opens with the Halloween pack. */
+const REGULAR_PACKS: ShowdownPackId[] = ['office', 'tech', 'food', 'life'];
+
+/** A new room's packs (the server's clock): October = Halloween; December = Winter plus the regulars. */
+export function defaultShowdownPacks(now: Date): ShowdownPackId[] {
+  const month = now.getMonth();
+  if (month === 9) return ['spooky'];
+  if (month === 11) return ['winter', ...REGULAR_PACKS];
+  return [...REGULAR_PACKS];
+}
+
+/** Defaults for a new room; the packs follow the season (defaultShowdownPacks). */
 export function defaultShowdownSettings(now: Date = new Date()): ShowdownSettings {
-  const october = now.getMonth() === 9;
   return {
     mode: 'classic',
     title: '',
     eventName: '',
     look: 'auto',
     source: 'packs',
-    packs: october ? ['spooky'] : ['office', 'tech', 'food', 'life'],
+    packs: defaultShowdownPacks(now),
     rounds: 4,
     scoring: 'final-double',
     steal: true,

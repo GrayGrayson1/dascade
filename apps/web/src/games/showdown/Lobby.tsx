@@ -226,7 +226,7 @@ export function ShowdownSettingsPanel({ settings, canEdit, update }: SettingsPan
                 <button key={id} type="button" className="sd-pack" aria-pressed={on} disabled={!canEdit} onClick={() => togglePack(id)}>
                   <span className="sd-pack__title">
                     {info.title}
-                    {info.seasonal ? <span aria-hidden> 🎃</span> : null}
+                    {info.icon ? <span aria-hidden> {info.icon}</span> : null}
                   </span>
                   <span className="sd-pack__blurb">{info.blurb}</span>
                   <span className="sd-pack__count">
