@@ -121,6 +121,22 @@ test('Halloween Night pre-selects the Trick or Treat preset; the room only chang
   await leaveRoom(page);
 });
 
+test('the presets include Snow Day Party and Gratitude / Harvest; loading Snow Day sets a weighted wheel', async ({ page }) => {
+  await createRoom(page, 'wheel', 'Host');
+  await openSettings(page);
+  const presets = page.getByRole('combobox', { name: 'Presets' });
+  await expect(presets.locator('option', { hasText: 'Snow Day Party' })).toHaveCount(1);
+  await expect(presets.locator('option', { hasText: 'Gratitude / Harvest' })).toHaveCount(1);
+
+  await presets.selectOption('builtin:snow-day');
+  await page.getByRole('button', { name: 'Load', exact: true }).click();
+  await expect.poll(() => segmentLabels(page)).toContain('Snow Day Jackpot');
+  const settings = JSON.parse((await roomState(page)).settingsJson);
+  expect(settings.sliceMode).toBe('weighted');
+  expect(settings.segments.find((s: { label: string }) => s.label === 'Snow Day Jackpot')).toMatchObject({ weight: 1, emoji: '🌟' });
+  await leaveRoom(page);
+});
+
 /** Sets the room's wheel through the host's session: two copies of one slice, shortest spin. */
 async function onlySlice(page: Page, label: string, emoji: string): Promise<void> {
   await page.evaluate(
