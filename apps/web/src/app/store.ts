@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME_PREF,
   // Listed (as undefined) so SETTINGS_KEYS / pickSettings / reconcile treat it as a setting, not an extra.
   seasonal: undefined,
+  haptics: true,
 };
 
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;

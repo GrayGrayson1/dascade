@@ -231,3 +231,27 @@ describe('seasonal prefs (October invite bookkeeping)', () => {
     expect(reconcileSettings({ ...DEFAULTS }, current, new Set<keyof AppSettings>(['seasonal'])).seasonal).toEqual(current.seasonal);
   });
 });
+
+describe('haptics (vibration switch)', () => {
+  const APP_DEFAULTS: AppSettings = { ...DEFAULTS, haptics: true };
+
+  it('reads a blob saved before the switch existed as on, without bumping the version', () => {
+    const out = migrateSettings({ settingsVersion: 3, muted: true }, APP_DEFAULTS);
+    expect(out.haptics).toBe(true);
+    expect(out.muted).toBe(true);
+    expect(out.settingsVersion).toBe(3);
+  });
+
+  it('keeps a stored choice and replaces junk with the default', () => {
+    expect(migrateSettings({ settingsVersion: 3, haptics: false }, APP_DEFAULTS).haptics).toBe(false);
+    expect(migrateSettings({ settingsVersion: 3, haptics: true }, APP_DEFAULTS).haptics).toBe(true);
+    for (const junk of ['no', 0, null, {}, []]) expect(migrateSettings({ settingsVersion: 3, haptics: junk }, APP_DEFAULTS).haptics).toBe(true);
+  });
+
+  it('is idempotent and a change made before hydrate wins over the stored copy', () => {
+    const once = migrateSettings({ haptics: false }, APP_DEFAULTS);
+    expect(migrateSettings(once, APP_DEFAULTS)).toEqual(once);
+    const current: AppSettings = { ...APP_DEFAULTS, haptics: false };
+    expect(reconcileSettings({ ...APP_DEFAULTS }, current, new Set<keyof AppSettings>(['haptics'])).haptics).toBe(false);
+  });
+});

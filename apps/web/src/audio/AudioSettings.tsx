@@ -1,7 +1,8 @@
 /**
- * Settings → Sound: master, SFX, game music, jukebox and the mixer policy choices.
+ * Settings → Sound: master, SFX, vibration, game music, jukebox and the mixer policy choices.
  * Rendered by the Settings modal (shell/modals.tsx); owned by audio-core.
  */
+import { useId } from 'react';
 import { Field, Segmented, Slider, Toggle } from '@dascade/ui';
 import { useApp, type GameMusicWithJukebox, type VisualizerPref } from '../app/store.ts';
 import { sfx } from './audio.ts';
@@ -23,6 +24,7 @@ export function AudioSettings() {
   const update = useApp((s) => s.updateSettings);
   const jukeboxMuted = useJukebox((s) => s.jukeboxMuted);
   const visualizerOn = visualizerEnabled(settings);
+  const hapticsHintId = useId();
   return (
     <div className="dc-col" style={{ gap: 18 }} data-part="audio-settings">
       <Toggle label="Mute everything" checked={settings.muted} onChange={(muted) => update({ muted })} />
@@ -42,6 +44,17 @@ export function AudioSettings() {
           />
         )}
       </Field>
+      <div className="dc-field">
+        <Toggle
+          label="Vibration"
+          checked={settings.haptics !== false}
+          aria-describedby={hapticsHintId}
+          onChange={(haptics) => update({ haptics })}
+        />
+        <span id={hapticsHintId} className="dc-field__hint">
+          A short buzz on phones when it's your turn. "Mute everything" stops it too.
+        </span>
+      </div>
 
       <hr className="dc-divider" style={{ margin: 0 }} />
       <GroupTitle>Game music</GroupTitle>
