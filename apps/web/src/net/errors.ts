@@ -31,7 +31,7 @@ export const ERRORS: Record<FriendlyErrorKind, Omit<FriendlyError, 'kind'>> = {
   },
   server_restarted: {
     title: 'The arcade restarted',
-    message: 'The game server restarted, which closed this room. Start a new game from the arcade — your name and settings are saved.',
+    message: 'The game server restarted (usually for an update), which closed this room. Start a new one — your name and settings are saved.',
     retryable: false,
   },
   not_found: {
