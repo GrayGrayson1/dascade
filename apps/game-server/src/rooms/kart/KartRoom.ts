@@ -168,7 +168,7 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
       maxNodes: KART_SIM.maxInputsPerPacket + 8,
     });
 
-    this.handle(KART_MSG.next, EmptySchema, () => this.onNext(), {
+    this.handle(KART_MSG.next, EmptySchema, (p) => this.onNext(p), {
       phases: ['RESULTS', 'INTERMISSION'],
       hostOnly: true,
       rate: { burst: 2, perSecond: 0.5 },
@@ -211,7 +211,7 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   // Settings
   // ---------------------------------------------------------------------------
 
-  /** Time trial is solo only; a tournament match (not offered today) would always be a plain race. */
+  /** Time trial is solo only; a tournament match is always a plain race (no computer racers, see rules()). */
   private normalizeSettings(): void {
     const s = this.getSettings();
     if (s.mode === 'timetrial' && (!this.isSolo || this.tournamentMatch)) this.updateSettings({ ...s, mode: 'race' });
@@ -369,7 +369,9 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   }
 
   /** Host: the next Grand Prix race now (INTERMISSION), or a rematch with the same settings (RESULTS). */
-  private onNext(): void {
+  private onNext(player: PlayerRecord): void {
+    // Tournament series run themselves (the next game starts after the intermission).
+    if (this.tournamentMatch) return this.reject(player, KART_MSG.next, 'not_allowed', 'The Tournament Center schedules the next race.');
     if (this.phase === 'INTERMISSION') {
       this.nextGpRace();
     } else if (this.phase === 'RESULTS') {
@@ -937,12 +939,14 @@ export class KartRoom extends BaseGameRoom<KartState, KartSettings> {
   /**
    * DASCADE stats for one race: finishing order (identical times share a place; bots are placed
    * as non-players), then every kart that did not finish as one last group. `scores` are race times
-   * in ms for finishers (lower is better). A race nobody finished is no contest.
+   * in ms for finishers (lower is better). A race nobody finished is no contest, except in a
+   * Tournament Center match: there it is a draw (everyone shares the DNF group), so the series always
+   * gets a result and moves on.
    */
   private reportRaceOutcome(standings: readonly SimKart[]): void {
     const idOf = (k: SimKart) => this.idAt.get(k.slot) ?? k.id;
     const finishers = standings.filter((k) => k.progress.finished);
-    if (finishers.length === 0) return;
+    if (finishers.length === 0 && !this.tournamentMatch) return;
     const dnf = standings.filter((k) => !k.progress.finished).map(idOf);
     const placements = groupSorted(finishers, idOf, (a, b) => a.progress.finishMs === b.progress.finishMs);
     if (dnf.length > 0) placements.push(dnf);

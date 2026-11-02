@@ -10,17 +10,23 @@
 import type { Room as SdkRoom } from '@colyseus/sdk';
 import type { ColyseusTestServer } from '@colyseus/testing';
 import { createSeededRng, type GameId, type TournamentMatchInfo, type WelcomePayload } from '@dascade/shared';
-import { CLASSICS_MSG } from '@dascade/shared/games/classics';
+import { CLASSICS_MSG, type RunTicket } from '@dascade/shared/games/classics';
 import { MEMORY_MSG, type MemoryPatternMsg } from '@dascade/shared/games/memory';
 import { PADDLE_TOURNAMENT_RULES } from '@dascade/shared/games/paddle';
 import { PUTT_MSG, type PuttShotView } from '@dascade/shared/games/putt';
 import { SHIPS_MSG } from '@dascade/shared/games/ships';
 import { SNAKE_MSG } from '@dascade/shared/games/snake';
+import { KART_MSG } from '@dascade/shared/games/kart';
 import { FACE_X, type PaddleMatch } from '@dascade/game-core/paddle';
+import { CODE as BLOCKS_CODE, createBlocksSim } from '@dascade/game-core/blocks';
+import { CODE as BRICKS_CODE, FIELD_W, createBricksSim, type BricksSim } from '@dascade/game-core/bricks';
+import type { ClassicsSim } from '@dascade/game-core/classics/shared';
 import { randomLayout } from '@dascade/game-core/ships';
 import { getHole, searchShots } from '@dascade/game-core/putt';
 import { botDirection, cellY, type SnakeGame } from '@dascade/game-core/snake';
+import { KartBot } from '@dascade/game-core/kart';
 import { collect, quiet, sleep, waitFor } from './helpers.ts';
+import { playRun, type ClassicsClient } from './classicsBot.ts';
 
 /** A participant seated in a live match room (joined with their ticket). */
 export interface MatchSeat {
@@ -32,6 +38,8 @@ export interface MatchSeat {
   server(): ServerRoom;
   patterns: MemoryPatternMsg[];
   shots: PuttShotView[];
+  /** Classics verified-run tickets (Block Drop, Brick Blitz…): one per game of the series. */
+  tickets: RunTicket[];
   errors: Array<{ type?: string; code: string; message: string }>;
   toasts: Array<{ kind: string; text: string }>;
   removed: Array<{ reason: string; message: string }>;
@@ -53,6 +61,7 @@ export async function joinMatchRoom(
   const welcomes = collect<WelcomePayload>(room, 'sys:welcome');
   const patterns = collect<MemoryPatternMsg>(room, MEMORY_MSG.pattern);
   const shots = collect<PuttShotView>(room, PUTT_MSG.shot);
+  const tickets = collect<RunTicket>(room, CLASSICS_MSG.run);
   const errors = collect<{ type?: string; code: string; message: string }>(room, 'sys:error');
   const toasts = collect<{ kind: string; text: string }>(room, 'sys:toast');
   const removed = collect<{ reason: string; message: string }>(room, 'sys:removed');
@@ -69,6 +78,7 @@ export async function joinMatchRoom(
     server: () => colyseus.getRoomById(code) as ServerRoom,
     patterns,
     shots,
+    tickets,
     errors,
     toasts,
     removed,
@@ -350,6 +360,92 @@ const snakeDriver: GameDriver = {
 };
 
 // ---------------------------------------------------------------------------
+// Block Drop and Brick Blitz: same-seed Blitz score races, played as verified runs (like the client)
+// ---------------------------------------------------------------------------
+
+type RaceFactory = (seed: string, options: Record<string, number | string | boolean>) => ClassicsSim;
+type RacePolicy = (sim: ClassicsSim) => number[];
+
+/**
+ * Play the seat's run of the current game to its end (top-out, last life or the Blitz clock) the way
+ * the web client does: the real engine, its input log streamed in batches. Like the games' own
+ * tests, the run clock is moved into the past so the bot may play faster than real time.
+ */
+async function raceRun(seat: MatchSeat, factory: RaceFactory, policy: RacePolicy): Promise<number> {
+  const server = seat.server();
+  const matchNo = server.state.classics.matchNo as number;
+  await waitFor(() => seat.tickets.some((t) => t.matchNo === matchNo), 4000, 'run ticket');
+  const ticket = seat.tickets.filter((t) => t.matchNo === matchNo).pop()!;
+  server.runs.get(seat.playerId()).startAt = Date.now() - 30 * 60_000;
+  // A person's client spreads a game's batches over minutes; the bot sends them in a second or two.
+  // Start every run with a full input allowance (the room's per-player rate bucket), as a person's
+  // would be after the previous game, so back-to-back series games don't trip the limiter.
+  server.players.get(seat.playerId())?.buckets.delete(CLASSICS_MSG.input);
+  const { sim } = await playRun({ room: seat.room } as ClassicsClient, ticket, factory, { policy, batchEvery: 300 });
+  return sim.summary().score;
+}
+
+/** Fresh (stateful) input policies for one run each. */
+interface RacePolicies {
+  win: () => RacePolicy;
+  lose: () => RacePolicy;
+  /** Both players use it for a draw. */
+  same: () => RacePolicy;
+}
+
+function raceDriver(gameId: 'blocks' | 'bricks', factory: RaceFactory, policies: RacePolicies): GameDriver {
+  return {
+    gameId,
+    sided: false,
+    fast(server) {
+      server.countdownMs = 60;
+      server.matchCountdownMs = 60;
+      server.resultsDelayMs = 40;
+    },
+    live: (seat) => stateOf(seat.room).phase === 'PLAYING',
+    rematch: { type: CLASSICS_MSG.rematch, payload: {} },
+    async win(winner, loser) {
+      const [won, lost] = await Promise.all([raceRun(winner, factory, policies.win()), raceRun(loser, factory, policies.lose())]);
+      if (won <= lost) throw new Error(`${gameId}: the winning bot scored ${won}, not more than the losing bot's ${lost}`);
+    },
+    async draw(a, b) {
+      // One seed for both and a deterministic engine: the same inputs end on the same score.
+      await Promise.all([raceRun(a, factory, policies.same()), raceRun(b, factory, policies.same())]);
+    },
+  };
+}
+
+/** Block Drop: hard-drop every piece (points per row dropped) vs never touching the controls (gravity scores nothing). */
+const blocksDriver = raceDriver('blocks', createBlocksSim, {
+  win: () => (sim) => (sim.tick % 6 === 0 ? [BLOCKS_CODE.hardDrop] : []),
+  lose: () => () => [],
+  same: () => () => [],
+});
+
+/** Brick Blitz: track the falling ball (bricks.test.ts' tracker) vs park the paddle in a corner (every life goes quickly). */
+const bricksDriver = raceDriver('bricks', createBricksSim, {
+  win: () => {
+    let last = -1;
+    return (s) => {
+      const sim = s as BricksSim;
+      const codes: number[] = [];
+      const falling = sim.balls.filter((b) => !b.stuck && b.vy > 0).sort((a, b) => b.y - a.y)[0] ?? sim.balls[0];
+      if (falling) {
+        const x = Math.max(0, Math.min(FIELD_W, Math.round(falling.x + 7)));
+        if (x !== last) {
+          codes.push(x);
+          last = x;
+        }
+      }
+      if (sim.phase === 'serve' && sim.tick % 20 === 0) codes.push(BRICKS_CODE.action);
+      return codes;
+    };
+  },
+  lose: () => (sim) => (sim.tick === 0 ? [0] : []),
+  same: () => () => [],
+});
+
+// ---------------------------------------------------------------------------
 // Memory Matrix: the winner repeats the patterns while the loser misses; then both run out
 // ---------------------------------------------------------------------------
 
@@ -408,6 +504,39 @@ const memoryDriver: GameDriver = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// DASphalt GP: the room's computer driver races the winner's kart; the race is fast-forwarded
+// ---------------------------------------------------------------------------
+
+/** Run the room's own 60 Hz tick synchronously (as kart-helpers' fastForward does) until this race is decided. */
+function kartFastForward(server: ServerRoom, maxTicks = 60 * 60 * 8): void {
+  const sim = server.sim;
+  for (let i = 0; i < maxTicks && sim && server.sim === sim && sim.status !== 'done'; i++) server.tick();
+}
+
+const kartDriver: GameDriver = {
+  gameId: 'kart',
+  sided: false,
+  fast(server) {
+    server.countdownMs = 60;
+    server.resultsDelayMs = 40;
+  },
+  live: (seat) => stateOf(seat.room).phase === 'PLAYING' && Boolean(seat.server().sim),
+  rematch: { type: KART_MSG.next, payload: {} },
+  async win(winner) {
+    // The winner's kart drives itself (the room's test autopilot); the loser never touches the
+    // throttle. The winner finishes, the finish window closes and the loser is classified DNF.
+    const server = winner.server();
+    const slot = server.slotOf.get(winner.playerId()) as number;
+    server.autopilots.set(slot, new KartBot('hard', slot + 1));
+    kartFastForward(server);
+  },
+  async draw(a) {
+    // Nobody drives: the race reaches its time limit with no finishers, which a tournament scores as a draw.
+    kartFastForward(a.server());
+  },
+};
+
 export const DRIVERS: Record<string, GameDriver> = {
   chess: boardDriver('chess'),
   checkers: boardDriver('checkers'),
@@ -417,5 +546,8 @@ export const DRIVERS: Record<string, GameDriver> = {
   putt: puttDriver,
   paddle: paddleDriver,
   snake: snakeDriver,
+  blocks: blocksDriver,
+  bricks: bricksDriver,
   memory: memoryDriver,
+  kart: kartDriver,
 };

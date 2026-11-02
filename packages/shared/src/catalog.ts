@@ -335,6 +335,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     ],
     virtualChips: false,
     prefersLandscape: true,
+    // Tournament games are single races with no computer racers; a race nobody finishes is a draw.
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3], maxField: 32, draws: true, sides: false },
   },
   quest: {
     id: 'quest',
@@ -850,6 +852,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     howToPlay: ['Bounce the ball off your paddle to break bricks.', 'Catch falling power-ups; don’t let the ball fall.', 'Clear the level to advance.'],
     virtualChips: false,
     prefersLandscape: false,
+    // Tournament games are a 3-minute Blitz score race (BRICKS_TOURNAMENT_SETTINGS).
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: false },
   },
   asteroids: {
     id: 'asteroids',
@@ -924,6 +928,8 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     howToPlay: ['Move and rotate falling blocks.', 'Fill a row completely to clear it.', 'The game ends when the stack reaches the top.'],
     virtualChips: false,
     prefersLandscape: false,
+    // Tournament games are a 3-minute Blitz score race (BLOCKS_TOURNAMENT_SETTINGS).
+    tournament: { formats: ['single_elimination', 'double_elimination', 'round_robin', 'swiss'], bestOf: [1, 3, 5], maxField: 64, draws: true, sides: false },
   },
   tournament: {
     id: 'tournament',
@@ -931,7 +937,7 @@ export const GAME_CATALOG: Record<GameId, GameCatalogEntry> = {
     marquee: 'TOURNAMENTS',
     tagline: 'Brackets, Swiss and round robins for any head-to-head game.',
     description:
-      'Run a tournament for chess, checkers, tic-tac-toe, ships, putt and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
+      'Run a tournament for chess, checkers, tic-tac-toe, ships, putt, DASphalt GP races and head-to-head classics: registration, check-in, seeding, automatic pairings and a live bracket everyone can follow.',
     category: 'meta',
     cabinet: null,
     accent: { primary: '#ffd23f', secondary: '#22d3ee', deep: '#1a1405' },
