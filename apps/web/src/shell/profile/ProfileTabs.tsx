@@ -1,6 +1,6 @@
 /** Profile modal body: "Profile" (name + avatar) and "Stats" (ratings + per-game stats). */
-import { lazy, Suspense, useState } from 'react';
-import { Spinner, Tabs } from '@dascade/ui';
+import { lazy, Suspense, useId, useState } from 'react';
+import { Spinner, Tabs, tabPanelProps } from '@dascade/ui';
 import { ProfileEditor } from '../common.tsx';
 
 const StatsPanel = lazy(() => import('./StatsPanel.tsx').then((m) => ({ default: m.StatsPanel })));
@@ -9,10 +9,12 @@ type Tab = 'profile' | 'stats';
 
 export function ProfileTabs({ onSubmit }: { onSubmit?: () => void }) {
   const [tab, setTab] = useState<Tab>('profile');
+  const tabsId = useId();
   return (
     <div className="ps-tabs">
       <Tabs<Tab>
         label="Profile sections"
+        idBase={tabsId}
         value={tab}
         onChange={setTab}
         tabs={[
@@ -20,7 +22,7 @@ export function ProfileTabs({ onSubmit }: { onSubmit?: () => void }) {
           { value: 'stats', label: 'Stats' },
         ]}
       />
-      <div className="ps-tabs__body" role="tabpanel" aria-label={tab === 'profile' ? 'Profile' : 'Stats'}>
+      <div className="ps-tabs__body" {...tabPanelProps(tabsId, tab)}>
         {tab === 'profile' ? (
           <ProfileEditor onSubmit={onSubmit} />
         ) : (

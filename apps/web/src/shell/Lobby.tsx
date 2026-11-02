@@ -18,6 +18,7 @@ import {
   TextInput,
   Toggle,
   cx,
+  tabPanelProps,
 } from '@dascade/ui';
 import { useBaseRoom } from '../net/hooks.ts';
 import { session, useSessionStore } from '../net/session.ts';
@@ -31,6 +32,12 @@ import { ThemedText } from '../themes/ThemedText.tsx';
 import { TournamentButton } from '../tournament/TournamentButton.tsx';
 
 type LobbyTab = 'players' | 'settings' | 'setup' | 'chat';
+
+/**
+ * The phone lobby's tabs and their panels (one lobby per page). Every panel is in the page, so
+ * every tab points at its own; wider screens show the panels side by side and hide the tabs.
+ */
+const LOBBY_TABS = 'lobby';
 
 const updateSettings = (patch: Record<string, unknown>) => session.lobby.settings(patch);
 
@@ -135,10 +142,11 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           spectators={players.length - seated.length}
         />
 
-        <Tabs className="lobby__tabs" label="Lobby sections" value={tab} onChange={setTab} tabs={tabs} />
+        <Tabs className="lobby__tabs" label="Lobby sections" idBase={LOBBY_TABS} allPanels value={tab} onChange={setTab} tabs={tabs} />
 
         <div className="lobby__grid" data-part="lobby-grid" data-tab={tab}>
           <Panel
+            {...tabPanelProps(LOBBY_TABS, 'players')}
             className="lobby__players"
             data-part="lobby-players"
             data-section="players"
@@ -168,12 +176,12 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
           {/* DOM order follows the layout (players, your setup, then settings) so Tab reaches your own
               setup before the host settings; the grid areas place the panels. */}
           {PlayerSetup ? (
-            <Panel className="lobby__setup" data-part="lobby-setup" data-section="setup" title="Your setup">
+            <Panel {...tabPanelProps(LOBBY_TABS, 'setup')} className="lobby__setup" data-part="lobby-setup" data-section="setup" title="Your setup">
               <PlayerSetup />
             </Panel>
           ) : null}
 
-          <div className="lobby__settings" data-part="lobby-settings" data-section="settings">
+          <div {...tabPanelProps(LOBBY_TABS, 'settings')} className="lobby__settings" data-part="lobby-settings" data-section="settings">
             {SettingsPanel ? (
               <Panel
                 title={tournamentMatch ? 'Game settings (set by the organizer)' : isHost ? 'Game settings' : 'Game settings (host controls these)'}
@@ -195,7 +203,7 @@ export function Lobby({ gameId, module }: { gameId: GameId; module: GameClientMo
             </Panel>
           </div>
 
-          <Panel className="lobby__chat" data-part="lobby-chat" data-section="chat" title="Lobby chat" padded={false}>
+          <Panel {...tabPanelProps(LOBBY_TABS, 'chat')} className="lobby__chat" data-part="lobby-chat" data-section="chat" title="Lobby chat" padded={false}>
             <ChatPanel />
           </Panel>
         </div>

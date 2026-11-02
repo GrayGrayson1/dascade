@@ -452,9 +452,36 @@ export interface TabsProps<T extends string> {
   onChange: (value: T) => void;
   label: string;
   className?: string;
+  /**
+   * Ties each tab to its panel for assistive tech: the tab gets `id` tabId(idBase, value) and
+   * `aria-controls` tabPanelId(idBase, value). Spread tabPanelProps(idBase, value) on the panel.
+   * Without it the tabs render as before (no ids).
+   */
+  idBase?: string;
+  /**
+   * Every tab's panel is in the page (hidden ones too), so every tab can point at its own. Leave it
+   * off when only the selected panel is rendered: then only the selected tab gets `aria-controls`,
+   * so none points at a panel that isn't there.
+   */
+  allPanels?: boolean;
 }
 
-export function Tabs<T extends string>({ value, tabs, onChange, label, className }: TabsProps<T>) {
+/** The id of tab `value` in the Tabs with this idBase. */
+export function tabId(idBase: string, value: string): string {
+  return `${idBase}-tab-${value}`;
+}
+
+/** The id of the panel tab `value` controls in the Tabs with this idBase. */
+export function tabPanelId(idBase: string, value: string): string {
+  return `${idBase}-panel-${value}`;
+}
+
+/** What a tab panel needs: its id, the tabpanel role and its tab as the label. */
+export function tabPanelProps(idBase: string, value: string): { id: string; role: 'tabpanel'; 'aria-labelledby': string } {
+  return { id: tabPanelId(idBase, value), role: 'tabpanel', 'aria-labelledby': tabId(idBase, value) };
+}
+
+export function Tabs<T extends string>({ value, tabs, onChange, label, className, idBase, allPanels }: TabsProps<T>) {
   return (
     // Arrow keys move focus along with the selection (previously the selection moved but focus stayed
     // on a tab that had just become tabIndex=-1, stranding keyboard users).
@@ -464,6 +491,8 @@ export function Tabs<T extends string>({ value, tabs, onChange, label, className
           key={t.value}
           type="button"
           role="tab"
+          id={idBase ? tabId(idBase, t.value) : undefined}
+          aria-controls={idBase && (allPanels || t.value === value) ? tabPanelId(idBase, t.value) : undefined}
           aria-selected={t.value === value}
           tabIndex={rovingTabIndex(
             t.value === value,

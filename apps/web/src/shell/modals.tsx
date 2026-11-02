@@ -1,5 +1,5 @@
 /** Global modals: Settings, Help / How to play, Profile, Join-by-code. */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   CABINET_LIST,
@@ -12,7 +12,7 @@ import {
   normalizeRoomCode,
   type GameId,
 } from '@dascade/shared';
-import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Tabs, TextInput, Toggle } from '@dascade/ui';
+import { Badge, Button, Field, Modal, PixelIcon, Segmented, Select, Tabs, TextInput, Toggle, tabPanelProps } from '@dascade/ui';
 import { selectCanPlay, useApp, type FxLevel } from '../app/store.ts';
 import { persistence } from '../persistence/index.ts';
 import { session } from '../net/session.ts';
@@ -53,6 +53,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
   const settings = useApp((s) => s.settings);
   const update = useApp((s) => s.updateSettings);
   const [tab, setTab] = useState<'sound' | 'display' | 'profile' | 'account'>('sound');
+  const tabsId = useId();
   const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement));
   useEffect(() => {
     const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -73,6 +74,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
     >
       <Tabs
         label="Settings sections"
+        idBase={tabsId}
         value={tab}
         onChange={setTab}
         tabs={[
@@ -82,7 +84,7 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
           { value: 'account', label: 'Account' },
         ]}
       />
-      <div className="settings-body">
+      <div className="settings-body" {...tabPanelProps(tabsId, tab)}>
         {tab === 'sound' ? <AudioSettings /> : null}
         {tab === 'display' ? (
           <div className="dc-col" style={{ gap: 18 }}>
@@ -194,6 +196,9 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const game = isGameId(tab) ? GAME_CATALOG[tab] : null;
   const cabinet = game ? cabinetForGame(game.id) : undefined;
   const siblings = cabinet ? [...new Set(cabinet.games.map((g) => g.gameId))] : [];
+  // The game tabs show for a cabinet with several games, and the page under them is the selected tab's.
+  const siblingTabs = siblings.length > 1;
+  const tabsId = useId();
   return (
     <Modal
       open={open}
@@ -236,13 +241,14 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Tabs
             className="help-nav__siblings"
             label={`${cabinet.title} games`}
+            idBase={tabsId}
             value={tab as GameId}
             onChange={setTab}
             tabs={siblings.map((id) => ({ value: id, label: GAME_CATALOG[id].title }))}
           />
         ) : null}
       </div>
-      <div className="help-body">
+      <div className="help-body" {...(siblingTabs ? tabPanelProps(tabsId, tab) : {})}>
         {game ? (
           <>
             {crumbCabinet(game.id) ? <p className="help-body__crumb">{cabinet?.title}</p> : null}

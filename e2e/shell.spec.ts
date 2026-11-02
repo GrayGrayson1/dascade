@@ -23,6 +23,47 @@ test('the lobby shows its cabinet, seats and lock state', async ({ page }) => {
     await expect(page.locator('.topbar').getByRole('img', { name: 'Room locked' })).toBeVisible();
 });
 
+test('tabs name their panels: Settings, Profile and the phone lobby', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  const sound = dialog.getByRole('tab', { name: 'Sound' });
+  await expect(dialog.getByRole('tabpanel', { name: 'Sound' })).toBeVisible();
+  const panelId = await sound.getAttribute('aria-controls');
+  expect(panelId).toBeTruthy();
+  expect(await dialog.getByRole('tabpanel').getAttribute('id')).toBe(panelId);
+  await dialog.getByRole('tab', { name: 'Display' }).click();
+  await expect(dialog.getByRole('tabpanel', { name: 'Display' })).toBeVisible();
+  // Only the shown panel is in the page, so only the selected tab points at one.
+  expect(await sound.getAttribute('aria-controls')).toBeNull();
+  await dialog.getByRole('tab', { name: 'Profile' }).click();
+  await expect(dialog.getByRole('tabpanel', { name: 'Profile' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(dialog).toBeHidden();
+
+  // The profile modal's Profile / Stats tabs.
+  await page.getByRole('button', { name: /Set your name|Profile:/ }).click();
+  const profile = page.getByRole('dialog');
+  await expect(profile.getByRole('tabpanel', { name: 'Profile' })).toBeVisible();
+  await profile.getByRole('tab', { name: 'Stats' }).click();
+  await expect(profile.getByRole('tabpanel', { name: 'Stats' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(profile).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await createRoom(page, 'wheel', 'Tabber');
+  const lobbyTabs = page.getByRole('tablist', { name: 'Lobby sections' });
+  await expect(page.getByRole('tabpanel', { name: /^Players/ })).toBeVisible();
+  for (const name of ['Settings', 'Chat']) {
+    const t = lobbyTabs.getByRole('tab', { name: new RegExp(`^${name}`) });
+    const controls = await t.getAttribute('aria-controls');
+    expect(controls).toBeTruthy();
+    await expect(page.locator(`[id="${controls}"]`)).toHaveAttribute('role', 'tabpanel');
+    await t.click();
+    await expect(page.getByRole('tabpanel', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+});
+
 test('results offer "Back to cabinet", which leaves the room for the cabinet title screen', async ({ page }) => {
   await createRoom(page, 'wheel', 'Spinner');
   await startGame(page);
