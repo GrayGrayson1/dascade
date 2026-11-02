@@ -28,9 +28,9 @@ export interface ThemePalette {
   strata: string;
   ore: string[];
   scorch: string;
-  /** Ambient floating particles (embers, snow, fireflies). */
+  /** Ambient floating particles (embers, snow, fireflies, falling leaves). */
   motes: string;
-  moteKind: 'ember' | 'snow' | 'spark' | 'ash';
+  moteKind: 'ember' | 'snow' | 'spark' | 'ash' | 'leaf';
   /** Decorative weather drawn by the background sky only (set by DASCADE themes, e.g. Neon Noir rain). */
   weather?: 'rain';
   cloud: string;
@@ -132,6 +132,30 @@ export const THEMES: Record<BattleTheme, ThemePalette> = {
     motes: '#ff8a3d',
     moteKind: 'ash',
     cloud: '#6a2a1e',
+  },
+  harvest: {
+    name: 'Harvest Moon',
+    sky: ['#070a1c', '#2b1838', '#9a5520'],
+    sun: { kind: 'moon', color: '#ffb84d', glow: '#ff8a3d', x: 0.72, y: 0.5, r: 0.13 },
+    stars: 90,
+    aurora: false,
+    far: '#2a1424',
+    farRim: '#ff9a3d',
+    mid: '#140a12',
+    midLights: ['#ffd23f', '#ff8a3d'],
+    haze: '#ff8a3d',
+    rim: '#ffd27a',
+    rimGlow: '#ff9a3d',
+    topsoil: '#b07a2a',
+    soil: '#6a3f1c',
+    rock: '#3a2416',
+    deep: '#1a0f0a',
+    strata: '#4e3018',
+    ore: ['#ffd23f', '#ff8a3d'],
+    scorch: '#120a06',
+    motes: '#ffb062',
+    moteKind: 'leaf',
+    cloud: '#8a5a4a',
   },
 };
 
