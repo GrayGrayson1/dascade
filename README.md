@@ -89,11 +89,12 @@ Games read materials with an exact fallback (`var(--mat-board-light, <original c
 | Game | Formats | Series (best of) | Field |
 |---|---|---|---|
 | Chess, Checkers, Reversi | single elim, double elim, round robin, Swiss | 1, 2, 3, 5 | up to 64 |
-| Tic-Tac-Toe, Ships, Pixel Paddle, Neon Snake, Memory Matrix | same | 1, 3, 5 | up to 64 |
-| DAS Putt | same | 1, 3 | up to 32 |
+| Tic-Tac-Toe, Ships, Pixel Paddle, Neon Snake, Memory Matrix, Block Drop, Brick Blitz | same | 1, 3, 5 | up to 64 |
+| DAS Putt, DASphalt GP | same | 1, 3 | up to 32 |
 
 - **Lifecycle:** draft, registration, optional check-in, seeding (random, manual or by DASCADE rating), live rounds, then champion. Double elimination has an optional grand-final reset. Swiss pairs players on the same score and avoids rematches. Round robin uses Berger tables. Byes are handled automatically.
 - **Matches run themselves.** When a match is ready, the server creates the game room and gives each participant a private ticket. **Play match** seats you, and anyone can **Spectate**. Games start automatically once both players are present. Series continue with sides swapped after a short intermission. No-shows forfeit after the configured time, counted from when the match room opens (if neither player turns up, both forfeit so the bracket keeps moving).
+- **Score races and kart races:** Block Drop and Brick Blitz matches are always a 3-minute Blitz on the same seed (higher verified score wins; equal scores draw; these runs count for the Blitz high scores). DASphalt GP matches are a single race with no computer racers; a race nobody finishes is a draw.
 - **Organizer console:** open or close registration and check-in, seed, begin, pause or resume, forfeit, disqualify, override a result, relaunch a match room, end or cancel. Every action is written to a public audit log with its reason.
 - Brackets render as a tree on desktop and as a round strip on phones. Round robin shows a crosstable and Swiss shows standings with explained tiebreaks.
 - Public tournaments are listed at `GET /api/tournaments`. Unlisted ones are joined by code.

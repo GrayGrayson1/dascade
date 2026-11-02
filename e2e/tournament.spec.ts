@@ -190,4 +190,48 @@ test.describe('Tournament Center', () => {
     await page.getByRole('button', { name: 'All games' }).click();
     await expect(page).toHaveURL(/\/tournaments\??$/);
   });
+
+  test('a Block Drop match starts by itself as the fixed 3-minute Blitz score race', async ({ page, browser }) => {
+    test.setTimeout(150_000);
+    await page.goto('/tournaments');
+    await page.getByRole('button', { name: 'Create tournament' }).first().click();
+    await page.getByRole('radio', { name: /BLOCK DROP/ }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByLabel('Tournament name').fill('Blitz Cup');
+    await setName(page, 'Orga');
+    await page.getByRole('button', { name: 'Create tournament' }).click();
+    await page.waitForURL(/\/room\/[A-Z0-9]{5}$/);
+    const code = page.url().split('/').pop()!;
+    await page.getByRole('button', { name: 'Open registration' }).click();
+    await expect.poll(() => kioskStatus(page)).toBe('REGISTRATION');
+
+    const ada = await joinKiosk(browser, code, 'Ada');
+    const bo = await joinKiosk(browser, code, 'Bo');
+    for (const p of [ada, bo]) {
+      await p.getByRole('button', { name: 'Register', exact: true }).click();
+      await expect(p.getByRole('heading', { name: 'You’re registered' })).toBeVisible();
+    }
+    await page.getByRole('button', { name: 'Start tournament' }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Start tournament' }).click();
+    await expect.poll(() => kioskStatus(page)).toBe('IN_PROGRESS');
+
+    for (const p of [ada, bo]) {
+      await expect(p.getByRole('button', { name: 'Play match' })).toBeVisible({ timeout: 20_000 });
+      await p.getByRole('button', { name: 'Play match' }).click();
+      await p.waitForURL((u) => /^\/room\/[A-Z0-9]{5}$/.test(u.pathname) && !u.pathname.endsWith(code), { timeout: 20_000 });
+    }
+    await waitForPhase(ada, 'PLAYING', 30_000);
+    await waitForPhase(bo, 'PLAYING', 10_000);
+    await expect(ada.locator('.cl-stage').first()).toBeVisible();
+    for (const p of [ada, bo]) {
+      const st = await roomState<{ settingsJson: string; classics: { mode: string; board: string; startAt: number; endsAt: number } }>(p);
+      expect(JSON.parse(st.settingsJson)).toMatchObject({ mode: 'blitz', blitzSeconds: 180 });
+      expect(st.classics).toMatchObject({ mode: 'blitz', board: 'blitz-3' });
+      expect(st.classics.endsAt - st.classics.startAt).toBe(180_000);
+    }
+
+    await ada.context().close();
+    await bo.context().close();
+  });
 });
