@@ -9,6 +9,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createRoom, roomState, setName, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 const SHOTS = process.env.SHOTS_DIR ?? '';
 async function shot(page: Page, name: string): Promise<void> {
@@ -25,7 +26,7 @@ const board = async (page: Page) => {
 async function loadRehearsal(page: Page): Promise<void> {
   const settingsTab = page.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await page.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(page, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => (await roomState(page)).customRounds).toBe(2);
   await expect.poll(async () => JSON.parse((await roomState(page)).settingsJson).points).toBe(true);
 }

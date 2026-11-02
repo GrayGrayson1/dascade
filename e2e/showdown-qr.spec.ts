@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { generate, correction } from 'lean-qr';
 import { expect, test, type Page } from '@playwright/test';
 import { createRoom, joinRoom, roomState, setName, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 const SHOTS = process.env.SHOTS_DIR ?? '';
 async function shot(page: Page, name: string): Promise<void> {
@@ -29,7 +30,7 @@ const board = async (page: Page) => {
 async function loadRehearsal(host: Page): Promise<void> {
   const settingsTab = host.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await host.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(host, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => JSON.parse((await roomState(host)).settingsJson).mode).toBe('showcase');
 }
 

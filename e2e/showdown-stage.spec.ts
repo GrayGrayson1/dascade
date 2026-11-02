@@ -12,6 +12,7 @@
  */
 import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test';
 import { createRoom, joinRoom, presetSettings, roomState, setName, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 test.skip(({ isMobile }) => isMobile, 'The stage is a big screen and the presenter runs the show from a laptop.');
 
@@ -26,7 +27,7 @@ const board = async (page: Page) => {
 async function loadRehearsal(host: Page): Promise<void> {
   const settingsTab = host.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await host.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(host, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => (await roomState(host)).rehearsal).toBe(true);
   await expect.poll(async () => JSON.parse((await roomState(host)).settingsJson).mode).toBe('showcase');
 }

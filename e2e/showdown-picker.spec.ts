@@ -6,6 +6,7 @@
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { createRoom, roomState, setName, startGame } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 /** Phones show one lobby section at a time: open the one that holds `target`. */
 async function showLobbySection(page: Page, tab: 'Settings' | 'Setup'): Promise<void> {
@@ -39,7 +40,7 @@ test('picker: a moderator excludes and includes from their crew screen; the pres
   const host = await hostCtx.newPage();
   const code = await createRoom(host, 'showdown', 'Marcus');
   await showLobbySection(host, 'Settings');
-  await host.getByRole('button', { name: 'Load DAS-O-Ween rehearsal (demo answers)' }).click();
+  await loadPreset(host, 'Load DAS-O-Ween rehearsal (demo answers)');
   await expect.poll(async () => (await roomState(host)).event).toBe('dasoween-rehearsal');
   // The setup has the picker's choices; the preset starts in Fair mode with crew out of the draw.
   await expect(host.getByRole('radio', { name: 'Fair mode' })).toBeChecked();

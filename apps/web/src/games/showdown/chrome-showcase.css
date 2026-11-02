@@ -2065,6 +2065,44 @@ button.sdc-audio {
   display: grid;
   gap: 6px;
 }
+/* A season's presets (DAS-O-Ween): open in its month, collapsed the rest of the year. */
+.sdc-presets__season > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line);
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-1);
+}
+.sdc-presets__season > summary::-webkit-details-marker {
+  display: none;
+}
+.sdc-presets__season > summary::before {
+  content: '▸' / '';
+  color: var(--text-2);
+}
+.sdc-presets__season[open] > summary {
+  margin-bottom: 6px;
+}
+.sdc-presets__season[open] > summary::before {
+  content: '▾' / '';
+}
+.sdc-presets__season > summary:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+.sdc-presets__season-title {
+  font-weight: 800;
+}
+.sdc-presets__season-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
 .sdc-preset {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

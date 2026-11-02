@@ -9,7 +9,7 @@
  * boards. Loading any of them makes the room an event room: the presenter's setup then gets "Crew &
  * checks" (preflight, crew links and the log, names).
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cleanText } from '@dascade/shared';
 import {
   SHOWDOWN_DISPLAYS,
@@ -34,6 +34,7 @@ import {
   SHOWDOWN_SCORING_INFO,
   SHOWDOWN_TEAMS,
   SHOWDOWN_DEFAULT_TITLE,
+  eventInSeason,
   eventShowFor,
   isShowdownEventId,
   resolveShowdownLook,
@@ -380,11 +381,20 @@ const PRESET_LABEL: Record<ShowdownEventId, { title: string; icon: string }> = {
   'dasoween-rehearsal': { title: 'DAS-O-Ween rehearsal (demo answers)', icon: '🧪' },
 };
 
+/** Year-round presets first; each season's in its own group, in list order. */
+const YEAR_ROUND = SHOWDOWN_EVENT_IDS.filter((id) => !SHOWDOWN_EVENT_INFO[id].season);
+const SEASONS = [...new Set(SHOWDOWN_EVENT_IDS.flatMap((id) => SHOWDOWN_EVENT_INFO[id].season?.name ?? []))].map((name) => {
+  const ids = SHOWDOWN_EVENT_IDS.filter((id) => SHOWDOWN_EVENT_INFO[id].season?.name === name);
+  const month = SHOWDOWN_EVENT_INFO[ids[0]!].season!.month;
+  return { name, ids, monthName: new Date(2000, month, 1).toLocaleString('en-US', { month: 'long' }) };
+});
+
 /**
  * One-click ready-made shows; each makes the room an event room. Event show (year-round) sets the
  * format, look and clock and plays the question packs; DAS-O-Ween 2026 keeps the rounds already
  * loaded (its boards live in the presenter's show file, never in the app). Each rehearsal also loads
- * two practice boards, replacing the room's rounds (so it asks first).
+ * two practice boards, replacing the room's rounds (so it asks first). A season's presets sit in a
+ * "Seasonal" group that's open in its month and collapsed the rest of the year (still one click away).
  */
 function EventPresets({
   customRounds,
@@ -465,7 +475,12 @@ function EventPresets({
           practice boards.
         </span>
       </div>
-      <div className="sdc-presets__list">{SHOWDOWN_EVENT_IDS.map(row)}</div>
+      <div className="sdc-presets__list">{YEAR_ROUND.map(row)}</div>
+      {SEASONS.map((season) => (
+        <SeasonalPresets key={season.name} {...season} current={current}>
+          {season.ids.map(row)}
+        </SeasonalPresets>
+      ))}
       <div className="sdc-presets__status" role="status" data-part="showdown-preset-status">
         {rehearsal ? (
           <p>
@@ -530,6 +545,46 @@ function EventPresets({
         </p>
       </Modal>
     </section>
+  );
+}
+
+/**
+ * "Seasonal: DAS-O-Ween": open in its own month (the season clock, so `?season=` QA dates work) or
+ * while one of its presets is loaded; collapsed the rest of the year.
+ */
+function SeasonalPresets({
+  name,
+  ids,
+  monthName,
+  current,
+  children,
+}: {
+  name: string;
+  ids: readonly ShowdownEventId[];
+  monthName: string;
+  current: ShowdownEventId | null;
+  children: ReactNode;
+}) {
+  const inSeason = eventInSeason(ids[0]!, seasonClock());
+  const holdsCurrent = current !== null && ids.includes(current);
+  const [open, setOpen] = useState(inSeason || holdsCurrent);
+  useEffect(() => {
+    if (holdsCurrent) setOpen(true);
+  }, [holdsCurrent]);
+  return (
+    <details
+      className="sdc-presets__season"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      data-part="showdown-seasonal-presets"
+      data-season={name}
+    >
+      <summary>
+        <span className="sdc-presets__season-title">Seasonal: {name}</span>
+        {inSeason ? null : <span className="sdc-presets__season-hint">Up front in {monthName}</span>}
+      </summary>
+      <div className="sdc-presets__list">{children}</div>
+    </details>
   );
 }
 
