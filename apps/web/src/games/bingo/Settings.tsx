@@ -7,7 +7,6 @@ import {
   BINGO_LIMITS,
   BINGO_MSG,
   DEFAULT_BINGO_SETTINGS,
-  type BingoPatternRef,
   type BingoPresetId,
   type BingoPublicState,
   type BingoRound,
@@ -39,131 +38,7 @@ import { sfx } from '../../audio/audio.ts';
 import { BingoCardView, PatternGrid } from './Card.tsx';
 import { PatternStudio, refMasks } from './PatternStudio.tsx';
 import { useDebouncedCommit } from './util.ts';
-
-const preset = (id: BingoPresetId): BingoPatternRef => ({ type: 'preset', id, rotate: false, mirror: false });
-
-const OFFICE_ITEMS = [
-  'Can you hear me?',
-  'You’re on mute',
-  'Let’s take this offline',
-  'Circle back',
-  'Synergy',
-  'Low-hanging fruit',
-  'Can everyone see my screen?',
-  'Sorry, go ahead',
-  'Quick sync',
-  'Per my last email',
-  'Touch base',
-  'Deep dive',
-  'Action items',
-  'Bandwidth',
-  'Move the needle',
-  'Dog barks in the background',
-  'Someone joins late',
-  'I have a hard stop',
-  'Parking lot',
-  'Let’s be mindful of time',
-  'Alignment',
-  'Paradigm shift',
-  'Stakeholders',
-  'Win-win',
-  'Deliverables',
-  'Leverage',
-  'Ping me',
-  'Next steps',
-  'Game changer',
-  'Reply-all accident',
-  'Frozen video',
-  'Wrong window shared',
-  'Awkward silence',
-  'Coffee refill',
-  'Pivot',
-  'Great question!',
-];
-
-const PARTY_ITEMS = [
-  'Someone sings along',
-  'Group photo',
-  'Spilled drink',
-  'Dance battle',
-  'Inside joke',
-  'Cake!',
-  'Someone arrives late',
-  'A toast speech',
-  'Karaoke',
-  'Lost phone',
-  'Birthday song',
-  'Surprise guest',
-];
-
-interface QuickSetup {
-  id: string;
-  label: string;
-  blurb: string;
-  settings: Partial<BingoSettings>;
-}
-
-const QUICK_SETUPS: QuickSetup[] = [
-  {
-    id: 'classic',
-    label: 'Classic 75-ball',
-    blurb: 'Any line wins',
-    settings: { mode: 'numbers', format: 'single', freeCenter: true, rounds: [{ prize: '', patterns: [preset('any-line')] }] },
-  },
-  {
-    id: 'hall',
-    label: 'Hall night',
-    blurb: 'Line → corners → X → blackout',
-    settings: {
-      mode: 'numbers',
-      format: 'progressive',
-      freeCenter: true,
-      continueCalls: false,
-      rounds: [
-        { prize: 'Snack', patterns: [preset('any-line')] },
-        { prize: 'Drink', patterns: [preset('four-corners')] },
-        { prize: '', patterns: [preset('x')] },
-        { prize: 'Grand prize', patterns: [preset('blackout')] },
-      ],
-    },
-  },
-  {
-    id: 'uk',
-    label: 'Line → full house',
-    blurb: 'Calls carry over between rounds',
-    settings: {
-      mode: 'numbers',
-      format: 'progressive',
-      continueCalls: true,
-      newCardsEachRound: false,
-      rounds: [
-        { prize: 'One line', patterns: [preset('any-row')] },
-        { prize: 'Two lines', patterns: [preset('two-lines')] },
-        { prize: 'Full house', patterns: [preset('blackout')] },
-      ],
-    },
-  },
-  {
-    id: 'office',
-    label: 'Meeting buzzwords',
-    blurb: '5×5 custom squares',
-    settings: { mode: 'text', size: 5, freeCenter: true, items: OFFICE_ITEMS, format: 'single', rounds: [{ prize: '', patterns: [preset('any-line')] }] },
-  },
-  {
-    id: 'party',
-    label: 'Quick 3×3 party',
-    blurb: 'Tiny cards, fast rounds',
-    settings: {
-      mode: 'text',
-      size: 3,
-      freeCenter: true,
-      items: PARTY_ITEMS,
-      format: 'single',
-      callSeconds: 4,
-      rounds: [{ prize: '', patterns: [preset('any-line')] }],
-    },
-  },
-];
+import { OFFICE_ITEMS, PARTY_ITEMS, QUICK_SETUPS, preset } from './quickSetups.ts';
 
 const SETUP_KIND = 'bingo-setup';
 
