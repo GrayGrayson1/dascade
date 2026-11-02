@@ -1134,6 +1134,93 @@
   min-height: 0;
 }
 
+/* ---------- Hand rankings (drawer tab) ---------- */
+.hd-ranks {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px calc(16px + var(--safe-bottom));
+}
+.hd-ranks__intro,
+.hd-ranks__foot {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.hd-ranks__intro {
+  margin-bottom: 6px;
+}
+.hd-ranks__foot {
+  margin-top: 10px;
+}
+.hd-ranks__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hd-ranks__row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 6px;
+}
+.hd-ranks__row + .hd-ranks__row {
+  border-top: 1px solid var(--line);
+}
+.hd-ranks__row[data-current='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.hd-ranks__num {
+  font-family: var(--hd-num);
+  font-size: 14px;
+  text-align: center;
+  color: var(--text-3);
+}
+.hd-ranks__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hd-ranks__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.hd-ranks__you {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.hd-ranks__blurb {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.hd-ranks__cards {
+  display: flex;
+}
+.hd-ranks__card + .hd-ranks__card {
+  margin-left: -12px;
+}
+@media (max-width: 359px) {
+  .hd-ranks__row {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .hd-ranks__cards {
+    grid-column: 2;
+  }
+}
+
 /* ---------- Results ---------- */
 .hd-results {
   display: grid;
@@ -1153,6 +1240,58 @@
 }
 .hd-results__board {
   width: 100%;
+}
+
+/* Awards (most hands won, biggest pot) */
+.hd-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+.hd-award {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--glass-strong);
+  animation: dc-pop-in var(--dur-3) var(--ease-out) both;
+  animation-delay: var(--delay);
+}
+.hd-award[data-me='true'] {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.hd-award__icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  color: var(--hd-gold);
+}
+.hd-award__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hd-award__name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-0);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hd-award__value {
+  font-family: var(--hd-num);
+  font-size: 18px;
+  color: var(--accent);
+}
+.hd-award__detail {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
 }
 .hd-standings {
   margin: 0;

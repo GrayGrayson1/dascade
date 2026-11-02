@@ -72,6 +72,8 @@ export const HOLDEM_MSG = {
   private: 'holdem:private',
   /** server → everyone: animation / sound cues. State stays the source of truth. */
   event: 'holdem:event',
+  /** server → everyone, once the game is over: the end-of-game awards (public; re-sent on rejoin). */
+  awards: 'holdem:awards',
 } as const;
 
 export const HOLDEM_ACTIONS = ['fold', 'check', 'call', 'bet', 'raise', 'allin'] as const;
@@ -200,6 +202,43 @@ export interface HoldemStandingView {
   handsWon: number;
   /** Largest single-hand win. */
   bestPot: number;
+}
+
+/** A player named by an end-of-game award. */
+export interface HoldemAwardPlayer {
+  playerId: string;
+  name: string;
+}
+
+/** "Most hands won": the top count, shared by everyone on it. */
+export interface HoldemMostHandsAward {
+  count: number;
+  players: HoldemAwardPlayer[];
+}
+
+/** "Biggest pot": the largest single-hand win (every player who won exactly that much). */
+export interface HoldemBiggestPotAward {
+  amount: number;
+  players: Array<
+    HoldemAwardPlayer & {
+      /** The hand it was won in. */
+      handNumber: number;
+      /** The winning hand as the table saw it at showdown; '' when it was won uncontested. */
+      description: string;
+    }
+  >;
+}
+
+/**
+ * End-of-game awards, sent only once the game is over and only about players on the final
+ * leaderboard. Public: nothing in it the table didn't already see (no hole cards, no mucked hands).
+ */
+export interface HoldemAwardsPayload {
+  /** Hands played in the game these awards belong to (equals the final state.handNumber). */
+  hands: number;
+  /** null when nobody won a hand. */
+  mostHands: HoldemMostHandsAward | null;
+  biggestPot: HoldemBiggestPotAward | null;
 }
 
 export interface HoldemPublicState extends BaseRoomView {

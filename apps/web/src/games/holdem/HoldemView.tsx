@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import {
   HOLDEM_MSG,
   formatBlinds,
+  type HoldemAwardsPayload,
   type HoldemPrivatePayload,
   type HoldemPublicState,
   type HoldemSettings,
@@ -14,7 +15,8 @@ import { GameStage } from '../../shell/common.tsx';
 import { ActionDock } from './ActionDock.tsx';
 import { computeGeometry } from './geometry.ts';
 import { streetLabel } from './helpers.ts';
-import { HistoryDrawer } from './HistoryDrawer.tsx';
+import { HistoryDrawer, type DrawerTab } from './HistoryDrawer.tsx';
+import { heroRankingKey } from './rankings.ts';
 import { Results } from './Results.tsx';
 import { HoldemSettingsPanel } from './Settings.tsx';
 import { Table } from './Table.tsx';
@@ -35,6 +37,7 @@ function useMedia(query: string): boolean {
 export function HoldemView() {
   const game = useGame<HoldemPublicState, HoldemSettings>();
   const priv = useLatestMessage<HoldemPrivatePayload>(HOLDEM_MSG.private);
+  const awards = useLatestMessage<HoldemAwardsPayload>(HOLDEM_MSG.awards);
   const reducedMotion = useApp((s) => s.settings.reducedMotion);
   const fx = useApp((s) => s.settings.fx);
   const compactDock = useMedia('(max-width: 719px), (max-height: 560px)');
@@ -44,6 +47,7 @@ export function HoldemView() {
   const arenaRef = useRef<HTMLDivElement>(null);
   const [arena, setArena] = useState({ w: 0, h: 0 });
   const [drawer, setDrawer] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>('hands');
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [tableSettings, setTableSettings] = useState(false);
 
@@ -67,6 +71,14 @@ export function HoldemView() {
 
   const geo = useMemo(() => computeGeometry(arena.w, arena.h), [arena.w, arena.h]);
   const closeDrawer = useCallback(() => setDrawer(false), []);
+  const rankingsOpen = drawer && drawerTab === 'rankings';
+  /** History reopens the drawer on the history/chat tab; Rankings opens it on the rankings. Each closes its own view. */
+  const toggleDrawer = (rankings: boolean) => {
+    if (drawer && rankingsOpen === rankings) return setDrawer(false);
+    if (rankings) setDrawerTab('rankings');
+    else if (drawerTab === 'rankings') setDrawerTab('hands');
+    setDrawer(true);
+  };
   const onSit = useCallback((seat: number) => session.send(HOLDEM_MSG.sit, { seat }), []);
 
   if (!game || !state) return null;
@@ -75,7 +87,7 @@ export function HoldemView() {
   if (game.phase === 'RESULTS') {
     return (
       <GameStage gameId="holdem" className="hd hd--results">
-        <Results state={state} players={state.players} playerId={playerId} />
+        <Results state={state} players={state.players} playerId={playerId} awards={awards} />
       </GameStage>
     );
   }
@@ -114,8 +126,20 @@ export function HoldemView() {
           <span className="hd-hud__virtual" title="DASCADE uses virtual chips only — no real money, purchases or payouts.">
             <PixelIcon name="chip" /> Virtual chips only
           </span>
-          <Button size="sm" variant="ghost" icon="chat" onClick={() => setDrawer((d) => !d)} aria-expanded={drawer} className="hd-hud__btn">
+          <Button size="sm" variant="ghost" icon="chat" onClick={() => toggleDrawer(false)} aria-expanded={drawer && !rankingsOpen} className="hd-hud__btn">
             <span className="hd-hud__btn-text">History</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="help"
+            onClick={() => toggleDrawer(true)}
+            aria-expanded={rankingsOpen}
+            aria-label="Hand rankings"
+            title="Hand rankings"
+            className="hd-hud__btn"
+          >
+            <span className="hd-hud__btn-text">Rankings</span>
           </Button>
           {isHost ? (
             <>
@@ -165,7 +189,15 @@ export function HoldemView() {
         collapseRaise={shortScreen}
       />
 
-      <HistoryDrawer open={drawer} onClose={closeDrawer} log={state.log} currentHand={state.handNumber} />
+      <HistoryDrawer
+        open={drawer}
+        onClose={closeDrawer}
+        tab={drawerTab}
+        onTab={setDrawerTab}
+        log={state.log}
+        currentHand={state.handNumber}
+        heroRanking={heroCards.length === 2 && !state.seats[mySeat]?.folded ? heroRankingKey(heroCards, state.board) : null}
+      />
 
       <Modal
         open={confirmEnd}

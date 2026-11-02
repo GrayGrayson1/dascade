@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ColyseusTestServer } from '@colyseus/testing';
 import type { Room as SdkRoom } from '@colyseus/sdk';
 import type { GameOutcome, WelcomePayload } from '@dascade/shared';
-import type { HoldemPrivatePayload, HoldemPublicState, HoldemEvent } from '@dascade/shared/games/holdem';
+import type { HoldemAwardsPayload, HoldemPrivatePayload, HoldemPublicState, HoldemEvent } from '@dascade/shared/games/holdem';
 import type { HandState } from '@dascade/game-core/holdem';
 import { cardToCode, createDeck } from '@dascade/game-core/cards';
 import { createDascadeServer } from '../src/server.ts';
@@ -37,6 +37,7 @@ interface Client {
   errors: Array<{ type?: string; code: string; message: string }>;
   privates: HoldemPrivatePayload[];
   events: HoldemEvent[];
+  awards: HoldemAwardsPayload[];
   me: () => WelcomePayload;
 }
 
@@ -45,8 +46,9 @@ function wire(room: SdkRoom): Client {
   const errors = collect<{ type?: string; code: string; message: string }>(room, 'sys:error');
   const privates = collect<HoldemPrivatePayload>(room, 'holdem:private');
   const events = collect<HoldemEvent>(room, 'holdem:event');
+  const awards = collect<HoldemAwardsPayload>(room, 'holdem:awards');
   quiet(room);
-  return { room, errors, privates, events, me: () => welcomes[welcomes.length - 1]! };
+  return { room, errors, privates, events, awards, me: () => welcomes[welcomes.length - 1]! };
 }
 
 async function ready(c: Client): Promise<Client> {
@@ -473,6 +475,53 @@ describe("DAS Hold'em room", () => {
     await waitFor(() => st(host).phase === 'LOBBY', 3000, 'lobby');
     expect(st(host).standings).toEqual([]);
     expect(st(host).seats.filter((seat) => seat.playerId).length).toBe(2);
+  });
+
+  it('publishes the end-of-game awards only once the game is over, to everyone, and again on reconnect', async () => {
+    const { host } = await createTable();
+    const guest = await join(host.room.roomId, 'Villain');
+    await start(host);
+    const rail = await join(host.room.roomId, 'Railbird', { spectator: true });
+    // Hand 1: the first to act raises and the other folds (a 200 pot: the uncalled raise goes back); the host ends after hand 2.
+    const c = await actor([host, guest]);
+    await act(c, 'raise', 600);
+    await act(c === host ? guest : host, 'fold');
+    await waitFor(() => st(host).handNumber === 2 && st(host).toActSeat >= 0, 4000, 'hand 2');
+    host.room.send('holdem:end', {});
+    await waitFor(() => st(host).endRequested, 3000, 'end requested');
+    for (const client of [host, guest, rail]) expect(client.awards).toEqual([]);
+    const d = await actor([host, guest]);
+    await act(d, 'fold');
+    await waitFor(() => st(host).phase === 'RESULTS', 3000, 'results');
+    await waitFor(() => [host, guest, rail].every((client) => client.awards.length === 1), 3000, 'awards');
+
+    const awards = host.awards[0]!;
+    expect(guest.awards[0]).toEqual(awards);
+    expect(rail.awards[0]).toEqual(awards);
+    expect(awards.hands).toBe(2);
+    const winner2 = d === host ? guest : host;
+    const biggest = { playerId: c.me().playerId, name: c === host ? 'Hero' : 'Villain', handNumber: 1, description: '' };
+    expect(awards.biggestPot).toEqual({ amount: 200, players: [biggest] });
+    // One hand each when the second hand went the other way, else two for one player.
+    if (winner2 === c) expect(awards.mostHands).toEqual({ count: 2, players: [{ playerId: c.me().playerId, name: biggest.name }] });
+    else expect(awards.mostHands!.count).toBe(1);
+    expect(awards.mostHands!.players.map((p) => p.playerId).every((id) => st(host).standings.some((r) => r.playerId === id))).toBe(true);
+    expect(JSON.stringify(awards)).not.toMatch(/\b[2-9TJQKA][shdc]\b/);
+
+    // A dropped connection on the results screen gets them again.
+    guest.room.reconnection.minUptime = 0;
+    const reconnected = new Promise<void>((r) => guest.room.onReconnect(() => r()));
+    (guest.room as any).connection.transport.ws.close(4010);
+    await reconnected;
+    await waitFor(() => guest.awards.length === 2, 3000, 'awards re-sent');
+    expect(guest.awards[1]).toEqual(awards);
+
+    // Back in the lobby they are gone: nobody joining now receives the last game's awards.
+    host.room.send('lobby:toLobby', {});
+    await waitFor(() => st(host).phase === 'LOBBY', 3000, 'lobby');
+    const fresh = await join(host.room.roomId, 'Newcomer', { spectator: true });
+    await sleep(150);
+    expect(fresh.awards).toEqual([]);
   });
 
   it('validates settings: blinds order and stack depth', async () => {

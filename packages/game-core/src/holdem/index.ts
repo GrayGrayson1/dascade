@@ -6,3 +6,4 @@ export * from './evaluator.ts';
 export * from './pots.ts';
 export * from './table.ts';
 export * from './hand.ts';
+export * from './awards.ts';

@@ -8,6 +8,15 @@ The game is DASCADE's **DAS Survey Showdown** in its **Presenter Showcase** form
 **DAS-O-Ween 2026** preset loaded and **your show file** holding the boards. Site:
 <https://dascade.onrender.com>.
 
+> **Running a show outside October?** Use the year-round **Event show** preset instead (Settings →
+> Event presets, listed first). It's the same Presenter Showcase event room: crew links, the preflight,
+> the sound station and the black box that brings the show back after a deploy. It uses the DAS
+> Showtime look and draws its rounds from the question packs, so there's no show file to load. To
+> practise, load **Event rehearsal (demo answers)** first, then **Event show** for the real thing (it
+> puts the practice boards away). Everything below works the same; just skip the show-file steps.
+> The DAS-O-Ween presets stay in the lobby all year, under **Seasonal: DAS-O-Ween** (open in October,
+> one click to expand otherwise).
+
 > **Watch the presenter tour** first: <https://dascade.onrender.com/tutorial/showdown> (animated, on
 > practice boards, about 6 minutes). It's also a click away in the lobby and in the console (**Presenter
 > tour**, in the top bar). Opening it during the show never changes the show. It walks through the
@@ -36,8 +45,9 @@ The real answers are **not in the app** (the old ones are public in the code's h
 new boards). They live in a show file on your computer:
 
 1. Open <https://dascade.onrender.com/play/showdown>, type your name, press **Create game**.
-2. In **Settings → Event presets**, press **Load** next to **DAS-O-Ween 2026**. It sets the format,
-   the Halloween Night look, the 10-minute clock and #5 as the special — but no boards. The lobby says
+2. In **Settings → Event presets**, press **Load** next to **DAS-O-Ween 2026** (outside October,
+   open **Seasonal: DAS-O-Ween** first). It sets the format, the Halloween Night look, the 10-minute
+   clock and #5 as the special — but no boards. The lobby says
    **Now load your show file**.
 3. Open **Edit your rounds** and write two Top-10 boards: the category, the question, the "According
    to …" line (keep "DAS-O-Ween Host Picks": it's a curated list, not a survey), the ten answers in

@@ -20,6 +20,7 @@ import {
   HoldemSitOutSchema,
   HoldemSitSchema,
   type HoldemActPayload,
+  type HoldemAwardsPayload,
   type HoldemEvent,
   type HoldemPrivatePayload,
   type HoldemSettings,
@@ -31,15 +32,20 @@ import {
   cancelHand,
   collectedPots,
   dealNextStreet,
+  emptyTally,
   evaluateBest,
   exposedSeats,
   forceFold,
+  handWinsBySeat,
+  holdemAwards,
   legalActions,
   moveButton,
   playerAt,
+  recordHandWin,
   resolveShowdown,
   startHand,
   type HandState,
+  type HoldemPlayerTally,
   type LogLine,
 } from '@dascade/game-core/holdem';
 import { BaseGameRoom, type PlayerRecord, type RemovalReason } from '../BaseGameRoom.ts';
@@ -76,8 +82,8 @@ interface Bankroll {
   stack: number;
   buyIns: number;
   rebuys: number;
-  handsWon: number;
-  bestPot: number;
+  /** Their leaderboard tally so far (null = no hand won yet). */
+  tally: HoldemPlayerTally | null;
 }
 
 /** Departed players remembered per game (keys; a player can have a guest and an account key). */
@@ -105,8 +111,10 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   private prevButton = -1;
   private handsDealt = 0;
   private consecutiveTimeouts = new Map<string, number>();
-  /** Per-player game stats for the leaderboard. */
-  private stats = new Map<string, { handsWon: number; bestPot: number }>();
+  /** Per-player game stats for the leaderboard and the end-of-game awards. */
+  private stats = new Map<string, HoldemPlayerTally>();
+  /** The finished game's awards (public), re-sent to anyone who (re)joins the results screen. */
+  private awards: HoldemAwardsPayload | null = null;
   /**
    * What departed players left the table with, keyed by guest/account identity, so leaving and
    * rejoining can't reset a balance (a fresh stack for a short or busted player, or a way around
@@ -213,6 +221,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     this.prevButton = -1;
     this.consecutiveTimeouts.clear();
     this.stats.clear();
+    this.awards = null;
     this.bankrolls.clear();
     this.state.endRequested = false;
     this.state.handNumber = 0;
@@ -226,6 +235,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   }
 
   protected override onReturnToLobby(): void {
+    this.awards = null;
     this.hand = null;
     this.lastHand = null;
     this.handsDealt = 0;
@@ -336,6 +346,8 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
         ? { handNumber: h.handNumber, seat, cards: [...hp.hole] }
         : { handNumber: this.state.handNumber, seat: -1, cards: [] };
     this.sendTo(player, HOLDEM_MSG.private, payload);
+    // Public end-of-game awards: only on the results screen (late joiners and rejoins get them too).
+    if (this.awards && this.phase === 'RESULTS') this.sendTo(player, HOLDEM_MSG.awards, this.awards);
   }
 
   // ===========================================================================
@@ -471,7 +483,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     const keys = this.identityKeys(player);
     if (keys.length === 0) return;
     const stat = this.stats.get(player.id);
-    const entry: Bankroll = { stack, buyIns: seat.buyIns, rebuys: seat.rebuys, handsWon: stat?.handsWon ?? 0, bestPot: stat?.bestPot ?? 0 };
+    const entry: Bankroll = { stack, buyIns: seat.buyIns, rebuys: seat.rebuys, tally: stat ? { ...stat } : null };
     for (const key of keys) {
       this.bankrolls.delete(key);
       this.bankrolls.set(key, entry);
@@ -496,7 +508,7 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     seat.buyIns = saved.buyIns;
     seat.rebuys = saved.rebuys;
     seat.busted = saved.stack === 0;
-    if (saved.handsWon > 0) this.stats.set(player.id, { handsWon: saved.handsWon, bestPot: saved.bestPot });
+    if (saved.tally && saved.tally.handsWon > 0) this.stats.set(player.id, { ...saved.tally });
   }
 
   private onSitOut(player: PlayerRecord, sittingOut: boolean): void {
@@ -818,13 +830,10 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
   /** Chips won per seat in a finished hand; also updates the leaderboard stats. */
   private tallyWins(h: HandState): Map<number, number> {
     const totals = new Map<number, number>();
-    for (const w of h.result?.winners ?? []) totals.set(w.seat, (totals.get(w.seat) ?? 0) + w.amount);
-    for (const [seat, amount] of totals) {
+    for (const [seat, win] of handWinsBySeat(h.result)) {
+      totals.set(seat, win.amount);
       const id = playerAt(h, seat)!.id;
-      const stat = this.stats.get(id) ?? { handsWon: 0, bestPot: 0 };
-      stat.handsWon++;
-      stat.bestPot = Math.max(stat.bestPot, amount);
-      this.stats.set(id, stat);
+      this.stats.set(id, recordHandWin(this.stats.get(id) ?? emptyTally(), h.handNumber, win.amount, win.description));
     }
     return totals;
   }
@@ -1070,6 +1079,8 @@ export class HoldemRoom extends BaseGameRoom<HoldemState, HoldemSettings> {
     this.state.tableMessage = '';
     this.pushLog({ kind: 'info', text: `Game over after ${this.state.handNumber} hand${this.state.handNumber === 1 ? '' : 's'}` });
     const standings = this.state.standings.map((s) => ({ ...s.toJSON() }));
+    // Sent with each player's private sync below, once the phase is RESULTS (never mid-game).
+    this.awards = holdemAwards(this.state.handNumber, standings, (id) => this.stats.get(id));
     this.reportHoldemOutcome(standings, reason);
     this.endMatch({
       players: standings.map((s) => {

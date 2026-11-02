@@ -1,5 +1,6 @@
 /**
- * DAS Survey Showdown — event rooms (the DAS-O-Ween decisions): the settings-only preset, crew links
+ * DAS Survey Showdown — event rooms (the DAS-O-Ween decisions): the settings-only preset, the year-round
+ * Event show on the question packs and its rehearsal, crew links
  * and permissions, presenter succession, the audience picker, moderation, the sound station, the
  * clock's cues, the Room DJ lock, the join-time name check, keep-alive, the preflight and the black box.
  */
@@ -257,6 +258,103 @@ describe('event rooms (ADM-01, OPS-03 data, crew)', () => {
     await waitFor(() => ada.errors.filter((e) => e.type === SHOWDOWN_MSG.claim).length >= 3, 3000, 'claims refused');
     const refusals = (t.server.audit.all() as Array<Json>).filter((e) => e.actorId === ada.id() && String(e.action).endsWith('.refused'));
     expect(refusals.length).toBeLessThanOrEqual(1);
+  });
+});
+
+/** A fresh room with the year-round Event show preset (the question packs): an event room. */
+async function packRoom(names: string[] = [], before?: (host: Client) => Promise<void>): Promise<Show & { guests: Client[] }> {
+  const host = await wire(await colyseus.sdk.create('showdown', { name: 'Host' }));
+  const server = colyseus.getRoomById(host.room.roomId) as unknown as Server;
+  server.sweepMs = { lead: 30, step: 40, suspense: 80, special: 60 };
+  server.minuteMs = 300;
+  const code = host.room.roomId;
+  const join = async (name: string, extra: Json = {}) => wire(await colyseus.sdk.joinById(code, { name, ...extra }));
+  if (before) await before(host);
+  host.room.send(SHOWDOWN_MSG.preset, { id: 'event-show' });
+  await waitFor(() => server.state.event === 'event-show', 2000, 'event room');
+  const guests: Client[] = [];
+  for (const n of names) guests.push(await join(n));
+  return { server, host, code, join, guests };
+}
+
+describe('year-round event presets (Event show, Event rehearsal)', () => {
+  it('Event show makes an event room on the question packs: Showtime, a producer link, the lookup and a preflight with nothing to load', async () => {
+    const t = await packRoom(['Ada']);
+    expect(t.server.state.customRounds).toBe(0);
+    expect(t.server.state.rehearsal).toBe(false);
+    const settings = JSON.parse(t.server.state.settingsJson);
+    expect(settings).toMatchObject({ mode: 'showcase', look: 'showtime', source: 'packs', minutes: 10, points: true, medals: 'round' });
+    expect(settings.packs).not.toContain('spooky');
+    expect(t.host.toasts.at(-1)?.text).toMatch(/^Loaded Event show: \d+ rounds from the question packs/);
+    // Every event-room feature: the producer link, crew permissions, the event join screen's lookup.
+    expect(t.host.crew.find((c) => c?.fresh)?.fresh).toMatchObject({ role: 'producer', name: 'Host' });
+    expect(lastCrew(t.host)).toMatchObject({ event: true, roles: ['producer'] });
+    await waitFor(() => json(t.guests[0]!).event === 'event-show', 2000, 'public event flag');
+    await sleep(1100);
+    expect(await lookup(t.code)).toMatchObject({ exists: true, gameId: 'showdown', event: 'event-show' });
+    t.host.room.send(SHOWDOWN_MSG.preflight, {});
+    await waitFor(() => t.host.preflight.length > 0, 2000, 'preflight');
+    expect(t.host.preflight.at(-1)).toMatchObject({ event: 'event-show', rehearsal: false, source: 'packs', packRounds: settings.rounds });
+    // It starts with no show file: the board is a pack question.
+    await live(t);
+    const view = JSON.parse(t.server.state.boardJson) as ShowdownBoardView;
+    expect(view).toMatchObject({ mode: 'showcase', stage: 'live' });
+    expect(view.prompt).not.toBe('');
+  });
+
+  it('Event rehearsal loads two practice boards; Event show then puts them away (the rehearsal is over) and keeps typed names', async () => {
+    const t = await packRoom([], async (host) => {
+      const server = colyseus.getRoomById(host.room.roomId) as unknown as Server;
+      host.room.send(SHOWDOWN_MSG.preset, { id: 'event-rehearsal' });
+      await waitFor(() => server.state.rehearsal === true && server.state.customRounds === 2, 2000, 'practice boards');
+      expect(JSON.parse(server.state.settingsJson)).toMatchObject({ look: 'showtime', source: 'custom' });
+      host.room.send('lobby:settings', { settings: { title: 'Year-End Trivia' } });
+      await waitFor(() => JSON.parse(server.state.settingsJson).title === 'Year-End Trivia', 2000, 'typed title');
+    });
+    await waitFor(() => t.server.state.rehearsal === false && t.server.state.customRounds === 0, 2000, 'practice put away');
+    expect(JSON.parse(t.server.state.settingsJson)).toMatchObject({ source: 'packs', title: 'Year-End Trivia' });
+    // Still one producer link: loading a second preset doesn't mint another.
+    expect(t.host.crew.filter((c) => c?.fresh?.role === 'producer')).toHaveLength(1);
+  });
+
+  it('after DAS-O-Ween, Event show drops its Halloween names; DAS-O-Ween still loads (nothing removed)', async () => {
+    const t = await packRoom([], async (host) => {
+      const server = colyseus.getRoomById(host.room.roomId) as unknown as Server;
+      host.room.send(SHOWDOWN_MSG.preset, { id: 'dasoween-rehearsal' });
+      await waitFor(() => server.state.event === 'dasoween-rehearsal', 2000, 'DAS-O-Ween rehearsal');
+      expect(JSON.parse(server.state.settingsJson)).toMatchObject({ look: 'halloween', title: 'DAS-O-Ween Rehearsal' });
+    });
+    await waitFor(() => JSON.parse(t.server.state.settingsJson).look === 'showtime', 2000, 'showtime');
+    expect(JSON.parse(t.server.state.settingsJson)).toMatchObject({ title: '', eventName: '' });
+    t.host.room.send(SHOWDOWN_MSG.preset, { id: 'dasoween-2026' });
+    await waitFor(() => t.server.state.event === 'dasoween-2026', 2000, 'DAS-O-Ween 2026');
+    expect(JSON.parse(t.server.state.settingsJson)).toMatchObject({ look: 'halloween', source: 'custom', title: 'DAS-O-Ween Trivia' });
+  });
+
+  it('a show on the packs comes back from its black box after the room is gone: same code, board and seats', async () => {
+    const t = await packRoom(['Ada']);
+    await live(t);
+    const boxesBefore = t.host.boxes.length;
+    await act(t, { a: 'reveal', slot: 0 });
+    // A snapshot taken after the reveal.
+    await waitFor(() => t.host.boxes.slice(boxesBefore).some((b) => b && b.takenAt > 0), 3000, 'box');
+    const before = JSON.parse(t.server.state.boardJson) as ShowdownBoardView;
+    const box = t.host.boxes.filter(Boolean).at(-1)!;
+    const tokens = { host: t.host.seatToken(), ada: t.guests[0]!.seatToken() };
+    await t.server.disconnect();
+    await waitFor(() => !colyseus.getRoomById(t.code), 3000, 'room gone');
+    const host2 = await wire(await colyseus.sdk.create('showdown', { name: 'Host', restore: box.blob, seatToken: tokens.host }));
+    expect(host2.room.roomId).toBe(t.code);
+    const server2 = colyseus.getRoomById(t.code) as unknown as Server;
+    expect(server2.state.event).toBe('event-show');
+    expect(server2.state.phase).toBe('PLAYING');
+    expect(JSON.parse(server2.state.settingsJson)).toMatchObject({ source: 'packs', look: 'showtime' });
+    const after = JSON.parse(server2.state.boardJson) as ShowdownBoardView;
+    expect(after.prompt).toBe(before.prompt);
+    expect(after.slots.map((x) => x.revealed)).toEqual(before.slots.map((x) => x.revealed));
+    const ada2 = await wire(await colyseus.sdk.joinById(t.code, { name: 'Ada', seatToken: tokens.ada }));
+    expect(ada2.id()).toBe(t.guests[0]!.id());
+    expect(lastCrew(host2)?.roles).toEqual(['producer']);
   });
 });
 

@@ -5,6 +5,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { createRoom, presetSettings, roomState, startGame, waitForPhase } from './helpers.ts';
+import { loadPreset } from './showdown-presets.ts';
 
 const CHAPTERS = [
   'Big picture',
@@ -103,7 +104,7 @@ test('opening the tour from a live console leaves the show alone', async ({ page
   await createRoom(page, 'showdown', 'Host');
   const settingsTab = page.getByRole('tab', { name: 'Settings' });
   if (await settingsTab.isVisible()) await settingsTab.click();
-  await page.getByRole('button', { name: /^Load DAS-O-Ween rehearsal/ }).click();
+  await loadPreset(page, /^Load DAS-O-Ween rehearsal/);
   await expect.poll(async () => (await roomState(page)).rehearsal).toBe(true);
 
   // The lobby's setup card offers the tour.
