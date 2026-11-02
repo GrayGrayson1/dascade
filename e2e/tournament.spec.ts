@@ -6,7 +6,7 @@
  * organizer options (Ships' combined fleet + grid, Putt's course) reach the kiosk.
  */
 import { expect, test, type Browser, type BrowserContextOptions, type Page } from '@playwright/test';
-import { dropConnection, myPlayerId, roomState, setName, waitForPhase } from './helpers.ts';
+import { dropConnection, myPlayerId, mySessionId, roomState, setName, waitForPhase } from './helpers.ts';
 
 /** Participants use the same device profile as the project (so "mobile" really plays on phones). */
 function deviceOptions(): BrowserContextOptions {
@@ -90,8 +90,9 @@ test.describe('Tournament Center', () => {
     await waitForPhase(ada, 'PLAYING', 30_000);
 
     // --- A participant whose seat token no longer matches (e.g. it expired during a long outage)
-    //     gets the seat back with the ticket remembered alongside it — not a spectator's view. ---------
+    //     takes the seat back by itself with the ticket remembered alongside it — not a spectator's view.
     const adaId = (await myPlayerId(ada))!;
+    const adaSession = await mySessionId(ada);
     const matchCode = new URL(ada.url()).pathname.split('/').pop()!;
     await ada.evaluate((key) => {
       for (const store of [sessionStorage, localStorage]) {
@@ -100,7 +101,16 @@ test.describe('Tournament Center', () => {
       }
     }, `dascade:seat:${matchCode}`);
     await dropConnection(ada, { maxRetries: 0 });
-    await ada.getByRole('button', { name: 'Rejoin my seat' }).click();
+    // No click: the tab rejoins on a new connection once the SDK gives up.
+    await expect
+      .poll(() =>
+        ada.evaluate((old) => {
+          const { store, session } = (window as any).__DASCADE__;
+          const id = session.room?.sessionId;
+          return store.getState().status === 'connected' && Boolean(id) && id !== old;
+        }, adaSession),
+      )
+      .toBe(true);
     await expect.poll(() => myPlayerId(ada)).toBe(adaId);
     await expect.poll(async () => (await roomState(ada)).players?.[adaId]?.spectator).toBe(false);
 
