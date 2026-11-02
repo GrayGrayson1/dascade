@@ -36,7 +36,7 @@ A work-friendly multiplayer browser arcade. Walk a pixel-art arcade floor of **1
 | | Block Drop (`blocks`) | 1–16 | Falling-block puzzle (marathon or timed blitz), solo or a score race |
 | **DAS Raceway** | DASh Circuit (`circuit`) | 1–20 | Top-down neon racer with a car customizer and time trials |
 | | DASphalt GP (`kart`) | 1–30 | 3D kart racer: eight racers, drift mini-turbos, eleven items, eight tracks in two cups, bots, Grand Prix and time trial with ghosts |
-| **DASQuest** | DASQuest (`quest`) | 1–12 | Co-op branching adventure: *The Glitch Beneath Delta Alpha* |
+| **DASQuest** | DASQuest (`quest`) | 1–12 | Co-op branching adventure: *The Glitch Beneath Delta Alpha*, plus the minis *The Case of the Missing Beans* and *Snowed In at Delta Alpha* (winter) |
 
 Every game supports spectators. Classics games keep verified high-score boards.
 
