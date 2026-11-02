@@ -8,11 +8,23 @@ import { GAME_CATALOG, cabinetPlayersLabel, type CabinetDef } from '@dascade/sha
 import { Badge, Button } from '@dascade/ui';
 import { useApp } from '../app/store.ts';
 import { cabinetBadges } from './cabinetInfo.ts';
+import { liveLabel, type LiveCount } from './liveCounts.ts';
 import { PixelWord } from './PixelWord.tsx';
 
 export { playerRange } from './cabinetInfo.ts';
 
-export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen: () => void; busy: boolean }) {
+export function Plaque({
+  cabinet,
+  onOpen,
+  busy,
+  live = null,
+}: {
+  cabinet: CabinetDef;
+  onOpen: () => void;
+  busy: boolean;
+  /** Live multiplayer rooms in this cabinet's games (from /api/health); null = none or no data. */
+  live?: LiveCount | null;
+}) {
   const openModal = useApp((s) => s.openModal);
   const multi = cabinet.games.length > 1;
   const only = cabinet.games[0]!;
@@ -35,6 +47,14 @@ export function Plaque({ cabinet, onOpen, busy }: { cabinet: CabinetDef; onOpen:
       <div className="af-plaque__id" data-part="plaque-id" key={`id-${cabinet.id}`}>
         <span className="af-plaque__kicker">
           {cabinet.family}
+          {/* Right after the family: the compact kicker clips its end first, and this is the news. */}
+          {live ? (
+            <span className="af-plaque__live" data-part="plaque-live">
+              {' · '}
+              <i className="af-plaque__live-dot" aria-hidden />
+              {liveLabel(live)}
+            </span>
+          ) : null}
           {multi ? <span className="af-plaque__count"> · {cabinet.games.length} games</span> : null}
           <span className="af-plaque__players"> · {cabinetPlayersLabel(cabinet)}</span>
         </span>

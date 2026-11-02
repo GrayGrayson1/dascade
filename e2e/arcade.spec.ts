@@ -286,6 +286,27 @@ test.describe('arcade lineup', () => {
     const transform = await page.locator('.af-slot[data-index="5"]').evaluate((el) => (el as HTMLElement).style.transform);
     expect(transform).not.toContain('rotateY');
   });
+
+  test('plaques show live rooms and players from /api/health, and nothing without the field', async ({ page }) => {
+    let games: unknown = { trivia: { rooms: 1, players: 6 }, deception: { rooms: 1, players: 3 }, chess: { rooms: 4, players: 8 } };
+    await page.route('**/api/health', (route) =>
+      route.fulfill({ json: { ok: true, uptimeSeconds: 1, rooms: 6, ...(games ? { games } : {}) } }),
+    );
+    await openFloor(page);
+    // Fresh visitors land on DAStravaganza (trivia + DASception).
+    await expectActive(page, 'stravaganza');
+    const live = page.locator('[data-part="plaque"] [data-part="plaque-live"]');
+    await expect(live).toHaveText(' · 2 rooms live · 9 playing');
+    await page.getByRole('button', { name: 'Next cabinet' }).click();
+    await expectActive(page, 'putt');
+    await expect(live).toHaveCount(0);
+    // An older server (no `games`): nothing at all, even on a cabinet that had rooms.
+    games = undefined;
+    await page.getByRole('button', { name: 'Previous cabinet' }).click();
+    await expectActive(page, 'stravaganza');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(live).toHaveCount(0);
+  });
 });
 
 test.describe('cabinets, pickers and title screens', () => {

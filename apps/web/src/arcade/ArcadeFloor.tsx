@@ -60,6 +60,7 @@ import {
   springStep,
   type SpringState,
 } from './carousel.ts';
+import { cabinetLive } from './liveCounts.ts';
 import { Plaque, plaqueAnnouncement } from './Plaque.tsx';
 import { TournamentKiosk } from './TournamentKiosk.tsx';
 import { lastCabinet, rememberCabinet, runViewTransition } from './transition.ts';
@@ -737,7 +738,7 @@ export function ArcadeFloor() {
       </section>
 
       <div className="af-floor__plaque-wrap" data-part="plaque-wrap">
-        <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} />
+        <Plaque cabinet={cabinet} onOpen={() => open(target.current)} busy={launching} live={cabinetLive(cabinet, status.games)} />
         <div className="af-floor__extras" data-part="floor-extras">
           {wide ? null : <TournamentKiosk variant="strip" />}
           {/* Phones: the jukebox's quick control lives here (the HUD has no room; the floor no corner). */}

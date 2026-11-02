@@ -13,12 +13,18 @@ import { CABINET_LIST } from '@dascade/shared';
 import { fill, tickerItems, useThemeCopy, useThemeFlavour } from '../themes/copy.ts';
 import { ThemeButton } from '../themes/ThemeButton.tsx';
 import { ExitHalloweenButton } from '../themes/ExitHalloween.tsx';
+import { parseLiveGames, type LiveGames } from './liveCounts.ts';
 
-export type ServerStatus = { state: 'checking' | 'online' | 'offline'; rooms: number };
+export type ServerStatus = {
+  state: 'checking' | 'online' | 'offline';
+  rooms: number;
+  /** Live multiplayer rooms per game (liveCounts.ts); null = no data (offline, or a server without the field). */
+  games: LiveGames | null;
+};
 
 /** Polls /api/health (every ~15s online, ~6s while offline; paused in hidden tabs). */
 export function useServerStatus(intervalMs = 15_000): ServerStatus {
-  const [status, setStatus] = useState<ServerStatus>({ state: 'checking', rooms: 0 });
+  const [status, setStatus] = useState<ServerStatus>({ state: 'checking', rooms: 0, games: null });
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -41,12 +47,13 @@ export function useServerStatus(intervalMs = 15_000): ServerStatus {
       try {
         const res = await fetch(`${serverUrl()}/api/health`, { cache: 'no-store', signal: ctrl.signal });
         if (!res.ok) throw new Error(String(res.status));
-        const body = (await res.json()) as { ok?: boolean; rooms?: number };
+        const body = (await res.json()) as { ok?: boolean; rooms?: number; games?: unknown };
         offline = false;
-        if (alive) setStatus({ state: 'online', rooms: Math.max(0, Number(body.rooms) || 0) });
+        if (alive) setStatus({ state: 'online', rooms: Math.max(0, Number(body.rooms) || 0), games: parseLiveGames(body.games) });
       } catch {
         offline = true;
-        if (alive) setStatus((s) => ({ state: 'offline', rooms: s.rooms }));
+        // Stale live counts would mislead: the plaques show nothing until the server answers again.
+        if (alive) setStatus((s) => ({ state: 'offline', rooms: s.rooms, games: null }));
       } finally {
         clearTimeout(abort);
         schedule();

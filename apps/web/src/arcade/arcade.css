@@ -1115,6 +1115,23 @@
   display: none;
   color: var(--af-ink-2);
 }
+/* "Live now" (liveCounts.ts): rooms and players in this cabinet's games right now. */
+.af-plaque__live {
+  color: var(--af-ink-0);
+}
+.af-plaque__live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--green, #2de38f);
+  box-shadow: 0 0 6px var(--green, #2de38f);
+  vertical-align: 1px;
+}
+:root[data-fx='off'] .af-plaque__live-dot {
+  box-shadow: none;
+}
 .af-plaque__title {
   --pw-max-h: 36px;
   --pw-ink: #fff;
