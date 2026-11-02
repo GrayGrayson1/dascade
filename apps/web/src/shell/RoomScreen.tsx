@@ -11,6 +11,7 @@ import { session, useSessionStore } from '../net/session.ts';
 import { useCountdown, useRoomSelector } from '../net/hooks.ts';
 import { selectCanPlay, useApp } from '../app/store.ts';
 import { friendly, type FriendlyError } from '../net/errors.ts';
+import { roomTabTitle } from '../net/roomTitle.ts';
 import { loadGameModule } from '../games/registry.ts';
 import type { GameClientModule } from '../games/types.ts';
 import { music, sfx } from '../audio/audio.ts';
@@ -251,6 +252,8 @@ function ActiveRoom({ gameId, code }: { gameId: GameId; code: string }) {
 
   return (
     <GameTheme accent={GAME_CATALOG[gameId].accent} className="room" data-part="room" data-immersive={immersive ? 'true' : undefined}>
+      {/* First child: its effects run before the game's, so a game's own tab title (the presenter console, the kiosk) wins. */}
+      <RoomTabTitle code={code} gameId={gameId} phase={phase} />
       {immersive ? <ShellMenu gameId={gameId} code={code} /> : <TopBar gameId={gameId} code={code} />}
       <TournamentBanner compact={immersive} />
       <ReconnectingOverlay gameId={gameId} immersive={immersive} />
@@ -492,4 +495,28 @@ function CountdownOverlay() {
       <span className="dc-label">Get ready</span>
     </div>
   );
+}
+
+/**
+ * Names the browser tab after the room ("ABCDE · DAS Chess · Lobby") and puts the old title back on the way
+ * out. A game that names the tab itself (it renders later, so its effect runs after this one) keeps its
+ * title: this only rewrites a title it wrote itself.
+ */
+function RoomTabTitle({ code, gameId, phase }: { code: string; gameId: GameId; phase: Parameters<typeof roomTabTitle>[2] }) {
+  const written = useRef<string | null>(null);
+  const before = useRef<string | null>(null);
+  useEffect(() => {
+    const next = roomTabTitle(code, GAME_CATALOG[gameId].title, phase);
+    if (written.current === null) before.current = document.title;
+    else if (document.title !== written.current) return;
+    document.title = next;
+    written.current = next;
+  }, [code, gameId, phase]);
+  useEffect(
+    () => () => {
+      if (written.current !== null && document.title === written.current && before.current !== null) document.title = before.current;
+    },
+    [],
+  );
+  return null;
 }
