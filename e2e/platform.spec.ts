@@ -3,7 +3,7 @@
  * Uses the Wheel cabinet's lobby, but only exercises shared behaviour.
  */
 import { expect, test } from '@playwright/test';
-import { createRoom, dropConnection, joinRoom, myPlayerId, roomState, setName } from './helpers.ts';
+import { createRoom, dropConnection, joinRoom, myPlayerId, mySessionId, roomState, setName } from './helpers.ts';
 
 const GAME = 'wheel';
 
@@ -112,12 +112,40 @@ test.describe('connection loss and error states', () => {
     await guest.context().close();
   });
 
-  test('when auto-reconnect gives up, "Rejoin my seat" reclaims the same seat without a reload', async ({ page, browser }) => {
+  test('when auto-reconnect gives up, the tab takes the same seat back by itself, without a reload', async ({ page, browser }) => {
     const code = await createRoom(page, GAME, 'Host');
     const guest = await joinRoom(browser, code, 'Flaky');
     const before = await myPlayerId(guest);
+    const oldSession = await mySessionId(guest);
+    await guest.evaluate(() => ((window as any).__sameDocument = true));
+    await dropConnection(guest, { maxRetries: 0 });
+    await expect(guest.getByRole('status').filter({ hasText: 'Reconnected!' })).toBeVisible();
+    // Back on a new connection (a seat-token rejoin, not the SDK's reconnect), in the same seat.
+    await expect
+      .poll(() =>
+        guest.evaluate((old) => {
+          const { store, session } = (window as any).__DASCADE__;
+          const id = session.room?.sessionId;
+          return store.getState().status === 'connected' && Boolean(id) && id !== old;
+        }, oldSession),
+      )
+      .toBe(true);
+    await expect(guest.locator('.lobby')).toBeVisible();
+    expect(await myPlayerId(guest)).toBe(before);
+    expect(await guest.evaluate(() => (window as any).__sameDocument)).toBe(true);
+    await expect.poll(async () => Object.keys((await roomState(page)).players).length).toBe(2);
+    await guest.context().close();
+  });
+
+  test('when the automatic rejoin fails too, "Rejoin my seat" reclaims the same seat without a reload', async ({ page, browser }) => {
+    const code = await createRoom(page, GAME, 'Host');
+    const guest = await joinRoom(browser, code, 'Flaky');
+    const before = await myPlayerId(guest);
+    // The network is still down when the tab tries to take its seat back by itself.
+    await guest.route('**/matchmake/**', (route) => route.abort('connectionrefused'));
     await dropConnection(guest, { maxRetries: 0 });
     await expect(guest.getByRole('heading', { name: 'Connection lost' })).toBeVisible();
+    await guest.unroute('**/matchmake/**');
     await guest.getByRole('button', { name: 'Rejoin my seat' }).click();
     await expect(guest.locator('.lobby')).toBeVisible();
     expect(await myPlayerId(guest)).toBe(before);
