@@ -219,6 +219,9 @@ test.describe('theme switching never alters game state', () => {
     await expect.poll(async () => Object.keys((await roomState(page))?.players ?? {}).length).toBe(2);
     await startGame(page);
     await waitForPhase(page, 'PLAYING', 20_000);
+    // A match opens in the armory (the shop) since the scorched-earth rebuild: both crews ready up.
+    await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('shop');
+    for (const p of [page, guest]) await p.locator('[data-part="shop-ready"]').click();
     await expect.poll(async () => (await roomState(page))?.battle?.stage, { timeout: 15_000 }).toBe('aim');
     const s0 = await roomState(page);
     const shooter = s0.battle.activeId === (await myPlayerId(page)) ? page : guest;
